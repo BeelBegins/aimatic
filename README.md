@@ -1,5 +1,5 @@
 ### Aimatic
-
+author: AIMATIC
 Retail
 
 ### Installation
