@@ -5,6 +5,19 @@ app_description = "Retail"
 app_email = "sthassan41@gmail.com"
 app_license = "mit"
 
+
+
+
+doc_events = {
+    "POS Invoice": {
+        "validate": "aimatic.fbr_pos.events.validate_pos_invoice",
+        "before_submit": "aimatic.fbr_pos.events.before_submit_pos_invoice",
+        "on_cancel": "aimatic.fbr_pos.events.on_cancel_pos_invoice",
+    },
+    "Customer": {
+        "validate": "aimatic.offline_pos.customer_validation.validate_customer",
+    },
+}
 # Apps
 # ------------------
 
