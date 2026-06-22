@@ -1068,7 +1068,17 @@ def _set_refund_payments(doc, pos, payments_data):
         frappe.throw(_("POS Profile has no payment modes configured"))
 
     rows = []
-    if isinstance(payments_data, list) and payments_data:
+    if isinstance(payments_data, list) and len(payments_data) == 1:
+        # Single chosen mode: snap to the exact server-computed refund total.
+        mode = (payments_data[0].get("mode_of_payment") or "").strip()
+        if not mode:
+            frappe.throw(_("Each refund payment row must have mode_of_payment"))
+        if mode not in allowed_modes:
+            frappe.throw(
+                _("Payment mode '{0}' is not allowed in POS Profile {1}").format(mode, pos.name)
+            )
+        rows.append((mode, grand_total))
+    elif isinstance(payments_data, list) and payments_data:
         for p in payments_data:
             mode = (p.get("mode_of_payment") or "").strip()
             amount = flt(p.get("amount") or 0, 2)
