@@ -5,3 +5,4 @@
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 aimatic.patches.create_pos_terminal_custom_fields
+aimatic.patches.create_terminal_refund_id_field

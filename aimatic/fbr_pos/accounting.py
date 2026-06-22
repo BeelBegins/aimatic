@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
 from aimatic.fbr_pos.settings import get_fbr_settings
 from aimatic.fbr_pos.payload_builder import get_invoice_branch
@@ -89,7 +89,14 @@ def add_fbr_pos_fee_row(doc, settings):
     """
     FBR POS service fee is extra.
     This increases customer payable total by Rs. 1.
+
+    The fee applies to sales only. On a return/credit note we add neither a
+    positive fee nor a negative refund of the original fee: the return total is
+    merchandise + return tax only. Normal sale behaviour is unchanged.
     """
+
+    if cint(getattr(doc, "is_return", 0)):
+        return
 
     fee_amount = flt(settings.get("fbr_pos_fee_amount"), 2)
 
@@ -114,6 +121,11 @@ def adjust_cash_payment_to_grand_total(doc):
     payments = doc.get("payments") or []
 
     if not payments:
+        return
+
+    # Return invoices carry explicit negative refund payments set by the refund
+    # endpoint; do not rewrite them with sale-oriented logic.
+    if cint(getattr(doc, "is_return", 0)):
         return
 
     grand_total = flt(doc.grand_total, 2)

@@ -772,6 +772,68 @@ class TestGetCustomerBenefits(_AimTestCase):
 # Context manager: stub FBR build/accounting
 # ---------------------------------------------------------------------------
 
+class TestPosRefund(_AimTestCase):
+    """Refund endpoint guard rails that run without FBR settings or network.
+
+    Full end-to-end refund submission (create return, FBR credit note) requires
+    the aimatic app installed on a site with FBR Integration Settings; those
+    scenarios are documented in the task report and exercised manually.
+    """
+
+    def test_get_invoice_for_refund_guest_blocked(self):
+        from aimatic.offline_pos.api import get_pos_invoice_for_refund
+
+        frappe.set_user("Guest")
+        with self.assertRaises(FrappePermissionError):
+            get_pos_invoice_for_refund("ANY")
+
+    def test_submit_refund_guest_blocked(self):
+        from aimatic.offline_pos.api import submit_pos_refund
+
+        frappe.set_user("Guest")
+        with self.assertRaises(FrappePermissionError):
+            submit_pos_refund("rid", "ANY")
+
+    def test_submit_refund_requires_terminal_refund_id(self):
+        from aimatic.offline_pos.api import submit_pos_refund
+
+        with self.assertRaises(frappe.ValidationError):
+            submit_pos_refund("", "ANY", items=[{"original_row_name": "x", "qty": 1}])
+
+    def test_get_invoice_for_refund_requires_name(self):
+        from aimatic.offline_pos.api import get_pos_invoice_for_refund
+
+        with self.assertRaises(frappe.ValidationError):
+            get_pos_invoice_for_refund("")
+
+    def test_fbr_acceptance_requires_code_and_number(self):
+        from aimatic.offline_pos.api import _normalize_refund_fbr_status
+
+        # Accepted only with explicit Accepted status AND a real invoice number.
+        self.assertEqual(_normalize_refund_fbr_status("Accepted", "FBR-123"), "Accepted")
+        # HTTP-200-style success without a real number is never Accepted.
+        for bad in ["", None, "N/A", "Not Available", "none", "null"]:
+            self.assertEqual(_normalize_refund_fbr_status("Accepted", bad), "Pending")
+        self.assertEqual(_normalize_refund_fbr_status("Failed", "FBR-1"), "Failed")
+        self.assertEqual(_normalize_refund_fbr_status("Sending", "FBR-1"), "Pending")
+
+    def test_returned_qty_aggregates_by_original_row(self):
+        from unittest.mock import patch as _patch
+        from aimatic.offline_pos.api import _validate_refund_quantities
+
+        original = frappe._dict(
+            name="ORIG-1",
+            items=[frappe._dict(name="row-a", qty=5, item_code="ITEM-A")],
+        )
+        # 2 already returned -> remaining 3; requesting 4 must fail, 3 must pass.
+        with _patch(
+            "aimatic.offline_pos.api._returned_qty_by_row", return_value={"row-a": 2}
+        ):
+            with self.assertRaises(frappe.ValidationError):
+                _validate_refund_quantities(original, {"row-a": 4})
+            _validate_refund_quantities(original, {"row-a": 3})  # exactly remaining: ok
+
+
 class _patch_fbr:
     """Stubs build_pos_payload and apply_fbr_accounting_rows so tests do not
     need FBR Integration Settings configured in the database.

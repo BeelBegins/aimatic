@@ -970,3 +970,400 @@ def get_pos_fbr_item_config(
         "has_more": has_more,
         "service_fee": _get_fbr_service_fee(),
     }
+
+
+# ---------------------------------------------------------------------------
+# POS Refund / Return (online only)
+# ---------------------------------------------------------------------------
+
+_FBR_INVALID_NUMBERS = {"", "none", "null", "n/a", "na", "not available"}
+
+
+def _returned_qty_by_row(original_name):
+    """Absolute returned quantity per original POS Invoice Item row.
+
+    Sums quantities from all submitted return POS Invoices linked to the
+    original via the standard ``pos_invoice_item`` reference set by make_return_doc.
+    """
+    result = {}
+    returns = frappe.get_all(
+        "POS Invoice",
+        filters={"return_against": original_name, "is_return": 1, "docstatus": 1},
+        pluck="name",
+    )
+    if not returns:
+        return result
+    rows = frappe.get_all(
+        "POS Invoice Item",
+        filters={"parent": ("in", returns), "parenttype": "POS Invoice"},
+        fields=["pos_invoice_item", "qty"],
+    )
+    for r in rows:
+        key = r.get("pos_invoice_item")
+        if not key:
+            continue
+        result[key] = flt(result.get(key, 0)) + abs(flt(r.get("qty")))
+    return result
+
+
+def _validate_refund_quantities(original, requested):
+    """Reject zero/negative or over-remaining requested quantities (re-checkable inside a txn)."""
+    returned = _returned_qty_by_row(original.name)
+    row_by_name = {r.name: r for r in original.items}
+    for row_name, qty in requested.items():
+        row = row_by_name.get(row_name)
+        if not row:
+            frappe.throw(
+                _("Row {0} does not belong to invoice {1}").format(row_name, original.name)
+            )
+        if qty <= 0:
+            frappe.throw(_("Return quantity must be positive for {0}").format(row.item_code))
+        sold = abs(flt(row.qty))
+        already = flt(returned.get(row_name, 0))
+        remaining = flt(sold - already, 3)
+        # Tolerance appropriate to ERPNext qty precision (3 dp)
+        if qty > flt(remaining + 0.001, 3):
+            frappe.throw(
+                _("Return quantity {0} exceeds remaining {1} for {2}").format(
+                    qty, remaining, row.item_code
+                )
+            )
+
+
+def _find_existing_return(terminal_refund_id):
+    """Return the name of an existing return POS Invoice for this refund UUID, or None."""
+    if not frappe.get_meta("POS Invoice").has_field("custom_terminal_refund_id"):
+        return None
+    return frappe.db.get_value(
+        "POS Invoice",
+        {"custom_terminal_refund_id": terminal_refund_id},
+        "name",
+    )
+
+
+def _normalize_refund_fbr_status(status, invoice_number):
+    """Accepted only with an explicit Accepted status AND a real FBR invoice number."""
+    has_number = (
+        bool(invoice_number)
+        and str(invoice_number).strip().lower() not in _FBR_INVALID_NUMBERS
+    )
+    if status == "Accepted" and has_number:
+        return "Accepted"
+    if status == "Failed":
+        return "Failed"
+    return "Pending"
+
+
+def _set_refund_payments(doc, pos, payments_data):
+    """Set negative refund payment rows that balance the (negative) return grand total.
+
+    - Modes must be allowed by the active POS Profile.
+    - Amounts are normalised to ERPNext's negative return convention.
+    - Total refunded cannot exceed the calculated refund payable.
+    - Split payments are preserved.
+    """
+    grand_total = flt(doc.grand_total, 2)  # negative for a return
+    allowed_modes = {p.mode_of_payment for p in (pos.get("payments") or [])}
+    if not allowed_modes:
+        frappe.throw(_("POS Profile has no payment modes configured"))
+
+    rows = []
+    if isinstance(payments_data, list) and payments_data:
+        for p in payments_data:
+            mode = (p.get("mode_of_payment") or "").strip()
+            amount = flt(p.get("amount") or 0, 2)
+            if not mode:
+                frappe.throw(_("Each refund payment row must have mode_of_payment"))
+            if mode not in allowed_modes:
+                frappe.throw(
+                    _("Payment mode '{0}' is not allowed in POS Profile {1}").format(mode, pos.name)
+                )
+            if amount == 0:
+                continue
+            rows.append((mode, -abs(amount)))  # refund payments are negative
+    else:
+        # Default to the original invoice's primary mode, else the first allowed mode.
+        default_mode = None
+        original = frappe.get_doc("POS Invoice", doc.return_against)
+        for p in (original.get("payments") or []):
+            default_mode = p.mode_of_payment
+            break
+        if not default_mode:
+            default_mode = sorted(allowed_modes)[0]
+        if default_mode not in allowed_modes:
+            frappe.throw(
+                _("Refund payment mode '{0}' is not allowed in POS Profile {1}").format(
+                    default_mode, pos.name
+                )
+            )
+        rows.append((default_mode, grand_total))
+
+    total = flt(sum(a for _, a in rows), 2)
+    if abs(total) > abs(grand_total) + 0.01:
+        frappe.throw(
+            _("Refund payments {0} exceed the refund payable {1}").format(total, grand_total)
+        )
+    if abs(total - grand_total) > 0.01:
+        frappe.throw(
+            _("Refund payments {0} must balance the refund total {1}").format(total, grand_total)
+        )
+
+    doc.set("payments", [])
+    for mode, amount in rows:
+        doc.append("payments", {"mode_of_payment": mode, "amount": amount})
+    doc.paid_amount = total
+    doc.base_paid_amount = total
+
+
+def _build_refund_response(doc, duplicate=False):
+    meta = doc.meta
+
+    def _cf(fieldname):
+        return getattr(doc, fieldname, None) if meta.has_field(fieldname) else None
+
+    items_out = [
+        {
+            "item_code": r.item_code,
+            "qty": flt(r.qty, 3),
+            "rate": flt(r.rate, 2),
+            "amount": flt(r.amount, 2),
+            "original_row_name": getattr(r, "pos_invoice_item", None),
+        }
+        for r in (doc.get("items") or [])
+    ]
+    payments_out = [
+        {"mode_of_payment": p.mode_of_payment, "amount": flt(p.amount, 2)}
+        for p in (doc.get("payments") or [])
+    ]
+    fbr_status = _cf("custom_fbr_status")
+    fbr_invoice_number = _cf("custom_fbr_invoice_number")
+
+    return {
+        "success": True,
+        "duplicate": duplicate,
+        "invoice": {
+            "name": doc.name,
+            "return_against": getattr(doc, "return_against", None),
+            "is_return": True,
+            "posting_date": str(doc.posting_date),
+            "posting_time": str(doc.posting_time),
+            "customer": doc.customer,
+            "grand_total": flt(doc.grand_total, 2),
+            "rounded_total": flt(getattr(doc, "rounded_total", None) or doc.grand_total, 2),
+        },
+        "items": items_out,
+        "payments": payments_out,
+        "fbr": {
+            "status": _normalize_refund_fbr_status(fbr_status, fbr_invoice_number),
+            "response_code": str(_cf("custom_fbr_http_status") or ""),
+            "invoice_number": fbr_invoice_number or "",
+            "message": _cf("custom_fbr_error") or "",
+        },
+    }
+
+
+@frappe.whitelist()
+def get_pos_invoice_for_refund(invoice_name):
+    """Return authoritative original-invoice data and refundable quantities.
+
+    Never uses current Item Price or current Item tax config — every value comes
+    from the original submitted POS Invoice and its FBR item snapshot.
+    """
+    _require_login()
+    if not invoice_name:
+        frappe.throw(_("invoice_name is required"))
+
+    original = frappe.get_doc("POS Invoice", invoice_name)
+    original.check_permission("read")
+
+    if original.docstatus != 1:
+        frappe.throw(_("Original POS Invoice must be submitted"))
+    if cint(getattr(original, "is_return", 0)):
+        frappe.throw(_("Cannot refund a return invoice"))
+
+    returned = _returned_qty_by_row(original.name)
+
+    items = []
+    any_remaining = False
+    for row in original.items:
+        sold = abs(flt(row.qty))
+        already = flt(returned.get(row.name, 0))
+        remaining = flt(sold - already, 3)
+        if remaining > 0.0009:
+            any_remaining = True
+        items.append({
+            "row_name": row.name,
+            "item_code": row.item_code,
+            "item_name": row.item_name,
+            "uom": row.uom,
+            "stock_uom": row.stock_uom,
+            "conversion_factor": flt(row.conversion_factor) or 1,
+            "warehouse": row.warehouse,
+            "sold_qty": sold,
+            "already_returned_qty": already,
+            "remaining_qty": max(remaining, 0.0),
+            "rate": flt(row.rate, 2),
+            "price_list_rate": flt(row.price_list_rate, 2),
+            "discount_percentage": flt(row.discount_percentage, 2),
+            "discount_amount": flt(row.discount_amount, 2),
+            "amount": flt(row.amount, 2),
+            "net_rate": flt(row.net_rate, 2),
+            "net_amount": flt(row.net_amount, 2),
+            # Original FBR snapshot (never recomputed from current config here)
+            "fbr_tax_category": getattr(row, "custom_fbr_tax_category", None),
+            "fbr_sale_type": getattr(row, "custom_fbr_sale_type", None),
+            "fbr_tax_rate": flt(getattr(row, "custom_fbr_tax_rate", 0) or 0, 2),
+            "is_third_schedule": cint(getattr(row, "custom_fbr_is_third_schedule", 0) or 0),
+            "mrp": flt(getattr(row, "custom_fbr_mrp", 0) or 0, 2),
+            "value_excluding_tax": flt(getattr(row, "custom_fbr_value_excluding_tax", 0) or 0, 2),
+            "sales_tax": flt(getattr(row, "custom_fbr_sales_tax", 0) or 0, 2),
+            "retail_price": flt(getattr(row, "custom_fbr_retail_price", 0) or 0, 2),
+            "hs_code": getattr(row, "custom_fbr_hs_code", None),
+        })
+
+    payments = [
+        {"mode_of_payment": p.mode_of_payment, "amount": flt(p.amount, 2)}
+        for p in (original.get("payments") or [])
+    ]
+
+    return {
+        "original_invoice": original.name,
+        "customer": original.customer,
+        "customer_name": getattr(original, "customer_name", None),
+        "company": original.company,
+        "pos_profile": original.pos_profile,
+        "posting_date": str(original.posting_date),
+        "posting_time": str(original.posting_time),
+        "grand_total": flt(original.grand_total, 2),
+        "rounded_total": flt(getattr(original, "rounded_total", None) or original.grand_total, 2),
+        "payments": payments,
+        "fbr_status": getattr(original, "custom_fbr_status", None),
+        "fbr_invoice_number": getattr(original, "custom_fbr_invoice_number", None),
+        "any_remaining": any_remaining,
+        "items": items,
+    }
+
+
+@frappe.whitelist()
+def submit_pos_refund(
+    terminal_refund_id,
+    original_invoice,
+    pos_opening_entry=None,
+    reason=None,
+    items=None,
+    payments=None,
+):
+    """Create and submit a return POS Invoice against an original sale.
+
+    Idempotent on custom_terminal_refund_id. Reuses the standard ERPNext return
+    mapper for original rates/accounts, restricts it to the requested quantities,
+    and lets the existing FBR hooks build the InvoiceType=2 credit note and submit
+    to FBR exactly once. Electron never calls FBR. The Rs.1 POS service fee is
+    neither added nor refunded on returns (see fbr_pos.accounting).
+    """
+    _require_login()
+
+    if not frappe.has_permission("POS Invoice", "create"):
+        frappe.throw(_("Not permitted to create POS Invoice"), frappe.PermissionError)
+    if not frappe.has_permission("POS Invoice", "submit"):
+        frappe.throw(_("Not permitted to submit POS Invoice"), frappe.PermissionError)
+    if not terminal_refund_id:
+        frappe.throw(_("terminal_refund_id is required"))
+
+    # Idempotency: never create a second return for the same refund UUID.
+    existing_name = _find_existing_return(terminal_refund_id)
+    if existing_name:
+        return _build_refund_response(frappe.get_doc("POS Invoice", existing_name), duplicate=True)
+
+    if not original_invoice:
+        frappe.throw(_("original_invoice is required"))
+
+    items = _parse_json_param(items, "items")
+    payments = _parse_json_param(payments, "payments") if payments else []
+    if not isinstance(items, list) or not items:
+        frappe.throw(_("At least one return item is required"))
+
+    original = frappe.get_doc("POS Invoice", original_invoice)
+    original.check_permission("read")
+    if original.docstatus != 1:
+        frappe.throw(_("Original POS Invoice must be submitted"))
+    if cint(getattr(original, "is_return", 0)):
+        frappe.throw(_("Cannot refund a return invoice"))
+
+    # POS Profile membership + an active submitted opening entry for this cashier.
+    pos = _load_pos_profile(original.pos_profile)
+    _validate_pos_opening_entry(pos.name)
+
+    # Aggregate requested quantities by original child-row name.
+    requested = {}
+    for it in items:
+        row_name = (it.get("original_row_name") or "").strip()
+        qty = abs(flt(it.get("qty") or it.get("qty_to_return") or 0, 3))
+        if not row_name:
+            frappe.throw(_("Each return item must include original_row_name"))
+        if qty <= 0:
+            continue
+        requested[row_name] = flt(requested.get(row_name, 0) + qty, 3)
+    if not requested:
+        frappe.throw(_("No positive return quantity requested"))
+
+    _validate_refund_quantities(original, requested)
+
+    # Standard ERPNext return mapper (copies original rates/accounts; accounts for prior returns).
+    from erpnext.controllers.sales_and_purchase_return import make_return_doc
+
+    return_doc = make_return_doc("POS Invoice", original.name)
+    return_doc.pos_profile = original.pos_profile
+    return_doc.set_posting_time = 1
+    return_doc.posting_date = nowdate()
+    return_doc.posting_time = nowtime()
+
+    # Restrict to requested rows and quantities (return quantities are negative).
+    kept = []
+    for row in return_doc.items:
+        original_row = getattr(row, "pos_invoice_item", None)
+        if original_row in requested:
+            row.qty = -abs(flt(requested[original_row], 3))
+            kept.append(row)
+    if not kept:
+        frappe.throw(_("No matching original rows for the requested return"))
+    return_doc.set("items", kept)
+
+    if return_doc.meta.has_field("custom_terminal_refund_id"):
+        return_doc.custom_terminal_refund_id = terminal_refund_id
+    if return_doc.meta.has_field("custom_terminal_id"):
+        return_doc.custom_terminal_id = getattr(original, "custom_terminal_id", None) or ""
+    if reason and return_doc.meta.has_field("remarks"):
+        return_doc.remarks = reason
+
+    # Apply FBR snapshot + accounting (negative sales tax, no service fee) so the
+    # negative grand_total is known before computing refund payments. The validate
+    # hook re-applies these idempotently on insert.
+    from aimatic.fbr_pos.accounting import apply_fbr_accounting_rows
+    from aimatic.fbr_pos.payload_builder import build_pos_payload
+
+    return_doc.run_method("calculate_taxes_and_totals")
+    build_pos_payload(return_doc)
+    apply_fbr_accounting_rows(return_doc)
+
+    _set_refund_payments(return_doc, pos, payments)
+
+    sp = "submit_pos_refund"
+    frappe.db.savepoint(sp)
+    try:
+        # Re-validate remaining quantities inside the transaction to defeat races.
+        _validate_refund_quantities(original, requested)
+        return_doc.insert()   # validate hook: clears copied FBR fields, builds InvoiceType=2 payload, accounting rows
+        return_doc.submit()   # before_submit hook: single FBR refund submission
+        frappe.db.release_savepoint(sp)
+    except frappe.UniqueValidationError:
+        frappe.db.rollback(save_point=sp)
+        existing_name = _find_existing_return(terminal_refund_id)
+        if existing_name:
+            return _build_refund_response(frappe.get_doc("POS Invoice", existing_name), duplicate=True)
+        raise
+    except Exception:
+        frappe.db.rollback(save_point=sp)
+        raise
+
+    return _build_refund_response(return_doc, duplicate=False)
