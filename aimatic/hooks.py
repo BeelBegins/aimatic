@@ -18,6 +18,16 @@ doc_events = {
         "validate": "aimatic.offline_pos.customer_validation.validate_customer",
     },
 }
+
+# Keep DB-side customizations made from the Desk backed up in git.
+# Run `bench --site <site> export-fixtures --app aimatic` after changing
+# Custom Fields, Customize Form settings, or Client Scripts.
+fixtures = [
+    {"doctype": "Custom Field"},
+    {"doctype": "Property Setter"},
+    {"doctype": "Client Script"},
+]
+
 # Apps
 # ------------------
 
@@ -262,4 +272,3 @@ doc_events = {
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-
