@@ -955,17 +955,34 @@ def close_pos_session(opening_entry, closing_balances, notes=None):
         if closing.meta.has_field("remarks"):
             closing.remarks = notes
 
-    savepoint = "close_pos_session"
+    savepoint = "close_pos_session_{0}".format(frappe.generate_hash(length=10))
     frappe.db.savepoint(savepoint)
     try:
         closing.insert()
         if notes and not closing.meta.has_field("remarks"):
             closing.add_comment("Comment", text=notes)
         closing.submit()
-        frappe.db.release_savepoint(savepoint)
     except Exception:
         # Keep a failed close from leaving a draft POS-CLO document behind.
-        frappe.db.rollback(save_point=savepoint)
+        # Some framework/database paths can clear savepoints before this
+        # handler runs.  If that happens, fall back to a request-level rollback
+        # and re-raise the original close error instead of masking it with
+        # "SAVEPOINT ... does not exist".
+        try:
+            frappe.db.rollback(save_point=savepoint)
+        except Exception:
+            rollback_traceback = frappe.get_traceback()
+            try:
+                frappe.db.rollback()
+            except Exception:
+                rollback_traceback = "{0}\n\nFull rollback also failed:\n{1}".format(
+                    rollback_traceback,
+                    frappe.get_traceback(),
+                )
+            frappe.log_error(
+                rollback_traceback,
+                _("POS close rollback failed for {0}").format(opening.name),
+            )
         raise
 
     return _build_closing_session_response(closing, opening.name)
