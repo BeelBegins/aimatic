@@ -6,8 +6,6 @@ app_email = "sthassan41@gmail.com"
 app_license = "mit"
 
 
-
-
 doc_events = {
     "POS Invoice": {
         "validate": "aimatic.fbr_pos.events.validate_pos_invoice",
@@ -19,13 +17,34 @@ doc_events = {
     },
 }
 
+hrms_fixture_doctypes = [
+    "Employee",
+    "Department",
+    "Designation",
+    "Expense Claim",
+    "Expense Claim Detail",
+    "Expense Taxes and Charges",
+    "Leave Encashment",
+    "Salary Slip",
+]
+
 # Keep DB-side customizations made from the Desk backed up in git.
 # Run `bench --site <site> export-fixtures --app aimatic` after changing
-# Custom Fields, Customize Form settings, or Client Scripts.
+# Custom Fields, Customize Form settings, Client Scripts, or Server Scripts.
 fixtures = [
-    {"doctype": "Custom Field"},
-    {"doctype": "Property Setter"},
-    {"doctype": "Client Script"},
+    {
+        "doctype": "Custom Field",
+        "filters": [["dt", "not in", hrms_fixture_doctypes]],
+    },
+    {
+        "doctype": "Property Setter",
+        "filters": [["doc_type", "not in", hrms_fixture_doctypes]],
+    },
+    {
+        "doctype": "Client Script",
+        "filters": [["dt", "not in", hrms_fixture_doctypes]],
+    },
+    {"doctype": "Server Script"},
 ]
 
 # Apps
