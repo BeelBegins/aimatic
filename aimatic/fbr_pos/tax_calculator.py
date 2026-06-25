@@ -142,7 +142,11 @@ def calculate_fbr_item(row, config):
             "retail_price": 0,
         }
     if is_third_schedule:
-        retail_price = money(mrp * qty)
+        # custom_mrp is maintained per stock UOM.  A sales row can use a
+        # larger UOM (for example, a 12-piece box), so its MRP tax base must
+        # include the sales-UOM conversion factor.
+        conversion_factor = abs(flt(getattr(row, "conversion_factor", 1)) or 1)
+        retail_price = money(mrp * qty * conversion_factor)
 
         sales_tax = money(
             retail_price * tax_rate / (100 + tax_rate)

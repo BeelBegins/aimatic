@@ -212,10 +212,12 @@ def _build_pos_invoice_doc(
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
-def get_item_barcodes(limit_start=0, limit_page_length=500):
+def get_item_barcodes(limit_start=0, limit_page_length=500, modified_after=None):
     """Return active sales item barcodes with correct pre-filtered pagination.
 
-    Response keys: rows, next_start, has_more
+    Supports incremental sync via modified_after (ISO datetime string): when
+    provided, only barcodes with `tabItem Barcode`.modified > modified_after
+    are returned. Response keys unchanged: rows, next_start, has_more
     """
     _require_login()
 
@@ -225,6 +227,12 @@ def get_item_barcodes(limit_start=0, limit_page_length=500):
     except Exception:
         start = 0
         page_length = 500
+
+    params = {"limit": page_length + 1, "offset": start}
+    modified_clause = ""
+    if modified_after:
+        modified_clause = " AND `tabItem Barcode`.modified > %(modified_after)s"
+        params["modified_after"] = modified_after
 
     # Filter inactive items and non-sales items at the database level so that
     # pagination counts are always accurate.
@@ -241,10 +249,62 @@ def get_item_barcodes(limit_start=0, limit_page_length=500):
         WHERE `tabItem Barcode`.barcode != ''
           AND `tabItem`.disabled = 0
           AND `tabItem`.is_sales_item = 1
+          {modified_clause}
         ORDER BY `tabItem Barcode`.modified DESC
         LIMIT %(limit)s OFFSET %(offset)s
-        """,
-        {"limit": page_length + 1, "offset": start},
+        """.format(modified_clause=modified_clause),
+        params,
+        as_dict=True,
+    )
+
+    has_more = len(rows) > page_length
+    rows = rows[:page_length]
+    next_start = start + len(rows) if has_more else None
+
+    return {"rows": rows, "next_start": next_start, "has_more": has_more}
+
+
+@frappe.whitelist()
+def get_uom_conversions(limit_start=0, limit_page_length=500, modified_after=None):
+    """Return UOM conversion factors for active sales items.
+
+    Served via a custom method (not /api/resource/UOM Conversion Detail) because that child
+    doctype is not directly readable by the POS user. Supports incremental sync via
+    modified_after. Response keys: rows, next_start, has_more
+    """
+    _require_login()
+
+    try:
+        start = int(limit_start or 0)
+        page_length = min(int(limit_page_length or 500), _MAX_PAGE_SIZE)
+    except Exception:
+        start = 0
+        page_length = 500
+
+    params = {"limit": page_length + 1, "offset": start}
+    modified_clause = ""
+    if modified_after:
+        modified_clause = " AND `tabUOM Conversion Detail`.modified > %(modified_after)s"
+        params["modified_after"] = modified_after
+
+    rows = frappe.db.sql(
+        """
+        SELECT
+            `tabUOM Conversion Detail`.parent  AS item_code,
+            `tabUOM Conversion Detail`.uom,
+            `tabUOM Conversion Detail`.conversion_factor,
+            `tabUOM Conversion Detail`.modified
+        FROM `tabUOM Conversion Detail`
+        INNER JOIN `tabItem`
+            ON  `tabItem`.name = `tabUOM Conversion Detail`.parent
+        WHERE `tabUOM Conversion Detail`.parenttype = 'Item'
+          AND `tabItem`.disabled = 0
+          AND `tabItem`.is_sales_item = 1
+          {modified_clause}
+        ORDER BY `tabUOM Conversion Detail`.modified DESC
+        LIMIT %(limit)s OFFSET %(offset)s
+        """.format(modified_clause=modified_clause),
+        params,
         as_dict=True,
     )
 
@@ -741,6 +801,187 @@ def get_active_pos_session(pos_profile):
         "session": None,
         "open_entries": all_open,
         "reason": reason,
+    }
+
+
+@frappe.whitelist()
+def close_pos_session(opening_entry, closing_balances, notes=None):
+    """Create and submit a POS Closing Entry for the current cashier's shift.
+
+    The client supplies only its counted amount for each payment mode.  Invoice
+    totals, expected amounts, and the opening balance are always derived from
+    ERPNext documents on the server.
+    """
+    _require_login()
+    frappe.has_permission("POS Closing Entry", "create", throw=True)
+
+    try:
+        opening = frappe.get_doc("POS Opening Entry", opening_entry)
+    except frappe.DoesNotExistError:
+        frappe.throw(_("Invalid POS Opening Entry: {0}").format(opening_entry))
+
+    if opening.user != frappe.session.user:
+        frappe.throw(
+            _("POS Opening Entry {0} does not belong to the authenticated user.").format(
+                opening.name
+            ),
+            frappe.PermissionError,
+        )
+
+    # Reuse the session/profile membership checks used by the other POS APIs.
+    pos = _load_pos_profile(opening.pos_profile)
+    if opening.company != pos.company:
+        frappe.throw(
+            _("POS Opening Entry {0} does not match its POS Profile company.").format(
+                opening.name
+            )
+        )
+
+    # Serialize close requests for this shift.  Reload after taking the lock
+    # so a retry cannot create another closing document after a prior request
+    # closed (or started closing) the same opening entry.
+    frappe.db.sql(
+        "SELECT name FROM `tabPOS Opening Entry` WHERE name = %s FOR UPDATE",
+        (opening.name,),
+    )
+    opening.reload()
+
+    if opening.docstatus != 1:
+        frappe.throw(_("POS Opening Entry {0} must be submitted before it can be closed.").format(opening.name))
+
+    if opening.status != "Open":
+        if opening.pos_closing_entry:
+            existing = frappe.get_doc("POS Closing Entry", opening.pos_closing_entry)
+            return _build_closing_session_response(existing, opening.name)
+        frappe.throw(_("POS Opening Entry {0} is not open.").format(opening.name))
+
+    existing = frappe.db.get_value(
+        "POS Closing Entry",
+        {"pos_opening_entry": opening.name, "docstatus": ("in", [0, 1])},
+        ["name", "docstatus"],
+        as_dict=True,
+    )
+    if existing:
+        if existing.docstatus == 1:
+            return _build_closing_session_response(
+                frappe.get_doc("POS Closing Entry", existing.name), opening.name
+            )
+        frappe.throw(
+            _("A draft POS Closing Entry {0} already exists for this shift. Please resolve it before closing again.").format(
+                existing.name
+            )
+        )
+
+    closing_balances = frappe.parse_json(closing_balances)
+    if not isinstance(closing_balances, list):
+        frappe.throw(_("closing_balances must be a list"))
+
+    counted_amounts = {}
+    for row in closing_balances:
+        if not isinstance(row, dict):
+            frappe.throw(_("Each closing balance row must be an object"))
+
+        mode_of_payment = (row.get("mode_of_payment") or "").strip()
+        if not mode_of_payment:
+            frappe.throw(_("Each closing balance row must have mode_of_payment"))
+        if mode_of_payment in counted_amounts:
+            frappe.throw(_("Duplicate closing balance for payment mode '{0}'").format(mode_of_payment))
+
+        try:
+            closing_amount = float(row.get("closing_amount"))
+        except (TypeError, ValueError):
+            frappe.throw(
+                _("closing_amount must be a number for payment mode '{0}'").format(
+                    mode_of_payment
+                )
+            )
+        counted_amounts[mode_of_payment] = flt(closing_amount)
+
+    from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
+        make_closing_entry_from_opening,
+    )
+
+    # ERPNext derives the shift invoices, payment totals, and linked documents.
+    closing = make_closing_entry_from_opening(opening.as_dict())
+    closing.period_end_date = now_datetime()
+    closing.posting_date = nowdate()
+    closing.user = frappe.session.user
+    closing.pos_profile = pos.name
+    closing.company = opening.company
+
+    # The helper starts payment rows from invoice payments.  Add each opening
+    # balance exactly as ERPNext's POS Closing Entry form does before it adds
+    # the transaction totals.
+    reconciliation_by_mode = {
+        row.mode_of_payment: row for row in closing.payment_reconciliation
+    }
+    for balance in opening.get("balance_details") or []:
+        reconciliation = reconciliation_by_mode.get(balance.mode_of_payment)
+        if reconciliation:
+            reconciliation.opening_amount = flt(balance.opening_amount)
+            reconciliation.expected_amount = flt(reconciliation.expected_amount) + flt(
+                balance.opening_amount
+            )
+        else:
+            reconciliation = closing.append(
+                "payment_reconciliation",
+                {
+                    "mode_of_payment": balance.mode_of_payment,
+                    "opening_amount": flt(balance.opening_amount),
+                    "expected_amount": flt(balance.opening_amount),
+                },
+            )
+            reconciliation_by_mode[balance.mode_of_payment] = reconciliation
+
+    unknown_modes = set(counted_amounts) - set(reconciliation_by_mode)
+    if unknown_modes:
+        frappe.throw(
+            _("Payment mode(s) are not part of this POS shift: {0}").format(
+                ", ".join(sorted(unknown_modes))
+            )
+        )
+
+    for mode_of_payment, closing_amount in counted_amounts.items():
+        reconciliation = reconciliation_by_mode[mode_of_payment]
+        reconciliation.closing_amount = closing_amount
+        # Do not trust the client-provided difference; calculate it from
+        # ERPNext's server-derived expected amount.
+        reconciliation.difference = flt(closing_amount) - flt(reconciliation.expected_amount)
+
+    if notes:
+        # Standard POS Closing Entry has no remarks field.  Respect a custom
+        # field when present; otherwise preserve the note on the document's
+        # timeline after insertion.
+        if closing.meta.has_field("remarks"):
+            closing.remarks = notes
+
+    savepoint = "close_pos_session"
+    frappe.db.savepoint(savepoint)
+    try:
+        closing.insert()
+        if notes and not closing.meta.has_field("remarks"):
+            closing.add_comment("Comment", text=notes)
+        closing.submit()
+        frappe.db.release_savepoint(savepoint)
+    except Exception:
+        # Keep a failed close from leaving a draft POS-CLO document behind.
+        frappe.db.rollback(save_point=savepoint)
+        raise
+
+    return _build_closing_session_response(closing, opening.name)
+
+
+def _build_closing_session_response(closing, opening_entry):
+    """Serialize a POS Closing Entry in the Electron close-session format."""
+    return {
+        "closing_entry": closing.name,
+        "name": closing.name,
+        "opening_entry": opening_entry,
+        "status": "Closed",
+        "grand_total": closing.grand_total,
+        "net_total": closing.net_total,
+        "total_quantity": closing.total_quantity,
+        "payment_reconciliation": [row.as_dict() for row in closing.payment_reconciliation],
     }
 
 
