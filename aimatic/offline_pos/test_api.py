@@ -833,6 +833,131 @@ class TestPosRefund(_AimTestCase):
                 _validate_refund_quantities(original, {"row-a": 4})
             _validate_refund_quantities(original, {"row-a": 3})  # exactly remaining: ok
 
+    def test_preserve_original_return_row_values_prorates_amounts(self):
+        from aimatic.offline_pos.api import _preserve_original_return_row_values
+
+        row = frappe._dict()
+        original = frappe._dict(
+            name="row-a",
+            item_code="ITEM-A",
+            item_name="Item A",
+            uom="Nos",
+            stock_uom="Nos",
+            conversion_factor=1,
+            warehouse="Stores",
+            qty=4,
+            rate=50,
+            price_list_rate=60,
+            discount_percentage=5,
+            discount_amount=10,
+            net_rate=45,
+            amount=200,
+            net_amount=180,
+        )
+
+        _preserve_original_return_row_values(row, original, 1)
+
+        self.assertEqual(row.item_code, "ITEM-A")
+        self.assertEqual(row.rate, 50)
+        self.assertEqual(row.amount, -50)
+        self.assertEqual(row.net_amount, -45)
+
+    def test_build_refund_response_includes_fbr_item_and_totals(self):
+        from unittest.mock import patch as _patch
+        from aimatic.offline_pos.api import _build_refund_response
+
+        class _Meta:
+            def has_field(self, fieldname):
+                return True
+
+        doc = frappe._dict(
+            meta=_Meta(),
+            name="RET-1",
+            return_against="POS-1",
+            posting_date="2026-06-26",
+            posting_time="10:00:00",
+            customer="CUST-1",
+            grand_total=-117,
+            rounded_total=-117,
+            custom_fbr_status="Accepted",
+            custom_fbr_invoice_number="FBR-RET-1",
+            custom_fbr_http_status=200,
+            custom_fbr_error="",
+            items=[
+                frappe._dict(
+                    item_code="ITEM-A",
+                    qty=-1,
+                    rate=117,
+                    net_rate=100,
+                    amount=-117,
+                    net_amount=-100,
+                    custom_fbr_sales_tax=17,
+                    custom_fbr_value_excluding_tax=100,
+                    pos_invoice_item="row-a",
+                )
+            ],
+            payments=[frappe._dict(mode_of_payment="Cash", amount=-117)],
+        )
+        original = frappe._dict(
+            taxes=[
+                frappe._dict(description="FBR POS Service Fee", tax_amount=1),
+            ],
+        )
+
+        with _patch("aimatic.offline_pos.api.frappe.get_doc", return_value=original):
+            response = _build_refund_response(doc)
+
+        self.assertEqual(response["items"][0]["sales_tax"], 17)
+        self.assertEqual(response["items"][0]["value_excluding_tax"], 100)
+        self.assertEqual(response["refund_totals"]["merchandise_refund"], 117)
+        self.assertEqual(response["refund_totals"]["gst_refund"], 17)
+        self.assertEqual(response["refund_totals"]["non_refundable_fbr_pos_fee"], 1)
+        self.assertEqual(response["refund_totals"]["total_refund"], 117)
+
+    def test_build_return_item_payload_uses_original_snapshot(self):
+        from unittest.mock import patch as _patch
+        from aimatic.fbr_pos.payload_builder import build_return_item_payload
+
+        class _Meta:
+            def has_field(self, fieldname):
+                return True
+
+        row = frappe._dict(
+            meta=_Meta(),
+            item_code="ITEM-A",
+            item_name="Item A",
+            qty=-1,
+            pos_invoice_item="row-a",
+        )
+        original = frappe._dict(
+            meta=_Meta(),
+            item_name="Item A",
+            qty=4,
+            discount_amount=8,
+            custom_fbr_value_excluding_tax=400,
+            custom_fbr_sales_tax=68,
+            custom_fbr_retail_price=0,
+            custom_fbr_tax_category="Standard",
+            custom_fbr_sale_type="Goods at standard rate",
+            custom_fbr_tax_rate=17,
+            custom_fbr_is_third_schedule=0,
+            custom_fbr_mrp=0,
+            custom_fbr_hs_code="01011000",
+        )
+
+        with _patch(
+            "aimatic.fbr_pos.payload_builder._get_original_return_row",
+            return_value=original,
+        ):
+            payload = build_return_item_payload(row)
+
+        self.assertEqual(payload["InvoiceType"], 2)
+        self.assertEqual(payload["SaleValue"], 100)
+        self.assertEqual(payload["TaxCharged"], 17)
+        self.assertEqual(payload["TotalAmount"], 117)
+        self.assertEqual(payload["Discount"], 2)
+        self.assertEqual(row.custom_fbr_sales_tax, 17)
+
 
 class _patch_fbr:
     """Stubs build_pos_payload and apply_fbr_accounting_rows so tests do not

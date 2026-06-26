@@ -215,6 +215,9 @@ def update_row_fbr_snapshot(row, config, calculated, hs_code):
 
 
 def build_item_payload(row, settings, invoice_type):
+    if cint(invoice_type) == 2:
+        return build_return_item_payload(row)
+
     config = get_item_fbr_configuration(
         row.item_code
     )
@@ -265,6 +268,76 @@ def build_item_payload(row, settings, invoice_type):
     }
 
 
+def _get_original_return_row(row):
+    original_row_name = getattr(row, "pos_invoice_item", None)
+
+    if not original_row_name:
+        frappe.throw(
+            _("Original POS Invoice Item reference is required for return item {0}").format(
+                frappe.bold(row.item_code)
+            )
+        )
+
+    return frappe.get_doc("POS Invoice Item", original_row_name)
+
+
+def _snapshot_value(row, fieldname, default=0):
+    return getattr(row, fieldname, None) if row.meta.has_field(fieldname) else default
+
+
+def build_return_item_payload(row):
+    """Build FBR credit-note item from original submitted row snapshot."""
+    original = _get_original_return_row(row)
+
+    qty = abs(flt(row.qty))
+    original_qty = abs(flt(original.qty))
+
+    if qty <= 0 or original_qty <= 0:
+        frappe.throw(
+            _("Quantity must be greater than zero for return item {0}").format(
+                frappe.bold(row.item_code)
+            )
+        )
+
+    ratio = qty / original_qty
+
+    sale_value = money(flt(_snapshot_value(original, "custom_fbr_value_excluding_tax")) * ratio)
+    tax_charged = money(flt(_snapshot_value(original, "custom_fbr_sales_tax")) * ratio)
+    total_amount = money(sale_value + tax_charged)
+    retail_price = money(flt(_snapshot_value(original, "custom_fbr_retail_price")) * ratio)
+
+    update_row_fbr_snapshot(
+        row,
+        {
+            "tax_category": _snapshot_value(original, "custom_fbr_tax_category", ""),
+            "fbr_sale_type": _snapshot_value(original, "custom_fbr_sale_type", ""),
+            "tax_rate": flt(_snapshot_value(original, "custom_fbr_tax_rate")),
+            "is_third_schedule": cint(_snapshot_value(original, "custom_fbr_is_third_schedule")),
+            "mrp": flt(_snapshot_value(original, "custom_fbr_mrp")),
+        },
+        {
+            "value_excluding_tax": sale_value,
+            "sales_tax": tax_charged,
+            "retail_price": retail_price,
+        },
+        _snapshot_value(original, "custom_fbr_hs_code", ""),
+    )
+
+    return {
+        "ItemCode": row.item_code or "",
+        "ItemName": row.item_name or original.item_name or "",
+        "PCTCode": _snapshot_value(original, "custom_fbr_hs_code", "") or DEFAULT_HS_CODE,
+        "Quantity": int(qty),
+        "TaxRate": int(flt(_snapshot_value(original, "custom_fbr_tax_rate"))),
+        "SaleValue": sale_value,
+        "TaxCharged": tax_charged,
+        "TotalAmount": total_amount,
+        "Discount": money(abs(flt(original.discount_amount)) * ratio),
+        "FurtherTax": 0,
+        "InvoiceType": 2,
+    }
+
+
 def get_posting_datetime(doc):
     posting_time = (
         getattr(doc, "posting_time", None)
@@ -293,7 +366,16 @@ def build_pos_payload(doc):
     if is_return:
         invoice_type = 2
         usin = get_usin(doc)
-        ref_usin = getattr(doc, "return_against", None)
+        original = (
+            frappe.get_doc("POS Invoice", doc.return_against)
+            if getattr(doc, "return_against", None)
+            else None
+        )
+        ref_usin = (
+            getattr(original, "custom_fbr_invoice_number", None)
+            if original
+            else None
+        ) or getattr(doc, "return_against", None)
 
         if not ref_usin:
             frappe.throw(_("Original invoice reference is required for FBR credit note"))

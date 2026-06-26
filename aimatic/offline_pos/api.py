@@ -1002,6 +1002,94 @@ def _build_closing_session_response(closing, opening_entry):
     }
 
 
+def _get_open_pos_opening_entry(opening_entry):
+    if not opening_entry:
+        frappe.throw(_("opening_entry is required"))
+
+    doc = frappe.get_doc("POS Opening Entry", opening_entry)
+    doc.check_permission("read")
+
+    if doc.docstatus != 1 or doc.status != "Open":
+        frappe.throw(_("POS Opening Entry {0} is not open").format(opening_entry))
+
+    if doc.user != frappe.session.user:
+        frappe.throw(_("POS Opening Entry belongs to another user"), frappe.PermissionError)
+
+    return doc
+
+
+@frappe.whitelist()
+def get_pos_closing_summary(opening_entry):
+    _require_login()
+
+    opening = _get_open_pos_opening_entry(opening_entry)
+
+    from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
+        make_closing_entry_from_opening,
+    )
+
+    closing_entry = make_closing_entry_from_opening(opening)
+    reconciliation_by_mode = {
+        row.mode_of_payment: row for row in closing_entry.get("payment_reconciliation") or []
+    }
+    for balance in opening.get("balance_details") or []:
+        reconciliation = reconciliation_by_mode.get(balance.mode_of_payment)
+        if reconciliation:
+            reconciliation.opening_amount = flt(balance.opening_amount)
+            reconciliation.expected_amount = flt(reconciliation.expected_amount) + flt(
+                balance.opening_amount
+            )
+        else:
+            reconciliation = closing_entry.append(
+                "payment_reconciliation",
+                {
+                    "mode_of_payment": balance.mode_of_payment,
+                    "opening_amount": flt(balance.opening_amount),
+                    "expected_amount": flt(balance.opening_amount),
+                },
+            )
+            reconciliation_by_mode[balance.mode_of_payment] = reconciliation
+
+    invoice_count = len(closing_entry.get("pos_transactions") or [])
+    if not invoice_count:
+        invoice_count = len(closing_entry.get("pos_invoices") or []) + len(
+            closing_entry.get("sales_invoices") or []
+        )
+
+    return {
+        "openingEntry": closing_entry.pos_opening_entry,
+        "posProfile": closing_entry.pos_profile,
+        "user": closing_entry.user,
+        "company": closing_entry.company,
+        "periodStart": str(closing_entry.period_start_date),
+        "payments": [
+            {
+                "mode_of_payment": p.mode_of_payment,
+                "opening_amount": flt(p.opening_amount, 2),
+                "expected_amount": flt(p.expected_amount, 2),
+                "collected_amount": flt(p.expected_amount - p.opening_amount, 2),
+            }
+            for p in closing_entry.get("payment_reconciliation") or []
+        ],
+        "invoiceCount": invoice_count,
+        "totalOpening": flt(
+            sum(
+                flt(p.opening_amount)
+                for p in closing_entry.get("payment_reconciliation") or []
+            ),
+            2,
+        ),
+        "totalExpected": flt(
+            sum(
+                flt(p.expected_amount)
+                for p in closing_entry.get("payment_reconciliation") or []
+            ),
+            2,
+        ),
+        "isEstimate": False,
+    }
+
+
 @frappe.whitelist()
 def start_pos_session(pos_profile, opening_balances=None):
     """Create and submit a POS Opening Entry for the current user.
@@ -1288,6 +1376,65 @@ def _validate_refund_quantities(original, requested):
             )
 
 
+def _preserve_original_return_row_values(row, original_row, qty):
+    """Keep refund unit valuation tied to the original submitted row."""
+    sold = abs(flt(original_row.qty))
+    if sold <= 0:
+        frappe.throw(_("Original quantity is invalid for row {0}").format(original_row.name))
+
+    ratio = abs(flt(qty, 3)) / sold
+    row.item_code = original_row.item_code
+    row.item_name = original_row.item_name
+    row.uom = original_row.uom
+    row.stock_uom = original_row.stock_uom
+    row.conversion_factor = flt(original_row.conversion_factor) or 1
+    row.warehouse = original_row.warehouse
+    row.rate = flt(original_row.rate, 6)
+    row.price_list_rate = flt(original_row.price_list_rate, 6)
+    row.discount_percentage = flt(original_row.discount_percentage, 6)
+    row.discount_amount = flt(original_row.discount_amount, 6)
+    row.net_rate = flt(original_row.net_rate, 6)
+    row.amount = -abs(flt(original_row.amount, 6) * ratio)
+    row.net_amount = -abs(flt(original_row.net_amount, 6) * ratio)
+
+
+def _validate_return_doc_against_original(return_doc, original):
+    original_by_name = {r.name: r for r in original.items}
+
+    for row in return_doc.items:
+        original_row_name = getattr(row, "pos_invoice_item", None)
+        original_row = original_by_name.get(original_row_name)
+
+        if not original_row:
+            frappe.throw(
+                _("Return row {0} is not linked to the original invoice").format(row.item_code)
+            )
+
+        checks = [
+            ("rate", flt(row.rate, 6), flt(original_row.rate, 6)),
+            ("price_list_rate", flt(row.price_list_rate, 6), flt(original_row.price_list_rate, 6)),
+            (
+                "discount_percentage",
+                flt(row.discount_percentage, 6),
+                flt(original_row.discount_percentage, 6),
+            ),
+            ("uom", row.uom, original_row.uom),
+            (
+                "conversion_factor",
+                flt(row.conversion_factor, 6),
+                flt(original_row.conversion_factor, 6) or 1,
+            ),
+        ]
+
+        for label, actual, expected in checks:
+            if actual != expected:
+                frappe.throw(
+                    _("Return {0} mismatch for item {1}: {2} != {3}").format(
+                        label, row.item_code, actual, expected
+                    )
+                )
+
+
 def _find_existing_return(terminal_refund_id):
     """Return the name of an existing return POS Invoice for this refund UUID, or None."""
     if not frappe.get_meta("POS Invoice").has_field("custom_terminal_refund_id"):
@@ -1394,7 +1541,13 @@ def _build_refund_response(doc, duplicate=False):
             "item_code": r.item_code,
             "qty": flt(r.qty, 3),
             "rate": flt(r.rate, 2),
+            "net_rate": flt(getattr(r, "net_rate", 0), 2),
             "amount": flt(r.amount, 2),
+            "net_amount": flt(getattr(r, "net_amount", 0), 2),
+            "sales_tax": flt(getattr(r, "custom_fbr_sales_tax", 0) or 0, 2),
+            "value_excluding_tax": flt(
+                getattr(r, "custom_fbr_value_excluding_tax", 0) or 0, 2
+            ),
             "original_row_name": getattr(r, "pos_invoice_item", None),
         }
         for r in (doc.get("items") or [])
@@ -1405,6 +1558,27 @@ def _build_refund_response(doc, duplicate=False):
     ]
     fbr_status = _cf("custom_fbr_status")
     fbr_invoice_number = _cf("custom_fbr_invoice_number")
+    merchandise_refund = abs(
+        flt(sum(flt(r.amount) for r in (doc.get("items") or [])), 2)
+    )
+    gst_refund = abs(
+        flt(
+            sum(
+                flt(getattr(r, "custom_fbr_sales_tax", 0) or 0)
+                for r in (doc.get("items") or [])
+            ),
+            2,
+        )
+    )
+    total_refund = abs(flt(doc.grand_total, 2))
+
+    non_refundable_fee = 0.0
+    if getattr(doc, "return_against", None):
+        original = frappe.get_doc("POS Invoice", doc.return_against)
+        for tax in original.get("taxes") or []:
+            if (getattr(tax, "description", "") or "").strip() == "FBR POS Service Fee":
+                non_refundable_fee = abs(flt(getattr(tax, "tax_amount", 0) or 0, 2))
+                break
 
     return {
         "success": True,
@@ -1426,6 +1600,12 @@ def _build_refund_response(doc, duplicate=False):
             "response_code": str(_cf("custom_fbr_http_status") or ""),
             "invoice_number": fbr_invoice_number or "",
             "message": _cf("custom_fbr_error") or "",
+        },
+        "refund_totals": {
+            "merchandise_refund": merchandise_refund,
+            "gst_refund": gst_refund,
+            "non_refundable_fbr_pos_fee": non_refundable_fee,
+            "total_refund": total_refund,
         },
     }
 
@@ -1493,6 +1673,11 @@ def get_pos_invoice_for_refund(invoice_name):
         {"mode_of_payment": p.mode_of_payment, "amount": flt(p.amount, 2)}
         for p in (original.get("payments") or [])
     ]
+    fbr_pos_service_fee = 0.0
+    for tax in original.get("taxes") or []:
+        if (getattr(tax, "description", "") or "").strip() == "FBR POS Service Fee":
+            fbr_pos_service_fee = abs(flt(getattr(tax, "tax_amount", 0) or 0, 2))
+            break
 
     return {
         "original_invoice": original.name,
@@ -1504,6 +1689,7 @@ def get_pos_invoice_for_refund(invoice_name):
         "posting_time": str(original.posting_time),
         "grand_total": flt(original.grand_total, 2),
         "rounded_total": flt(getattr(original, "rounded_total", None) or original.grand_total, 2),
+        "fbr_pos_service_fee": fbr_pos_service_fee,
         "payments": payments,
         "fbr_status": getattr(original, "custom_fbr_status", None),
         "fbr_invoice_number": getattr(original, "custom_fbr_invoice_number", None),
@@ -1587,15 +1773,22 @@ def submit_pos_refund(
     return_doc.posting_time = nowtime()
 
     # Restrict to requested rows and quantities (return quantities are negative).
+    original_by_name = {r.name: r for r in original.items}
     kept = []
     for row in return_doc.items:
         original_row = getattr(row, "pos_invoice_item", None)
         if original_row in requested:
             row.qty = -abs(flt(requested[original_row], 3))
+            _preserve_original_return_row_values(
+                row,
+                original_by_name[original_row],
+                requested[original_row],
+            )
             kept.append(row)
     if not kept:
         frappe.throw(_("No matching original rows for the requested return"))
     return_doc.set("items", kept)
+    _validate_return_doc_against_original(return_doc, original)
 
     if return_doc.meta.has_field("custom_terminal_refund_id"):
         return_doc.custom_terminal_refund_id = terminal_refund_id
@@ -1613,6 +1806,7 @@ def submit_pos_refund(
     return_doc.run_method("calculate_taxes_and_totals")
     build_pos_payload(return_doc)
     apply_fbr_accounting_rows(return_doc)
+    _validate_return_doc_against_original(return_doc, original)
 
     _set_refund_payments(return_doc, pos, payments)
 
