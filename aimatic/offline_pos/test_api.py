@@ -817,14 +817,63 @@ class TestPosRefund(_AimTestCase):
         self.assertEqual(_normalize_refund_fbr_status("Failed", "FBR-1"), "Failed")
         self.assertEqual(_normalize_refund_fbr_status("Sending", "FBR-1"), "Pending")
 
+    def test_refund_permission_allows_supervisor_role(self):
+        from aimatic.offline_pos.api import _require_refund_permission
+
+        pos = frappe._dict(name="POS-A")
+        pos.meta = frappe._dict(has_field=lambda fieldname: False)
+
+        with patch("aimatic.offline_pos.api.frappe.get_roles", return_value=["POS Supervisor"]):
+            _require_refund_permission(pos)
+
+    def test_refund_permission_allows_profile_user(self):
+        from aimatic.offline_pos.api import _require_refund_permission
+
+        frappe.set_user("cashier@example.com")
+        pos = frappe._dict(
+            name="POS-A",
+            custom_refund_allowed_users=[frappe._dict(user="cashier@example.com")],
+        )
+        pos.meta = frappe._dict(
+            has_field=lambda fieldname: fieldname == "custom_refund_allowed_users"
+        )
+
+        with patch("aimatic.offline_pos.api.frappe.get_roles", return_value=[]):
+            _require_refund_permission(pos)
+
+    def test_refund_permission_blocks_empty_profile_allow_list(self):
+        from aimatic.offline_pos.api import _require_refund_permission
+
+        frappe.set_user("cashier@example.com")
+        pos = frappe._dict(name="POS-A", custom_refund_allowed_users=[])
+        pos.meta = frappe._dict(
+            has_field=lambda fieldname: fieldname == "custom_refund_allowed_users"
+        )
+
+        with patch("aimatic.offline_pos.api.frappe.get_roles", return_value=[]):
+            with self.assertRaises(FrappePermissionError):
+                _require_refund_permission(pos)
+
+    def test_refund_permission_blocks_missing_role_without_profile_field(self):
+        from aimatic.offline_pos.api import _require_refund_permission
+
+        frappe.set_user("cashier@example.com")
+        pos = frappe._dict(name="POS-A")
+        pos.meta = frappe._dict(has_field=lambda fieldname: False)
+
+        with patch("aimatic.offline_pos.api.frappe.get_roles", return_value=[]):
+            with self.assertRaises(FrappePermissionError):
+                _require_refund_permission(pos)
+
     def test_returned_qty_aggregates_by_original_row(self):
         from unittest.mock import patch as _patch
         from aimatic.offline_pos.api import _validate_refund_quantities
 
-        original = frappe._dict(
-            name="ORIG-1",
-            items=[frappe._dict(name="row-a", qty=5, item_code="ITEM-A")],
-        )
+        class _Original:
+            name = "ORIG-1"
+            items = [frappe._dict(name="row-a", qty=5, item_code="ITEM-A")]
+
+        original = _Original()
         # 2 already returned -> remaining 3; requesting 4 must fail, 3 must pass.
         with _patch(
             "aimatic.offline_pos.api._returned_qty_by_row", return_value={"row-a": 2}
@@ -951,7 +1000,7 @@ class TestPosRefund(_AimTestCase):
         ):
             payload = build_return_item_payload(row)
 
-        self.assertEqual(payload["InvoiceType"], 2)
+        self.assertEqual(payload["InvoiceType"], 1)
         self.assertEqual(payload["SaleValue"], 100)
         self.assertEqual(payload["TaxCharged"], 17)
         self.assertEqual(payload["TotalAmount"], 117)

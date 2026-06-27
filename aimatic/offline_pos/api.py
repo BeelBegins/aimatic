@@ -1,10 +1,16 @@
 import json
+import secrets
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, now_datetime, nowdate, nowtime
+from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime, nowdate, nowtime
+from frappe.utils.data import sha256_hash
+from frappe.utils.password import check_password
 
 _MAX_PAGE_SIZE = 1000
+_ALLOWED_POS_ADMIN_ACTIONS = {"setup_pin", "reset_pin", "change_credentials"}
+_ALLOWED_POS_ADMIN_ROLES = {"POS Supervisor", "System Manager"}
+_ALLOWED_REFUND_ROLES = {"POS Supervisor", "System Manager"}
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +92,136 @@ def _parse_json_param(value, name="parameter"):
         except Exception:
             frappe.throw(_("Invalid JSON for {0}").format(name))
     return value
+
+
+def _hash_pos_admin_token(token):
+    return sha256_hash(token or "")
+
+
+def _audit_pos_admin_action(user, action, terminal_id, status):
+    if user and not frappe.db.exists("User", user):
+        user = None
+
+    frappe.get_doc({
+        "doctype": "POS Admin Audit Log",
+        "user": user,
+        "action": action,
+        "terminal_id": terminal_id,
+        "status": status,
+        "created_at": now_datetime(),
+    }).insert(ignore_permissions=True)
+
+
+def _require_https_for_pos_admin_authorization():
+    request = getattr(frappe.local, "request", None)
+    scheme = (getattr(request, "scheme", "") or "").lower()
+
+    if scheme != "https":
+        frappe.throw(_("HTTPS is required for supervisor authorization"))
+
+
+def _validate_pos_admin_action_args(action, terminal_id):
+    if action not in _ALLOWED_POS_ADMIN_ACTIONS:
+        frappe.throw(_("Invalid admin action"))
+
+    if not terminal_id:
+        frappe.throw(_("Supervisor credentials, action and terminal ID are required"))
+
+
+@frappe.whitelist()
+def authorize_pos_admin_action(username, password, action, terminal_id):
+    _require_login()
+    _require_https_for_pos_admin_authorization()
+
+    _validate_pos_admin_action_args(action, terminal_id)
+
+    if not username or not password:
+        frappe.throw(_("Supervisor credentials, action and terminal ID are required"))
+
+    # Use Frappe password verification. Do not compare hashes manually.
+    try:
+        check_password(username, password)
+    except Exception:
+        _audit_pos_admin_action(username, action, terminal_id, "failed")
+        frappe.throw(_("Supervisor authorization failed"), frappe.AuthenticationError)
+
+    user = frappe.get_doc("User", username)
+    if not user.enabled:
+        _audit_pos_admin_action(username, action, terminal_id, "disabled_user")
+        frappe.throw(_("Supervisor authorization failed"), frappe.AuthenticationError)
+
+    roles = set(frappe.get_roles(username))
+    if not roles.intersection(_ALLOWED_POS_ADMIN_ROLES):
+        _audit_pos_admin_action(username, action, terminal_id, "missing_role")
+        frappe.throw(_("Supervisor authorization failed"), frappe.PermissionError)
+
+    token = secrets.token_urlsafe(32)
+    token_hash = _hash_pos_admin_token(token)
+    expires_at = add_to_date(now_datetime(), minutes=5)
+
+    doc = frappe.get_doc({
+        "doctype": "POS Admin Authorization",
+        "user": username,
+        "action": action,
+        "terminal_id": terminal_id,
+        "token_hash": token_hash,
+        "expires_at": expires_at,
+        "used": 0,
+    })
+    doc.insert(ignore_permissions=True)
+
+    _audit_pos_admin_action(username, action, terminal_id, "success")
+
+    return {
+        "token": token,
+        "expires_at": str(expires_at),
+    }
+
+
+@frappe.whitelist()
+def consume_pos_admin_authorization(token, action, terminal_id):
+    _require_login()
+    _require_https_for_pos_admin_authorization()
+
+    _validate_pos_admin_action_args(action, terminal_id)
+
+    if not token:
+        frappe.throw(_("Supervisor authorization token is required"))
+
+    token_hash = _hash_pos_admin_token(token)
+    auth_name = frappe.db.get_value(
+        "POS Admin Authorization",
+        {
+            "token_hash": token_hash,
+            "action": action,
+            "terminal_id": terminal_id,
+        },
+        "name",
+    )
+
+    if not auth_name:
+        _audit_pos_admin_action(None, action, terminal_id, "invalid_token")
+        frappe.throw(_("Supervisor authorization token is invalid"), frappe.PermissionError)
+
+    frappe.db.sql(
+        "SELECT name FROM `tabPOS Admin Authorization` WHERE name = %s FOR UPDATE",
+        (auth_name,),
+    )
+    auth = frappe.get_doc("POS Admin Authorization", auth_name)
+
+    if cint(auth.used):
+        _audit_pos_admin_action(auth.user, action, terminal_id, "token_used")
+        frappe.throw(_("Supervisor authorization token has already been used"), frappe.PermissionError)
+
+    if now_datetime() > get_datetime(auth.expires_at):
+        _audit_pos_admin_action(auth.user, action, terminal_id, "token_expired")
+        frappe.throw(_("Supervisor authorization token has expired"), frappe.PermissionError)
+
+    auth.used = 1
+    auth.save(ignore_permissions=True)
+    _audit_pos_admin_action(auth.user, action, terminal_id, "token_consumed")
+
+    return {"success": True}
 
 
 # ---------------------------------------------------------------------------
@@ -1325,6 +1461,48 @@ def get_pos_fbr_item_config(
 _FBR_INVALID_NUMBERS = {"", "none", "null", "n/a", "na", "not available"}
 
 
+def _pos_profile_user_allowed(pos, fieldname, user):
+    if not pos.meta.has_field(fieldname):
+        return None
+
+    allowed_users = {
+        getattr(row, "user", None)
+        for row in (pos.get(fieldname) or [])
+        if getattr(row, "user", None)
+    }
+
+    if not allowed_users:
+        return False
+
+    return user in allowed_users
+
+
+def _require_refund_permission(pos):
+    """Require a refund role, or an explicit POS Profile user allow-list entry."""
+    user = frappe.session.user
+    roles = set(frappe.get_roles(user))
+
+    if roles.intersection(_ALLOWED_REFUND_ROLES):
+        return
+
+    allowed = _pos_profile_user_allowed(pos, "custom_refund_allowed_users", user)
+    if allowed is True:
+        return
+
+    if allowed is False:
+        frappe.throw(
+            _("Refund is not allowed for user {0} on POS Profile {1}").format(
+                user, pos.name
+            ),
+            frappe.PermissionError,
+        )
+
+    frappe.throw(
+        _("Refund requires POS Supervisor or System Manager role"),
+        frappe.PermissionError,
+    )
+
+
 def _returned_qty_by_row(original_name):
     """Absolute returned quantity per original POS Invoice Item row.
 
@@ -1746,6 +1924,7 @@ def submit_pos_refund(
 
     # POS Profile membership + an active submitted opening entry for this cashier.
     pos = _load_pos_profile(original.pos_profile)
+    _require_refund_permission(pos)
     _validate_pos_opening_entry(pos.name)
 
     # Aggregate requested quantities by original child-row name.

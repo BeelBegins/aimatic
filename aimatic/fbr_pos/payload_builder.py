@@ -334,7 +334,7 @@ def build_return_item_payload(row):
         "TotalAmount": total_amount,
         "Discount": money(abs(flt(original.discount_amount)) * ratio),
         "FurtherTax": 0,
-        "InvoiceType": 2,
+        "InvoiceType": 1,
     }
 
 
