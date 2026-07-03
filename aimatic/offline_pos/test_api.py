@@ -33,9 +33,28 @@ def _site_customer_name():
     return row
 
 
+def _site_stocked_item_code():
+    """An active sales item with real stock on hand, for tests that actually
+    submit a POS Invoice (submission validates stock; _ITEM_CODE is not
+    guaranteed to have any, and preview-only tests don't need it to)."""
+    row = frappe.db.sql(
+        """
+        SELECT bin.item_code
+        FROM `tabBin` bin
+        INNER JOIN `tabItem` item ON item.item_code = bin.item_code
+        WHERE bin.actual_qty > 0
+          AND item.disabled = 0
+          AND item.is_sales_item = 1
+        LIMIT 1
+        """
+    )
+    return row[0][0] if row else None
+
+
 _POS_PROFILE_NAME = _site_pos_profile_name()
 _ITEM_CODE = _site_item_code()
 _CUSTOMER_NAME = _site_customer_name()
+_STOCKED_ITEM_CODE = _site_stocked_item_code()
 
 
 def _require_fixtures(test):
@@ -118,9 +137,9 @@ def _make_restricted_pos_profile(restrict_to_user):
         "income_account": ref.income_account,
         "write_off_account": ref.write_off_account,
         "write_off_cost_center": ref.write_off_cost_center,
-        "territory": ref.territory,
-        "customer_group": ref.customer_group,
+        "write_off_limit": ref.write_off_limit,
         "cost_center": ref.cost_center,
+        "branch": ref.get("branch"),  # mandatory accounting dimension on this site
     })
     for d in ref.get("payments") or []:
         pos.append("payments", {"mode_of_payment": d.mode_of_payment, "default": d.default or 0})
@@ -792,13 +811,16 @@ class TestPosRefund(_AimTestCase):
 
         frappe.set_user("Guest")
         with self.assertRaises(FrappePermissionError):
-            submit_pos_refund("rid", "ANY")
+            submit_pos_refund("rid", "ANY", "cashier@example.com")
 
     def test_submit_refund_requires_terminal_refund_id(self):
         from aimatic.offline_pos.api import submit_pos_refund
 
         with self.assertRaises(frappe.ValidationError):
-            submit_pos_refund("", "ANY", items=[{"original_row_name": "x", "qty": 1}])
+            submit_pos_refund(
+                "", "ANY", "cashier@example.com",
+                items=[{"original_row_name": "x", "qty": 1}],
+            )
 
     def test_get_invoice_for_refund_requires_name(self):
         from aimatic.offline_pos.api import get_pos_invoice_for_refund
@@ -1006,6 +1028,445 @@ class TestPosRefund(_AimTestCase):
         self.assertEqual(payload["TotalAmount"], 117)
         self.assertEqual(payload["Discount"], 2)
         self.assertEqual(row.custom_fbr_sales_tax, 17)
+
+
+# ---------------------------------------------------------------------------
+# Cashier-aware endpoints — pos_cashier_login, start_pos_session,
+# get_active_pos_session, get_pos_closing_summary, close_pos_session,
+# submit_online_sale
+# ---------------------------------------------------------------------------
+
+def _make_cashier(roles=("POS User",), enabled=1, password="Cashier@12345"):
+    """Create a throw-away cashier User with the given roles.
+
+    Rolled back with the rest of the test transaction. Each call uses a
+    unique email, so a stale Redis role-cache entry from an earlier test can
+    never be mistaken for this user's roles.
+    """
+    email = "cashier_{0}@example.com".format(frappe.generate_hash(length=8))
+    user = frappe.get_doc({
+        "doctype": "User",
+        "email": email,
+        "first_name": "Test Cashier",
+        "send_welcome_email": 0,
+        "enabled": enabled,
+    })
+    user.insert(ignore_permissions=True)
+    if roles:
+        user.add_roles(*roles)
+
+    from frappe.utils.password import update_password
+    update_password(email, password)
+
+    return email, password
+
+
+class TestPosCashierLogin(_AimTestCase):
+    """pos_cashier_login: credential/role/profile checks, no session created."""
+
+    @_require_fixtures
+    def test_login_success(self):
+        from aimatic.offline_pos.api import pos_cashier_login
+
+        cashier, password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+
+        result = pos_cashier_login(cashier, password, "TERM-1", profile)
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["user"], cashier)
+        self.assertEqual(result["allowed_pos_profiles"], [profile])
+        self.assertEqual(result["default_pos_profile"], profile)
+        self.assertTrue(result["can_start_shift"])
+        self.assertTrue(result["require_pin_setup"])
+        self.assertIn("offline_login_expires_at", result)
+        # Caller's own session must be untouched — no cashier session created.
+        self.assertEqual(frappe.session.user, "Administrator")
+
+        log = frappe.get_all(
+            "POS Cashier Login Log",
+            filters={"user": cashier, "status": "success"},
+            fields=["name"],
+        )
+        self.assertEqual(len(log), 1)
+
+    @_require_fixtures
+    def test_login_wrong_password(self):
+        from aimatic.offline_pos.api import pos_cashier_login
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+
+        with self.assertRaises(frappe.AuthenticationError):
+            pos_cashier_login(cashier, "definitely-wrong", "TERM-1", profile)
+
+    @_require_fixtures
+    def test_login_disabled_cashier(self):
+        from aimatic.offline_pos.api import pos_cashier_login
+
+        cashier, password = _make_cashier(roles=("POS User",), enabled=0)
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+
+        with self.assertRaises(frappe.AuthenticationError):
+            pos_cashier_login(cashier, password, "TERM-1", profile)
+
+    @_require_fixtures
+    def test_login_missing_pos_role(self):
+        from aimatic.offline_pos.api import pos_cashier_login
+
+        cashier, password = _make_cashier(roles=())
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+
+        with self.assertRaises(FrappePermissionError):
+            pos_cashier_login(cashier, password, "TERM-1", profile)
+
+    @_require_fixtures
+    def test_login_pos_profile_not_allowed(self):
+        from aimatic.offline_pos.api import pos_cashier_login
+
+        cashier, password = _make_cashier(roles=("POS User",))
+        other_cashier, _pw = _make_cashier(roles=("POS User",))
+        # Profile is restricted to a different user entirely.
+        profile = _make_restricted_pos_profile(other_cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+
+        with self.assertRaises(FrappePermissionError):
+            pos_cashier_login(cashier, password, "TERM-1", profile)
+
+
+class TestStartPosSessionCashier(_AimTestCase):
+    @_require_fixtures
+    def test_start_shift_as_cashier(self):
+        from aimatic.offline_pos.api import start_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+
+        result = start_pos_session(profile, cashier)
+
+        self.assertEqual(result["user"], cashier)
+        self.assertEqual(result["cashier_user"], cashier)
+        self.assertIn("cashier_full_name", result)
+        self.assertEqual(
+            frappe.db.get_value("POS Opening Entry", result["name"], "user"), cashier
+        )
+
+
+class TestGetActivePosSessionCashier(_AimTestCase):
+    @_require_fixtures
+    def test_get_active_session_as_cashier(self):
+        from aimatic.offline_pos.api import get_active_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        result = get_active_pos_session(profile, cashier)
+
+        self.assertEqual(result["opening_entry"], opening.name)
+        self.assertEqual(result["cashier_user"], cashier)
+        self.assertEqual(result["pos_profile"], profile)
+        self.assertEqual(result["status"], "Open")
+
+
+class TestGetPosClosingSummaryCashier(_AimTestCase):
+    @_require_fixtures
+    def test_close_summary_as_cashier(self):
+        from aimatic.offline_pos.api import get_pos_closing_summary
+
+        cashier, _password = _make_cashier(roles=("POS Supervisor",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        result = get_pos_closing_summary(opening.name, cashier)
+
+        self.assertEqual(result["cashierUser"], cashier)
+        self.assertEqual(result["openingEntry"], opening.name)
+
+    @_require_fixtures
+    def test_close_summary_wrong_cashier_blocked(self):
+        from aimatic.offline_pos.api import get_pos_closing_summary
+
+        owner_cashier, _pw1 = _make_cashier(roles=("POS Supervisor",))
+        other_cashier, _pw2 = _make_cashier(roles=("POS Supervisor",))
+        profile = _make_restricted_pos_profile(owner_cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=owner_cashier)
+
+        with self.assertRaises(FrappePermissionError):
+            get_pos_closing_summary(opening.name, other_cashier)
+
+
+class TestClosePosSessionCashier(_AimTestCase):
+    @_require_fixtures
+    def test_close_shift_supervisor_allowed(self):
+        from aimatic.offline_pos.api import close_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS Supervisor",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        result = close_pos_session(opening.name, cashier, [])
+
+        self.assertEqual(result["status"], "Closed")
+        self.assertEqual(result["cashier_user"], cashier)
+        self.assertEqual(
+            frappe.db.get_value("POS Opening Entry", opening.name, "status"), "Closed"
+        )
+
+    @_require_fixtures
+    def test_close_shift_normal_cashier_blocked(self):
+        """A plain POS User can open a shift but cannot close it here."""
+        from aimatic.offline_pos.api import close_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        with self.assertRaises(FrappePermissionError):
+            close_pos_session(opening.name, cashier, [])
+
+        self.assertEqual(
+            frappe.db.get_value("POS Opening Entry", opening.name, "status"), "Open"
+        )
+
+    @_require_fixtures
+    def test_close_shift_wrong_cashier_blocked(self):
+        """Cannot close another cashier's shift, even with a supervisor role."""
+        from aimatic.offline_pos.api import close_pos_session
+
+        owner_cashier, _pw1 = _make_cashier(roles=("POS User",))
+        other_supervisor, _pw2 = _make_cashier(roles=("POS Supervisor",))
+        profile = _make_restricted_pos_profile(owner_cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=owner_cashier)
+
+        with self.assertRaises(FrappePermissionError):
+            close_pos_session(opening.name, other_supervisor, [])
+
+        self.assertEqual(
+            frappe.db.get_value("POS Opening Entry", opening.name, "status"), "Open"
+        )
+
+
+class TestSubmitOnlineSaleCashier(_AimTestCase):
+    """Cashier-aware guard rails on submit_online_sale.
+
+    Full end-to-end FBR submission is exercised in test_offline_sale_cashier_pin_accepted;
+    the rejection-path tests below never reach invoice building or FBR at all.
+    """
+
+    @_require_fixtures
+    def test_submit_sale_opening_entry_cashier_mismatch_blocked(self):
+        from aimatic.offline_pos.api import submit_online_sale
+
+        owner_cashier, _pw1 = _make_cashier(roles=("POS User",))
+        other_cashier, _pw2 = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(owner_cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=owner_cashier)
+
+        with self.assertRaises(FrappePermissionError):
+            submit_online_sale(
+                terminal_invoice_id="TI-MISMATCH-{0}".format(frappe.generate_hash(length=6)),
+                terminal_id="TERM-1",
+                pos_profile=profile,
+                opening_entry=opening.name,
+                customer=self._customer_or_skip(),
+                items=[{"item_code": self._item_or_skip(), "qty": 1}],
+                payments=[{"mode_of_payment": "Cash", "amount": 1}],
+                cashier_user=other_cashier,
+            )
+
+    @_require_fixtures
+    def test_offline_sale_cached_password_rejected(self):
+        from aimatic.offline_pos.api import submit_online_sale
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        with self.assertRaises(FrappePermissionError):
+            submit_online_sale(
+                terminal_invoice_id="TI-CACHEDPW-{0}".format(frappe.generate_hash(length=6)),
+                terminal_id="TERM-1",
+                pos_profile=profile,
+                opening_entry=opening.name,
+                customer=self._customer_or_skip(),
+                items=[{"item_code": self._item_or_skip(), "qty": 1}],
+                payments=[{"mode_of_payment": "Cash", "amount": 1}],
+                cashier_user=cashier,
+                offline_authenticated=1,
+                offline_auth_method="cached_password",
+            )
+
+    @_require_fixtures
+    def test_disabled_cashier_queued_sale_rejected(self):
+        from aimatic.offline_pos.api import submit_online_sale
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        # Disabled after the shift was opened, e.g. mid-shift by an admin.
+        frappe.db.set_value("User", cashier, "enabled", 0)
+
+        with self.assertRaises(FrappePermissionError):
+            submit_online_sale(
+                terminal_invoice_id="TI-DISABLED-{0}".format(frappe.generate_hash(length=6)),
+                terminal_id="TERM-1",
+                pos_profile=profile,
+                opening_entry=opening.name,
+                customer=self._customer_or_skip(),
+                items=[{"item_code": self._item_or_skip(), "qty": 1}],
+                payments=[{"mode_of_payment": "Cash", "amount": 1}],
+                cashier_user=cashier,
+                offline_authenticated=1,
+                offline_auth_method="cashier_pin",
+            )
+
+    @_require_fixtures
+    def test_idempotent_terminal_invoice_id_still_works(self):
+        from aimatic.offline_pos.api import submit_online_sale, _build_pos_invoice_doc
+
+        if not _STOCKED_ITEM_CODE:
+            raise unittest.SkipTest("No item with on-hand stock found on site")
+
+        terminal_invoice_id = "TI-IDEMPOTENT-{0}".format(frappe.generate_hash(length=6))
+
+        pos = frappe.get_cached_doc("POS Profile", _POS_PROFILE_NAME)
+        cust = frappe.get_cached_doc("Customer", _CUSTOMER_NAME)
+        with _patch_fbr():
+            doc = _build_pos_invoice_doc(pos, cust, [{"item_code": _STOCKED_ITEM_CODE, "qty": 1}])
+            doc.custom_terminal_invoice_id = terminal_invoice_id
+            doc.append("payments", {"mode_of_payment": "Cash", "amount": doc.grand_total or 1})
+            doc.insert(ignore_permissions=True)  # draft is enough: idempotency doesn't check docstatus
+
+        before_count = frappe.db.count(
+            "POS Invoice", {"custom_terminal_invoice_id": terminal_invoice_id}
+        )
+        self.assertEqual(before_count, 1)
+
+        result = submit_online_sale(
+            terminal_invoice_id=terminal_invoice_id,
+            terminal_id="TERM-1",
+            pos_profile=_POS_PROFILE_NAME,
+            opening_entry="NONEXISTENT-DOES-NOT-MATTER",
+            customer=_CUSTOMER_NAME,
+            items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
+            payments=[{"mode_of_payment": "Cash", "amount": 1}],
+            cashier_user="whoever@example.com",
+        )
+
+        self.assertEqual(result["pos_invoice"], doc.name)
+        after_count = frappe.db.count(
+            "POS Invoice", {"custom_terminal_invoice_id": terminal_invoice_id}
+        )
+        self.assertEqual(after_count, 1)
+
+    @_require_fixtures
+    def test_offline_sale_cashier_pin_accepted(self):
+        from aimatic.offline_pos.api import submit_online_sale
+
+        if not _STOCKED_ITEM_CODE:
+            raise unittest.SkipTest("No item with on-hand stock found on site")
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        with _patch_fbr(), patch(
+            "aimatic.fbr_pos.events.submit_pos_invoice_to_fbr", return_value=None
+        ):
+            result = submit_online_sale(
+                terminal_invoice_id="TI-PIN-{0}".format(frappe.generate_hash(length=6)),
+                terminal_id="TERM-1",
+                pos_profile=profile,
+                opening_entry=opening.name,
+                customer=self._customer_or_skip(),
+                items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
+                payments=[{"mode_of_payment": "Cash", "amount": 999999}],
+                cashier_user=cashier,
+                cashier_full_name="Test Cashier",
+                offline_authenticated=1,
+                offline_auth_method="cashier_pin",
+                local_offline_session_id="offline-sess-1",
+            )
+
+        self.assertEqual(result["docstatus"], 1)
+        self.assertEqual(result["cashier_user"], cashier)
+        self.assertTrue(result["offline_authenticated"])
+        # ERPNext's POS Closing Entry matches shift invoices by `owner`, so this
+        # must be reattributed from the terminal's session to the cashier.
+        self.assertEqual(
+            frappe.db.get_value("POS Invoice", result["pos_invoice"], "owner"), cashier
+        )
+        self.assertEqual(
+            frappe.db.get_value("POS Invoice", result["pos_invoice"], "custom_offline_auth_method"),
+            "cashier_pin",
+        )
+
+    def _customer_or_skip(self):
+        if not _CUSTOMER_NAME:
+            raise unittest.SkipTest("No customer fixture on site")
+        return _CUSTOMER_NAME
+
+    def _item_or_skip(self):
+        if not _ITEM_CODE:
+            raise unittest.SkipTest("No item fixture on site")
+        return _ITEM_CODE
+
+
+class TestSubmitPosRefundCashier(_AimTestCase):
+    """Cashier-aware guard rails on submit_pos_refund.
+
+    Full end-to-end refund submission (original sale + FBR credit note) is
+    out of scope here for the same reason as the rest of TestPosRefund: it
+    requires FBR Integration Settings and network access. These tests target
+    the cashier-identity/ownership hardening directly instead.
+    """
+
+    def test_submit_refund_requires_cashier_user(self):
+        from aimatic.offline_pos.api import submit_pos_refund
+
+        with self.assertRaises(FrappePermissionError):
+            submit_pos_refund(
+                "rid", "ANY", "",
+                items=[{"original_row_name": "x", "qty": 1}],
+            )
+
+    def test_refund_permission_checks_passed_user_not_session(self):
+        """_require_refund_permission(pos, user) must authorize `user`'s roles,
+        not frappe.session.user — the terminal's own session is never the
+        cashier processing the refund."""
+        from aimatic.offline_pos.api import _require_refund_permission
+
+        frappe.set_user("Administrator")  # session user would pass any role check
+        pos = frappe._dict(name="POS-A")
+        pos.meta = frappe._dict(has_field=lambda fieldname: False)
+
+        def _roles_for(user):
+            return ["POS Supervisor"] if user == "cashier@example.com" else []
+
+        with patch("aimatic.offline_pos.api.frappe.get_roles", side_effect=_roles_for):
+            # Explicit cashier with the role succeeds...
+            _require_refund_permission(pos, "cashier@example.com")
+            # ...but a different explicit user without the role is blocked,
+            # even though frappe.session.user (Administrator) would pass.
+            with self.assertRaises(FrappePermissionError):
+                _require_refund_permission(pos, "someone_else@example.com")
 
 
 class _patch_fbr:

@@ -11,6 +11,9 @@ _MAX_PAGE_SIZE = 1000
 _ALLOWED_POS_ADMIN_ACTIONS = {"setup_pin", "reset_pin", "change_credentials"}
 _ALLOWED_POS_ADMIN_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_REFUND_ROLES = {"POS Supervisor", "System Manager"}
+_ALLOWED_CLOSE_SHIFT_ROLES = {"POS Supervisor", "System Manager"}
+_ALLOWED_CASHIER_ROLES = {"POS User", "POS Supervisor", "System Manager"}
+_CASHIER_OFFLINE_LOGIN_VALID_DAYS = 7
 
 
 # ---------------------------------------------------------------------------
@@ -45,14 +48,16 @@ def _load_pos_profile(pos_profile_name):
     return pos
 
 
-def _validate_pos_opening_entry(pos_profile_name):
-    """Raise if there is no active submitted POS Opening Entry for the current user and profile."""
+def _validate_pos_opening_entry(pos_profile_name, user=None):
+    """Raise if there is no active submitted POS Opening Entry for the given
+    user (defaults to the authenticated session user) and profile."""
+    user = user or frappe.session.user
     opening_entries = frappe.get_all(
         "POS Opening Entry",
         fields=["name", "period_start_date"],
         filters={
             "pos_profile": pos_profile_name,
-            "user": frappe.session.user,
+            "user": user,
             "status": "Open",
             "docstatus": 1,
         },
@@ -67,6 +72,99 @@ def _validate_pos_opening_entry(pos_profile_name):
         )
 
     return opening_entries[0]
+
+
+def _get_pos_profile_or_throw(pos_profile_name):
+    """Load a POS Profile by existence/disabled state only.
+
+    Unlike _load_pos_profile, this does not check whether the authenticated
+    caller belongs to the profile's applicable_for_users list. Cashier-aware
+    endpoints are called by a terminal's own fixed API identity on behalf of
+    a separate human cashier, so "does the caller belong to this profile" is
+    the wrong question — cashier membership is checked independently against
+    the actual cashier_user via _validate_cashier_identity.
+    """
+    if not frappe.db.exists("POS Profile", pos_profile_name):
+        frappe.throw(_("Invalid POS Profile: {0}").format(pos_profile_name))
+
+    pos = frappe.get_cached_doc("POS Profile", pos_profile_name)
+    if cint(pos.disabled):
+        frappe.throw(_("POS Profile {0} is disabled").format(pos.name))
+
+    return pos
+
+
+def _validate_cashier_identity(cashier_user, pos, required_roles=None):
+    """Validate a human cashier against current server state.
+
+    Checks the cashier exists, is enabled, holds one of required_roles
+    (default _ALLOWED_CASHIER_ROLES), and is permitted on this POS Profile's
+    applicable_for_users list.  Raises frappe.PermissionError with a clear
+    message on any failure.  Returns the cashier's role set (minus All/Guest).
+    """
+    if not cashier_user:
+        frappe.throw(_("cashier_user is required"), frappe.PermissionError)
+
+    if not frappe.db.exists("User", cashier_user):
+        frappe.throw(_("Invalid cashier: {0}").format(cashier_user), frappe.PermissionError)
+
+    if not cint(frappe.db.get_value("User", cashier_user, "enabled")):
+        frappe.throw(_("Cashier {0} is disabled").format(cashier_user), frappe.PermissionError)
+
+    roles = set(frappe.get_roles(cashier_user)) - {"All", "Guest"}
+    required = required_roles or _ALLOWED_CASHIER_ROLES
+    if not roles.intersection(required):
+        frappe.throw(
+            _("Cashier {0} is not authorized for this POS operation").format(cashier_user),
+            frappe.PermissionError,
+        )
+
+    user_list = [r.user for r in (pos.get("applicable_for_users") or [])]
+    if user_list and cashier_user not in user_list:
+        frappe.throw(
+            _("Cashier {0} is not permitted on POS Profile {1}").format(cashier_user, pos.name),
+            frappe.PermissionError,
+        )
+
+    return roles
+
+
+def _require_open_entry_for_cashier(opening_entry, cashier_user, pos):
+    """Load a submitted, Open POS Opening Entry and confirm it belongs to
+    cashier_user and this POS Profile.  Never matches on the authenticated
+    (terminal) session user — a terminal is shared across cashiers.
+    """
+    if not opening_entry:
+        frappe.throw(_("opening_entry is required"))
+    if not cashier_user:
+        frappe.throw(_("cashier_user is required"), frappe.PermissionError)
+
+    entry = frappe.db.get_value(
+        "POS Opening Entry",
+        opening_entry,
+        ["name", "user", "pos_profile", "company", "docstatus", "status"],
+        as_dict=True,
+    )
+    if not entry:
+        frappe.throw(_("Invalid POS Opening Entry: {0}").format(opening_entry))
+
+    if entry.user != cashier_user:
+        frappe.throw(
+            _("POS Opening Entry {0} does not belong to cashier {1}").format(
+                opening_entry, cashier_user
+            ),
+            frappe.PermissionError,
+        )
+
+    if entry.pos_profile != pos.name:
+        frappe.throw(
+            _("POS Opening Entry {0} does not match POS Profile {1}").format(opening_entry, pos.name)
+        )
+
+    if entry.docstatus != 1 or entry.status != "Open":
+        frappe.throw(_("POS Opening Entry {0} is not open").format(opening_entry))
+
+    return entry
 
 
 def _load_customer(customer_name):
@@ -112,11 +210,27 @@ def _audit_pos_admin_action(user, action, terminal_id, status):
     }).insert(ignore_permissions=True)
 
 
-def _require_https_for_pos_admin_authorization():
+def _is_https_request():
     request = getattr(frappe.local, "request", None)
-    scheme = (getattr(request, "scheme", "") or "").lower()
+    if not request:
+        return False
 
-    if scheme != "https":
+    if getattr(request, "scheme", "") == "https":
+        return True
+
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "")
+    if forwarded_proto.split(",")[0].strip().lower() == "https":
+        return True
+
+    forwarded_ssl = request.headers.get("X-Forwarded-Ssl", "")
+    if forwarded_ssl.lower() == "on":
+        return True
+
+    return False
+
+
+def _require_https_for_pos_admin_authorization():
+    if not _is_https_request():
         frappe.throw(_("HTTPS is required for supervisor authorization"))
 
 
@@ -222,6 +336,106 @@ def consume_pos_admin_authorization(token, action, terminal_id):
     _audit_pos_admin_action(auth.user, action, terminal_id, "token_consumed")
 
     return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# POS cashier authentication
+# ---------------------------------------------------------------------------
+
+def _audit_cashier_login(user, terminal_id, pos_profile, status, offline_expires_at=None):
+    if user and not frappe.db.exists("User", user):
+        user = None
+    if pos_profile and not frappe.db.exists("POS Profile", pos_profile):
+        pos_profile = None
+
+    frappe.get_doc({
+        "doctype": "POS Cashier Login Log",
+        "user": user,
+        "terminal_id": terminal_id,
+        "pos_profile": pos_profile,
+        "status": status,
+        "offline_expires_at": offline_expires_at,
+        "created_at": now_datetime(),
+    }).insert(ignore_permissions=True)
+
+
+@frappe.whitelist(allow_guest=False)
+def pos_cashier_login(username, password, terminal_id, pos_profile):
+    """Verify a cashier's credentials for the Electron terminal.
+
+    Called by an already-authenticated terminal (its own persistent API
+    session) to check a specific cashier in at the register.  This does NOT
+    switch or create a Frappe session for the cashier — it only verifies
+    their credentials via Frappe's password check (never a manual hash
+    compare), confirms they hold a POS role, and confirms they are permitted
+    on the requested POS Profile.  Every attempt is written to POS Cashier
+    Login Log; the password is never logged.
+    """
+    _require_login()
+
+    if not username or not password or not terminal_id or not pos_profile:
+        frappe.throw(_("username, password, terminal_id and pos_profile are required"))
+
+    if not frappe.db.exists("User", username):
+        _audit_cashier_login(None, terminal_id, pos_profile, "invalid_user")
+        frappe.throw(_("Invalid cashier credentials"), frappe.AuthenticationError)
+
+    if not cint(frappe.db.get_value("User", username, "enabled")):
+        _audit_cashier_login(username, terminal_id, pos_profile, "disabled_user")
+        frappe.throw(_("Invalid cashier credentials"), frappe.AuthenticationError)
+
+    # Frappe-native password verification. Never compare hashes manually.
+    try:
+        check_password(username, password)
+    except Exception:
+        _audit_cashier_login(username, terminal_id, pos_profile, "failed")
+        frappe.throw(_("Invalid cashier credentials"), frappe.AuthenticationError)
+
+    roles = set(frappe.get_roles(username)) - {"All", "Guest"}
+    if not roles.intersection(_ALLOWED_CASHIER_ROLES):
+        _audit_cashier_login(username, terminal_id, pos_profile, "missing_role")
+        frappe.throw(_("Cashier is not authorized for POS operations"), frappe.PermissionError)
+
+    if not frappe.db.exists("POS Profile", pos_profile):
+        _audit_cashier_login(username, terminal_id, pos_profile, "invalid_pos_profile")
+        frappe.throw(_("Invalid POS Profile: {0}").format(pos_profile))
+
+    pos = frappe.get_cached_doc("POS Profile", pos_profile)
+    if cint(pos.disabled):
+        _audit_cashier_login(username, terminal_id, pos.name, "pos_profile_disabled")
+        frappe.throw(_("POS Profile {0} is disabled").format(pos.name))
+
+    user_list = [r.user for r in (pos.get("applicable_for_users") or [])]
+    if user_list and username not in user_list:
+        _audit_cashier_login(username, terminal_id, pos.name, "pos_profile_not_allowed")
+        frappe.throw(
+            _("Cashier {0} is not permitted on POS Profile {1}").format(username, pos.name),
+            frappe.PermissionError,
+        )
+
+    can_start_shift = True  # gated on _ALLOWED_CASHIER_ROLES above
+    can_offline_sale = True  # gated on _ALLOWED_CASHIER_ROLES above
+    can_refund = bool(roles.intersection(_ALLOWED_REFUND_ROLES))
+    can_close_shift = bool(roles.intersection(_ALLOWED_CLOSE_SHIFT_ROLES))
+
+    offline_expires_at = add_to_date(now_datetime(), days=_CASHIER_OFFLINE_LOGIN_VALID_DAYS)
+
+    _audit_cashier_login(username, terminal_id, pos.name, "success", offline_expires_at)
+
+    return {
+        "success": True,
+        "user": username,
+        "full_name": frappe.db.get_value("User", username, "full_name") or username,
+        "roles": sorted(roles),
+        "allowed_pos_profiles": [pos.name],
+        "default_pos_profile": pos.name,
+        "can_start_shift": can_start_shift,
+        "can_refund": can_refund,
+        "can_close_shift": can_close_shift,
+        "can_offline_sale": can_offline_sale,
+        "offline_login_expires_at": offline_expires_at.isoformat(),
+        "require_pin_setup": True,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -569,6 +783,9 @@ def preview_cart(
     return {"rows": rows, "taxes": taxes, "totals": totals}
 
 
+_OFFLINE_AUTH_METHOD_PIN = "cashier_pin"
+
+
 @frappe.whitelist()
 def submit_online_sale(
     terminal_invoice_id,
@@ -578,18 +795,39 @@ def submit_online_sale(
     customer,
     items,
     payments,
+    cashier_user,
     coupon_code=None,
     redeem_loyalty_points=0,
     loyalty_points=0,
+    cashier_full_name=None,
+    offline_authenticated=0,
+    offline_auth_method=None,
+    local_offline_session_id=None,
 ):
     """Create and submit a POS Invoice from the Electron terminal.
 
     Idempotent: if a POS Invoice with the same terminal_invoice_id already exists
     it is returned immediately without creating a duplicate.  This protects
-    against Electron losing the HTTP response after the invoice was created.
+    against Electron losing the HTTP response after the invoice was created,
+    and lets queued offline sales be safely retried/replayed on reconnect
+    without ever double-submitting.  An idempotent replay is never re-validated
+    against the checks below, so a cashier who was disabled after a sale
+    already succeeded cannot retroactively block Electron from confirming it.
 
     All totals, pricing rules, taxes and payable amounts are recalculated on the
     server.  Values sent by Electron are never trusted.
+
+    cashier_user is the human cashier who rang up the sale, established by
+    pos_cashier_login (possibly hours or days earlier if the terminal was
+    offline) — never the terminal's own authenticated API identity.  It is
+    re-validated against current server state on every non-idempotent call:
+    still enabled, still permitted on this POS Profile, and opening_entry
+    must actually belong to this cashier.  An offline cache can go stale, so
+    none of this is trusted from Electron without a fresh check.
+
+    offline_authenticated sales must report offline_auth_method exactly as
+    "cashier_pin" — a locally cached full account password is not an
+    acceptable offline credential and is rejected.
 
     FBR snapshot and accounting rows are applied by the existing validate hook
     (validate_pos_invoice) during doc.insert().  The FBR API call happens through
@@ -604,14 +842,27 @@ def submit_online_sale(
     if not terminal_invoice_id:
         frappe.throw(_("terminal_invoice_id is required"))
 
+    if not cashier_user:
+        frappe.throw(_("cashier_user is required"), frappe.PermissionError)
+
+    if cint(offline_authenticated) and offline_auth_method != _OFFLINE_AUTH_METHOD_PIN:
+        frappe.throw(
+            _(
+                "Offline-authenticated sales must use offline_auth_method '{0}'; "
+                "got '{1}'"
+            ).format(_OFFLINE_AUTH_METHOD_PIN, offline_auth_method),
+            frappe.PermissionError,
+        )
+
     # Idempotency: return existing invoice if one was already created for this terminal request
     existing_name = _find_existing_invoice(terminal_invoice_id)
     if existing_name:
         return _build_submission_response(frappe.get_doc("POS Invoice", existing_name))
 
     # Auth and profile checks
-    pos = _load_pos_profile(pos_profile)
-    _validate_pos_opening_entry(pos.name)
+    pos = _get_pos_profile_or_throw(pos_profile)
+    _validate_cashier_for_sale(cashier_user, pos)
+    _require_open_entry_for_cashier(opening_entry, cashier_user, pos)
     cust = _load_customer(customer)
 
     # Coerce JSON-string parameters that arrive as strings over HTTP
@@ -639,6 +890,14 @@ def submit_online_sale(
 
     # Stamp terminal identifiers before insert so they are stored with the record
     _set_terminal_fields(doc, terminal_invoice_id, terminal_id)
+    _set_cashier_offline_fields(
+        doc,
+        cashier_user,
+        cashier_full_name,
+        offline_authenticated,
+        offline_auth_method,
+        local_offline_session_id,
+    )
 
     # Insert + submit within a named savepoint so any unexpected failure rolls back
     # cleanly without aborting the outer transaction.
@@ -647,6 +906,14 @@ def submit_online_sale(
     try:
         doc.insert()   # validate hook fires: FBR snapshot + accounting rows (idempotent)
         doc.submit()   # before_submit hook fires: FBR API call
+        # ERPNext's POS Closing Entry attributes shift invoices by the `owner`
+        # metadata field (see build_invoice_query in pos_closing_entry.py), not
+        # by any cashier-specific business field.  The invoice was inserted
+        # under the terminal's own authenticated session, so owner defaults to
+        # the terminal — reattribute it to the actual cashier so end-of-shift
+        # closing/reconciliation finds this invoice under the right shift.
+        frappe.db.set_value("POS Invoice", doc.name, "owner", cashier_user, update_modified=False)
+        doc.owner = cashier_user
         frappe.db.release_savepoint(sp)
     except frappe.UniqueValidationError:
         frappe.db.rollback(save_point=sp)
@@ -754,12 +1021,58 @@ def _validate_and_set_payments(doc, pos, payments_data):
             doc.append("payments", {"mode_of_payment": mode, "amount": amount})
 
 
+def _validate_cashier_for_sale(cashier_user, pos):
+    """Re-validate a cashier at sale time; offline caches can go stale.
+
+    Raises frappe.PermissionError with a clear message if the cashier is no
+    longer enabled or no longer permitted on this POS Profile.
+    """
+    if not frappe.db.exists("User", cashier_user):
+        frappe.throw(
+            _("Cashier {0} is not a valid user").format(cashier_user), frappe.PermissionError
+        )
+
+    if not cint(frappe.db.get_value("User", cashier_user, "enabled")):
+        frappe.throw(
+            _("Cashier {0} is disabled and cannot submit sales").format(cashier_user),
+            frappe.PermissionError,
+        )
+
+    user_list = [r.user for r in (pos.get("applicable_for_users") or [])]
+    if user_list and cashier_user not in user_list:
+        frappe.throw(
+            _("Cashier {0} is not permitted on POS Profile {1}").format(cashier_user, pos.name),
+            frappe.PermissionError,
+        )
+
+
 def _set_terminal_fields(doc, terminal_invoice_id, terminal_id):
     meta = doc.meta
     if meta.has_field("custom_terminal_invoice_id"):
         doc.custom_terminal_invoice_id = terminal_invoice_id
     if meta.has_field("custom_terminal_id"):
         doc.custom_terminal_id = terminal_id or ""
+
+
+def _set_cashier_offline_fields(
+    doc,
+    cashier_user,
+    cashier_full_name,
+    offline_authenticated,
+    offline_auth_method,
+    local_offline_session_id,
+):
+    meta = doc.meta
+    if meta.has_field("custom_cashier_user"):
+        doc.custom_cashier_user = cashier_user or ""
+    if meta.has_field("custom_cashier_full_name"):
+        doc.custom_cashier_full_name = cashier_full_name or ""
+    if meta.has_field("custom_offline_authenticated"):
+        doc.custom_offline_authenticated = cint(offline_authenticated)
+    if meta.has_field("custom_offline_auth_method"):
+        doc.custom_offline_auth_method = offline_auth_method or ""
+    if meta.has_field("custom_local_offline_session_id"):
+        doc.custom_local_offline_session_id = local_offline_session_id or ""
 
 
 def _build_submission_response(doc):
@@ -814,6 +1127,9 @@ def _build_submission_response(doc):
         "fbr_invoice_number": _cf("custom_fbr_invoice_number"),
         "fbr_qr": fbr_qr,
         "fbr_usin": _cf("custom_fbr_usin"),
+        "cashier_user": _cf("custom_cashier_user"),
+        "cashier_full_name": _cf("custom_cashier_full_name"),
+        "offline_authenticated": bool(cint(_cf("custom_offline_authenticated") or 0)),
     }
 
 
@@ -867,82 +1183,87 @@ def get_customer_benefits(pos_profile, customer):
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
-def get_active_pos_session(pos_profile):
-    """Return diagnostic info about the current POS session state.
+def get_active_pos_session(pos_profile, cashier_user):
+    """Return the active POS Opening Entry for a specific cashier + POS Profile.
 
-    Always returns a dict with keys:
-        authenticated_user, requested_pos_profile, session, open_entries, reason
+    Looked up by cashier_user, never by the authenticated (terminal) session
+    user — a terminal is shared across cashiers, so "my session" is not a
+    meaningful concept here.  If a different cashier currently has this POS
+    Profile's shift open, that is surfaced under other_open_sessions as
+    diagnostic info only; it is never silently reused for a different
+    cashier_user.
     """
     _require_login()
 
-    user = frappe.session.user
-
-    # All submitted open entries across all users/profiles — for diagnostics
-    all_open = frappe.get_all(
-        "POS Opening Entry",
-        filters={"docstatus": 1, "status": "Open"},
-        fields=["name", "user", "pos_profile", "status", "docstatus", "period_start_date"],
-        order_by="period_start_date desc",
-    )
-
     if not pos_profile:
-        return {
-            "authenticated_user": user,
-            "requested_pos_profile": pos_profile,
-            "session": None,
-            "open_entries": all_open,
-            "reason": "POS Profile argument is empty",
-        }
+        frappe.throw(_("pos_profile is required"))
+    if not cashier_user:
+        frappe.throw(_("cashier_user is required"))
 
-    # Exact match for the authenticated user + requested profile
-    matched = frappe.get_all(
+    # All submitted open entries for this profile — for the match and diagnostics
+    profile_open = frappe.get_all(
         "POS Opening Entry",
-        filters={
-            "pos_profile": pos_profile,
-            "user": user,
-            "docstatus": 1,
-            "status": "Open",
-        },
-        fields=["name", "period_start_date"],
+        filters={"pos_profile": pos_profile, "docstatus": 1, "status": "Open"},
+        fields=["name", "user", "pos_profile", "company", "status", "docstatus", "period_start_date"],
         order_by="period_start_date desc",
-        limit=1,
     )
+
+    matched = next((e for e in profile_open if e.user == cashier_user), None)
 
     if matched:
-        session_doc = frappe.get_doc("POS Opening Entry", matched[0].name).as_dict()
         return {
-            "authenticated_user": user,
-            "requested_pos_profile": pos_profile,
-            "session": session_doc,
-            "open_entries": all_open,
+            "opening_entry": matched.name,
+            "user": matched.user,
+            "cashier_user": matched.user,
+            "cashier_full_name": frappe.db.get_value("User", matched.user, "full_name") or matched.user,
+            "pos_profile": matched.pos_profile,
+            "company": matched.company,
+            "status": matched.status,
+            "docstatus": matched.docstatus,
+            "period_start_date": matched.period_start_date,
             "reason": "Active session found",
+            "other_open_sessions": [],
         }
 
-    # Determine a specific reason for the miss
-    profile_entries = [e for e in all_open if e.pos_profile == pos_profile]
-    user_entries = [e for e in all_open if e.user == user]
-
-    if not all_open:
-        reason = "No submitted open POS Opening Entry exists"
-    elif profile_entries and not any(e.user == user for e in profile_entries):
-        reason = "Open session exists but cashier does not match authenticated API user"
-    elif user_entries and not any(e.pos_profile == pos_profile for e in user_entries):
-        reason = "Open session exists but POS Profile does not match"
-    else:
-        reason = "No submitted open POS Opening Entry exists"
+    other_open = [
+        {
+            "opening_entry": e.name,
+            "user": e.user,
+            "cashier_full_name": frappe.db.get_value("User", e.user, "full_name") or e.user,
+            "period_start_date": e.period_start_date,
+        }
+        for e in profile_open
+    ]
 
     return {
-        "authenticated_user": user,
-        "requested_pos_profile": pos_profile,
-        "session": None,
-        "open_entries": all_open,
-        "reason": reason,
+        "opening_entry": None,
+        "user": None,
+        "cashier_user": cashier_user,
+        "cashier_full_name": frappe.db.get_value("User", cashier_user, "full_name") or cashier_user,
+        "pos_profile": pos_profile,
+        "company": None,
+        "status": None,
+        "docstatus": None,
+        "period_start_date": None,
+        "reason": (
+            "Another cashier has this POS Profile open"
+            if other_open
+            else "No submitted open POS Opening Entry exists for this cashier"
+        ),
+        "other_open_sessions": other_open,
     }
 
 
 @frappe.whitelist()
-def close_pos_session(opening_entry, closing_balances, notes=None):
-    """Create and submit a POS Closing Entry for the current cashier's shift.
+def close_pos_session(opening_entry, cashier_user, closing_balances, notes=None):
+    """Create and submit a POS Closing Entry for a specific cashier's shift.
+
+    The authenticated caller is the terminal's own fixed API identity.
+    cashier_user must match the Opening Entry's owning cashier and must hold
+    a close-shift role (POS Supervisor or System Manager) — a plain POS User
+    can start a shift (see start_pos_session) but cannot close one here. This
+    never closes a different cashier's shift, even one open on the same
+    terminal/POS Profile.
 
     The client supplies only its counted amount for each payment mode.  Invoice
     totals, expected amounts, and the opening balance are always derived from
@@ -951,21 +1272,25 @@ def close_pos_session(opening_entry, closing_balances, notes=None):
     _require_login()
     frappe.has_permission("POS Closing Entry", "create", throw=True)
 
+    if not cashier_user:
+        frappe.throw(_("cashier_user is required"), frappe.PermissionError)
+
     try:
         opening = frappe.get_doc("POS Opening Entry", opening_entry)
     except frappe.DoesNotExistError:
         frappe.throw(_("Invalid POS Opening Entry: {0}").format(opening_entry))
 
-    if opening.user != frappe.session.user:
+    if opening.user != cashier_user:
         frappe.throw(
-            _("POS Opening Entry {0} does not belong to the authenticated user.").format(
-                opening.name
+            _("POS Opening Entry {0} does not belong to cashier {1}").format(
+                opening.name, cashier_user
             ),
             frappe.PermissionError,
         )
 
-    # Reuse the session/profile membership checks used by the other POS APIs.
-    pos = _load_pos_profile(opening.pos_profile)
+    pos = _get_pos_profile_or_throw(opening.pos_profile)
+    _validate_cashier_identity(cashier_user, pos, required_roles=_ALLOWED_CLOSE_SHIFT_ROLES)
+
     if opening.company != pos.company:
         frappe.throw(
             _("POS Opening Entry {0} does not match its POS Profile company.").format(
@@ -1037,11 +1362,16 @@ def close_pos_session(opening_entry, closing_balances, notes=None):
         make_closing_entry_from_opening,
     )
 
-    # ERPNext derives the shift invoices, payment totals, and linked documents.
+    # ERPNext derives the shift invoices, payment totals, and linked documents,
+    # matching invoices to this shift by comparing each invoice's `owner` field
+    # to closing.user — so closing.user must be the cashier who owns the shift,
+    # never the terminal's own authenticated identity (make_closing_entry_from_opening
+    # already sets this from opening_entry.user; kept explicit here since getting
+    # this wrong makes every invoice in the shift fail POS Closing Entry submission).
     closing = make_closing_entry_from_opening(opening.as_dict())
     closing.period_end_date = now_datetime()
     closing.posting_date = nowdate()
-    closing.user = frappe.session.user
+    closing.user = cashier_user
     closing.pos_profile = pos.name
     closing.company = opening.company
 
@@ -1131,6 +1461,8 @@ def _build_closing_session_response(closing, opening_entry):
         "name": closing.name,
         "opening_entry": opening_entry,
         "status": "Closed",
+        "cashier_user": closing.user,
+        "cashier_full_name": frappe.db.get_value("User", closing.user, "full_name") or closing.user,
         "grand_total": closing.grand_total,
         "net_total": closing.net_total,
         "total_quantity": closing.total_quantity,
@@ -1138,9 +1470,11 @@ def _build_closing_session_response(closing, opening_entry):
     }
 
 
-def _get_open_pos_opening_entry(opening_entry):
+def _get_open_pos_opening_entry_for_cashier(opening_entry, cashier_user):
     if not opening_entry:
         frappe.throw(_("opening_entry is required"))
+    if not cashier_user:
+        frappe.throw(_("cashier_user is required"), frappe.PermissionError)
 
     doc = frappe.get_doc("POS Opening Entry", opening_entry)
     doc.check_permission("read")
@@ -1148,17 +1482,29 @@ def _get_open_pos_opening_entry(opening_entry):
     if doc.docstatus != 1 or doc.status != "Open":
         frappe.throw(_("POS Opening Entry {0} is not open").format(opening_entry))
 
-    if doc.user != frappe.session.user:
-        frappe.throw(_("POS Opening Entry belongs to another user"), frappe.PermissionError)
+    if doc.user != cashier_user:
+        frappe.throw(
+            _("POS Opening Entry {0} does not belong to cashier {1}").format(
+                opening_entry, cashier_user
+            ),
+            frappe.PermissionError,
+        )
 
     return doc
 
 
 @frappe.whitelist()
-def get_pos_closing_summary(opening_entry):
+def get_pos_closing_summary(opening_entry, cashier_user):
+    """Preview end-of-shift totals for a specific cashier's open shift.
+
+    Callable by the terminal's own authenticated API identity, but
+    opening_entry must actually belong to cashier_user — never inferred from
+    the authenticated session, and never computed across a different
+    cashier's invoices.
+    """
     _require_login()
 
-    opening = _get_open_pos_opening_entry(opening_entry)
+    opening = _get_open_pos_opening_entry_for_cashier(opening_entry, cashier_user)
 
     from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
         make_closing_entry_from_opening,
@@ -1196,6 +1542,9 @@ def get_pos_closing_summary(opening_entry):
         "openingEntry": closing_entry.pos_opening_entry,
         "posProfile": closing_entry.pos_profile,
         "user": closing_entry.user,
+        "cashierUser": closing_entry.user,
+        "cashierFullName": frappe.db.get_value("User", closing_entry.user, "full_name")
+        or closing_entry.user,
         "company": closing_entry.company,
         "periodStart": str(closing_entry.period_start_date),
         "payments": [
@@ -1227,11 +1576,22 @@ def get_pos_closing_summary(opening_entry):
 
 
 @frappe.whitelist()
-def start_pos_session(pos_profile, opening_balances=None):
-    """Create and submit a POS Opening Entry for the current user.
+def start_pos_session(pos_profile, cashier_user, opening_balances=None):
+    """Create and submit a POS Opening Entry for a human cashier.
 
-    If an open session already exists for this user + profile, returns it
-    instead of creating a duplicate.
+    The authenticated caller is the terminal's own fixed API identity;
+    cashier_user is the human cashier who will own the shift.  cashier_user is
+    validated independently (exists, enabled, holds a POS role, permitted on
+    this POS Profile) and the resulting Opening Entry is always created under
+    cashier_user — never under the terminal's own authenticated user.
+
+    Idempotent: if cashier_user already has an open submitted Opening Entry
+    for this POS Profile + company, it is returned instead of creating a
+    duplicate.  This also covers the offline-batch case, where Electron may
+    call this repeatedly while replaying a queue of offline sales without a
+    real per-shift opening_entry of its own — opening_balances can be omitted
+    (defaults to zero for every configured payment mode), and the resulting
+    entry is never auto-closed here.
 
     opening_balances: JSON string or list of {mode_of_payment, opening_amount}.
                       Electron should send this JSON-stringified.
@@ -1243,7 +1603,8 @@ def start_pos_session(pos_profile, opening_balances=None):
     if not frappe.has_permission("POS Opening Entry", "submit"):
         frappe.throw(_("Not permitted to submit POS Opening Entry"), frappe.PermissionError)
 
-    pos = _load_pos_profile(pos_profile)
+    pos = _get_pos_profile_or_throw(pos_profile)
+    _validate_cashier_identity(cashier_user, pos)
 
     if isinstance(opening_balances, str):
         opening_balances = frappe.parse_json(opening_balances)
@@ -1284,12 +1645,13 @@ def start_pos_session(pos_profile, opening_balances=None):
                 )
             balance_rows.append({"mode_of_payment": mode, "opening_amount": amount})
 
-    # Idempotency: return existing open session if one already exists
+    # Idempotency: return existing open session for this cashier if one already exists
     existing = frappe.get_all(
         "POS Opening Entry",
         filters={
             "pos_profile": pos.name,
-            "user": frappe.session.user,
+            "company": pos.company,
+            "user": cashier_user,
             "docstatus": 1,
             "status": "Open",
         },
@@ -1298,11 +1660,11 @@ def start_pos_session(pos_profile, opening_balances=None):
         limit=1,
     )
     if existing:
-        return frappe.get_doc("POS Opening Entry", existing[0].name).as_dict()
+        return _build_opening_session_response(frappe.get_doc("POS Opening Entry", existing[0].name))
 
     entry = frappe.new_doc("POS Opening Entry")
     entry.pos_profile = pos.name
-    entry.user = frappe.session.user
+    entry.user = cashier_user
     entry.company = pos.company
     entry.posting_date = nowdate()
     entry.period_start_date = now_datetime()
@@ -1321,7 +1683,15 @@ def start_pos_session(pos_profile, opening_balances=None):
     entry.insert()
     entry.submit()
 
-    return entry.as_dict()
+    return _build_opening_session_response(entry)
+
+
+def _build_opening_session_response(entry):
+    """Serialize a POS Opening Entry, surfacing the owning cashier explicitly."""
+    data = entry.as_dict()
+    data["cashier_user"] = entry.user
+    data["cashier_full_name"] = frappe.db.get_value("User", entry.user, "full_name") or entry.user
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -1477,9 +1847,14 @@ def _pos_profile_user_allowed(pos, fieldname, user):
     return user in allowed_users
 
 
-def _require_refund_permission(pos):
-    """Require a refund role, or an explicit POS Profile user allow-list entry."""
-    user = frappe.session.user
+def _require_refund_permission(pos, user=None):
+    """Require a refund role, or an explicit POS Profile user allow-list entry.
+
+    user defaults to the authenticated session user; callers acting on behalf
+    of a separate human cashier (e.g. submit_pos_refund) pass cashier_user
+    explicitly so the check runs against the cashier, not the terminal.
+    """
+    user = user or frappe.session.user
     roles = set(frappe.get_roles(user))
 
     if roles.intersection(_ALLOWED_REFUND_ROLES):
@@ -1785,6 +2160,9 @@ def _build_refund_response(doc, duplicate=False):
             "non_refundable_fbr_pos_fee": non_refundable_fee,
             "total_refund": total_refund,
         },
+        "cashier_user": _cf("custom_cashier_user"),
+        "cashier_full_name": _cf("custom_cashier_full_name"),
+        "offline_authenticated": bool(cint(_cf("custom_offline_authenticated") or 0)),
     }
 
 
@@ -1880,10 +2258,15 @@ def get_pos_invoice_for_refund(invoice_name):
 def submit_pos_refund(
     terminal_refund_id,
     original_invoice,
+    cashier_user,
     pos_opening_entry=None,
     reason=None,
     items=None,
     payments=None,
+    cashier_full_name=None,
+    offline_authenticated=0,
+    offline_auth_method=None,
+    local_offline_session_id=None,
 ):
     """Create and submit a return POS Invoice against an original sale.
 
@@ -1892,6 +2275,19 @@ def submit_pos_refund(
     and lets the existing FBR hooks build the InvoiceType=2 credit note and submit
     to FBR exactly once. Electron never calls FBR. The Rs.1 POS service fee is
     neither added nor refunded on returns (see fbr_pos.accounting).
+
+    cashier_user is the human cashier processing the refund — never the
+    terminal's own authenticated API identity — validated the same way
+    submit_online_sale validates its cashier: must be enabled, permitted on
+    this POS Profile, and (via _require_refund_permission) either hold a
+    refund role or be explicitly allow-listed on the POS Profile. If
+    pos_opening_entry is given it must belong to cashier_user; otherwise
+    cashier_user must have some other open shift on this POS Profile. The
+    return invoice's `owner` is reattributed to cashier_user after submit,
+    for the same reason submit_online_sale does this: ERPNext's POS Closing
+    Entry matches shift invoices by `owner`, not by any cashier-specific
+    business field, so an unattributed refund would be invisible to that
+    cashier's shift close/reconciliation.
     """
     _require_login()
 
@@ -1901,6 +2297,17 @@ def submit_pos_refund(
         frappe.throw(_("Not permitted to submit POS Invoice"), frappe.PermissionError)
     if not terminal_refund_id:
         frappe.throw(_("terminal_refund_id is required"))
+    if not cashier_user:
+        frappe.throw(_("cashier_user is required"), frappe.PermissionError)
+
+    if cint(offline_authenticated) and offline_auth_method != _OFFLINE_AUTH_METHOD_PIN:
+        frappe.throw(
+            _(
+                "Offline-authenticated refunds must use offline_auth_method '{0}'; "
+                "got '{1}'"
+            ).format(_OFFLINE_AUTH_METHOD_PIN, offline_auth_method),
+            frappe.PermissionError,
+        )
 
     # Idempotency: never create a second return for the same refund UUID.
     existing_name = _find_existing_return(terminal_refund_id)
@@ -1922,10 +2329,15 @@ def submit_pos_refund(
     if cint(getattr(original, "is_return", 0)):
         frappe.throw(_("Cannot refund a return invoice"))
 
-    # POS Profile membership + an active submitted opening entry for this cashier.
-    pos = _load_pos_profile(original.pos_profile)
-    _require_refund_permission(pos)
-    _validate_pos_opening_entry(pos.name)
+    # Cashier identity, refund authorization, and shift checks — all against
+    # cashier_user, never the terminal's own authenticated session.
+    pos = _get_pos_profile_or_throw(original.pos_profile)
+    _validate_cashier_for_sale(cashier_user, pos)
+    _require_refund_permission(pos, cashier_user)
+    if pos_opening_entry:
+        _require_open_entry_for_cashier(pos_opening_entry, cashier_user, pos)
+    else:
+        _validate_pos_opening_entry(pos.name, cashier_user)
 
     # Aggregate requested quantities by original child-row name.
     requested = {}
@@ -1976,6 +2388,15 @@ def submit_pos_refund(
     if reason and return_doc.meta.has_field("remarks"):
         return_doc.remarks = reason
 
+    _set_cashier_offline_fields(
+        return_doc,
+        cashier_user,
+        cashier_full_name,
+        offline_authenticated,
+        offline_auth_method,
+        local_offline_session_id,
+    )
+
     # Apply FBR snapshot + accounting (negative sales tax, no service fee) so the
     # negative grand_total is known before computing refund payments. The validate
     # hook re-applies these idempotently on insert.
@@ -1996,6 +2417,11 @@ def submit_pos_refund(
         _validate_refund_quantities(original, requested)
         return_doc.insert()   # validate hook: clears copied FBR fields, builds InvoiceType=2 payload, accounting rows
         return_doc.submit()   # before_submit hook: single FBR refund submission
+        # Reattribute from the terminal's session to the cashier — see docstring.
+        frappe.db.set_value(
+            "POS Invoice", return_doc.name, "owner", cashier_user, update_modified=False
+        )
+        return_doc.owner = cashier_user
         frappe.db.release_savepoint(sp)
     except frappe.UniqueValidationError:
         frappe.db.rollback(save_point=sp)
