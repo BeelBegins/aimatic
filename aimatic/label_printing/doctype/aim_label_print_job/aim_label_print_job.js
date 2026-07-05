@@ -1,3 +1,10 @@
+const SOURCE_LINK_FIELDS = {
+	"Purchase Receipt": "purchase_receipt",
+	"Delivery Note": "delivery_note",
+	"Stock Entry": "stock_entry",
+	"Sales Invoice": "sales_invoice",
+};
+
 frappe.ui.form.on("AIM Label Print Job", {
 	setup(frm) {
 		frm.set_query("template", () => ({
@@ -6,6 +13,12 @@ frappe.ui.form.on("AIM Label Print Job", {
 				label_type: frm.doc.label_type || ["is", "set"],
 			},
 		}));
+
+		Object.values(SOURCE_LINK_FIELDS).forEach((fieldname) => {
+			frm.set_query(fieldname, () => ({
+				query: "aimatic.label_printing.api.query_source_documents",
+			}));
+		});
 	},
 
 	refresh(frm) {
@@ -29,10 +42,76 @@ frappe.ui.form.on("AIM Label Print Job", {
 		frm.set_value("template", null);
 	},
 
+	source_type(frm) {
+		Object.values(SOURCE_LINK_FIELDS).forEach((fieldname) => {
+			if (frm.doc[fieldname]) frm.set_value(fieldname, null);
+		});
+	},
+
+	purchase_receipt(frm) {
+		populate_items_from_source(frm, "Purchase Receipt", frm.doc.purchase_receipt);
+	},
+
+	delivery_note(frm) {
+		populate_items_from_source(frm, "Delivery Note", frm.doc.delivery_note);
+	},
+
+	stock_entry(frm) {
+		populate_items_from_source(frm, "Stock Entry", frm.doc.stock_entry);
+	},
+
+	sales_invoice(frm) {
+		populate_items_from_source(frm, "Sales Invoice", frm.doc.sales_invoice);
+	},
+
 	validate(frm) {
 		render_totals(frm);
 	},
 });
+
+function populate_items_from_source(frm, source_type, source_name) {
+	if (!source_name) return;
+
+	frappe.call({
+		method: "aimatic.label_printing.api.get_items_from_source_document",
+		args: {
+			source_type: source_type,
+			source_name: source_name,
+			label_type: frm.doc.label_type || "Barcode Label",
+			price_list: frm.doc.price_list,
+		},
+		freeze: true,
+		freeze_message: __("Fetching items from {0}...", [source_name]),
+		callback: (r) => {
+			if (!r.message) return;
+
+			frm.clear_table("items");
+			(r.message.items || []).forEach((row_values) => {
+				const row = frappe.model.add_child(frm.doc, "AIM Label Print Job Item", "items");
+				Object.entries(row_values).forEach(([key, value]) => {
+					row[key] = value;
+				});
+			});
+			frm.refresh_field("items");
+
+			if (!frm.doc.company && r.message.company) {
+				frm.set_value("company", r.message.company);
+			}
+			if (!frm.doc.warehouse && r.message.warehouse) {
+				frm.set_value("warehouse", r.message.warehouse);
+			}
+			if (!frm.doc.price_list && r.message.price_list) {
+				frm.set_value("price_list", r.message.price_list);
+			}
+
+			render_totals(frm);
+			frappe.show_alert({
+				message: __("Fetched {0} item(s) from {1}", [(r.message.items || []).length, source_name]),
+				indicator: "green",
+			});
+		},
+	});
+}
 
 frappe.ui.form.on("AIM Label Print Job Item", {
 	item_code(frm, cdt, cdn) {

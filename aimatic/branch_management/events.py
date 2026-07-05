@@ -72,3 +72,40 @@ def apply_branch_defaults(doc, method=None):
 		and branch_defaults["rejected_warehouse"]
 	):
 		doc.rejected_warehouse = branch_defaults["rejected_warehouse"]
+
+
+_BRANCH_COMPANY_SCOPED_FIELDS = {
+	"cost_center": ("Cost Center", "Cost Center"),
+	"finished_goods_warehouse": ("Warehouse", "Finished Goods Warehouse"),
+	"rejected_warehouse": ("Warehouse", "Rejected Warehouse"),
+}
+
+
+def validate_branch_company_consistency(doc, method=None):
+	"""
+	Branch's cost_center/finished_goods_warehouse/rejected_warehouse must
+	belong to the Branch's own company. The link_filters on those fields only
+	filter the dropdown *while picking a new value* - they never re-validate
+	an already-set value when company itself changes. Without this check,
+	editing Company alone silently leaves stale cross-company references,
+	which then get force-injected into transactions via apply_branch_defaults
+	above (a real incident: changing a Branch's Company left its Cost Center/
+	Warehouse pointing at the old company).
+	"""
+
+	if not doc.company:
+		return
+
+	for fieldname, (linked_doctype, label) in _BRANCH_COMPANY_SCOPED_FIELDS.items():
+		value = doc.get(fieldname)
+		if not value:
+			continue
+
+		linked_company = frappe.db.get_value(linked_doctype, value, "company")
+		if linked_company and linked_company != doc.company:
+			frappe.throw(
+				_(
+					"{0} {1} belongs to {2}, not {3}. Update it (or this Branch's "
+					"Company) so they match before saving."
+				).format(label, value, linked_company, doc.company)
+			)

@@ -1,0 +1,62 @@
+[
+ {
+  "category_name": "Exempted",
+  "company": "Test Company",
+  "description": null,
+  "docstatus": 0,
+  "doctype": "FBR Tax Category",
+  "enabled": 1,
+  "fbr_sale_type": "Exempted",
+  "is_exempt": 1,
+  "is_third_schedule": 0,
+  "is_zero_rated": 0,
+  "modified": "2026-07-03 02:24:29.344741",
+  "name": "Exempted",
+  "tax_rate": 0.0
+ },
+ {
+  "category_name": "Goods at 25%",
+  "company": "Test Company",
+  "description": null,
+  "docstatus": 0,
+  "doctype": "FBR Tax Category",
+  "enabled": 1,
+  "fbr_sale_type": "Goods at 25%",
+  "is_exempt": 0,
+  "is_third_schedule": 0,
+  "is_zero_rated": 0,
+  "modified": "2026-07-03 02:25:07.326918",
+  "name": "Goods at 25%",
+  "tax_rate": 25.0
+ },
+ {
+  "category_name": "Standard GST 18%",
+  "company": "Test Company",
+  "description": null,
+  "docstatus": 0,
+  "doctype": "FBR Tax Category",
+  "enabled": 1,
+  "fbr_sale_type": "Standard Rated",
+  "is_exempt": 0,
+  "is_third_schedule": 0,
+  "is_zero_rated": 0,
+  "modified": "2026-06-25 13:37:10.888775",
+  "name": "Standard GST 18%",
+  "tax_rate": 18.0
+ },
+ {
+  "category_name": "3rd Schedule Goods @ 18%",
+  "company": "Test Company",
+  "description": null,
+  "docstatus": 0,
+  "doctype": "FBR Tax Category",
+  "enabled": 1,
+  "fbr_sale_type": "Third Schedule",
+  "is_exempt": 0,
+  "is_third_schedule": 1,
+  "is_zero_rated": 0,
+  "modified": "2026-06-25 13:36:36.451107",
+  "name": "3rd Schedule Goods @ 18%",
+  "tax_rate": 18.0
+ }
+]

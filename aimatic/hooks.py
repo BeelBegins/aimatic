@@ -44,12 +44,19 @@ doc_events = {
     "Purchase Receipt": {
         "validate": "aimatic.branch_management.events.apply_branch_defaults",
     },
+    "Branch": {
+        "validate": "aimatic.branch_management.events.validate_branch_company_consistency",
+    },
 }
 
 # Label Printing module: adds a "Create Barcode Labels" button to Purchase
-# Receipt via client script only. Purchase Receipt itself is never modified.
+# Receipt, Delivery Note, Stock Entry, and Sales Invoice via client script
+# only. None of these doctypes are ever modified server-side.
 doctype_js = {
     "Purchase Receipt": "public/js/purchase_receipt_label_printing.js",
+    "Delivery Note": "public/js/label_printing_source_buttons.js",
+    "Stock Entry": "public/js/label_printing_source_buttons.js",
+    "Sales Invoice": "public/js/label_printing_source_buttons.js",
 }
 
 jinja = {
@@ -95,6 +102,17 @@ fixtures = [
         "filters": [["dt", "not in", hrms_fixture_doctypes]],
     },
     {"doctype": "Server Script"},
+    # GST/Advance Tax/FED formula definitions used by the Purchase Receipt/
+    # Purchase Order tax-calc client scripts - configuration, not transactional
+    # data, so it ships with the app rather than being recreated by hand on
+    # every new site.
+    {"doctype": "Tax Formula"},
+    # Reference GST categories for FBR e-invoicing - configuration, no secrets.
+    {"doctype": "FBR Tax Category"},
+    # NOTE: FBR Integration Settings is deliberately NOT a fixture - it holds
+    # a security_token (Password) plus real sandbox/production URLs per
+    # company+branch. Only its schema is git-tracked (doctype file below);
+    # each site must have its own credentials configured directly.
 ]
 
 # Apps

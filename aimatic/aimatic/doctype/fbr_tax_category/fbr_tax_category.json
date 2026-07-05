@@ -1,0 +1,101 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:category_name",
+ "creation": "2026-06-17 07:03:17.470541",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_mzng",
+  "category_name",
+  "fbr_sale_type",
+  "tax_rate",
+  "company",
+  "enabled",
+  "is_third_schedule",
+  "is_exempt",
+  "is_zero_rated",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_mzng",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "category_name",
+   "fieldtype": "Data",
+   "label": "Category Name",
+   "unique": 1
+  },
+  {
+   "fieldname": "fbr_sale_type",
+   "fieldtype": "Data",
+   "label": "FBR Sale Type"
+  },
+  {
+   "fieldname": "tax_rate",
+   "fieldtype": "Percent",
+   "label": "Tax Rate"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_third_schedule",
+   "fieldtype": "Check",
+   "label": "Is Third Schedule"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_exempt",
+   "fieldtype": "Check",
+   "label": "Is Exempt"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_zero_rated",
+   "fieldtype": "Check",
+   "label": "Is Zero Rated"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-06 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "FBR Tax Category",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "title_field": "category_name"
+}

@@ -1,0 +1,214 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:{company}-{branch}",
+ "creation": "2026-06-17 10:15:56.888608",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "branch",
+  "enabled",
+  "environment",
+  "submission_mode",
+  "pos_id",
+  "security_token",
+  "pos_production_url",
+  "pos_sandbox_url",
+  "request_timeout",
+  "maximum_retries",
+  "enable_fbr_for_pos",
+  "send_in_background",
+  "business_name",
+  "seller_ntn",
+  "seller_strn",
+  "branch_code",
+  "verify_ssl",
+  "default_payment_mode",
+  "block_submit_on_failure",
+  "store_full_response",
+  "last_successful_sync",
+  "last_error",
+  "default_pct_code",
+  "sales_tax_account",
+  "fbr_pos_fee_account",
+  "fbr_pos_fee_amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "environment",
+   "fieldtype": "Select",
+   "label": "Environment",
+   "options": "Sandbox\nProduction"
+  },
+  {
+   "fieldname": "submission_mode",
+   "fieldtype": "Select",
+   "label": "Submission Mode",
+   "options": "Preview Only\nReal Time\nDisabled"
+  },
+  {
+   "fieldname": "pos_id",
+   "fieldtype": "Data",
+   "label": "POS ID"
+  },
+  {
+   "description": "Bearer token used to authenticate against FBR's API. Never exported as a fixture - set this directly on each site.",
+   "fieldname": "security_token",
+   "fieldtype": "Password",
+   "label": "Security Token"
+  },
+  {
+   "fieldname": "pos_production_url",
+   "fieldtype": "Data",
+   "label": "POS Production URL"
+  },
+  {
+   "fieldname": "pos_sandbox_url",
+   "fieldtype": "Data",
+   "label": "POS Sandbox URL"
+  },
+  {
+   "fieldname": "request_timeout",
+   "fieldtype": "Int",
+   "label": "Request Timeout"
+  },
+  {
+   "fieldname": "maximum_retries",
+   "fieldtype": "Int",
+   "label": "Maximum Retries"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_fbr_for_pos",
+   "fieldtype": "Check",
+   "label": "Enable FBR for POS"
+  },
+  {
+   "default": "0",
+   "fieldname": "send_in_background",
+   "fieldtype": "Check",
+   "label": "Send in Background"
+  },
+  {
+   "fieldname": "business_name",
+   "fieldtype": "Data",
+   "label": "Business Name"
+  },
+  {
+   "fieldname": "seller_ntn",
+   "fieldtype": "Data",
+   "label": "Seller NTN"
+  },
+  {
+   "fieldname": "seller_strn",
+   "fieldtype": "Data",
+   "label": "Seller STRN"
+  },
+  {
+   "fieldname": "branch_code",
+   "fieldtype": "Data",
+   "label": "Branch Code"
+  },
+  {
+   "default": "0",
+   "fieldname": "verify_ssl",
+   "fieldtype": "Check",
+   "label": "Verify SSL"
+  },
+  {
+   "fieldname": "default_payment_mode",
+   "fieldtype": "Int",
+   "label": "Default Payment Mode"
+  },
+  {
+   "default": "0",
+   "fieldname": "block_submit_on_failure",
+   "fieldtype": "Check",
+   "label": "Block Submit on Failure"
+  },
+  {
+   "default": "0",
+   "fieldname": "store_full_response",
+   "fieldtype": "Check",
+   "label": "Store Full Response"
+  },
+  {
+   "fieldname": "last_successful_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Successful Sync"
+  },
+  {
+   "fieldname": "last_error",
+   "fieldtype": "Long Text",
+   "label": "Last Error"
+  },
+  {
+   "default": "01011000",
+   "fieldname": "default_pct_code",
+   "fieldtype": "Data",
+   "label": "Label: Default PCT Code"
+  },
+  {
+   "fieldname": "sales_tax_account",
+   "fieldtype": "Link",
+   "label": "Sales Tax Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "fbr_pos_fee_account",
+   "fieldtype": "Link",
+   "label": "FBR POS Service Fee Account",
+   "options": "Account"
+  },
+  {
+   "default": "1",
+   "fieldname": "fbr_pos_fee_amount",
+   "fieldtype": "Currency",
+   "label": "FBR POS Service Fee Amount"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-06 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "FBR Integration Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC"
+}
