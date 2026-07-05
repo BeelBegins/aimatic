@@ -7,6 +7,8 @@ from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime, now
 from frappe.utils.data import sha256_hash
 from frappe.utils.password import check_password
 
+from aimatic.pos_shared import returned_qty_by_row
+
 _MAX_PAGE_SIZE = 1000
 _ALLOWED_POS_ADMIN_ACTIONS = {"setup_pin", "reset_pin", "change_credentials"}
 _ALLOWED_POS_ADMIN_ROLES = {"POS Supervisor", "System Manager"}
@@ -673,11 +675,14 @@ def preview_cart(
     coupon_code=None,
     redeem_loyalty_points=0,
     loyalty_points=0,
+    gift_voucher_code=None,
 ):
     """Build an unsaved POS Invoice and return priced/taxed cart preview.
 
     Never inserts, saves, submits, calls FBR servers, updates coupon counts,
-    or creates loyalty ledger entries.
+    creates loyalty ledger entries, or redeems a gift voucher — gift_voucher_code
+    here is validated/priced only, exactly like redeem_loyalty_points is priced
+    without being finalized.
     """
     _require_login()
 
@@ -764,6 +769,31 @@ def preview_cart(
             )
             break
 
+    payable_before_voucher = flt(
+        flt(doc.grand_total, 2) - flt(getattr(doc, "loyalty_amount", 0) or 0, 2), 2
+    )
+
+    gift_voucher_amount = 0.0
+    gift_voucher_error = None
+    if gift_voucher_code:
+        from aimatic.gift_voucher.api import _load_active_gift_voucher
+
+        try:
+            gv = _load_active_gift_voucher(gift_voucher_code, cust.name)
+            criteria = frappe.get_cached_doc("Gift Voucher Criteria", gv.criteria)
+            if payable_before_voucher < flt(criteria.minimum_redemption_value, 2):
+                gift_voucher_error = _(
+                    "This sale must be at least {0} to redeem this gift voucher"
+                ).format(criteria.minimum_redemption_value)
+            else:
+                gift_voucher_amount = min(
+                    flt(gv.amount, 2), max(0.0, payable_before_voucher)
+                )
+        except frappe.ValidationError as e:
+            # Preview tolerates an invalid/incomplete code (cashier may still be
+            # typing it) — surface the reason instead of hard-failing the cart.
+            gift_voucher_error = str(e)
+
     totals = {
         "total": getattr(doc, "total", None),
         "net_total": getattr(doc, "net_total", None),
@@ -778,6 +808,9 @@ def preview_cart(
         "value_excluding_tax": value_excluding_tax,
         "total_sales_tax": total_sales_tax,
         "fbr_pos_service_fee": fbr_pos_service_fee,
+        "gift_voucher_amount": gift_voucher_amount,
+        "gift_voucher_error": gift_voucher_error,
+        "amount_due": flt(payable_before_voucher - gift_voucher_amount, 2),
     }
 
     return {"rows": rows, "taxes": taxes, "totals": totals}
@@ -799,6 +832,7 @@ def submit_online_sale(
     coupon_code=None,
     redeem_loyalty_points=0,
     loyalty_points=0,
+    gift_voucher_code=None,
     cashier_full_name=None,
     offline_authenticated=0,
     offline_auth_method=None,
@@ -833,6 +867,13 @@ def submit_online_sale(
     (validate_pos_invoice) during doc.insert().  The FBR API call happens through
     the existing before_submit hook (before_submit_pos_invoice) during doc.submit().
     Neither hook is called manually here.
+
+    gift_voucher_code, if provided, is validated server-side (ownership, status,
+    expiry, and a minimum-sale-value rule specific to the bracket that issued it)
+    and applied as a "Gift Voucher" payment row for the min(voucher amount, amount
+    due) — any excess over the bill is forfeited. The voucher is only marked
+    Redeemed after doc.submit() succeeds, under a row lock re-checked against
+    concurrent redemption of the same code.
     """
     _require_login()
 
@@ -884,9 +925,40 @@ def submit_online_sale(
     build_pos_payload(doc)
     apply_fbr_accounting_rows(doc)
 
+    # Gift voucher redemption is a payment-side concern, applied after FBR
+    # accounting so it never touches grand_total / the FBR payload — see
+    # aimatic.gift_voucher for why this must be a Mode of Payment row and not
+    # a discount. Loaded here (not earlier) so it reflects any loyalty
+    # redemption already folded into doc.loyalty_amount above.
+    gift_voucher_doc = None
+    gift_voucher_amount = 0.0
+    if gift_voucher_code:
+        from aimatic.gift_voucher.api import _load_active_gift_voucher
+
+        gift_voucher_doc = _load_active_gift_voucher(gift_voucher_code, cust.name)
+        criteria = frappe.get_cached_doc("Gift Voucher Criteria", gift_voucher_doc.criteria)
+        payable_before_voucher = flt(
+            flt(doc.grand_total, 2) - flt(getattr(doc, "loyalty_amount", 0) or 0, 2), 2
+        )
+        if payable_before_voucher < flt(criteria.minimum_redemption_value, 2):
+            frappe.throw(
+                _("This sale must be at least {0} to redeem this gift voucher").format(
+                    criteria.minimum_redemption_value
+                )
+            )
+        # Excess voucher value over the bill is forfeited, not carried forward.
+        gift_voucher_amount = min(flt(gift_voucher_doc.amount, 2), max(0.0, payable_before_voucher))
+
     # Validate the client-supplied payments against the server-computed grand_total
     # and write them onto the doc.
-    _validate_and_set_payments(doc, pos, payments)
+    _validate_and_set_payments(doc, pos, payments, gift_voucher_amount=gift_voucher_amount)
+
+    if gift_voucher_doc and gift_voucher_amount > 0:
+        # Appended after _validate_and_set_payments, which resets doc.payments to
+        # only the client-sent rows — this one is server-only and must never be
+        # sent/chosen by the terminal (the Mode of Payment isn't in any POS
+        # Profile's allowed list, so a client-sent row for it would be rejected).
+        doc.append("payments", {"mode_of_payment": "Gift Voucher", "amount": gift_voucher_amount})
 
     # Stamp terminal identifiers before insert so they are stored with the record
     _set_terminal_fields(doc, terminal_invoice_id, terminal_id)
@@ -914,6 +986,29 @@ def submit_online_sale(
         # closing/reconciliation finds this invoice under the right shift.
         frappe.db.set_value("POS Invoice", doc.name, "owner", cashier_user, update_modified=False)
         doc.owner = cashier_user
+
+        if gift_voucher_doc and gift_voucher_amount > 0:
+            # Lock the voucher row and re-check it's still Active before marking
+            # it Redeemed, so a concurrent redemption of the same code loses this
+            # race cleanly (raises here, rolling back the whole submission)
+            # rather than double-spending the voucher.
+            frappe.db.sql(
+                "SELECT name FROM `tabGift Voucher` WHERE name = %s FOR UPDATE",
+                (gift_voucher_doc.name,),
+            )
+            current_status = frappe.db.get_value("Gift Voucher", gift_voucher_doc.name, "status")
+            if current_status != "Active":
+                frappe.throw(_("This gift voucher is no longer available for redemption"))
+            frappe.db.set_value(
+                "Gift Voucher",
+                gift_voucher_doc.name,
+                {
+                    "status": "Redeemed",
+                    "redeemed_against_invoice": doc.name,
+                    "redeemed_on": now_datetime(),
+                },
+            )
+
         frappe.db.release_savepoint(sp)
     except frappe.UniqueValidationError:
         frappe.db.rollback(save_point=sp)
@@ -944,7 +1039,7 @@ def _find_existing_invoice(terminal_invoice_id):
     )
 
 
-def _validate_and_set_payments(doc, pos, payments_data):
+def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
     """Validate client payment rows and write them onto the doc.
 
     Rules enforced:
@@ -952,7 +1047,11 @@ def _validate_and_set_payments(doc, pos, payments_data):
     - Every amount must be positive.
     - Non-cash payments cannot individually exceed the remaining payable amount.
     - Cash may exceed payable (creates change).
-    - Total payments must cover payable_after_loyalty.
+    - Total payments must cover payable_after_loyalty_and_gift_voucher.
+
+    gift_voucher_amount is already-validated server-side (see submit_online_sale)
+    and reduces payable the same way loyalty_amount does; it is never part of
+    payments_data since the client can't choose/send the Gift Voucher mode.
     """
     if not isinstance(payments_data, list) or not payments_data:
         frappe.throw(_("At least one payment row is required"))
@@ -972,7 +1071,7 @@ def _validate_and_set_payments(doc, pos, payments_data):
 
     grand_total = flt(doc.grand_total, 2)
     loyalty_amount = flt(getattr(doc, "loyalty_amount", 0) or 0, 2)
-    payable = flt(grand_total - loyalty_amount, 2)
+    payable = flt(grand_total - loyalty_amount - flt(gift_voucher_amount, 2), 2)
 
     total_paid = 0.0
 
@@ -1878,36 +1977,9 @@ def _require_refund_permission(pos, user=None):
     )
 
 
-def _returned_qty_by_row(original_name):
-    """Absolute returned quantity per original POS Invoice Item row.
-
-    Sums quantities from all submitted return POS Invoices linked to the
-    original via the standard ``pos_invoice_item`` reference set by make_return_doc.
-    """
-    result = {}
-    returns = frappe.get_all(
-        "POS Invoice",
-        filters={"return_against": original_name, "is_return": 1, "docstatus": 1},
-        pluck="name",
-    )
-    if not returns:
-        return result
-    rows = frappe.get_all(
-        "POS Invoice Item",
-        filters={"parent": ("in", returns), "parenttype": "POS Invoice"},
-        fields=["pos_invoice_item", "qty"],
-    )
-    for r in rows:
-        key = r.get("pos_invoice_item")
-        if not key:
-            continue
-        result[key] = flt(result.get(key, 0)) + abs(flt(r.get("qty")))
-    return result
-
-
 def _validate_refund_quantities(original, requested):
     """Reject zero/negative or over-remaining requested quantities (re-checkable inside a txn)."""
-    returned = _returned_qty_by_row(original.name)
+    returned = returned_qty_by_row(original.name)
     row_by_name = {r.name: r for r in original.items}
     for row_name, qty in requested.items():
         row = row_by_name.get(row_name)
@@ -2185,7 +2257,7 @@ def get_pos_invoice_for_refund(invoice_name):
     if cint(getattr(original, "is_return", 0)):
         frappe.throw(_("Cannot refund a return invoice"))
 
-    returned = _returned_qty_by_row(original.name)
+    returned = returned_qty_by_row(original.name)
 
     items = []
     any_remaining = False

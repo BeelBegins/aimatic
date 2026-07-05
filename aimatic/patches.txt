@@ -3,9 +3,15 @@
 # Read docs to understand patches: https://frappeframework.com/docs/v14/user/en/database-migrations
 aimatic.patches.create_pos_supervisor_role
 aimatic.patches.create_pos_user_role
+aimatic.patches.create_label_printing_roles
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 aimatic.patches.create_pos_terminal_custom_fields
 aimatic.patches.create_terminal_refund_id_field
 aimatic.patches.create_pos_invoice_cashier_fields
+aimatic.patches.create_label_printing_default_templates
+aimatic.patches.create_label_printing_double_column_template
+aimatic.patches.create_customer_mobile_no_index
+aimatic.patches.create_item_group_loyalty_custom_fields
+aimatic.patches.create_gift_voucher_mode_of_payment

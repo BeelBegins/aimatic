@@ -1,0 +1,377 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:template_name",
+ "creation": "2026-07-04 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "engine": "InnoDB",
+ "field_order": [
+  "template_name",
+  "enabled",
+  "label_type",
+  "column_break_type",
+  "print_mode",
+  "paper_type",
+  "barcode_type",
+  "section_break_size",
+  "label_width_mm",
+  "label_height_mm",
+  "barcode_height_mm",
+  "column_break_size",
+  "page_width_mm",
+  "page_height_mm",
+  "column_count",
+  "column_break_gap",
+  "row_gap_mm",
+  "column_gap_mm",
+  "section_break_margins",
+  "margin_top_mm",
+  "margin_bottom_mm",
+  "column_break_margins",
+  "margin_left_mm",
+  "margin_right_mm",
+  "section_break_typography",
+  "font_family",
+  "item_name_font_size",
+  "column_break_typography",
+  "item_code_font_size",
+  "price_font_size",
+  "section_break_fields",
+  "show_item_code",
+  "show_item_name",
+  "show_barcode_text",
+  "show_price",
+  "show_mrp",
+  "show_uom",
+  "column_break_fields",
+  "show_batch_no",
+  "show_mfg_date",
+  "show_expiry_date",
+  "show_company",
+  "show_shelf_location",
+  "section_break_advanced",
+  "custom_css",
+  "tspl_template"
+ ],
+ "fields": [
+  {
+   "fieldname": "template_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Template Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "label_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Label Type",
+   "options": "Barcode Label\nShelf Label",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_type",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "print_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Print Mode",
+   "options": "Browser HTML\nPDF\nTSC TSPL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "paper_type",
+   "fieldtype": "Select",
+   "label": "Paper Type",
+   "options": "Roll\nA4",
+   "reqd": 1
+  },
+  {
+   "fieldname": "barcode_type",
+   "fieldtype": "Select",
+   "label": "Barcode Type",
+   "options": "Code128\nEAN13",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_size",
+   "fieldtype": "Section Break",
+   "label": "Label Size"
+  },
+  {
+   "default": "40",
+   "depends_on": "eval:doc.paper_type=='Roll'",
+   "description": "Used for Roll labels. Ignored for A4 (page size is used instead).",
+   "fieldname": "label_width_mm",
+   "fieldtype": "Float",
+   "label": "Label Width (mm)"
+  },
+  {
+   "default": "25",
+   "depends_on": "eval:doc.paper_type=='Roll'",
+   "fieldname": "label_height_mm",
+   "fieldtype": "Float",
+   "label": "Label Height (mm)"
+  },
+  {
+   "default": "10",
+   "fieldname": "barcode_height_mm",
+   "fieldtype": "Float",
+   "label": "Barcode Height (mm)"
+  },
+  {
+   "fieldname": "column_break_size",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "210",
+   "depends_on": "eval:doc.paper_type=='A4'",
+   "fieldname": "page_width_mm",
+   "fieldtype": "Float",
+   "label": "Page Width (mm)"
+  },
+  {
+   "default": "297",
+   "depends_on": "eval:doc.paper_type=='A4'",
+   "fieldname": "page_height_mm",
+   "fieldtype": "Float",
+   "label": "Page Height (mm)"
+  },
+  {
+   "default": "1",
+   "description": "Labels printed side by side per row. Use 1 for a single-lane roll. Use 2+ for a double/multi-column roll or an A4 sheet.",
+   "fieldname": "column_count",
+   "fieldtype": "Int",
+   "label": "Column Count"
+  },
+  {
+   "fieldname": "column_break_gap",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3",
+   "fieldname": "row_gap_mm",
+   "fieldtype": "Float",
+   "label": "Row Gap (mm)"
+  },
+  {
+   "default": "3",
+   "fieldname": "column_gap_mm",
+   "fieldtype": "Float",
+   "label": "Column Gap (mm)"
+  },
+  {
+   "fieldname": "section_break_margins",
+   "fieldtype": "Section Break",
+   "label": "Page Margins"
+  },
+  {
+   "default": "10",
+   "fieldname": "margin_top_mm",
+   "fieldtype": "Float",
+   "label": "Margin Top (mm)"
+  },
+  {
+   "default": "10",
+   "fieldname": "margin_bottom_mm",
+   "fieldtype": "Float",
+   "label": "Margin Bottom (mm)"
+  },
+  {
+   "fieldname": "column_break_margins",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "8",
+   "fieldname": "margin_left_mm",
+   "fieldtype": "Float",
+   "label": "Margin Left (mm)"
+  },
+  {
+   "default": "8",
+   "fieldname": "margin_right_mm",
+   "fieldtype": "Float",
+   "label": "Margin Right (mm)"
+  },
+  {
+   "fieldname": "section_break_typography",
+   "fieldtype": "Section Break",
+   "label": "Typography"
+  },
+  {
+   "default": "Arial, Helvetica, sans-serif",
+   "fieldname": "font_family",
+   "fieldtype": "Data",
+   "label": "Font Family"
+  },
+  {
+   "default": "9",
+   "fieldname": "item_name_font_size",
+   "fieldtype": "Float",
+   "label": "Item Name Font Size (pt)"
+  },
+  {
+   "fieldname": "column_break_typography",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "7",
+   "fieldname": "item_code_font_size",
+   "fieldtype": "Float",
+   "label": "Item Code Font Size (pt)"
+  },
+  {
+   "default": "10",
+   "fieldname": "price_font_size",
+   "fieldtype": "Float",
+   "label": "Price Font Size (pt)"
+  },
+  {
+   "fieldname": "section_break_fields",
+   "fieldtype": "Section Break",
+   "label": "Fields to Show on Label"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_item_code",
+   "fieldtype": "Check",
+   "label": "Show Item Code"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_item_name",
+   "fieldtype": "Check",
+   "label": "Show Item Name"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_barcode_text",
+   "fieldtype": "Check",
+   "label": "Show Barcode Text"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_price",
+   "fieldtype": "Check",
+   "label": "Show Price"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_mrp",
+   "fieldtype": "Check",
+   "label": "Show MRP"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_uom",
+   "fieldtype": "Check",
+   "label": "Show UOM"
+  },
+  {
+   "fieldname": "column_break_fields",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_batch_no",
+   "fieldtype": "Check",
+   "label": "Show Batch No"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_mfg_date",
+   "fieldtype": "Check",
+   "label": "Show MFG Date"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_expiry_date",
+   "fieldtype": "Check",
+   "label": "Show Expiry Date"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_company",
+   "fieldtype": "Check",
+   "label": "Show Company"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_shelf_location",
+   "fieldtype": "Check",
+   "label": "Show Shelf/Location"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_advanced",
+   "fieldtype": "Section Break",
+   "label": "Advanced"
+  },
+  {
+   "fieldname": "custom_css",
+   "fieldtype": "Code",
+   "label": "Custom CSS"
+  },
+  {
+   "depends_on": "eval:doc.print_mode=='TSC TSPL'",
+   "description": "Jinja template used to generate TSPL commands. Available context: doc, template, row, barcode_value, final_mfg_date, final_expiry_date. Leave blank to use the built-in default TSPL layout.",
+   "fieldname": "tspl_template",
+   "fieldtype": "Code",
+   "label": "TSPL Template Override"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-04 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Label Printing",
+ "name": "AIM Label Template",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Label Printing Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Label Printing User"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

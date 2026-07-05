@@ -53,21 +53,28 @@ def validate_customer(doc, method=None):
         set_default_price_list_if_missing(doc)
         return
 
+    previous = None if doc.is_new() else doc.get_doc_before_save()
+    mobile_changed = not previous or previous.get("mobile_no") != normalized
     doc.mobile_no = normalized
 
-    # Efficient duplicate check: query directly for the normalized number.
-    # Because validate_customer normalizes numbers on every save, all persisted
-    # mobile_no values are already in +92XXXXXXXXXX form, so a direct equality
-    # filter is sufficient.
-    existing_name = frappe.db.get_value(
-        "Customer",
-        {"mobile_no": normalized},
-        "name",
-    )
-
-    if existing_name and existing_name != doc.name:
-        frappe.throw(
-            _("Mobile number already belongs to Customer: {0}").format(existing_name)
+    # Skip the duplicate check entirely when mobile_no hasn't actually changed
+    # (e.g. saving a customer for an unrelated field) — no need to re-query.
+    if mobile_changed:
+        # Query directly for the normalized number rather than a LIKE scan.
+        # Because validate_customer normalizes numbers on every save, all persisted
+        # mobile_no values are already in +92XXXXXXXXXX form, so a direct equality
+        # filter is sufficient. This relies on a DB index on Customer.mobile_no
+        # (see patches.create_customer_mobile_no_index) — without it, this becomes
+        # a full table scan on every Customer save as the table grows.
+        existing_name = frappe.db.get_value(
+            "Customer",
+            {"mobile_no": normalized},
+            "name",
         )
+
+        if existing_name and existing_name != doc.name:
+            frappe.throw(
+                _("Mobile number already belongs to Customer: {0}").format(existing_name)
+            )
 
     set_default_price_list_if_missing(doc)

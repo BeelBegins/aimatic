@@ -898,7 +898,7 @@ class TestPosRefund(_AimTestCase):
         original = _Original()
         # 2 already returned -> remaining 3; requesting 4 must fail, 3 must pass.
         with _patch(
-            "aimatic.offline_pos.api._returned_qty_by_row", return_value={"row-a": 2}
+            "aimatic.offline_pos.api.returned_qty_by_row", return_value={"row-a": 2}
         ):
             with self.assertRaises(frappe.ValidationError):
                 _validate_refund_quantities(original, {"row-a": 4})

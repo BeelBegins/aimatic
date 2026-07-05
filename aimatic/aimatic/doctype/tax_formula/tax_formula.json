@@ -1,0 +1,94 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:formula_name",
+ "creation": "2026-06-10 16:50:53.336804",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "engine": "InnoDB",
+ "field_order": [
+  "formula_name",
+  "formula_type",
+  "description",
+  "gst_account",
+  "advance_tax_account",
+  "discount_account",
+  "formula_string"
+ ],
+ "fields": [
+  {
+   "fieldname": "formula_name",
+   "fieldtype": "Data",
+   "bold": 1,
+   "in_list_view": 1,
+   "label": "Formula Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "formula_type",
+   "fieldtype": "Select",
+   "label": "Formula Type",
+   "options": "gst\nadvance_tax\nfed"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description",
+   "description": "Explain When to use "
+  },
+  {
+   "fieldname": "gst_account",
+   "fieldtype": "Link",
+   "label": "GST Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "advance_tax_account",
+   "fieldtype": "Link",
+   "label": "Advance Tax Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "discount_account",
+   "fieldtype": "Link",
+   "label": "Discount Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "formula_string",
+   "fieldtype": "Long Text",
+   "label": "formula_string",
+   "description": "ALLOWED_VARS = {\n    'rate',\n    'qty',\n    'custom_scheme_qty',\n    'custom_discount_per',\n    'custom_trade_offer',\n    'custom_mrp',\n    'custom_gst_per',\n    'custom_advance_tax_per',\n    'custom_fed_per',\n    'custom_gross_total',\n    'custom_discount_amnt',\n    'custom_trade_offer_total',\n    'custom_gst_amount',\n    'custom_advance_tax_amount',\n    'custom_fed_amount',\n}"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-05 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Tax Formula",
+ "owner": "nabeelmehmood448@gmail.com",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "share": 1,
+   "print": 1,
+   "email": 1
+  },
+  {
+   "role": "All",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "track_changes": 0
+}

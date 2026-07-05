@@ -1,0 +1,211 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-07-04 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "item_name",
+  "item_group",
+  "column_break_item",
+  "barcode",
+  "barcode_uom",
+  "uom",
+  "section_break_dates",
+  "batch_no",
+  "system_mfg_date",
+  "system_expiry_date",
+  "column_break_dates",
+  "manual_mfg_date",
+  "manual_expiry_date",
+  "final_mfg_date",
+  "final_expiry_date",
+  "section_break_pricing",
+  "price",
+  "mrp",
+  "shelf_location",
+  "column_break_qty",
+  "purchase_receipt_item",
+  "purchase_qty",
+  "barcode_label_qty",
+  "shelf_label_qty",
+  "print_label",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.item_group",
+   "fieldname": "item_group",
+   "fieldtype": "Data",
+   "label": "Item Group",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_item",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "barcode",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Barcode"
+  },
+  {
+   "fieldname": "barcode_uom",
+   "fieldtype": "Data",
+   "label": "Barcode UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "section_break_dates",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "batch_no",
+   "fieldtype": "Link",
+   "label": "Batch No",
+   "options": "Batch"
+  },
+  {
+   "fieldname": "system_mfg_date",
+   "fieldtype": "Date",
+   "label": "System MFG Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "system_expiry_date",
+   "fieldtype": "Date",
+   "label": "System Expiry Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "manual_mfg_date",
+   "fieldtype": "Date",
+   "label": "Manual MFG Date"
+  },
+  {
+   "fieldname": "manual_expiry_date",
+   "fieldtype": "Date",
+   "label": "Manual Expiry Date"
+  },
+  {
+   "fieldname": "final_mfg_date",
+   "fieldtype": "Date",
+   "label": "Final MFG Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "final_expiry_date",
+   "fieldtype": "Date",
+   "label": "Final Expiry Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_pricing",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "price",
+   "fieldtype": "Currency",
+   "label": "Price"
+  },
+  {
+   "fieldname": "mrp",
+   "fieldtype": "Currency",
+   "label": "MRP"
+  },
+  {
+   "fieldname": "shelf_location",
+   "fieldtype": "Data",
+   "label": "Shelf / Location"
+  },
+  {
+   "fieldname": "column_break_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "purchase_receipt_item",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Purchase Receipt Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "purchase_qty",
+   "fieldtype": "Float",
+   "label": "Purchase Qty",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "default": "1",
+   "fieldname": "barcode_label_qty",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Barcode Label Qty"
+  },
+  {
+   "default": "1",
+   "fieldname": "shelf_label_qty",
+   "fieldtype": "Int",
+   "label": "Shelf Label Qty",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "1",
+   "fieldname": "print_label",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Print"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-04 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Label Printing",
+ "name": "AIM Label Print Job Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

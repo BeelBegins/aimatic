@@ -10,12 +10,62 @@ doc_events = {
     "POS Invoice": {
         "validate": "aimatic.fbr_pos.events.validate_pos_invoice",
         "before_submit": "aimatic.fbr_pos.events.before_submit_pos_invoice",
-        "on_cancel": "aimatic.fbr_pos.events.on_cancel_pos_invoice",
+        "on_submit": [
+            "aimatic.loyalty.events.on_submit_correct_loyalty_points",
+            "aimatic.gift_voucher.events.on_submit_issue_gift_voucher",
+        ],
+        "on_cancel": [
+            "aimatic.fbr_pos.events.on_cancel_pos_invoice",
+            "aimatic.gift_voucher.events.on_cancel_gift_voucher",
+        ],
     },
     "Customer": {
         "validate": "aimatic.offline_pos.customer_validation.validate_customer",
     },
+    # Branch Management: derives cost_center / set_warehouse / rejected_warehouse
+    # from the document's Branch so normal Sales/Purchase users never pick these
+    # (and can't pick them wrong). POS Invoice is deliberately excluded - see
+    # aimatic.branch_management.events.apply_branch_defaults docstring.
+    "Sales Order": {
+        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+    },
+    "Sales Invoice": {
+        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+    },
+    "Delivery Note": {
+        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+    },
+    "Purchase Order": {
+        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+    },
+    "Purchase Invoice": {
+        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+    },
+    "Purchase Receipt": {
+        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+    },
 }
+
+# Label Printing module: adds a "Create Barcode Labels" button to Purchase
+# Receipt via client script only. Purchase Receipt itself is never modified.
+doctype_js = {
+    "Purchase Receipt": "public/js/purchase_receipt_label_printing.js",
+}
+
+jinja = {
+    "methods": [
+        "aimatic.label_printing.barcode_render.get_barcode_data_uri",
+        "aimatic.label_printing.utils.expand_print_rows",
+        "aimatic.label_printing.utils.get_template_context",
+        "aimatic.label_printing.utils.format_price",
+    ],
+}
+
+# Creates the Label Printing roles and default templates on a fresh
+# `bench install-app aimatic`. Patches of the same name handle sites that
+# already had the app installed before this module existed (patches are
+# marked as already-applied and skipped on a fresh install).
+after_install = "aimatic.label_printing.setup.after_install"
 
 hrms_fixture_doctypes = [
     "Employee",

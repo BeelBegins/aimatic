@@ -1,0 +1,136 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-07-04 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "System",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "branch",
+  "column_break_1",
+  "enabled",
+  "section_break_bracket",
+  "min_value",
+  "max_value",
+  "column_break_2",
+  "percentage",
+  "validity_days",
+  "section_break_redemption",
+  "minimum_redemption_value"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "section_break_bracket",
+   "fieldtype": "Section Break",
+   "label": "Issuance Bracket"
+  },
+  {
+   "fieldname": "min_value",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Start Value",
+   "reqd": 1
+  },
+  {
+   "fieldname": "max_value",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "End Value",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "percentage",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Voucher Percentage",
+   "reqd": 1
+  },
+  {
+   "description": "Days from date of shopping until the issued voucher expires.",
+   "fieldname": "validity_days",
+   "fieldtype": "Int",
+   "label": "Validity (Days)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_redemption",
+   "fieldtype": "Section Break",
+   "label": "Redemption Rule"
+  },
+  {
+   "description": "A voucher issued from this bracket can only be redeemed on a sale worth at least this much. Independent of Start Value above.",
+   "fieldname": "minimum_redemption_value",
+   "fieldtype": "Currency",
+   "label": "Minimum Redemption Value",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-04 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Gift Voucher Criteria",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "POS Supervisor",
+   "share": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

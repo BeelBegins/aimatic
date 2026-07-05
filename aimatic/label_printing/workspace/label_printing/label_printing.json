@@ -1,0 +1,53 @@
+{
+ "app": "aimatic",
+ "charts": [],
+ "content": "[{\"id\": \"lpHeader1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Label Printing</b></span>\", \"col\": 12}}, {\"id\": \"lpShortcut1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"New Label Print Job\", \"col\": 4}}, {\"id\": \"lpShortcut2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Label Print Jobs\", \"col\": 4}}, {\"id\": \"lpShortcut3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Label Templates\", \"col\": 4}}]",
+ "creation": "2026-07-04 00:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "tag",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Label Printing",
+ "links": [],
+ "modified": "2026-07-04 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Label Printing",
+ "name": "Label Printing",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [],
+ "sequence_id": 100.0,
+ "shortcuts": [
+  {
+   "label": "New Label Print Job",
+   "type": "DocType",
+   "link_to": "AIM Label Print Job",
+   "doc_view": "New",
+   "color": "Green"
+  },
+  {
+   "label": "Label Print Jobs",
+   "type": "DocType",
+   "link_to": "AIM Label Print Job",
+   "doc_view": "List",
+   "color": "Blue"
+  },
+  {
+   "label": "Label Templates",
+   "type": "DocType",
+   "link_to": "AIM Label Template",
+   "doc_view": "List",
+   "color": "Grey"
+  }
+ ],
+ "title": "Label Printing",
+ "type": "Workspace"
+}
