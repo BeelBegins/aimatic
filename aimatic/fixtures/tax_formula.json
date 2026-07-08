@@ -234,19 +234,6 @@
   "name": "GST Standard (With SchemeQty)"
  },
  {
-  "advance_tax_account": "",
-  "description": "3rd Schedule Tax",
-  "discount_account": "",
-  "docstatus": 0,
-  "doctype": "Tax Formula",
-  "formula_name": "3rd Schedule",
-  "formula_string": "(custom_mrp*(custom_gst_per/(100+custom_gst_per)))*(qty-custom_scheme_qty)",
-  "formula_type": "gst",
-  "gst_account": "Sales Tax on Goods - ST",
-  "modified": "2026-06-15 08:53:52.884816",
-  "name": "3rd Schedule"
- },
- {
   "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
   "description": null,
   "discount_account": null,
@@ -258,5 +245,18 @@
   "gst_account": "",
   "modified": "2026-06-15 08:23:00.294221",
   "name": "Advance Tax On TP + GST - Discount"
+ },
+ {
+  "advance_tax_account": "",
+  "description": "3rd Schedule Tax",
+  "discount_account": "",
+  "docstatus": 0,
+  "doctype": "Tax Formula",
+  "formula_name": "3rd Schedule",
+  "formula_string": "(custom_mrp*(custom_gst_per/(100+custom_gst_per)))*(qty-custom_scheme_qty)",
+  "formula_type": "gst",
+  "gst_account": "Sales Tax on Goods - ST",
+  "modified": "2026-06-15 08:53:52.884816",
+  "name": "3rd Schedule"
  }
 ]

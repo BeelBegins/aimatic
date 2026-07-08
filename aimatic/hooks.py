@@ -27,25 +27,42 @@ doc_events = {
     # (and can't pick them wrong). POS Invoice is deliberately excluded - see
     # aimatic.branch_management.events.apply_branch_defaults docstring.
     "Sales Order": {
-        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
     },
     "Sales Invoice": {
-        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
     },
     "Delivery Note": {
-        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
     },
     "Purchase Order": {
-        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
     },
     "Purchase Invoice": {
-        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
     },
     "Purchase Receipt": {
-        "validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
+    },
+    # Stock Entry: only branch/cost_center get defaulted here (it has no
+    # set_warehouse/rejected_warehouse fields, so those parts of
+    # apply_branch_defaults are harmless no-ops for this doctype). Needed so
+    # its branch field - a mandatory Accounting Dimension for P&L accounts -
+    # is populated before GL entries are made (e.g. the Stock Adjustment
+    # account on a Material Issue/Receipt/Repack entry).
+    "Stock Entry": {
+        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
     },
     "Branch": {
         "validate": "aimatic.branch_management.events.validate_branch_company_consistency",
+    },
+    # Mirrors a user's default Branch (assigned via User Permission) onto
+    # User.custom_branch so it's visible as a column on the User list view.
+    "User Permission": {
+        "after_insert": "aimatic.branch_management.events.sync_branch_to_user",
+        "after_delete": "aimatic.branch_management.events.sync_branch_to_user",
     },
 }
 
