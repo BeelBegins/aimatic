@@ -15,3 +15,4 @@ aimatic.patches.create_label_printing_double_column_template
 aimatic.patches.create_customer_mobile_no_index
 aimatic.patches.create_item_group_loyalty_custom_fields
 aimatic.patches.create_gift_voucher_mode_of_payment
+aimatic.patches.create_warehouse_branch_field

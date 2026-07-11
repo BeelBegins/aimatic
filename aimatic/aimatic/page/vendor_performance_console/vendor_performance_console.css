@@ -220,6 +220,11 @@
     color: var(--alert-text-danger, var(--text-on-red));
 }
 
+.vendor-performance-page .vp-badge-warning {
+    background: var(--alert-bg-warning, var(--bg-yellow));
+    color: var(--alert-text-warning, var(--text-on-yellow));
+}
+
 /* ---------- Tables ---------- */
 
 .vendor-performance-page .vp-table-wrap {
@@ -282,6 +287,16 @@
 
 .vendor-performance-page .vp-table tbody tr.vp-row-flagged:hover {
     background: var(--alert-bg-danger, rgba(239, 68, 68, 0.14));
+    filter: brightness(0.97);
+}
+
+.vendor-performance-page .vp-table tbody tr.vp-row-warning,
+.vendor-performance-page .vp-table tbody tr.vp-row-warning:nth-child(even) {
+    background: var(--alert-bg-warning, rgba(234, 179, 8, 0.1));
+}
+
+.vendor-performance-page .vp-table tbody tr.vp-row-warning:hover {
+    background: var(--alert-bg-warning, rgba(234, 179, 8, 0.16));
     filter: brightness(0.97);
 }
 

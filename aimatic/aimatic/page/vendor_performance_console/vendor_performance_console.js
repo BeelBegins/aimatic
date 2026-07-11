@@ -39,6 +39,35 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
             reqd: 1,
             change: () => this.refresh_if_ready(),
         });
+        this.branch_field = this.page.add_field({
+            label: __('Branch'),
+            fieldname: 'branch',
+            fieldtype: 'Link',
+            options: 'Branch',
+            change: () => this.refresh_if_ready(),
+        });
+        this.warehouse_field = this.page.add_field({
+            label: __('Warehouse'),
+            fieldname: 'warehouse',
+            fieldtype: 'Link',
+            options: 'Warehouse',
+            get_query: () => {
+                const branch = this.branch_field.get_value();
+                return branch ? { filters: { custom_branch: branch } } : {};
+            },
+            change: () => {
+                const warehouse = this.warehouse_field.get_value();
+                if (warehouse) {
+                    frappe.db.get_value('Warehouse', warehouse, 'custom_branch').then((r) => {
+                        const derived_branch = r.message && r.message.custom_branch;
+                        if (derived_branch && this.branch_field.get_value() !== derived_branch) {
+                            this.branch_field.set_value(derived_branch);
+                        }
+                    });
+                }
+                this.refresh_if_ready();
+            },
+        });
         this.lookback_field = this.page.add_field({
             label: __('Days'),
             fieldname: 'lookback_days',
@@ -76,6 +105,12 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
         if (route_options.company && !this.company_field.get_value()) {
             this.company_field.set_value(route_options.company);
         }
+        if (route_options.branch && !this.branch_field.get_value()) {
+            this.branch_field.set_value(route_options.branch);
+        }
+        if (route_options.warehouse && !this.warehouse_field.get_value()) {
+            this.warehouse_field.set_value(route_options.warehouse);
+        }
         this.refresh_if_ready();
     }
 
@@ -83,6 +118,8 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
         return {
             supplier: this.supplier_field.get_value(),
             company: this.company_field.get_value(),
+            branch: this.branch_field.get_value(),
+            warehouse: this.warehouse_field.get_value(),
             lookback_days: parseInt(this.lookback_field.get_value() || 30, 10) || 30,
         };
     }
@@ -164,27 +201,27 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
         this.drill_sections = {
             origin: {
                 method: 'aimatic.vendor_performance.api.get_vendor_origin_stock_detail',
-                get_args: () => ({ supplier: filters.supplier, company: filters.company, item_limit: 15 }),
+                get_args: () => ({ supplier: filters.supplier, company: filters.company, item_limit: 15, branch: filters.branch, warehouse: filters.warehouse }),
                 render: (result) => this.render_origin_section(result, data),
             },
             stock: {
                 method: 'aimatic.vendor_performance.api.get_vendor_stock_detail',
-                get_args: () => ({ supplier: filters.supplier, company: filters.company, lookback_days: filters.lookback_days, item_limit: 15 }),
+                get_args: () => ({ supplier: filters.supplier, company: filters.company, lookback_days: filters.lookback_days, item_limit: 15, branch: filters.branch, warehouse: filters.warehouse }),
                 render: (result) => this.renderStockTable(result.stock_items || []),
             },
             purchases: {
                 method: 'aimatic.vendor_performance.api.get_vendor_recent_purchases',
-                get_args: () => ({ supplier: filters.supplier, company: filters.company, limit: 3 }),
+                get_args: () => ({ supplier: filters.supplier, company: filters.company, limit: 3, branch: filters.branch, warehouse: filters.warehouse }),
                 render: (result) => this.renderPurchaseTable(result.recent_purchases || []),
             },
             sales: {
                 method: 'aimatic.vendor_performance.api.get_vendor_recent_sales',
-                get_args: () => ({ supplier: filters.supplier, company: filters.company, lookback_days: filters.lookback_days, limit: 3 }),
+                get_args: () => ({ supplier: filters.supplier, company: filters.company, lookback_days: filters.lookback_days, limit: 3, branch: filters.branch, warehouse: filters.warehouse }),
                 render: (result) => this.renderSalesTable(result.recent_sales || []),
             },
             ratios: {
                 method: 'aimatic.vendor_performance.api.get_vendor_abnormal_ratios',
-                get_args: () => ({ supplier: filters.supplier, company: filters.company, lookback_days: 90 }),
+                get_args: () => ({ supplier: filters.supplier, company: filters.company, lookback_days: 90, branch: filters.branch, warehouse: filters.warehouse }),
                 render: (result) => this.render_ratios_section(result),
             },
         };
@@ -216,7 +253,7 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
             ${this.drill_section('stock', 'package', __('Current Stock of Supplier-Linked SKUs'), `<span class="vp-badge">${__('Top 15 by stock value')}</span>`, __('Loads current stock (at cost) plus sales revenue, cost of goods sold, and margin in the selected window for each supplier-linked SKU.'), __('Load stock items'))}
             ${this.drill_section('purchases', 'shopping-cart', __('Last 3 Purchase Invoices'), '', __('Loads the 3 most recent submitted purchase invoices for this supplier.'), __('Load recent purchases'))}
             ${this.drill_section('sales', 'receipt', __('Last 3 Sales'), `<span class="vp-badge">${__('Within selected window')}</span>`, __('Loads the 3 most recent sales of supplier-linked SKUs within the selected window, with cost of goods sold and margin.'), __('Load recent sales'))}
-            ${this.drill_section('ratios', 'alert-triangle', __('Abnormal Purchase:Sale Ratios'), `<span class="vp-badge">${__('Last 90 days')}</span>`, __('Flags supplier-linked SKUs where units purchased are unusually high relative to units sold - a downstream signal for short deliveries or shrinkage that would not show up as a paperwork mismatch. Flagged automatically per item against this vendor\'s own item set, not a manually configured threshold.'), __('Check for abnormal ratios'))}
+            ${this.drill_section('ratios', 'alert-triangle', __('Abnormal Sell-Through'), `<span class="vp-badge">${__('Last 90 days')}</span>`, __('Flags supplier-linked SKUs selling slower than their own normal pace given how long ago they were received - a downstream signal for short deliveries or shrinkage that would not show up as a paperwork mismatch. Judged per item against its own sales history where available, otherwise against this vendor\'s other items - never a manually configured threshold.'), __('Check for abnormal sell-through'))}
         `);
     }
 
@@ -325,15 +362,13 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
     render_ratios_section(result) {
         const items = result.items || [];
         const flaggedCount = result.flagged_count || 0;
-        const methodLabel = result.method === 'iqr'
-            ? __('Statistical outliers vs. this vendor\'s own item set (IQR method)')
-            : __('Too few items with sales for statistics - fixed sanity multiple used instead');
+        const criticalCount = result.critical_count || 0;
         const summaryHtml = `
             <div class="vp-note" style="margin-bottom:14px;">
                 <div class="vp-note-icon">${frappe.utils.icon(flaggedCount ? 'alert-triangle' : 'info', 'sm')}</div>
                 <div class="vp-note-body">
-                    <div><strong>${__('Flagged items')}:</strong> ${flaggedCount} ${__('of')} ${items.length}</div>
-                    <div class="vp-item-meta">${__('Method')}: ${methodLabel}. ${__('Normal range for this vendor')}: 0 - ${this.number(result.upper_fence)} (${__('median')} ${this.number(result.median_ratio)})</div>
+                    <div><strong>${__('Flagged items')}:</strong> ${flaggedCount} ${__('of')} ${items.length} (${criticalCount} ${__('critical')})</div>
+                    <div class="vp-item-meta">${__('Each item is judged against its own normal sell-through pace (from the trailing {0} days) given how long ago it was received - not a fixed ratio. Items without enough sales history for a personal pace are compared against this vendor\'s other items instead.', [this.number(result.velocity_baseline_days)])}</div>
                 </div>
             </div>
         `;
@@ -345,23 +380,31 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
             return `
                 <div class="vp-empty">
                     <div class="vp-state-icon">${frappe.utils.icon('alert-triangle', 'md')}</div>
-                    ${__('No purchase or sale activity found for this supplier\'s linked items in the selected window.')}
+                    ${__('No purchase activity found for this supplier\'s linked items in the selected window.')}
                 </div>
             `;
         }
+        const statusBadge = (severity) => {
+            if (severity === 'critical') {
+                return `<span class="vp-badge vp-badge-danger">${frappe.utils.icon('alert-triangle', 'xs')} ${__('Critical')}</span>`;
+            }
+            if (severity === 'abnormal') {
+                return `<span class="vp-badge vp-badge-warning">${frappe.utils.icon('alert-triangle', 'xs')} ${__('Abnormal')}</span>`;
+            }
+            return `<span class="vp-badge">${__('Normal')}</span>`;
+        };
         const body = rows.map((row) => `
-            <tr class="${row.is_outlier ? 'vp-row-flagged' : ''}">
+            <tr class="${row.severity === 'critical' ? 'vp-row-flagged' : (row.severity === 'abnormal' ? 'vp-row-warning' : '')}">
                 <td>
                     <div class="vp-item-title">${frappe.utils.escape_html(row.item_code)}</div>
                     <div class="vp-item-meta">${frappe.utils.escape_html(row.item_name || '')}</div>
                 </td>
                 <td class="vp-num">${this.number(row.purchased_qty)}</td>
+                <td>${row.purchase_date ? frappe.datetime.str_to_user(row.purchase_date) : ''} <span class="vp-item-meta">(${row.days_since_purchase}d ${__('ago')})</span></td>
                 <td class="vp-num">${this.number(row.sold_qty)}</td>
-                <td class="vp-num">${row.ratio === null ? '—' : this.number(row.ratio)}</td>
-                <td>${row.is_outlier
-                    ? `<span class="vp-badge vp-badge-danger">${frappe.utils.icon('alert-triangle', 'xs')} ${__('Flagged')}</span>`
-                    : `<span class="vp-badge">${__('Normal')}</span>`}
-                </td>
+                <td class="vp-num">${this.percent(row.pct_sold * 100)}</td>
+                <td><span class="vp-badge">${row.method === 'velocity' ? __('Own pace') : __('Peer compare')}</span></td>
+                <td>${statusBadge(row.severity)}</td>
                 <td class="vp-item-meta">${frappe.utils.escape_html(row.flag_reason || '')}</td>
             </tr>
         `).join('');
@@ -372,8 +415,10 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
                         <tr>
                             <th>${__('Item')}</th>
                             <th class="vp-num">${__('Purchased Qty')}</th>
-                            <th class="vp-num">${__('Sold Qty')}</th>
-                            <th class="vp-num">${__('Ratio')}</th>
+                            <th>${__('Received')}</th>
+                            <th class="vp-num">${__('Sold Since')}</th>
+                            <th class="vp-num">${__('% Sold')}</th>
+                            <th>${__('Method')}</th>
                             <th>${__('Status')}</th>
                             <th>${__('Reason')}</th>
                         </tr>
