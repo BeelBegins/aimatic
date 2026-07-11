@@ -182,6 +182,11 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
                 get_args: () => ({ supplier: filters.supplier, company: filters.company, lookback_days: filters.lookback_days, limit: 3 }),
                 render: (result) => this.renderSalesTable(result.recent_sales || []),
             },
+            ratios: {
+                method: 'aimatic.vendor_performance.api.get_vendor_abnormal_ratios',
+                get_args: () => ({ supplier: filters.supplier, company: filters.company, lookback_days: 90 }),
+                render: (result) => this.render_ratios_section(result),
+            },
         };
 
         const noteHtml = `
@@ -211,6 +216,7 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
             ${this.drill_section('stock', 'package', __('Current Stock of Supplier-Linked SKUs'), `<span class="vp-badge">${__('Top 15 by stock value')}</span>`, __('Loads current stock (at cost) plus sales revenue, cost of goods sold, and margin in the selected window for each supplier-linked SKU.'), __('Load stock items'))}
             ${this.drill_section('purchases', 'shopping-cart', __('Last 3 Purchase Invoices'), '', __('Loads the 3 most recent submitted purchase invoices for this supplier.'), __('Load recent purchases'))}
             ${this.drill_section('sales', 'receipt', __('Last 3 Sales'), `<span class="vp-badge">${__('Within selected window')}</span>`, __('Loads the 3 most recent sales of supplier-linked SKUs within the selected window, with cost of goods sold and margin.'), __('Load recent sales'))}
+            ${this.drill_section('ratios', 'alert-triangle', __('Abnormal Purchase:Sale Ratios'), `<span class="vp-badge">${__('Last 90 days')}</span>`, __('Flags supplier-linked SKUs where units purchased are unusually high relative to units sold - a downstream signal for short deliveries or shrinkage that would not show up as a paperwork mismatch. Flagged automatically per item against this vendor\'s own item set, not a manually configured threshold.'), __('Check for abnormal ratios'))}
         `);
     }
 
@@ -308,6 +314,68 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
                             <th class="vp-num">${__('Attributed Value')}</th>
                             <th>${__('Last Origin Date')}</th>
                             <th>${__('Last Origin Doc')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>${body}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    render_ratios_section(result) {
+        const items = result.items || [];
+        const flaggedCount = result.flagged_count || 0;
+        const methodLabel = result.method === 'iqr'
+            ? __('Statistical outliers vs. this vendor\'s own item set (IQR method)')
+            : __('Too few items with sales for statistics - fixed sanity multiple used instead');
+        const summaryHtml = `
+            <div class="vp-note" style="margin-bottom:14px;">
+                <div class="vp-note-icon">${frappe.utils.icon(flaggedCount ? 'alert-triangle' : 'info', 'sm')}</div>
+                <div class="vp-note-body">
+                    <div><strong>${__('Flagged items')}:</strong> ${flaggedCount} ${__('of')} ${items.length}</div>
+                    <div class="vp-item-meta">${__('Method')}: ${methodLabel}. ${__('Normal range for this vendor')}: 0 - ${this.number(result.upper_fence)} (${__('median')} ${this.number(result.median_ratio)})</div>
+                </div>
+            </div>
+        `;
+        return summaryHtml + this.renderRatiosTable(items);
+    }
+
+    renderRatiosTable(rows) {
+        if (!rows.length) {
+            return `
+                <div class="vp-empty">
+                    <div class="vp-state-icon">${frappe.utils.icon('alert-triangle', 'md')}</div>
+                    ${__('No purchase or sale activity found for this supplier\'s linked items in the selected window.')}
+                </div>
+            `;
+        }
+        const body = rows.map((row) => `
+            <tr class="${row.is_outlier ? 'vp-row-flagged' : ''}">
+                <td>
+                    <div class="vp-item-title">${frappe.utils.escape_html(row.item_code)}</div>
+                    <div class="vp-item-meta">${frappe.utils.escape_html(row.item_name || '')}</div>
+                </td>
+                <td class="vp-num">${this.number(row.purchased_qty)}</td>
+                <td class="vp-num">${this.number(row.sold_qty)}</td>
+                <td class="vp-num">${row.ratio === null ? '—' : this.number(row.ratio)}</td>
+                <td>${row.is_outlier
+                    ? `<span class="vp-badge vp-badge-danger">${frappe.utils.icon('alert-triangle', 'xs')} ${__('Flagged')}</span>`
+                    : `<span class="vp-badge">${__('Normal')}</span>`}
+                </td>
+                <td class="vp-item-meta">${frappe.utils.escape_html(row.flag_reason || '')}</td>
+            </tr>
+        `).join('');
+        return `
+            <div class="vp-table-wrap">
+                <table class="vp-table">
+                    <thead>
+                        <tr>
+                            <th>${__('Item')}</th>
+                            <th class="vp-num">${__('Purchased Qty')}</th>
+                            <th class="vp-num">${__('Sold Qty')}</th>
+                            <th class="vp-num">${__('Ratio')}</th>
+                            <th>${__('Status')}</th>
+                            <th>${__('Reason')}</th>
                         </tr>
                     </thead>
                     <tbody>${body}</tbody>

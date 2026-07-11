@@ -197,6 +197,7 @@
 .vendor-performance-page .vp-badge {
     display: inline-flex;
     align-items: center;
+    gap: 4px;
     padding: 3px 10px;
     border-radius: 999px;
     background: var(--control-bg);
@@ -206,6 +207,17 @@
     text-transform: uppercase;
     letter-spacing: 0.02em;
     white-space: nowrap;
+}
+
+.vendor-performance-page .vp-badge svg {
+    width: 10px;
+    height: 10px;
+    stroke: currentColor;
+}
+
+.vendor-performance-page .vp-badge-danger {
+    background: var(--alert-bg-danger, var(--bg-red));
+    color: var(--alert-text-danger, var(--text-on-red));
 }
 
 /* ---------- Tables ---------- */
@@ -261,6 +273,16 @@
 
 .vendor-performance-page .vp-table tbody tr:hover {
     background: var(--control-bg-on-gray, var(--control-bg));
+}
+
+.vendor-performance-page .vp-table tbody tr.vp-row-flagged,
+.vendor-performance-page .vp-table tbody tr.vp-row-flagged:nth-child(even) {
+    background: var(--alert-bg-danger, rgba(239, 68, 68, 0.08));
+}
+
+.vendor-performance-page .vp-table tbody tr.vp-row-flagged:hover {
+    background: var(--alert-bg-danger, rgba(239, 68, 68, 0.14));
+    filter: brightness(0.97);
 }
 
 .vendor-performance-page .vp-table tr:last-child td {

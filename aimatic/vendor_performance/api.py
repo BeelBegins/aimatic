@@ -267,6 +267,101 @@ def get_vendor_recent_sales(supplier: str, company: str | None = None, lookback_
     return {'recent_sales': recent_sales}
 
 
+@frappe.whitelist()
+def get_vendor_abnormal_ratios(supplier: str, company: str | None = None, lookback_days: int = 90):
+    """Drill-through: per-item purchase-to-sale ratio, flagged for outliers.
+
+    This is a shrinkage/theft-adjacent signal, not a paperwork check: a vendor who
+    physically under-delivers while the Purchase Receipt still records the agreed
+    quantity (a deceived/colluding receiving count) won't show up as a PO-vs-PR
+    document mismatch, since both documents agree with each other. It only surfaces
+    later as fewer units than expected actually being available to sell, i.e. an
+    inflated purchase_qty relative to sold_qty for that item compared to the vendor's
+    other items. Both sides are read from Stock Ledger Entry (not invoice/receipt
+    tables) so the two are on the same, physically-grounded footing - see
+    _get_purchase_qty_by_item and _get_sold_qty_by_item.
+
+    "Abnormal" can't be a manually-tuned per-item threshold at this item count (37k+
+    SKUs sitewide), so outliers are detected statistically: each item's ratio is
+    compared against the *same vendor's own* item-set distribution via Tukey's IQR
+    fence (ratio > Q3 + 1.5*IQR), which needs no per-item configuration and adapts to
+    each vendor's normal purchase:sale pattern. With too few items for that to be
+    meaningful (< 5 with sales), falls back to a fixed multiple-of-median-ish sanity
+    rule instead. Items purchased in-window with zero recorded sales are always
+    flagged outright, regardless of which method is used, since a ratio can't even be
+    computed for them.
+    """
+    supplier, company, _meta, _currency = _resolve_context(supplier, company)
+    lookback_days, date_from, date_to = _get_date_window(lookback_days)
+
+    item_codes = _get_supplier_item_codes(supplier=supplier, company=company)
+    if not item_codes:
+        return {'method': None, 'median_ratio': None, 'lower_fence': None, 'upper_fence': None, 'items': [], 'lookback_days': lookback_days}
+
+    purchased_by_item = _get_purchase_receipt_qty_by_item(item_codes=item_codes, company=company, date_from=date_from, date_to=date_to)
+    # Reuses the same COGS-qty source (SLE-based, includes the known historical
+    # backfill Stock Entries - see _HISTORICAL_POS_STOCK_CORRECTION_ENTRIES) so both
+    # sides of the ratio are the same "what actually moved in stock" source of truth.
+    sold_by_item = _get_cogs_by_item(item_codes=item_codes, company=company, date_from=date_from, date_to=date_to)
+    item_names = frappe.db.get_all('Item', filters={'item_code': ['in', item_codes]}, fields=['item_code', 'item_name'])
+    item_name_map = {row.item_code: row.item_name for row in item_names}
+
+    rows = []
+    for item_code in item_codes:
+        purchased_qty = flt(purchased_by_item.get(item_code))
+        sold_qty = flt(sold_by_item.get(item_code, {}).get('cogs_qty'))
+        if not purchased_qty and not sold_qty:
+            continue
+        ratio = (purchased_qty / sold_qty) if sold_qty else None
+        rows.append({
+            'item_code': item_code,
+            'item_name': item_name_map.get(item_code) or item_code,
+            'purchased_qty': purchased_qty,
+            'sold_qty': sold_qty,
+            'ratio': ratio,
+        })
+
+    ratios_with_sales = [row['ratio'] for row in rows if row['ratio'] is not None]
+    if len(ratios_with_sales) >= 5:
+        method = 'iqr'
+        q1, q3 = _percentile(ratios_with_sales, 25), _percentile(ratios_with_sales, 75)
+        iqr = q3 - q1
+        upper_fence = q3 + 1.5 * iqr
+        lower_fence = max(0.0, q1 - 1.5 * iqr)
+        median_ratio = _percentile(ratios_with_sales, 50)
+    else:
+        method = 'fallback'
+        median_ratio = _percentile(ratios_with_sales, 50) if ratios_with_sales else 0.0
+        # No stable distribution to lean on with this little data - fall back to a
+        # fixed sanity multiple (purchasing >3x what's sold) plus a minimum absolute
+        # quantity so a couple of stray units don't trip it on pure noise.
+        upper_fence = max(3.0, median_ratio * 3)
+        lower_fence = 0.0
+
+    for row in rows:
+        if row['sold_qty'] == 0 and row['purchased_qty'] > 0:
+            row['is_outlier'] = True
+            row['flag_reason'] = _('No sales recorded in window despite {0} units purchased.').format(row['purchased_qty'])
+        elif row['ratio'] is not None and row['ratio'] > upper_fence and row['purchased_qty'] >= 5:
+            row['is_outlier'] = True
+            row['flag_reason'] = _('Purchase:sale ratio {0} is well above this vendor\'s normal range (up to ~{1}).').format(round(row['ratio'], 2), round(upper_fence, 2))
+        else:
+            row['is_outlier'] = False
+            row['flag_reason'] = None
+
+    rows.sort(key=lambda r: (not r['is_outlier'], -(r['ratio'] or (r['purchased_qty'] + 1))))
+
+    return {
+        'method': method,
+        'median_ratio': median_ratio,
+        'lower_fence': lower_fence,
+        'upper_fence': upper_fence,
+        'items': rows,
+        'lookback_days': lookback_days,
+        'flagged_count': sum(1 for row in rows if row['is_outlier']),
+    }
+
+
 def _get_supplier_item_codes(supplier: str, company: str) -> list[str]:
     rows = frappe.db.sql(
         '''
@@ -856,6 +951,48 @@ def _get_cogs_by_item(item_codes: list[str], company: str, date_from, date_to):
         as_dict=True,
     )
     return {row.item_code: {'cogs_qty': flt(row.cogs_qty), 'cogs_amount': flt(row.cogs_amount)} for row in rows}
+
+
+def _get_purchase_receipt_qty_by_item(item_codes: list[str], company: str, date_from, date_to):
+    """Physical goods-in per item, read from Stock Ledger Entry (Purchase Receipt
+    only, not Purchase Invoice) so it's on the same "what actually moved in stock"
+    footing as _get_cogs_by_item's sold_qty - used for the abnormal purchase:sale
+    ratio check, not for the Purchase Receipt KPI card (which reads the document
+    table directly for billed-amount purposes)."""
+    if not item_codes:
+        return {}
+
+    rows = frappe.db.sql(
+        '''
+        SELECT item_code, SUM(actual_qty) AS purchased_qty
+        FROM `tabStock Ledger Entry`
+        WHERE is_cancelled = 0
+          AND company = %(company)s
+          AND item_code IN %(item_codes)s
+          AND voucher_type = 'Purchase Receipt'
+          AND actual_qty > 0
+          AND posting_date BETWEEN %(date_from)s AND %(date_to)s
+        GROUP BY item_code
+        ''',
+        {'company': company, 'item_codes': tuple(item_codes), 'date_from': date_from, 'date_to': date_to},
+        as_dict=True,
+    )
+    return {row.item_code: flt(row.purchased_qty) for row in rows}
+
+
+def _percentile(values: list[float], pct: float) -> float:
+    """Linear-interpolation percentile (matches numpy's default), no external
+    dependency needed for the small per-vendor item lists this runs on."""
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    k = (len(ordered) - 1) * (pct / 100)
+    lower_idx = int(k)
+    upper_idx = min(lower_idx + 1, len(ordered) - 1)
+    fraction = k - lower_idx
+    return ordered[lower_idx] + (ordered[upper_idx] - ordered[lower_idx]) * fraction
 
 
 def _get_cogs_by_voucher(voucher_names: list[str], item_codes: list[str], company: str):
