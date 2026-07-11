@@ -11,6 +11,27 @@ from frappe.utils import add_days, cint, flt, getdate, today
 # instead of the request hanging.
 _MAX_ORIGIN_STOCK_SLE_ROWS = 150_000
 
+# One-off, szl-only historical correction (2026-07-11): these Stock Entries backfill
+# the stock/COGS impact of POS Invoices submitted with update_stock=0 before that bug
+# was fixed in offline_pos._build_pos_invoice_doc. The originals were deliberately never
+# touched (already FBR-reported), so their cost never lands under voucher_type in
+# ('Sales Invoice', 'POS Invoice') like a normal sale's SLE would. Counting these
+# specific, known documents as COGS too keeps this dashboard's numbers reconciled for
+# that historical window without misclassifying unrelated Material Issues (write-offs,
+# internal consumption, etc.) as sales COGS. See CLAUDE.md's offline_pos section.
+_HISTORICAL_POS_STOCK_CORRECTION_ENTRIES = (
+    'MAT-STE-2026-00008',
+    'MAT-STE-2026-00009',
+    'MAT-STE-2026-00010',
+    'MAT-STE-2026-00011',
+    'MAT-STE-2026-00012',
+    'MAT-STE-2026-00013',
+    'MAT-STE-2026-00014',
+    'MAT-STE-2026-00015',
+    'MAT-STE-2026-00016',
+    'MAT-STE-2026-00017',
+)
+
 
 def _resolve_context(supplier: str, company: str | None):
     if frappe.session.user == 'Guest':
@@ -540,11 +561,20 @@ def _get_cogs_summary(item_codes: list[str], company: str, date_from, date_to):
         WHERE is_cancelled = 0
           AND company = %(company)s
           AND item_code IN %(item_codes)s
-          AND voucher_type IN ('Sales Invoice', 'POS Invoice')
+          AND (
+              voucher_type IN ('Sales Invoice', 'POS Invoice')
+              OR (voucher_type = 'Stock Entry' AND voucher_no IN %(historical_correction_entries)s)
+          )
           AND actual_qty < 0
           AND posting_date BETWEEN %(date_from)s AND %(date_to)s
         ''',
-        {'company': company, 'item_codes': tuple(item_codes), 'date_from': date_from, 'date_to': date_to},
+        {
+            'company': company,
+            'item_codes': tuple(item_codes),
+            'date_from': date_from,
+            'date_to': date_to,
+            'historical_correction_entries': _HISTORICAL_POS_STOCK_CORRECTION_ENTRIES,
+        },
         as_dict=True,
     )
     row = rows[0] if rows else {}
@@ -763,12 +793,21 @@ def _get_cogs_by_item(item_codes: list[str], company: str, date_from, date_to):
         WHERE is_cancelled = 0
           AND company = %(company)s
           AND item_code IN %(item_codes)s
-          AND voucher_type IN ('Sales Invoice', 'POS Invoice')
+          AND (
+              voucher_type IN ('Sales Invoice', 'POS Invoice')
+              OR (voucher_type = 'Stock Entry' AND voucher_no IN %(historical_correction_entries)s)
+          )
           AND actual_qty < 0
           AND posting_date BETWEEN %(date_from)s AND %(date_to)s
         GROUP BY item_code
         ''',
-        {'company': company, 'item_codes': tuple(item_codes), 'date_from': date_from, 'date_to': date_to},
+        {
+            'company': company,
+            'item_codes': tuple(item_codes),
+            'date_from': date_from,
+            'date_to': date_to,
+            'historical_correction_entries': _HISTORICAL_POS_STOCK_CORRECTION_ENTRIES,
+        },
         as_dict=True,
     )
     return {row.item_code: {'cogs_qty': flt(row.cogs_qty), 'cogs_amount': flt(row.cogs_amount)} for row in rows}
