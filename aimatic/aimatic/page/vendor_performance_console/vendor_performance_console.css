@@ -1,0 +1,389 @@
+
+.vendor-performance-page {
+    font-size: 13px;
+    color: var(--text-color);
+    padding-bottom: var(--padding-2xl, 32px);
+}
+
+.vendor-performance-page * {
+    box-sizing: border-box;
+}
+
+/* ---------- Header note / definitions callout ---------- */
+
+.vendor-performance-page .vp-note {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--border-radius-md);
+    background: var(--alert-bg-info, var(--subtle-fg));
+    color: var(--alert-text-info, var(--text-color));
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.vendor-performance-page .vp-note .vp-note-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+    color: inherit;
+}
+
+.vendor-performance-page .vp-note .vp-note-icon svg {
+    width: 15px;
+    height: 15px;
+    stroke: currentColor;
+}
+
+.vendor-performance-page .vp-note-body > div {
+    margin-bottom: 3px;
+}
+
+.vendor-performance-page .vp-note-body > div:last-child {
+    margin-bottom: 0;
+}
+
+.vendor-performance-page .vp-note strong {
+    font-weight: 600;
+}
+
+/* ---------- KPI card grid ---------- */
+
+.vendor-performance-page .vp-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    margin-bottom: 28px;
+}
+
+.vendor-performance-page .vp-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-radius: var(--border-radius-lg, 12px);
+    padding: 16px 18px;
+    background: var(--card-bg);
+    box-shadow: var(--card-shadow, 0 1px 2px rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vendor-performance-page .vp-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.vendor-performance-page .vp-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--vp-accent, var(--dark-border-color));
+}
+
+.vendor-performance-page .vp-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.vendor-performance-page .vp-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--vp-accent-bg, var(--subtle-fg));
+    color: var(--vp-accent, var(--text-muted));
+    flex-shrink: 0;
+}
+
+.vendor-performance-page .vp-card-icon svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+}
+
+.vendor-performance-page .vp-card-label {
+    color: var(--text-muted);
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.vendor-performance-page .vp-card-value {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--heading-color, var(--text-color));
+    font-variant-numeric: tabular-nums;
+}
+
+.vendor-performance-page .vp-card-subvalue {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* Accent themes per KPI category */
+.vendor-performance-page .vp-card.vp-accent-stock { --vp-accent: var(--text-on-gray, #6b7280); --vp-accent-bg: var(--bg-light-gray, var(--subtle-fg)); }
+.vendor-performance-page .vp-card.vp-accent-revenue { --vp-accent: var(--text-on-blue, #3b82f6); --vp-accent-bg: var(--bg-light-blue, var(--subtle-fg)); }
+.vendor-performance-page .vp-card.vp-accent-cogs { --vp-accent: var(--text-on-orange, #d97706); --vp-accent-bg: var(--bg-orange, var(--subtle-fg)); }
+.vendor-performance-page .vp-card.vp-accent-margin { --vp-accent: var(--text-on-green, #16a34a); --vp-accent-bg: var(--bg-green, var(--subtle-fg)); }
+.vendor-performance-page .vp-card.vp-accent-purchase { --vp-accent: var(--text-on-purple, #8b5cf6); --vp-accent-bg: var(--bg-purple, var(--subtle-fg)); }
+.vendor-performance-page .vp-card.vp-accent-payable { --vp-accent: var(--text-on-red, #ef4444); --vp-accent-bg: var(--bg-red, var(--subtle-fg)); }
+.vendor-performance-page .vp-card.vp-accent-payment { --vp-accent: var(--text-on-cyan, #06b6d4); --vp-accent-bg: var(--bg-cyan, var(--subtle-fg)); }
+
+.vendor-performance-page .vp-value-positive { color: var(--text-on-green, #16a34a); }
+.vendor-performance-page .vp-value-negative { color: var(--text-on-red, #ef4444); }
+
+/* ---------- Sections ---------- */
+
+.vendor-performance-page .vp-section {
+    margin-bottom: 24px;
+}
+
+.vendor-performance-page .vp-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.vendor-performance-page .vp-section-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vendor-performance-page .vp-section-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: var(--subtle-fg);
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.vendor-performance-page .vp-section-icon svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+}
+
+.vendor-performance-page .vp-section-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--heading-color, var(--text-color));
+}
+
+.vendor-performance-page .vp-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--control-bg);
+    color: var(--text-muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+/* ---------- Tables ---------- */
+
+.vendor-performance-page .vp-table-wrap {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    overflow: auto;
+    background: var(--card-bg);
+    box-shadow: var(--card-shadow, none);
+}
+
+.vendor-performance-page .vp-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 760px;
+}
+
+.vendor-performance-page .vp-table th,
+.vendor-performance-page .vp-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    font-size: 12.5px;
+}
+
+.vendor-performance-page .vp-table th {
+    background: var(--subtle-fg);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+}
+
+.vendor-performance-page .vp-table td.vp-num,
+.vendor-performance-page .vp-table th.vp-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.vendor-performance-page .vp-table tbody tr {
+    transition: background 0.1s ease;
+}
+
+.vendor-performance-page .vp-table tbody tr:nth-child(even) {
+    background: var(--subtle-fg);
+}
+
+.vendor-performance-page .vp-table tbody tr:hover {
+    background: var(--control-bg-on-gray, var(--control-bg));
+}
+
+.vendor-performance-page .vp-table tr:last-child td {
+    border-bottom: none;
+}
+
+.vendor-performance-page .vp-table a {
+    font-weight: 600;
+}
+
+/* ---------- Empty / loading states ---------- */
+
+.vendor-performance-page .vp-empty,
+.vendor-performance-page .vp-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    border: 1px dashed var(--border-color);
+    border-radius: var(--border-radius-lg, 12px);
+    background: var(--card-bg);
+    font-size: 13px;
+}
+
+.vendor-performance-page .vp-empty .vp-state-icon,
+.vendor-performance-page .vp-loading .vp-state-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--subtle-fg);
+    color: var(--text-muted);
+}
+
+.vendor-performance-page .vp-empty .vp-state-icon svg,
+.vendor-performance-page .vp-loading .vp-state-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+}
+
+.vendor-performance-page .vp-loading .vp-state-icon {
+    animation: vp-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes vp-pulse {
+    0%, 100% { opacity: 0.45; transform: scale(0.94); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
+.vendor-performance-page .vp-empty.text-danger {
+    border-color: var(--alert-bg-danger, var(--border-color));
+    color: var(--alert-text-danger, var(--text-color));
+}
+
+.vendor-performance-page .vp-item-title {
+    font-weight: 600;
+    color: var(--heading-color, var(--text-color));
+}
+
+.vendor-performance-page .vp-item-meta {
+    color: var(--text-muted);
+    margin-top: 3px;
+    font-size: 11.5px;
+}
+
+/* ---------- Drill-through placeholder ---------- */
+
+.vendor-performance-page .vp-drill-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 28px 20px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--border-radius-lg, 12px);
+    background: var(--subtle-fg);
+    text-align: center;
+}
+
+.vendor-performance-page .vp-drill-placeholder .vp-state-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--card-bg);
+    color: var(--text-muted);
+    box-shadow: var(--card-shadow, none);
+}
+
+.vendor-performance-page .vp-drill-placeholder .vp-state-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+}
+
+.vendor-performance-page .vp-drill-placeholder p {
+    color: var(--text-muted);
+    font-size: 12.5px;
+    max-width: 480px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.vendor-performance-page .vp-drill-placeholder button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vendor-performance-page .vp-drill-placeholder button svg {
+    width: 13px;
+    height: 13px;
+    stroke: currentColor;
+}
+
+.vendor-performance-page .vp-drill-summary {
+    margin-bottom: 14px;
+    max-width: 280px;
+}

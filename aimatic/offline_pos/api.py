@@ -482,6 +482,7 @@ def _build_pos_invoice_doc(
         "doctype": "POS Invoice",
         "is_pos": 1,
         "pos_profile": pos.name,
+        "update_stock": cint(pos.get("update_stock")),
         "customer": cust.name,
         "company": pos.company or frappe.defaults.get_user_default("Company"),
         "posting_date": nowdate(),

@@ -36,14 +36,23 @@ doc_events = {
         "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
     },
     "Purchase Order": {
-        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_validate": [
+            "aimatic.branch_management.events.apply_branch_defaults",
+            "aimatic.purchase_printing.populate_old_purchase_snapshot",
+        ],
     },
     "Purchase Invoice": {
-        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_validate": [
+            "aimatic.branch_management.events.apply_branch_defaults",
+            "aimatic.purchase_printing.populate_old_purchase_snapshot",
+        ],
         "on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
     },
     "Purchase Receipt": {
-        "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_validate": [
+            "aimatic.branch_management.events.apply_branch_defaults",
+            "aimatic.purchase_printing.populate_old_purchase_snapshot",
+        ],
         "on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
     },
     # Stock Entry: only branch/cost_center get defaulted here (it has no
@@ -74,6 +83,7 @@ doctype_js = {
     "Delivery Note": "public/js/label_printing_source_buttons.js",
     "Stock Entry": "public/js/label_printing_source_buttons.js",
     "Sales Invoice": "public/js/label_printing_source_buttons.js",
+    "Supplier": "public/js/supplier_vendor_performance.js",
 }
 
 jinja = {
@@ -82,6 +92,7 @@ jinja = {
         "aimatic.label_printing.utils.expand_print_rows",
         "aimatic.label_printing.utils.get_template_context",
         "aimatic.label_printing.utils.format_price",
+        "aimatic.purchase_printing.get_purchase_print_item_context",
     ],
 }
 
