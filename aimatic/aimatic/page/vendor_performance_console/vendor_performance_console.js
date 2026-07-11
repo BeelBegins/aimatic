@@ -203,6 +203,7 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
                 ${this.card('cogs', 'shopping-bag', __('Cost of Goods Sold (Window)'), this.money(summary.cogs_amount), `${this.number(summary.cogs_qty)} ${__('qty')}`)}
                 ${this.card('margin', 'percent', __('Gross Margin (Window)'), this.money(summary.gross_margin_amount), `${this.percent(summary.gross_margin_pct)} ${__('of revenue')}`, summary.gross_margin_amount)}
                 ${this.card('purchase', 'truck', __('Purchase Invoices (Window, at Cost)'), this.money(summary.purchase_amount), `${this.number(summary.purchase_qty)} ${__('qty')} · ${this.number(summary.purchase_doc_count)} ${__('docs')}`)}
+                ${this.card('receipt', 'package-check', __('Purchase Receipts (Window, at Cost)'), this.money(summary.purchase_receipt_amount), `${this.number(summary.purchase_receipt_qty)} ${__('qty')} · ${this.number(summary.purchase_receipt_doc_count)} ${__('docs')}`)}
                 ${this.card('payable', 'wallet', __('Outstanding Payable'), this.money(summary.outstanding_amount), `${this.number(summary.outstanding_invoice_count)} ${__('open invoices')}`)}
                 ${this.card('payment', 'credit-card', __('Last Payment'), lastPayment ? this.money(lastPayment.amount) : __('No payment'), lastPayment ? `${frappe.datetime.str_to_user(lastPayment.posting_date)} · ${frappe.utils.escape_html(lastPayment.payment_entry)}` : __('No submitted supplier payment found'))}
             </div>

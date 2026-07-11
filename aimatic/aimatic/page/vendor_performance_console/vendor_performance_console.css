@@ -140,6 +140,7 @@
 .vendor-performance-page .vp-card.vp-accent-cogs { --vp-accent: var(--text-on-orange, #d97706); --vp-accent-bg: var(--bg-orange, var(--subtle-fg)); }
 .vendor-performance-page .vp-card.vp-accent-margin { --vp-accent: var(--text-on-green, #16a34a); --vp-accent-bg: var(--bg-green, var(--subtle-fg)); }
 .vendor-performance-page .vp-card.vp-accent-purchase { --vp-accent: var(--text-on-purple, #8b5cf6); --vp-accent-bg: var(--bg-purple, var(--subtle-fg)); }
+.vendor-performance-page .vp-card.vp-accent-receipt { --vp-accent: var(--text-on-pink, #db2777); --vp-accent-bg: var(--bg-pink, var(--subtle-fg)); }
 .vendor-performance-page .vp-card.vp-accent-payable { --vp-accent: var(--text-on-red, #ef4444); --vp-accent-bg: var(--bg-red, var(--subtle-fg)); }
 .vendor-performance-page .vp-card.vp-accent-payment { --vp-accent: var(--text-on-cyan, #06b6d4); --vp-accent-bg: var(--bg-cyan, var(--subtle-fg)); }
 

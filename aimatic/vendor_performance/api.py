@@ -80,6 +80,7 @@ def get_vendor_performance_summary(supplier: str, company: str | None = None, lo
     sales_summary = _get_sales_summary(item_codes=item_codes, company=company, date_from=date_from, date_to=date_to)
     cogs_summary = _get_cogs_summary(item_codes=item_codes, company=company, date_from=date_from, date_to=date_to)
     purchase_summary = _get_purchase_summary(supplier=supplier, company=company, date_from=date_from, date_to=date_to)
+    purchase_receipt_summary = _get_purchase_receipt_summary(supplier=supplier, company=company, date_from=date_from, date_to=date_to)
     outstanding_summary = _get_outstanding_summary(supplier=supplier, company=company)
     last_payment = _get_last_payment(supplier=supplier, company=company)
 
@@ -116,6 +117,9 @@ def get_vendor_performance_summary(supplier: str, company: str | None = None, lo
             'purchase_qty': flt(purchase_summary.get('purchase_qty')),
             'purchase_amount': flt(purchase_summary.get('purchase_amount')),
             'purchase_doc_count': cint(purchase_summary.get('doc_count')),
+            'purchase_receipt_qty': flt(purchase_receipt_summary.get('purchase_qty')),
+            'purchase_receipt_amount': flt(purchase_receipt_summary.get('purchase_amount')),
+            'purchase_receipt_doc_count': cint(purchase_receipt_summary.get('doc_count')),
             'outstanding_amount': flt(outstanding_summary.get('outstanding_amount')),
             'outstanding_invoice_count': cint(outstanding_summary.get('invoice_count')),
         },
@@ -615,6 +619,47 @@ def _get_purchase_summary(supplier: str, company: str, date_from, date_to):
         'doc_count': cint(invoice_row.get('doc_count')),
         'purchase_qty': flt(qty_row.get('purchase_qty')),
         'purchase_amount': flt(invoice_row.get('purchase_amount')),
+    }
+
+
+def _get_purchase_receipt_summary(supplier: str, company: str, date_from, date_to):
+    """Goods actually received (Purchase Receipt), separate from Purchase Invoice
+    billing - the two can diverge (received-not-billed, billed-without-receipt for
+    service/direct items), so this is tracked as its own card rather than folded
+    into the Purchase Invoice numbers."""
+    receipt_rows = frappe.db.sql(
+        '''
+        SELECT COUNT(*) AS doc_count, COALESCE(SUM(base_grand_total), 0) AS purchase_amount
+        FROM `tabPurchase Receipt`
+        WHERE docstatus = 1
+          AND IFNULL(is_return, 0) = 0
+          AND company = %(company)s
+          AND supplier = %(supplier)s
+          AND posting_date BETWEEN %(date_from)s AND %(date_to)s
+        ''',
+        {'supplier': supplier, 'company': company, 'date_from': date_from, 'date_to': date_to},
+        as_dict=True,
+    )
+    qty_rows = frappe.db.sql(
+        '''
+        SELECT COALESCE(SUM(pri.qty), 0) AS purchase_qty
+        FROM `tabPurchase Receipt Item` pri
+        INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
+        WHERE pr.docstatus = 1
+          AND IFNULL(pr.is_return, 0) = 0
+          AND pr.company = %(company)s
+          AND pr.supplier = %(supplier)s
+          AND pr.posting_date BETWEEN %(date_from)s AND %(date_to)s
+        ''',
+        {'supplier': supplier, 'company': company, 'date_from': date_from, 'date_to': date_to},
+        as_dict=True,
+    )
+    receipt_row = receipt_rows[0] if receipt_rows else {}
+    qty_row = qty_rows[0] if qty_rows else {}
+    return {
+        'doc_count': cint(receipt_row.get('doc_count')),
+        'purchase_qty': flt(qty_row.get('purchase_qty')),
+        'purchase_amount': flt(receipt_row.get('purchase_amount')),
     }
 
 
