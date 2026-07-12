@@ -67,6 +67,13 @@ doc_events = {
     "Branch": {
         "validate": "aimatic.branch_management.events.validate_branch_company_consistency",
     },
+    # Tax ID/NTN is the entry field; tax_ntn is a read-only mirror of it (see
+    # patches.rename_supplier_tax_id_label for the label/read-only Property
+    # Setters). 7-digit-no-dashes format is only enforced for suppliers in the
+    # Filers tax withholding group.
+    "Supplier": {
+        "validate": "aimatic.supplier_management.events.validate_supplier_ntn",
+    },
     # Mirrors a user's default Branch (assigned via User Permission) onto
     # User.custom_branch so it's visible as a column on the User list view.
     "User Permission": {

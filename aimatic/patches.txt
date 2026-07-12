@@ -16,3 +16,4 @@ aimatic.patches.create_customer_mobile_no_index
 aimatic.patches.create_item_group_loyalty_custom_fields
 aimatic.patches.create_gift_voucher_mode_of_payment
 aimatic.patches.create_warehouse_branch_field
+aimatic.patches.rename_supplier_tax_id_label
