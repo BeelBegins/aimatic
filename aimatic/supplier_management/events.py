@@ -3,7 +3,7 @@ import re
 import frappe
 from frappe import _
 
-NTN_PATTERN = re.compile(r"^\d{7}$")
+NTN_PATTERN = re.compile(r"^[A-Za-z0-9]{7}$")
 
 
 def validate_supplier_ntn(doc, method=None):
@@ -12,7 +12,7 @@ def validate_supplier_ntn(doc, method=None):
         if not NTN_PATTERN.match(value):
             frappe.throw(
                 _(
-                    "A valid 7-digit NTN (digits only, no dashes) is required in "
+                    "A valid 7-character NTN (letters/numbers, no dashes) is required in "
                     "Tax ID/NTN for suppliers in the Filers tax withholding group."
                 )
             )
