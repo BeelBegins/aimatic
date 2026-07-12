@@ -6,8 +6,26 @@ from aimatic.branch_management.utils import (
 	REJECTED_WAREHOUSE_DOCTYPES,
 	get_branch_defaults,
 	get_user_default_branch,
+	get_warehouse_branch,
 	user_can_override,
 )
+
+
+def _infer_stock_entry_branch(doc):
+	"""Fallback for when the acting user has no default Branch (e.g.
+	Administrator, or a Manager role testing/covering another branch): derive
+	one from whichever item row's warehouse has a Branch mapped, so the
+	document isn't left with a blank Branch - a mandatory Accounting
+	Dimension for Profit and Loss accounts - which would otherwise only
+	surface as a GL-entry error at submit time."""
+
+	for row in doc.get("items") or []:
+		branch = get_warehouse_branch(row.get("s_warehouse")) or get_warehouse_branch(
+			row.get("t_warehouse")
+		)
+		if branch:
+			return branch
+	return None
 
 
 def _apply_item_row_defaults(doc, branch_defaults, can_override, has_set_warehouse):
@@ -48,6 +66,19 @@ def _apply_item_row_defaults(doc, branch_defaults, can_override, has_set_warehou
 				# rejected_warehouse value at all, regardless of who's saving.
 				row.rejected_warehouse = None
 
+		if doc.doctype == "Stock Entry" and row.meta.has_field("branch") and not row.get("branch"):
+			# Stock Entry Detail.branch has no fetch_from and nothing else
+			# populates it - without this, every GL line from this row
+			# inherits the single parent-level branch, which is wrong for an
+			# inter-branch transfer and blank (throwing a mandatory-dimension
+			# error at submit) for a user with no default Branch. Prefer the
+			# row's own warehouse's branch over the document-level one.
+			row.branch = (
+				get_warehouse_branch(row.get("s_warehouse"))
+				or get_warehouse_branch(row.get("t_warehouse"))
+				or doc.branch
+			)
+
 
 def apply_branch_defaults(doc, method=None):
 	"""
@@ -80,6 +111,15 @@ def apply_branch_defaults(doc, method=None):
 
 	if not doc.branch:
 		doc.branch = get_user_default_branch()
+
+	if not doc.branch and can_override and doc.doctype == "Stock Entry":
+		# Override users (e.g. Administrator, or a Manager) commonly have no
+		# default Branch assigned - it's not needed for the rest of their
+		# work. Without this, a Stock Entry submitted by such a user is left
+		# with a blank Branch, which only surfaces as a GL-entry error at
+		# submit time (Branch is a mandatory Accounting Dimension for Profit
+		# and Loss accounts, e.g. the Stock Adjustment account).
+		doc.branch = _infer_stock_entry_branch(doc)
 
 	if not doc.branch:
 		if can_override:

@@ -33,3 +33,13 @@ def get_branch_defaults(branch):
 		"finished_goods_warehouse": branch_doc.get("finished_goods_warehouse"),
 		"rejected_warehouse": branch_doc.get("rejected_warehouse"),
 	}
+
+
+def get_warehouse_branch(warehouse):
+	"""Reverse lookup via Warehouse.custom_branch. May be None (not every
+	warehouse - e.g. Siezal Super Market's, or generic/disabled ones - has
+	this backfilled)."""
+
+	if not warehouse:
+		return None
+	return frappe.get_cached_value("Warehouse", warehouse, "custom_branch")
