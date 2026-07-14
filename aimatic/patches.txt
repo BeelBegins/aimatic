@@ -23,3 +23,5 @@ aimatic.patches.create_item_fbr_tax_rate_field
 aimatic.patches.reload_print_formats_from_module_files
 aimatic.patches.rename_purchase_stock_debit_note_layouts
 aimatic.patches.remove_demo_doctype
+aimatic.patches.create_pos_profile_terminal_id_field
+aimatic.patches.create_pos_oauth_client

@@ -5,6 +5,7 @@ Run with:
     bench --site <site> run-tests --app aimatic --module aimatic.offline_pos.test_api
 """
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
@@ -85,6 +86,43 @@ class _AimTestCase(unittest.TestCase):
     def tearDown(self):
         frappe.set_user(self._original_user)
         frappe.db.rollback()
+
+
+class TestAndroidBearerSecurity(_AimTestCase):
+    def test_bearer_detection_is_false_without_http_request(self):
+        from aimatic.offline_pos.api import _is_bearer_authenticated_request
+
+        with patch("aimatic.offline_pos.api.frappe.local", SimpleNamespace()):
+            self.assertFalse(_is_bearer_authenticated_request())
+
+    def test_bearer_detection_does_not_confuse_terminal_token(self):
+        from aimatic.offline_pos.api import _is_bearer_authenticated_request
+
+        terminal = SimpleNamespace(request=SimpleNamespace(headers={"Authorization": "token key:secret"}))
+        oauth = SimpleNamespace(request=SimpleNamespace(headers={"Authorization": "Bearer access-token"}))
+        with patch("aimatic.offline_pos.api.frappe.local", terminal):
+            self.assertFalse(_is_bearer_authenticated_request())
+        with patch("aimatic.offline_pos.api.frappe.local", oauth):
+            self.assertTrue(_is_bearer_authenticated_request())
+
+    def test_bearer_cashier_identity_comes_from_session_and_device_profile(self):
+        from aimatic.offline_pos.api import _resolve_cashier_user
+
+        frappe.set_user("Administrator")
+        with patch("aimatic.offline_pos.api.require_active_device", return_value="Main POS"):
+            self.assertEqual(
+                _resolve_cashier_user("attacker@example.com", "Main POS", "device-1", True),
+                "Administrator",
+            )
+
+    def test_public_oauth_client_id_is_resolved_by_app_name(self):
+        from aimatic.offline_pos.api import _get_pos_android_oauth_client_id
+
+        with patch("aimatic.offline_pos.api.frappe.db.get_value", return_value="public-client-id") as get_value:
+            self.assertEqual(_get_pos_android_oauth_client_id(), "public-client-id")
+            get_value.assert_called_once_with(
+                "OAuth Client", {"app_name": "Aimatic POS Android"}, "name"
+            )
 
 
 def _create_opening_entry(pos_profile_name, user="Administrator"):
@@ -419,8 +457,10 @@ class TestPreviewCartValidation(_AimTestCase):
         """A user absent from applicable_for_users must be denied."""
         from aimatic.offline_pos.api import preview_cart
 
-        # Create a profile that only allows 'some_stranger@example.com'
-        restricted_name = _make_restricted_pos_profile("some_stranger@example.com")
+        # Use a real linked User because Frappe v16 validates Link rows when
+        # inserting the cloned POS Profile.
+        stranger, _password = _make_cashier(roles=("POS User",))
+        restricted_name = _make_restricted_pos_profile(stranger)
         frappe.clear_document_cache("POS Profile", restricted_name)
 
         with self.assertRaises(FrappePermissionError):
@@ -660,7 +700,8 @@ class TestPreviewCartFunctional(_AimTestCase):
                     ) or "Test Tax Account",
                     "description": "FBR Sales Tax",
                     "tax_amount": 170,
-                    "included_in_print_rate": 1,
+                    # ERPNext v16 rejects Actual charges marked inclusive.
+                    "included_in_print_rate": 0,
                 },
             )
 
@@ -1347,6 +1388,8 @@ class TestSubmitOnlineSaleCashier(_AimTestCase):
 
         pos = frappe.get_cached_doc("POS Profile", _POS_PROFILE_NAME)
         cust = frappe.get_cached_doc("Customer", _CUSTOMER_NAME)
+        if not frappe.db.exists("POS Opening Entry", {"pos_profile": pos.name, "user": "Administrator", "status": "Open", "docstatus": 1}):
+            _create_opening_entry(pos.name, user="Administrator")
         with _patch_fbr():
             doc = _build_pos_invoice_doc(pos, cust, [{"item_code": _STOCKED_ITEM_CODE, "qty": 1}])
             doc.custom_terminal_invoice_id = terminal_invoice_id

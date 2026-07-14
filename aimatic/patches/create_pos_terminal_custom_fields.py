@@ -1,5 +1,11 @@
 import frappe
 
+# NOTE: POS Invoice.custom_terminal_id below is populated from the client's (now server-derived,
+# read-only) logical terminal_id — a label that may be shared across every physical terminal
+# assigned to the same POS Profile. Its "Hardware terminal identifier" description predates that;
+# the real per-machine identifier is POS Invoice.custom_hardware_id, added by
+# create_pos_profile_terminal_id_field.py.
+
 
 def execute():
     custom_fields = [

@@ -3,6 +3,7 @@ import secrets
 
 import frappe
 from frappe import _
+from frappe.rate_limiter import rate_limit
 from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime, nowdate, nowtime
 from frappe.utils.data import sha256_hash
 from frappe.utils.password import check_password
@@ -236,6 +237,68 @@ def _require_https_for_pos_admin_authorization():
         frappe.throw(_("HTTPS is required for supervisor authorization"))
 
 
+@frappe.whitelist(allow_guest=True)
+@rate_limit(key="username", limit=5, seconds=5 * 60)
+def provision_terminal_credentials(username, password):
+    """First-run Electron setup: exchange an ERPNext username+password for that
+    user's terminal api_key/api_secret, so the desktop app never requires
+    copy-pasting keys out of Frappe's User settings. The password is verified
+    once via Frappe's own check_password and never stored; only the resulting
+    key/secret pair — the same terminal-token credential Electron has always
+    used — is returned and persisted locally by the client from then on.
+
+    allow_guest is deliberate and reviewed: a fresh Electron install has no
+    api_key/api_secret yet, so nothing else can authenticate this call. The
+    response is narrowly the calling user's own credential, nothing else.
+    Rate-limited (5 attempts / 5 min per username+IP) because check_password
+    alone does not get Frappe's normal login-attempt lockout — that lives in
+    the full LoginManager flow, not in check_password.
+
+    api_secret is a Frappe "Password" field (encrypted at rest, never
+    readable back in plaintext) — exactly like the stock User settings
+    "Generate Keys" button, calling this a second time regenerates and
+    invalidates the previous secret. If multiple terminals should stay
+    independently valid, provision each from its own dedicated ERPNext user
+    rather than reusing one username across terminals.
+    """
+    if not _is_https_request():
+        frappe.throw(_("HTTPS is required for terminal credential provisioning"))
+
+    if not username or not password:
+        frappe.throw(_("Username and password are required"))
+
+    if not frappe.db.exists("User", username):
+        _audit_pos_admin_action(None, "provision_terminal_credentials", "electron-provisioning", "invalid_user")
+        frappe.throw(_("Invalid credentials"), frappe.AuthenticationError)
+
+    if not cint(frappe.db.get_value("User", username, "enabled")):
+        _audit_pos_admin_action(username, "provision_terminal_credentials", "electron-provisioning", "disabled_user")
+        frappe.throw(_("Invalid credentials"), frappe.AuthenticationError)
+
+    try:
+        check_password(username, password)
+    except Exception:
+        _audit_pos_admin_action(username, "provision_terminal_credentials", "electron-provisioning", "failed")
+        frappe.throw(_("Invalid credentials"), frappe.AuthenticationError)
+
+    roles = set(frappe.get_roles(username)) - {"All", "Guest"}
+    if not roles.intersection(_ALLOWED_CASHIER_ROLES):
+        _audit_pos_admin_action(username, "provision_terminal_credentials", "electron-provisioning", "missing_role")
+        frappe.throw(_("User is not authorized for POS terminal setup"), frappe.PermissionError)
+
+    user_doc = frappe.get_doc("User", username)
+    if not user_doc.api_key:
+        user_doc.api_key = frappe.generate_hash(length=15)
+    api_secret = frappe.generate_hash(length=15)
+    user_doc.api_secret = api_secret
+    user_doc.save(ignore_permissions=True)
+    frappe.db.commit()
+
+    _audit_pos_admin_action(username, "provision_terminal_credentials", "electron-provisioning", "success")
+
+    return {"api_key": user_doc.api_key, "api_secret": api_secret}
+
+
 def _validate_pos_admin_action_args(action, terminal_id):
     if action not in _ALLOWED_POS_ADMIN_ACTIONS:
         frappe.throw(_("Invalid admin action"))
@@ -341,6 +404,227 @@ def consume_pos_admin_authorization(token, action, terminal_id):
 
 
 # ---------------------------------------------------------------------------
+# POS device enrollment — binds a physical hardware_id to a POS Profile via a
+# one-time, expiring, supervisor-issued code (QR). Redeeming is allow_guest
+# because the device has no ERPNext session yet; the response is intentionally
+# narrow (pos_profile/branch labels only, never prices/stock/customers/etc.)
+# and the token is single-use and short-lived, same as POS Admin Authorization.
+# ---------------------------------------------------------------------------
+
+_DEVICE_ENROLLMENT_VALID_MINUTES = 10
+_POS_ANDROID_OAUTH_APP_NAME = "Aimatic POS Android"
+
+
+def _hash_device_token(token):
+    return sha256_hash(token or "")
+
+
+def _get_pos_android_oauth_client_id():
+    """Return the public OAuth client identifier needed by the APK.
+
+    This value is intentionally not a client secret. Android receives it only
+    after a valid one-time device enrollment redemption, keeping discovery and
+    configuration in one narrow response.
+    """
+    client_id = frappe.db.get_value(
+        "OAuth Client", {"app_name": _POS_ANDROID_OAUTH_APP_NAME}, "name"
+    )
+    if not client_id:
+        frappe.throw(_("Ai Matic POS Android OAuth client is not configured"))
+    return client_id
+
+
+def _audit_device_action(user, hardware_id, pos_profile, status):
+    if user and not frappe.db.exists("User", user):
+        user = None
+
+    frappe.get_doc({
+        "doctype": "POS Device Audit Log",
+        "user": user,
+        "hardware_id": hardware_id,
+        "pos_profile": pos_profile,
+        "status": status,
+        "created_at": now_datetime(),
+    }).insert(ignore_permissions=True)
+
+
+def require_active_device(hardware_id):
+    """Raise unless hardware_id is bound to an enabled POS Device. Call this
+    from any endpoint reachable with a user-session (Bearer) token so a
+    revoked/disabled device is rejected even with a valid cashier token."""
+    if not hardware_id:
+        frappe.throw(_("hardware_id is required"), frappe.PermissionError)
+
+    device = frappe.db.get_value(
+        "POS Device", hardware_id, ["enabled", "pos_profile"], as_dict=True
+    )
+    if not device:
+        _audit_device_action(frappe.session.user, hardware_id, None, "unknown_device")
+        frappe.throw(_("This device is not enrolled"), frappe.PermissionError)
+    if not cint(device.enabled):
+        _audit_device_action(frappe.session.user, hardware_id, device.pos_profile, "device_disabled")
+        frappe.throw(_("This device has been disabled"), frappe.PermissionError)
+
+    return device.pos_profile
+
+
+def _is_bearer_authenticated_request():
+    """True for Android's per-cashier OAuth session, False for Electron's
+    terminal-token session. Electron sends `Authorization: token key:secret`
+    (built in src/api/client.ts); an OAuth2 Bearer request always sends
+    `Authorization: Bearer <access_token>` — the two are unambiguous from a
+    single request header, so this needs no frappe core change."""
+    request = getattr(frappe.local, "request", None)
+    if not request:
+        # Background jobs, direct Python calls, and the existing test suite do
+        # not have an HTTP request. They are never Android OAuth requests and
+        # must retain the legacy terminal-token/cashier_user behavior.
+        return False
+    return (request.headers.get("Authorization") or "").startswith("Bearer ")
+
+
+def _resolve_cashier_user(cashier_user, pos_profile, hardware_id, is_bearer):
+    """Electron (terminal-token): unchanged — cashier_user stays whatever the
+    client sends, exactly as submit_online_sale/submit_pos_refund have always
+    done, because the terminal's own authenticated identity is a fixed
+    service account, never the human cashier.
+
+    Android (Bearer/OAuth): frappe.session.user IS the real, individually
+    authenticated cashier by the time this runs (Frappe core resolves it
+    before any whitelisted function executes) — so the client-supplied
+    cashier_user is never trusted here, even if present; it's derived
+    entirely from the session. Also enforces the request's hardware_id is an
+    enrolled, enabled device bound to this exact pos_profile.
+    """
+    if not is_bearer:
+        return cashier_user
+
+    if frappe.session.user in (None, "", "Guest"):
+        frappe.throw(_("Authentication required"), frappe.AuthenticationError)
+    if not hardware_id:
+        frappe.throw(_("hardware_id is required for device sessions"), frappe.PermissionError)
+
+    bound_profile = require_active_device(hardware_id)
+    if bound_profile != pos_profile:
+        frappe.throw(
+            _("This device is not enrolled for POS Profile {0}").format(pos_profile),
+            frappe.PermissionError,
+        )
+
+    return frappe.session.user
+
+
+@frappe.whitelist()
+def generate_device_enrollment_code(pos_profile):
+    """Desk-callable: a POS Supervisor/System Manager generates a one-time
+    enrollment code for a physical Android device, scoped to one POS Profile."""
+    _require_login()
+
+    if not pos_profile:
+        frappe.throw(_("POS Profile is required"))
+
+    # Deliberately not _load_pos_profile(): that also enforces the calling
+    # user is in applicable_for_users, which is a cashier-membership list and
+    # unrelated to who may administratively enroll a device. Role check below
+    # is the actual gate for this action.
+    try:
+        pos = frappe.get_cached_doc("POS Profile", pos_profile)
+    except frappe.DoesNotExistError:
+        frappe.throw(_("Invalid POS Profile: {0}").format(pos_profile))
+
+    roles = set(frappe.get_roles(frappe.session.user))
+    if not roles.intersection(_ALLOWED_POS_ADMIN_ROLES):
+        frappe.throw(_("Not permitted to enroll POS devices"), frappe.PermissionError)
+
+    token = secrets.token_urlsafe(32)
+    expires_at = add_to_date(now_datetime(), minutes=_DEVICE_ENROLLMENT_VALID_MINUTES)
+
+    frappe.get_doc({
+        "doctype": "POS Device Enrollment",
+        "pos_profile": pos.name,
+        "token_hash": _hash_device_token(token),
+        "expires_at": expires_at,
+        "used": 0,
+        "created_by_user": frappe.session.user,
+    }).insert(ignore_permissions=True)
+
+    _audit_device_action(frappe.session.user, None, pos.name, "enrollment_code_issued")
+
+    return {
+        "url": frappe.utils.get_url(),
+        "token": token,
+        "pos_profile": pos.name,
+        "expires_at": str(expires_at),
+    }
+
+
+@frappe.whitelist(allow_guest=True)
+def redeem_device_enrollment(token, hardware_id):
+    """Called by a newly-installed Android device with no ERPNext session yet.
+    Single-use, expiring, row-locked exactly like consume_pos_admin_authorization."""
+    if not token or not hardware_id:
+        frappe.throw(_("Enrollment code and hardware ID are required"))
+
+    token_hash = _hash_device_token(token)
+    enrollment_name = frappe.db.get_value(
+        "POS Device Enrollment", {"token_hash": token_hash}, "name"
+    )
+    if not enrollment_name:
+        _audit_device_action(None, hardware_id, None, "invalid_code")
+        frappe.throw(_("Enrollment code is invalid"), frappe.PermissionError)
+
+    frappe.db.sql(
+        "SELECT name FROM `tabPOS Device Enrollment` WHERE name = %s FOR UPDATE",
+        (enrollment_name,),
+    )
+    enrollment = frappe.get_doc("POS Device Enrollment", enrollment_name)
+
+    if cint(enrollment.used):
+        _audit_device_action(None, hardware_id, enrollment.pos_profile, "code_already_used")
+        frappe.throw(_("Enrollment code has already been used"), frappe.PermissionError)
+
+    if now_datetime() > get_datetime(enrollment.expires_at):
+        _audit_device_action(None, hardware_id, enrollment.pos_profile, "code_expired")
+        frappe.throw(_("Enrollment code has expired"), frappe.PermissionError)
+
+    enrollment.used = 1
+    enrollment.hardware_id = hardware_id
+    enrollment.save(ignore_permissions=True)
+
+    existing = frappe.db.exists("POS Device", hardware_id)
+    if existing:
+        frappe.db.set_value("POS Device", hardware_id, {
+            "pos_profile": enrollment.pos_profile,
+            "enabled": 1,
+            "enrolled_at": now_datetime(),
+            "enrolled_by": enrollment.created_by_user,
+            "disabled_at": None,
+            "disabled_reason": None,
+        })
+    else:
+        frappe.get_doc({
+            "doctype": "POS Device",
+            "hardware_id": hardware_id,
+            "pos_profile": enrollment.pos_profile,
+            "enabled": 1,
+            "enrolled_at": now_datetime(),
+            "enrolled_by": enrollment.created_by_user,
+        }).insert(ignore_permissions=True)
+    frappe.db.commit()
+
+    _audit_device_action(enrollment.created_by_user, hardware_id, enrollment.pos_profile, "enrolled")
+
+    pos = frappe.get_cached_doc("POS Profile", enrollment.pos_profile)
+    return {
+        "pos_profile": pos.name,
+        "terminal_id": getattr(pos, "custom_terminal_id", "") or "",
+        "branch": getattr(pos, "custom_branch", "") or getattr(pos, "branch", "") or "",
+        "warehouse": pos.warehouse,
+        "oauth_client_id": _get_pos_android_oauth_client_id(),
+    }
+
+
+# ---------------------------------------------------------------------------
 # POS cashier authentication
 # ---------------------------------------------------------------------------
 
@@ -435,6 +719,58 @@ def pos_cashier_login(username, password, terminal_id, pos_profile):
         "can_refund": can_refund,
         "can_close_shift": can_close_shift,
         "can_offline_sale": can_offline_sale,
+        "offline_login_expires_at": offline_expires_at.isoformat(),
+        "require_pin_setup": True,
+    }
+
+
+@frappe.whitelist()
+def get_cashier_context(pos_profile, hardware_id):
+    """The Bearer-mode (Android OAuth) analogue of pos_cashier_login.
+
+    No password is involved — the request is already Bearer-authenticated
+    (Frappe core resolves frappe.session.user before this runs), so identity
+    comes from the session, not a client-supplied username/password. Returns
+    the same response shape as pos_cashier_login so mobile.ts's existing
+    offline-PIN-cache logic doesn't need to change.
+    """
+    _require_login()
+
+    if not pos_profile or not hardware_id:
+        frappe.throw(_("pos_profile and hardware_id are required"))
+
+    bound_profile = require_active_device(hardware_id)
+    if bound_profile != pos_profile:
+        frappe.throw(
+            _("This device is not enrolled for POS Profile {0}").format(pos_profile),
+            frappe.PermissionError,
+        )
+
+    user = frappe.session.user
+    pos = _load_pos_profile(pos_profile)  # enforces applicable_for_users membership for the session user
+
+    roles = set(frappe.get_roles(user)) - {"All", "Guest"}
+    if not roles.intersection(_ALLOWED_CASHIER_ROLES):
+        _audit_cashier_login(user, hardware_id, pos.name, "missing_role")
+        frappe.throw(_("Cashier is not authorized for POS operations"), frappe.PermissionError)
+
+    can_refund = bool(roles.intersection(_ALLOWED_REFUND_ROLES))
+    can_close_shift = bool(roles.intersection(_ALLOWED_CLOSE_SHIFT_ROLES))
+    offline_expires_at = add_to_date(now_datetime(), days=_CASHIER_OFFLINE_LOGIN_VALID_DAYS)
+
+    _audit_cashier_login(user, hardware_id, pos.name, "success", offline_expires_at)
+
+    return {
+        "success": True,
+        "user": user,
+        "full_name": frappe.db.get_value("User", user, "full_name") or user,
+        "roles": sorted(roles),
+        "allowed_pos_profiles": [pos.name],
+        "default_pos_profile": pos.name,
+        "can_start_shift": True,
+        "can_refund": can_refund,
+        "can_close_shift": can_close_shift,
+        "can_offline_sale": True,
         "offline_login_expires_at": offline_expires_at.isoformat(),
         "require_pin_setup": True,
     }
@@ -838,6 +1174,7 @@ def submit_online_sale(
     offline_authenticated=0,
     offline_auth_method=None,
     local_offline_session_id=None,
+    hardware_id=None,
 ):
     """Create and submit a POS Invoice from the Electron terminal.
 
@@ -877,6 +1214,7 @@ def submit_online_sale(
     concurrent redemption of the same code.
     """
     _require_login()
+    is_bearer = _is_bearer_authenticated_request()
 
     if not frappe.has_permission("POS Invoice", "create"):
         frappe.throw(_("Not permitted to create POS Invoice"), frappe.PermissionError)
@@ -884,7 +1222,7 @@ def submit_online_sale(
     if not terminal_invoice_id:
         frappe.throw(_("terminal_invoice_id is required"))
 
-    if not cashier_user:
+    if not cashier_user and not is_bearer:
         frappe.throw(_("cashier_user is required"), frappe.PermissionError)
 
     if cint(offline_authenticated) and offline_auth_method != _OFFLINE_AUTH_METHOD_PIN:
@@ -896,13 +1234,17 @@ def submit_online_sale(
             frappe.PermissionError,
         )
 
-    # Idempotency: return existing invoice if one was already created for this terminal request
+    # Idempotency: return existing invoice if one was already created for this terminal request.
+    # Deliberately checked before cashier/device resolution below — a device that was
+    # disabled *after* successfully creating this invoice must still be able to get an
+    # idempotent confirmation of it (see offline queue replay guarantees).
     existing_name = _find_existing_invoice(terminal_invoice_id)
     if existing_name:
         return _build_submission_response(frappe.get_doc("POS Invoice", existing_name))
 
     # Auth and profile checks
     pos = _get_pos_profile_or_throw(pos_profile)
+    cashier_user = _resolve_cashier_user(cashier_user, pos_profile, hardware_id, is_bearer)
     _validate_cashier_for_sale(cashier_user, pos)
     _require_open_entry_for_cashier(opening_entry, cashier_user, pos)
     cust = _load_customer(customer)
@@ -962,7 +1304,7 @@ def submit_online_sale(
         doc.append("payments", {"mode_of_payment": "Gift Voucher", "amount": gift_voucher_amount})
 
     # Stamp terminal identifiers before insert so they are stored with the record
-    _set_terminal_fields(doc, terminal_invoice_id, terminal_id)
+    _set_terminal_fields(doc, terminal_invoice_id, terminal_id, hardware_id)
     _set_cashier_offline_fields(
         doc,
         cashier_user,
@@ -1146,12 +1488,14 @@ def _validate_cashier_for_sale(cashier_user, pos):
         )
 
 
-def _set_terminal_fields(doc, terminal_invoice_id, terminal_id):
+def _set_terminal_fields(doc, terminal_invoice_id, terminal_id, hardware_id=None):
     meta = doc.meta
     if meta.has_field("custom_terminal_invoice_id"):
         doc.custom_terminal_invoice_id = terminal_invoice_id
     if meta.has_field("custom_terminal_id"):
         doc.custom_terminal_id = terminal_id or ""
+    if meta.has_field("custom_hardware_id"):
+        doc.custom_hardware_id = hardware_id or ""
 
 
 def _set_cashier_offline_fields(
@@ -2340,6 +2684,7 @@ def submit_pos_refund(
     offline_authenticated=0,
     offline_auth_method=None,
     local_offline_session_id=None,
+    hardware_id=None,
 ):
     """Create and submit a return POS Invoice against an original sale.
 
@@ -2363,6 +2708,7 @@ def submit_pos_refund(
     cashier's shift close/reconciliation.
     """
     _require_login()
+    is_bearer = _is_bearer_authenticated_request()
 
     if not frappe.has_permission("POS Invoice", "create"):
         frappe.throw(_("Not permitted to create POS Invoice"), frappe.PermissionError)
@@ -2370,7 +2716,7 @@ def submit_pos_refund(
         frappe.throw(_("Not permitted to submit POS Invoice"), frappe.PermissionError)
     if not terminal_refund_id:
         frappe.throw(_("terminal_refund_id is required"))
-    if not cashier_user:
+    if not cashier_user and not is_bearer:
         frappe.throw(_("cashier_user is required"), frappe.PermissionError)
 
     if cint(offline_authenticated) and offline_auth_method != _OFFLINE_AUTH_METHOD_PIN:
@@ -2382,7 +2728,8 @@ def submit_pos_refund(
             frappe.PermissionError,
         )
 
-    # Idempotency: never create a second return for the same refund UUID.
+    # Idempotency: never create a second return for the same refund UUID. Deliberately
+    # checked before cashier/device resolution, same reasoning as submit_online_sale.
     existing_name = _find_existing_return(terminal_refund_id)
     if existing_name:
         return _build_refund_response(frappe.get_doc("POS Invoice", existing_name), duplicate=True)
@@ -2405,6 +2752,7 @@ def submit_pos_refund(
     # Cashier identity, refund authorization, and shift checks — all against
     # cashier_user, never the terminal's own authenticated session.
     pos = _get_pos_profile_or_throw(original.pos_profile)
+    cashier_user = _resolve_cashier_user(cashier_user, original.pos_profile, hardware_id, is_bearer)
     _validate_cashier_for_sale(cashier_user, pos)
     _require_refund_permission(pos, cashier_user)
     if pos_opening_entry:
@@ -2458,6 +2806,8 @@ def submit_pos_refund(
         return_doc.custom_terminal_refund_id = terminal_refund_id
     if return_doc.meta.has_field("custom_terminal_id"):
         return_doc.custom_terminal_id = getattr(original, "custom_terminal_id", None) or ""
+    if return_doc.meta.has_field("custom_hardware_id"):
+        return_doc.custom_hardware_id = getattr(original, "custom_hardware_id", None) or ""
     if reason and return_doc.meta.has_field("remarks"):
         return_doc.remarks = reason
 

@@ -90,6 +90,19 @@ doc_events = {
         "after_insert": "aimatic.branch_management.events.sync_branch_to_user",
         "after_delete": "aimatic.branch_management.events.sync_branch_to_user",
     },
+    # Disabling a POS Device in Desk must kill that device's live OAuth
+    # session immediately, not just be caught by require_active_device() on
+    # its next API call.
+    "POS Device": {
+        "on_update": "aimatic.offline_pos.device_events.on_pos_device_update",
+    },
+}
+
+# Redirects frappe.integrations.oauth2.get_token to our own implementation so
+# refresh-token rotation/replay detection (aimatic.aimatic.oauth.validator)
+# applies without modifying frappe core. See aimatic/aimatic/oauth/endpoints.py.
+override_whitelisted_methods = {
+    "frappe.integrations.oauth2.get_token": "aimatic.aimatic.oauth.endpoints.get_token",
 }
 
 # Label Printing module: adds a "Create Barcode Labels" button to Purchase
