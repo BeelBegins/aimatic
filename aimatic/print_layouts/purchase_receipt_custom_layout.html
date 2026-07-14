@@ -1,0 +1,128 @@
+{% set title = 'PURCHASE RECEIPT' %}
+<style>
+@page { size: A4 landscape; margin: 5mm; }
+.print-format { font-family: Arial, Helvetica, sans-serif; font-size: 6.5pt; color: #000; }
+.aim-title { text-align: center; font-size: 10pt; font-weight: 700; margin: 0 0 2mm; }
+.aim-head { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
+.aim-head td { border: 0; padding: .35mm 1mm; vertical-align: top; }
+.aim-label { font-weight: 700; white-space: nowrap; }
+.aim-company { text-align: center; font-size: 8pt; font-weight: 700; }
+.aim-status { text-align: center; font-weight: 700; }
+.aim-summary { text-align: right; white-space: nowrap; }
+.aim-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.aim-grid th { border-top: .25mm solid #000; border-bottom: .25mm solid #000; padding: .65mm .35mm; font-size: 5.2pt; line-height: 1.05; text-align: center; vertical-align: bottom; }
+.aim-grid td { padding: .75mm .35mm; border-bottom: .1mm solid #bbb; vertical-align: middle; overflow-wrap: normal; word-break: normal; }
+.aim-grid .num { text-align: right; white-space: nowrap; }
+.aim-grid .center { text-align: center; }
+.aim-grid .desc { text-align: left; overflow-wrap: anywhere; }
+.aim-grid .barcode { white-space: nowrap; font-size: 5.3pt; font-weight: 700; }
+.aim-grid tfoot td { border-top: .25mm solid #000; border-bottom: 0; font-weight: 700; }
+.aim-bottom { width: 100%; margin-top: 2mm; border-collapse: collapse; }
+.aim-bottom td { border: 0; padding: .6mm; vertical-align: bottom; }
+.aim-sign { border-top: .25mm solid #000 !important; text-align: center; width: 35mm; }
+.aim-note { min-height: 8mm; }
+</style>
+{% set gross = doc.custom_total_gross or doc.total or 0 %}
+{% set discount = doc.custom_total_discount or doc.discount_amount or 0 %}
+{% set gst = doc.custom_total_gst or 0 %}
+{% set trade_offer = doc.custom_total_trade_offer or 0 %}
+{% set advance_tax = doc.custom_total_advance_tax or 0 %}
+{% set branch_title = doc.branch and (' (' ~ doc.branch|upper ~ ')') or '' %}
+{% set item_context = get_purchase_print_item_context(doc) %}
+{% set totals = namespace(qty=0, inv_qty=0, scheme_qty=0, gst=0, advance_tax=0, gross=0, line=0) %}
+<div class="aim-title">{{ title }}{{ branch_title }}</div>
+<table class="aim-head">
+ <tr>
+  <td style="width:9%" class="aim-label">Voucher No.</td><td style="width:17%">{{ doc.name }}</td>
+  <td style="width:38%" rowspan="3" class="aim-company">{{ doc.supplier_name or doc.supplier }}<br><span style="font-weight:400">{{ doc.company }}</span></td>
+  <td style="width:12%" class="aim-summary">Gross Amount</td><td style="width:10%" class="aim-summary">{{ frappe.utils.fmt_money(gross, currency=doc.currency) }}</td>
+ </tr>
+ <tr><td class="aim-label">Voucher Date</td><td>{{ frappe.utils.formatdate(doc.posting_date) }}</td><td class="aim-summary">Total Discount</td><td class="aim-summary">{{ frappe.utils.fmt_money(discount, currency=doc.currency) }}</td></tr>
+ <tr>
+  <td class="aim-label">Inv. No.</td><td>{{ doc.bill_no or doc.supplier_delivery_note or '' }}</td>
+  <td class="aim-status">{{ doc.owner }} &nbsp;&nbsp; {{ doc.docstatus == 1 and 'POSTED' or (doc.docstatus == 2 and 'CANCELLED' or 'DRAFT') }}</td>
+  <td class="aim-summary">Invoice Line Total</td><td class="aim-summary">{{ frappe.utils.fmt_money(doc.custom_grand_line_total or doc.grand_total or 0, currency=doc.currency) }}</td>
+ </tr>
+ <tr>
+  <td class="aim-label">Inv. Date</td><td>{{ frappe.utils.formatdate(doc.bill_date or doc.posting_date) }}</td>
+  <td class="aim-status">Page <span class="page"></span></td>
+  <td class="aim-summary">GST Amount</td><td class="aim-summary">{{ frappe.utils.fmt_money(gst, currency=doc.currency) }}</td>
+ </tr>
+ <tr>
+  <td class="aim-label">Supplier</td><td colspan="2">{{ doc.supplier }}</td>
+  <td class="aim-summary">Advance Tax Amount</td><td class="aim-summary">{{ frappe.utils.fmt_money(advance_tax, currency=doc.currency) }}</td>
+ </tr>
+ <tr>
+  <td class="aim-label">Reference</td><td colspan="2">{{ doc.remarks or doc.instructions or '' }}</td>
+  <td class="aim-summary">Trade Offer</td><td class="aim-summary">{{ frappe.utils.fmt_money(trade_offer, currency=doc.currency) }}</td>
+ </tr>
+</table>
+<table class="aim-grid">
+ <thead><tr>
+  <th style="width:2%">S#</th><th style="width:8%">Barcode</th><th style="width:12%">Description</th>
+  <th style="width:4%">Qty</th><th style="width:4%">Inv.<br>Qty</th><th style="width:3%">Sch<br>Qty</th>
+  <th style="width:6%">Vendor<br>Rate</th><th style="width:4%">Disc.<br>%</th><th style="width:3%">GST<br>%</th>
+  <th style="width:5%">GST<br>Amount</th><th style="width:4%">Adv.<br>Tax %</th><th style="width:5%">Adv.<br>Tax Amt</th>
+  <th style="width:5%">New Cost<br>Price</th><th style="width:5%">Old Cost<br>Price</th><th style="width:6%">Line<br>Total</th>
+  <th style="width:6%">Gross<br>Total</th><th style="width:5%">New Sale<br>Price</th><th style="width:5%">Old Sale<br>Price</th>
+  <th style="width:4%">MRP</th><th style="width:5%">Margin<br>Amt</th><th style="width:4%">Margin<br>%</th>
+ </tr></thead>
+ <tbody>
+ {% for row in doc.items %}
+  {% set row_ctx = item_context.get(row.name, {}) %}
+  {% set qty = row.qty or 0 %}
+  {% set inv_qty = row.custom_inventory_qty or row.received_qty or qty %}
+  {% set scheme_qty = row.custom_scheme_qty or 0 %}
+  {% set vendor_rate = row.custom_vendor_rate or row.rate or 0 %}
+  {% set discount_per = row.custom_discount_per or row.discount_percentage or 0 %}
+  {% set gst_per = row.custom_gst_per or 0 %}
+  {% set gst_amount = row.custom_gst_amount or 0 %}
+  {% set advance_tax_per = row.custom_advance_tax_per or 0 %}
+  {% set advance_tax_amount = row.custom_advance_tax_amount or 0 %}
+  {% set new_cost = row.custom_price_after_taxes or row.valuation_rate or row.rate or 0 %}
+  {% set old_cost = row_ctx.old_cost_price or 0 %}
+  {% set line_total = row.custom_line_total or row.amount or 0 %}
+  {% set gross_total = row.custom_gross_total or row.amount or 0 %}
+  {% set sale = row.custom_shelf_price or row.custom_mrp or row.price_list_rate or 0 %}
+  {% set old_sale = row_ctx.old_sale_price or 0 %}
+  {% set margin = sale - new_cost %}
+  {% set margin_perc = sale and (margin / sale) * 100 or 0 %}
+  {% set barcode_value = row.barcode or row_ctx.barcode or row.item_code or '' %}
+  {% set totals.qty = totals.qty + qty %}
+  {% set totals.inv_qty = totals.inv_qty + inv_qty %}
+  {% set totals.scheme_qty = totals.scheme_qty + scheme_qty %}
+  {% set totals.gst = totals.gst + gst_amount %}
+  {% set totals.advance_tax = totals.advance_tax + advance_tax_amount %}
+  {% set totals.gross = totals.gross + gross_total %}
+  {% set totals.line = totals.line + line_total %}
+  <tr>
+   <td class="center">{{ loop.index }}</td><td class="barcode">{{ barcode_value }}</td><td class="desc">{{ row.item_name or row.description }}</td>
+   <td class="num">{{ frappe.utils.flt(qty, 2) }}</td><td class="num">{{ frappe.utils.flt(inv_qty, 2) }}</td><td class="num">{{ frappe.utils.flt(scheme_qty, 2) }}</td>
+   <td class="num">{{ frappe.utils.fmt_money(vendor_rate, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.flt(discount_per, 2) }}</td><td class="num">{{ frappe.utils.flt(gst_per, 2) }}</td>
+   <td class="num">{{ frappe.utils.fmt_money(gst_amount, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.flt(advance_tax_per, 2) }}</td><td class="num">{{ frappe.utils.fmt_money(advance_tax_amount, currency=doc.currency) }}</td>
+   <td class="num">{{ frappe.utils.fmt_money(new_cost, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(old_cost, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(line_total, currency=doc.currency) }}</td>
+   <td class="num">{{ frappe.utils.fmt_money(gross_total, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(sale, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(old_sale, currency=doc.currency) }}</td>
+   <td class="num">{{ frappe.utils.fmt_money(row.custom_mrp or 0, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(margin, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.flt(margin_perc, 2) }}</td>
+  </tr>
+ {% endfor %}
+ </tbody>
+ <tfoot>
+  <tr>
+   <td colspan="3">Total</td>
+   <td class="num">{{ frappe.utils.flt(totals.qty, 2) }}</td>
+   <td class="num">{{ frappe.utils.flt(totals.inv_qty, 2) }}</td>
+   <td class="num">{{ frappe.utils.flt(totals.scheme_qty, 2) }}</td>
+   <td colspan="3"></td>
+   <td class="num">{{ frappe.utils.fmt_money(totals.gst, currency=doc.currency) }}</td>
+   <td></td>
+   <td class="num">{{ frappe.utils.fmt_money(totals.advance_tax, currency=doc.currency) }}</td>
+   <td colspan="2"></td>
+   <td class="num">{{ frappe.utils.fmt_money(totals.line, currency=doc.currency) }}</td>
+   <td class="num">{{ frappe.utils.fmt_money(totals.gross, currency=doc.currency) }}</td>
+   <td colspan="5"></td>
+  </tr>
+ </tfoot>
+</table>
+<table class="aim-bottom">
+ <tr><td style="width:58%" class="aim-note"><span class="aim-label">Note:</span> {{ doc.remarks or doc.instructions or '' }}</td><td style="width:25%; text-align:right"><span class="aim-label">Advance Tax Amount:</span> {{ frappe.utils.fmt_money(advance_tax, currency=doc.currency) }}<br><span class="aim-label">Total After Advance Tax:</span> {{ frappe.utils.fmt_money((doc.custom_grand_line_total or doc.grand_total or 0) - advance_tax, currency=doc.currency) }}</td><td style="width:5%"></td><td class="aim-sign">Signature</td></tr>
+</table>

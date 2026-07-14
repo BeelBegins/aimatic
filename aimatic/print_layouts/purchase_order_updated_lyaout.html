@@ -1,0 +1,191 @@
+<!--
+=====================================================================
+ ERPNext PRINT FORMAT -> Purchase Order  ("SIEZAL Receipt Voucher /
+                                            WHT Slip" style, 2 copies
+                                            on one A4/A5 page)
+=====================================================================
+ HOW TO INSTALL
+ 1. Desk > Print Format > New
+      - Name          : Siezal Receipt Voucher
+      - Doc Type      : Purchase Order   (change if this is really
+                         a Payment Entry in your setup - see note
+                         below)
+      - Print Format Type : Jinja
+ 2. Paste everything below into "Edit HTML" in the Print Format
+    Builder.
+ 3. Page size: A5 landscape or A4 (half page per copy) works well.
+
+ IMPORTANT - FIELD MAPPING NOTES
+ The original slip mixes a generic multi-purpose voucher (left
+ blank-field block) with a branded "Receipt Voucher / WHT Slip"
+ (right block). Standard Purchase Order does NOT have fields like
+ "Bill No", "Bill Date", "WH Tax", "WH Per", "User ID", "Payment
+ Date" - these look like custom fields from a Pakistan
+ tax-withholding customisation. I've mapped what I reasonably could
+ to standard fields and left the rest as `doc.get("fieldname")`
+ placeholders so nothing breaks if the field doesn't exist yet.
+ Go to Customize Form > Purchase Order and add/rename these to match:
+
+   doc.get("user_id")            -> "User ID" (else falls back to owner)
+   doc.get("bill_no")            -> Supplier invoice/bill number
+   doc.get("bill_date")          -> Supplier invoice/bill date
+   doc.get("wh_tax_amount")      -> Withholding tax amount
+   doc.get("wh_tax_percent")     -> Withholding tax %
+   doc.get("payment_date")       -> Date payment was released
+   doc.get("stock_received_by"), doc.get("issued_by"),
+   doc.get("approved_by")        -> sign-off names (else blank boxes)
+
+ If this voucher is actually raised against a Payment Entry rather
+ than the Purchase Order itself, just change the Doc Type in step 1
+ to "Payment Entry" and swap doc.grand_total -> doc.paid_amount,
+ doc.supplier -> doc.party, etc.
+=====================================================================
+-->
+
+{% macro voucher_copy(copy_label, title) %}
+<div class="voucher-half">
+
+  <!-- LEFT generic multi-purpose block -->
+  <div class="left-block">
+    <div class="lb-title">Date</div>
+    <div class="lb-row"><span>Purchase :</span></div>
+    <div class="lb-row"><span>Stock :</span></div>
+    <div class="lb-row"><span>Expiry &amp; Damage :</span></div>
+    <div class="lb-row"><span>Net Payable :</span></div>
+    <div class="lb-row"><span>Checked By :</span></div>
+
+    <div class="lb-title" style="margin-top:6px;">Payment Mode</div>
+    <div class="lb-row"><span>Cash :</span></div>
+    <div class="lb-row"><span>Cheque # :</span></div>
+    <div class="lb-subtitle">Supplier Info</div>
+    <div class="lb-row"><span>Contact :</span></div>
+    <div class="lb-row"><span>Payment Received By</span></div>
+
+    <div class="lb-title lb-title-right">Sale :</div>
+    <div class="lb-row lb-right"><span>Dead&amp;Slow Stock :</span></div>
+    <div class="lb-row lb-right"><span>DSM :</span></div>
+    <div class="lb-row lb-right"><span>Approved by :</span></div>
+    <div class="lb-row lb-right"><span>Amount :</span></div>
+    <div class="lb-row lb-right"><span>Amount &amp; Due Date :</span></div>
+    <div class="lb-row lb-right"><span>Name :</span></div>
+  </div>
+
+  <div class="v-dashed"></div>
+
+  <!-- RIGHT branded voucher -->
+  <div class="right-block">
+    <div class="rb-header">
+      <div class="rb-logo">&#9670;&#9671; <span class="rb-brand">SIEZAL</span></div>
+      <div class="rb-copy">{{ copy_label }}</div>
+    </div>
+    <div class="rb-title">{{ title }} <span class="rb-phase">(BAHRIA PHASE&nbsp;8)</span></div>
+
+    <table class="rb-fields">
+      <tr><td class="k">Voucher No.</td><td class="v">{{ doc.name }}</td>
+          <td class="k">User ID</td><td class="v">{{ doc.get("user_id") or frappe.db.get_value("User", doc.owner, "full_name") or doc.owner }}</td></tr>
+      <tr><td class="k">Voucher Date.</td><td class="v">{{ frappe.utils.format_date(doc.transaction_date, "dd/MM/yyyy") }}</td>
+          <td></td><td></td></tr>
+      <tr><td class="k">Bill No.</td><td class="v">{{ doc.get("bill_no") or "" }}</td><td></td><td></td></tr>
+      <tr><td class="k">Bill Date.</td><td class="v">{{ frappe.utils.format_date(doc.get("bill_date"), "dd/MM/yyyy") if doc.get("bill_date") else "" }}</td><td></td><td></td></tr>
+    </table>
+
+    <table class="rb-fields" style="margin-top:6px;">
+      <tr><td class="k">Supplier.</td><td class="v" colspan="3">{{ doc.supplier }} {{ doc.supplier_name }}</td></tr>
+      <tr><td class="k">Voucher Total.</td><td class="v">{{ "%.2f"|format(doc.grand_total) }}</td></tr>
+      <tr><td class="k">WH Tax.</td><td class="v">{{ "%.2f"|format(doc.get("wh_tax_amount") or 0) }}</td>
+          <td class="k">WH Per.</td><td class="v">{{ "%.2f"|format(doc.get("wh_tax_percent") or 0) }}%</td></tr>
+      <tr><td class="k rb-bold">Net Payable.</td><td class="v rb-bold rb-underline">{{ "%.0f"|format(doc.grand_total - (doc.get("wh_tax_amount") or 0)) }}</td></tr>
+    </table>
+
+    {% if title == "WHT SLIP" %}
+    <div class="rb-condition">
+      Condition. If a new SKU remains unsold for 30 Day, It will be
+      returned to the supplier at the orignal invoice price with no
+      deductions.
+    </div>
+    <div class="rb-stamp">STAMP HERE</div>
+    {% else %}
+    <div class="rb-payment-date">
+      <span class="k">Payment Date.</span> <span class="v">{{ frappe.utils.format_date(doc.get("payment_date"), "dd/MM/yyyy") if doc.get("payment_date") else "" }}</span>
+    </div>
+    <table class="rb-signoff">
+      <tr>
+        <td>{{ doc.get("stock_received_by") or "" }}</td>
+        <td>{{ doc.get("issued_by") or "" }}</td>
+        <td>{{ doc.get("approved_by") or "" }}</td>
+      </tr>
+      <tr class="rb-signoff-label">
+        <td>STOCK RECEIVED BY</td>
+        <td>ISSUED BY</td>
+        <td>APPROVED BY</td>
+      </tr>
+    </table>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+<div class="siezal-voucher">
+  {{ voucher_copy("OFFICE COPY", "RECEIPT VOUCHER") }}
+  <div class="page-dashed"></div>
+  {{ voucher_copy("VENDOR COPY", "WHT SLIP") }}
+</div>
+
+<style>
+  @media print {
+    @page { size: A4 portrait; margin: 10mm; }
+  }
+  .siezal-voucher {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    color: #000;
+  }
+  .page-dashed { border-top: 1px dashed #000; margin: 10px 0; }
+
+  .voucher-half { display: flex; }
+  .v-dashed { border-left: 1px dashed #999; margin: 0 10px; }
+
+  /* LEFT generic block */
+  .left-block {
+    width: 42%;
+    position: relative;
+    padding-right: 6px;
+    font-size: 10px;
+  }
+  .lb-title { font-weight: 700; }
+  .lb-title-right { position: absolute; top: 0; right: 0; }
+  .lb-subtitle { font-weight: 700; margin-top: 4px; }
+  .lb-row { margin: 2px 0; }
+  .lb-right { position: absolute; right: 0; }
+  /* re-flow right column using nth-of-type offsets */
+  .left-block .lb-row.lb-right:nth-of-type(1) { top: 26px; }
+  .left-block { min-height: 150px; }
+  .left-block .lb-title-right,
+  .left-block .lb-row.lb-right { width: 50%; text-align: left; }
+
+  /* RIGHT branded block */
+  .right-block { width: 58%; }
+  .rb-header { display: flex; justify-content: space-between; align-items: center; }
+  .rb-brand { color: #1f7a8c; font-weight: 900; font-size: 20px; letter-spacing: 1px; }
+  .rb-copy { font-weight: 700; font-size: 10px; text-align: right; }
+  .rb-title { font-weight: 700; text-align: center; border-bottom: 1px solid #000; padding-bottom: 3px; margin: 4px 0 6px; }
+  .rb-phase { font-weight: 400; }
+
+  .rb-fields { width: 100%; border-collapse: collapse; }
+  .rb-fields td { padding: 1px 4px; font-size: 10.5px; }
+  .rb-fields .k { white-space: nowrap; }
+  .rb-fields .v { border-bottom: 1px dotted #666; min-width: 60px; }
+  .rb-bold { font-weight: 700; }
+  .rb-underline { border-bottom: 2px solid #000 !important; }
+
+  .rb-condition { font-size: 9px; margin-top: 8px; line-height: 1.3; }
+  .rb-stamp {
+    width: 70px; height: 45px; border: 1px solid #000; float: right;
+    text-align: center; font-size: 8px; color: #999; padding-top: 15px;
+    margin-top: 4px;
+  }
+  .rb-payment-date { margin-top: 8px; font-size: 10.5px; }
+  .rb-signoff { width: 100%; border-collapse: collapse; margin-top: 14px; }
+  .rb-signoff td { border-top: 1px solid #000; text-align: center; font-size: 9px; padding-top: 2px; width: 33%; }
+  .rb-signoff-label td { border-top: none; font-weight: 700; padding-top: 0; }
+</style>

@@ -10,13 +10,13 @@
  "docstatus": 0,
  "doctype": "Print Format",
  "font_size": 9,
- "html": "{% set template = get_template_context(doc.template) %}\n{% set rows = expand_print_rows(doc) %}\n<style>\n  @page {\n    size: {{ template.page_width_mm }}mm {{ template.page_height_mm }}mm;\n    margin: {{ template.margin_top_mm }}mm {{ template.margin_right_mm }}mm {{ template.margin_bottom_mm }}mm {{ template.margin_left_mm }}mm;\n  }\n  * { box-sizing: border-box; }\n  body { margin: 0; padding: 0; font-family: {{ template.font_family or \"Arial, Helvetica, sans-serif\" }}; }\n  .sheet {\n    display: grid;\n    grid-template-columns: repeat({{ template.column_count or 3 }}, 1fr);\n    column-gap: {{ template.column_gap_mm }}mm;\n    row-gap: {{ template.row_gap_mm }}mm;\n  }\n  .shelf-label {\n    border: 1px dashed #999;\n    padding: 2mm;\n    break-inside: avoid;\n    page-break-inside: avoid;\n    display: flex;\n    flex-direction: column;\n    justify-content: center;\n    min-height: 22mm;\n  }\n  .item-name {\n    font-size: {{ template.item_name_font_size }}pt;\n    font-weight: bold;\n    line-height: 1.15;\n  }\n  .company-row { font-size: 6.5pt; color: #333; }\n  .barcode-img { width: 100%; height: {{ template.barcode_height_mm }}mm; object-fit: contain; }\n  .barcode-text {\n    font-size: {{ template.item_code_font_size }}pt;\n    text-align: center;\n    letter-spacing: 1px;\n  }\n  .meta-row {\n    font-size: 7pt;\n    display: flex;\n    justify-content: space-between;\n  }\n  .price-row {\n    font-size: {{ template.price_font_size }}pt;\n    font-weight: bold;\n    text-align: center;\n  }\n  {{ template.custom_css or \"\" }}\n</style>\n<div class=\"sheet\">\n{% for row in rows %}\n  <div class=\"shelf-label\">\n    {% if template.show_company and doc.company %}<div class=\"company-row\">{{ doc.company }}</div>{% endif %}\n    {% if template.show_item_name %}<div class=\"item-name\">{{ row.item_name }}</div>{% endif %}\n    {% if template.show_price or template.show_mrp %}\n    <div class=\"price-row\">\n      {% if template.show_price %}Rs. {{ format_price(row.price) }}{% endif %}\n      {% if template.show_mrp %}&nbsp;&nbsp;MRP {{ format_price(row.mrp) }}{% endif %}\n    </div>\n    {% endif %}\n    {% if row.barcode %}\n      <img class=\"barcode-img\" src=\"{{ get_barcode_data_uri(row.barcode, template.barcode_type, template.barcode_height_mm) }}\" alt=\"barcode\">\n      {% if template.show_barcode_text %}<div class=\"barcode-text\">{{ row.barcode }}</div>{% endif %}\n    {% else %}\n      <div class=\"barcode-text\">NO BARCODE</div>\n    {% endif %}\n    <div class=\"meta-row\">\n      {% if template.show_item_code %}<span>{{ row.item_code }}</span>{% endif %}\n      {% if template.show_uom and row.uom %}<span>{{ row.uom }}</span>{% endif %}\n    </div>\n    {% if template.show_batch_no and row.batch_no %}<div class=\"meta-row\"><span>Batch: {{ row.batch_no }}</span></div>{% endif %}\n    {% if template.show_mfg_date and row.final_mfg_date %}<div class=\"meta-row\"><span>MFG: {{ row.final_mfg_date }}</span></div>{% endif %}\n    {% if template.show_expiry_date and row.final_expiry_date %}<div class=\"meta-row\"><span>EXP: {{ row.final_expiry_date }}</span></div>{% endif %}\n    {% if template.show_shelf_location and row.shelf_location %}<div class=\"meta-row\"><span>{{ row.shelf_location }}</span></div>{% endif %}\n  </div>\n{% endfor %}\n</div>\n",
+ "html": "{{ render_print_layout(\"aim_shelf_label_a4\", doc) }}\n",
  "line_breaks": 0,
  "margin_bottom": 0.0,
  "margin_left": 0.0,
  "margin_right": 0.0,
  "margin_top": 0.0,
- "modified": "2026-07-05 00:00:02.000000",
+ "modified": "2026-07-15 00:20:00.000000",
  "modified_by": "Administrator",
  "module": "Label Printing",
  "name": "AIM Shelf Label A4",
@@ -29,5 +29,5 @@
  "print_format_type": "Jinja",
  "raw_printing": 0,
  "show_section_headings": 0,
- "standard": "Yes"
+ "standard": "No"
 }

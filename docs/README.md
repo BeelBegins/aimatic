@@ -93,6 +93,11 @@ Receipt, Delivery Note, Sales Invoice, or stock transfer — with configurable l
 (size, columns, fonts, which fields appear) so different label types (small barcode stickers
 vs. full shelf-price cards) can be maintained without any code changes.
 
+The print layouts themselves — barcode labels, shelf labels, the two purchase stock-debit-note
+formats, and the POS receipt layouts — ship automatically with the app. An implementer setting
+up a new site does not need to manually recreate any of these; they're already there the moment
+the app is installed.
+
 ### Customer loyalty points and gift vouchers
 
 Customers earn loyalty points on every purchase, at a rate that can be configured per item

@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 app_name = "aimatic"
 app_title = "Aimatic"
 app_publisher = "Aimatic"
@@ -107,43 +110,41 @@ jinja = {
         "aimatic.label_printing.utils.get_template_context",
         "aimatic.label_printing.utils.format_price",
         "aimatic.purchase_printing.get_purchase_print_item_context",
+        "aimatic.pos_printing.get_pos_receipt_context",
+        "aimatic.print_layout_loader.render_print_layout",
     ],
 }
 
 # Creates the Label Printing roles and default templates on a fresh
-# `bench install-app aimatic`. Patches of the same name handle sites that
-# already had the app installed before this module existed (patches are
-# marked as already-applied and skipped on a fresh install).
+# `bench install-app aimatic`. The equivalent patches (create_label_printing_roles,
+# create_label_printing_default_templates) handle sites that already had the
+# app installed before this module existed. Print Format/Report packaging
+# does NOT need an after_install entry - see the printingformats note in
+# CLAUDE.md for how those ship via Frappe's own native module-doc sync
+# instead.
 after_install = "aimatic.label_printing.setup.after_install"
 
-hrms_fixture_doctypes = [
-    "Employee",
-    "Department",
-    "Designation",
-    "Expense Claim",
-    "Expense Claim Detail",
-    "Expense Taxes and Charges",
-    "Leave Encashment",
-    "Salary Slip",
-]
+_fixture_exclusions = json.loads(
+    (Path(__file__).with_name("fixture_exclusions.json")).read_text(encoding="utf-8")
+)
 
-# Keep DB-side customizations made from the Desk backed up in git.
+# Every Custom Field/Property Setter/Client Script/Server Script is treated as
+# an aimatic fixture EXCEPT the specific foreign/system records named in
+# fixture_exclusions.json - Frappe's own Accounting Dimension auto-injected
+# `-branch` fields, HRMS's own fields, Pakistan NIC/NTN/STRN localization
+# fields, CRM integration fields, and core system fields (`impersonate`).
+# This is deliberately an exclude-list, not an allowlist: a genuinely new
+# aimatic customization is included automatically the next time fixtures are
+# exported, with no manual step - only *newly appearing foreign/system*
+# records ever need adding here, which is rare and self-evident (it'll show
+# up unexpectedly in an `export-fixtures` diff).
 # Run `bench --site <site> export-fixtures --app aimatic` after changing
 # Custom Fields, Customize Form settings, Client Scripts, or Server Scripts.
 fixtures = [
-    {
-        "doctype": "Custom Field",
-        "filters": [["dt", "not in", hrms_fixture_doctypes]],
-    },
-    {
-        "doctype": "Property Setter",
-        "filters": [["doc_type", "not in", hrms_fixture_doctypes]],
-    },
-    {
-        "doctype": "Client Script",
-        "filters": [["dt", "not in", hrms_fixture_doctypes]],
-    },
-    {"doctype": "Server Script"},
+    {"doctype": "Custom Field", "filters": [["name", "not in", _fixture_exclusions["Custom Field"]]]},
+    {"doctype": "Property Setter", "filters": [["name", "not in", _fixture_exclusions["Property Setter"]]]},
+    {"doctype": "Client Script", "filters": [["name", "not in", _fixture_exclusions["Client Script"]]]},
+    {"doctype": "Server Script", "filters": [["name", "not in", _fixture_exclusions["Server Script"]]]},
     # GST/Advance Tax/FED formula definitions used by the Purchase Receipt/
     # Purchase Order tax-calc client scripts - configuration, not transactional
     # data, so it ships with the app rather than being recreated by hand on

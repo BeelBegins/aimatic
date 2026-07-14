@@ -1,0 +1,209 @@
+<!--
+====================================================================
+ ERPNext PRINT FORMAT  ->  POS Invoice  ("SIEZAL" style thermal slip)
+====================================================================
+ HOW TO INSTALL
+ 1. Desk > Print Format > New
+      - Name          : Siezal POS Receipt
+      - Doc Type      : POS Invoice
+      - Print Format Type : Jinja
+      - Disable "Standard"
+ 2. Paste everything below into the "Print Format Builder" HTML box
+      (switch the builder to "Edit HTML" / raw mode).
+ 3. Set Page settings on the linked Print Style / Page size to
+      "Custom" width 76mm (or 80mm) so it prints like a thermal roll.
+ 4. In POS Invoice list/detail, Print > choose "Siezal POS Receipt".
+
+ FIELDS YOU WILL LIKELY NEED TO ADJUST (these are NOT standard
+ ERPNext fields, they clearly come from a Pakistan/FBR customisation
+ or custom fields you already have on POS Invoice / Company):
+   - doc.ntn, doc.strn                -> NTN / STRN of the branch
+   - doc.fbr_invoice_number           -> the "FBR INV" number
+   - doc.fbr_qr_code (image/attach)   -> the FBR POS QR code image
+   - doc.rewarded_cash_back           -> loyalty cash back amount
+   - doc.shift                        -> "MOR" / "EVE" shift code
+   - doc.custom_print_copy_label      -> "DUPLICATE" / "ORIGINAL"
+ Rename these to match whatever your actual custom fieldnames are
+ (Customize Form > POS Invoice to check/create them).
+====================================================================
+-->
+
+<div class="siezal-receipt">
+
+  <!-- ================= HEADER ================= -->
+  <div class="rc-center">
+    <div class="rc-logo">&#9670;&#9671; <span class="rc-brand">SIEZAL</span></div>
+    <div class="rc-addr">
+      {{ doc.company_address_display or frappe.db.get_value("Address", {"is_your_company_address":1}, "address_line1") or "Sector-C Commercial, Bahria Town Phase8, Rawalpindi" }}
+    </div>
+    <div class="rc-addr">
+      Ph : {{ frappe.db.get_value("Company", doc.company, "phone_no") or "051-6166100" }}
+      &nbsp;Whatsapp : {{ doc.get("custom_whatsapp") or "031 111 9-6100" }}
+    </div>
+  </div>
+
+  <div class="rc-dashed"></div>
+
+  <div class="rc-row rc-bold">
+    <span>NTN : {{ doc.get("ntn") or frappe.db.get_value("Company", doc.company, "tax_id") or "" }}</span>
+    <span>STRN : {{ doc.get("strn") or "" }}</span>
+  </div>
+
+  <div class="rc-center rc-italic">We Value Our Customers</div>
+
+  <div class="rc-dashed"></div>
+
+  <div class="rc-row">
+    <span>{{ frappe.utils.format_date(doc.posting_date, "dd MMM yyyy") }}</span>
+    <span>{{ doc.posting_time if doc.posting_time else "" }}</span>
+  </div>
+  <div class="rc-row">
+    <span>Cashier: {{ frappe.db.get_value("User", doc.owner, "full_name") or doc.owner }}</span>
+    <span></span>
+  </div>
+  <div class="rc-row">
+    <span>Shift : {{ doc.get("shift") or "" }}</span>
+    <span>{{ doc.name.split("-")[-1] }}</span>
+  </div>
+
+  <div class="rc-center rc-bold rc-copy-label">
+    {{ doc.get("custom_print_copy_label") or "DUPLICATE" }}
+  </div>
+
+  <!-- ================= ITEMS ================= -->
+  <table class="rc-items">
+    <thead>
+      <tr>
+        <th class="l">QTY</th>
+        <th class="r">MKT<br>Price</th>
+        <th class="r">Siezal<br>Price</th>
+        <th class="r">DISC<br>OUNT</th>
+        <th class="r">Net<br>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in doc.items %}
+      <tr>
+        <td colspan="5" class="rc-item-name">
+          {{ item.item_name }}{% if item.get("barcode") %} {{ item.barcode }}{% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td class="l">{{ "%.2f"|format(item.qty) }}</td>
+        <td class="r">{{ "%.2f"|format(item.price_list_rate or item.rate) }}</td>
+        <td class="r">{{ "%.2f"|format(item.rate) }}</td>
+        <td class="r">{{ "%.2f"|format(item.discount_amount or 0) }}</td>
+        <td class="r">{{ "%.0f"|format(item.amount) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="rc-dashed"></div>
+
+  <div class="rc-row">
+    <span>Items:&nbsp;&nbsp;{{ doc.items|length }}</span>
+    <span class="rc-bold">Sub Total</span>
+    <span class="rc-bold">{{ "%.2f"|format(doc.total) }}</span>
+  </div>
+
+  <div class="rc-dashed"></div>
+
+  <div class="rc-row rc-italic rc-thankyou">
+    <span>THANK YOU<br>FOR YOUR<br>KIND VISIT</span>
+    <span class="rc-totals">
+      <div class="rc-row"><span>Grand Total</span><span>{{ "%.2f"|format(doc.grand_total) }}</span></div>
+      <div class="rc-row"><span>Payment {{ doc.payments[0].mode_of_payment if doc.payments else "" }}</span><span>{{ "%.2f"|format(doc.paid_amount) }}</span></div>
+      <div class="rc-row"><span>Change</span><span>{{ "%.2f"|format(doc.change_amount or 0) }}</span></div>
+    </span>
+  </div>
+
+  <div class="rc-center rc-words">
+    {{ frappe.utils.money_in_words(doc.paid_amount, doc.currency) }}
+  </div>
+
+  <!-- ================= MODE OF PAYMENT ================= -->
+  <div class="rc-box">
+    <div class="rc-center rc-bold">MODE OF PAYMENT</div>
+    <table class="rc-mop">
+      <tr><td>MOP</td><td class="r">Amount</td></tr>
+      {% for pay in doc.payments %}
+      <tr><td>{{ pay.mode_of_payment|upper }}</td><td class="r">{{ "%.2f"|format(pay.amount) }}</td></tr>
+      {% endfor %}
+      <tr class="rc-bold rc-top-border"><td>Total :-</td><td class="r">{{ "%.2f"|format(doc.paid_amount) }}</td></tr>
+    </table>
+  </div>
+
+  <!-- ================= FBR POS ================= -->
+  <div class="rc-row rc-fbr">
+    <span class="rc-fbr-badge">FBR<br>POS</span>
+    {% if doc.get("fbr_qr_code") %}
+    <img class="rc-qr" src="{{ doc.fbr_qr_code }}">
+    {% endif %}
+  </div>
+  <div class="rc-center">FBR INV: {{ doc.get("fbr_invoice_number") or "" }}</div>
+
+  <div class="rc-box rc-cashback">
+    <div class="rc-row">
+      <span>Rewarded Cash Back Rs</span>
+      <span class="rc-bold">{{ "%.2f"|format(doc.get("rewarded_cash_back") or 0) }}</span>
+    </div>
+  </div>
+
+  <div class="rc-center rc-bold">Return &amp; Exchange Policy:</div>
+  <div class="rc-policy">
+    1. Returns (4 Days Only), Original Invoice required<br>
+    2. No return on: Frozen, Cosmetics, Opened/Damaged, Discounted items<br>
+    3. Card refunds: 2% deduction
+  </div>
+</div>
+
+<style>
+  @media print {
+    @page { size: 80mm auto; margin: 2mm; }
+  }
+  .siezal-receipt {
+    width: 72mm;
+    margin: 0 auto;
+    font-family: "Courier New", monospace;
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: #000;
+  }
+  .rc-center   { text-align: center; }
+  .rc-bold     { font-weight: 700; }
+  .rc-italic   { font-style: italic; }
+  .rc-brand    { font-size: 20px; font-weight: 900; letter-spacing: 1px; }
+  .rc-logo     { margin-bottom: 2px; }
+  .rc-addr     { font-size: 9.5px; }
+  .rc-dashed   { border-top: 1px dashed #000; margin: 3px 0; }
+  .rc-row      { display: flex; justify-content: space-between; align-items: flex-start; }
+  .rc-copy-label { margin: 4px 0; text-transform: uppercase; }
+
+  .rc-items { width: 100%; border-collapse: collapse; margin-top: 2px; }
+  .rc-items th { border-bottom: 1px solid #000; border-top: 1px solid #000; font-size: 9px; padding: 2px 0; }
+  .rc-items td { padding: 1px 0; font-size: 10px; }
+  .rc-item-name { padding-top: 3px; font-weight: 600; }
+  .l { text-align: left; }
+  .r { text-align: right; }
+
+  .rc-thankyou { align-items: flex-start; }
+  .rc-totals { flex: 1; margin-left: 10px; }
+  .rc-totals .rc-row { width: 100%; }
+  .rc-words { font-weight: 600; margin: 3px 0; }
+
+  .rc-box { border: 1px solid #000; padding: 3px 5px; margin: 4px 0; }
+  .rc-mop { width: 100%; border-collapse: collapse; margin-top: 3px; }
+  .rc-mop td { padding: 1px 0; }
+  .rc-top-border td { border-top: 1px solid #000; padding-top: 2px; }
+
+  .rc-fbr { align-items: center; justify-content: space-between; margin: 6px 0; }
+  .rc-fbr-badge {
+    border: 2px solid #000; border-radius: 4px; padding: 2px 6px;
+    font-weight: 900; font-size: 9px; text-align: center; line-height: 1.1;
+  }
+  .rc-qr { width: 26mm; height: 26mm; }
+
+  .rc-cashback { text-align: left; }
+  .rc-policy { font-size: 8.5px; text-align: center; margin-top: 2px; }
+</style>
