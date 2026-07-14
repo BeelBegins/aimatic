@@ -53,7 +53,14 @@ doc_events = {
             "aimatic.branch_management.events.apply_branch_defaults",
             "aimatic.purchase_printing.populate_old_purchase_snapshot",
         ],
+        # shelf_pricing: Shelf Price must not undercut cost before the
+        # receipt is allowed to submit. The actual branch/Foodpanda price
+        # propagation is client-script-driven (popups + retry buttons)
+        # calling aimatic.shelf_pricing.api, not a hook - see the
+        # shelf_pricing module docstring.
+        "before_submit": "aimatic.shelf_pricing.events.validate_shelf_price_before_submit",
         "on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
+        "on_cancel": "aimatic.shelf_pricing.events.restore_prices_on_cancel",
     },
     # Stock Entry: only branch/cost_center get defaulted here (it has no
     # set_warehouse/rejected_warehouse fields, so those parts of

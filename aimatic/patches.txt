@@ -4,6 +4,7 @@
 aimatic.patches.create_pos_supervisor_role
 aimatic.patches.create_pos_user_role
 aimatic.patches.create_label_printing_roles
+aimatic.patches.create_buying_price_control_role
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
