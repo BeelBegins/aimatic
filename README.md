@@ -1,7 +1,10 @@
 ### Aimatic
 author: AIMATIC
 Retail
-#test
+
+For what this app actually does — features, roles, setting up a new branch — see
+[`docs/README.md`](docs/README.md). This file only covers installation/contributing/CI.
+
 ### Installation
 
 You can install this app using the [bench](https://github.com/frappe/bench) CLI:
