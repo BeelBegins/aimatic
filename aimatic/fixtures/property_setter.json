@@ -7,7 +7,7 @@
   "doctype_or_field": "DocType",
   "field_name": null,
   "is_system_generated": 0,
-  "modified": "2026-07-13 20:58:05.825508",
+  "modified": "2026-07-15 00:22:00.351695",
   "module": null,
   "name": "POS Profile User-main-allow_import",
   "property": "allow_import",
@@ -23,7 +23,7 @@
   "doctype_or_field": "DocType",
   "field_name": null,
   "is_system_generated": 0,
-  "modified": "2026-07-13 20:58:05.942748",
+  "modified": "2026-07-15 00:22:00.530043",
   "module": null,
   "name": "POS Profile User-main-field_order",
   "property": "field_order",
@@ -1357,7 +1357,7 @@
   "property": "default_print_format",
   "property_type": "Data",
   "row_name": null,
-  "value": "AIM Stock Debit Note - Purchase Receipt"
+  "value": "Purchase Receipt Custom Layout"
  },
  {
   "default_value": null,
