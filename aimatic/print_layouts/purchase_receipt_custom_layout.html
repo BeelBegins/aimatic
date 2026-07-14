@@ -1,26 +1,36 @@
 {% set title = 'PURCHASE RECEIPT' %}
 <style>
-@page { size: A4 landscape; margin: 5mm; }
-.print-format { font-family: Arial, Helvetica, sans-serif; font-size: 6.5pt; color: #000; }
-.aim-title { text-align: center; font-size: 10pt; font-weight: 700; margin: 0 0 2mm; }
-.aim-head { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
+@page { size: 297mm 210mm; margin: 5mm; }
+html, body { width: 297mm; margin: 0; padding: 0; }
+.print-format { width: 287mm !important; max-width: 287mm !important; min-height: 0 !important; margin: 0 auto !important; padding: 0 !important; font-family: Arial, Helvetica, sans-serif; font-size: 6.5pt; color: #000; }
+.aim-title { text-align: center; font-size: 10pt; font-weight: 700; margin: 0 0 1mm; }
+.aim-head { width: 100%; border-collapse: collapse; margin: 0 0 1mm; }
 .aim-head td { border: 0; padding: .35mm 1mm; vertical-align: top; }
 .aim-label { font-weight: 700; white-space: nowrap; }
 .aim-company { text-align: center; font-size: 8pt; font-weight: 700; }
 .aim-status { text-align: center; font-weight: 700; }
-.aim-summary { text-align: right; white-space: nowrap; }
 .aim-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .aim-grid th { border-top: .25mm solid #000; border-bottom: .25mm solid #000; padding: .65mm .35mm; font-size: 5.2pt; line-height: 1.05; text-align: center; vertical-align: bottom; }
-.aim-grid td { padding: .75mm .35mm; border-bottom: .1mm solid #bbb; vertical-align: middle; overflow-wrap: normal; word-break: normal; }
-.aim-grid .num { text-align: right; white-space: nowrap; }
+.aim-grid td { padding: .75mm .3mm; border-bottom: .1mm solid #bbb; vertical-align: middle; overflow: hidden; overflow-wrap: normal; word-break: normal; }
+.aim-grid .num { text-align: right; white-space: nowrap; font-size: 5.4pt; }
+.aim-grid .line-total { font-size: 5pt; padding-left: .15mm; padding-right: .15mm; }
 .aim-grid .center { text-align: center; }
 .aim-grid .desc { text-align: left; overflow-wrap: anywhere; }
-.aim-grid .barcode { white-space: nowrap; font-size: 5.3pt; font-weight: 700; }
+.aim-grid .barcode { white-space: nowrap; font-size: 5pt; font-weight: 700; }
 .aim-grid tfoot td { border-top: .25mm solid #000; border-bottom: 0; font-weight: 700; }
-.aim-bottom { width: 100%; margin-top: 2mm; border-collapse: collapse; }
-.aim-bottom td { border: 0; padding: .6mm; vertical-align: bottom; }
+.aim-bottom { width: 100%; margin-top: 1mm; border-collapse: collapse; page-break-inside: avoid; }
+.aim-bottom > tbody > tr > td { border: 0; padding: .4mm .6mm; vertical-align: bottom; }
+.aim-summary { width: 100%; margin-left: auto; border-collapse: collapse; table-layout: fixed; }
+.aim-summary td { border: 0; padding: .25mm .5mm; white-space: nowrap; }
+.aim-summary .summary-label { width: 61%; text-align: right; font-weight: 700; }
+.aim-summary .summary-value { width: 39%; text-align: right; }
+.aim-summary .grand-total td { padding-top: .6mm; border-top: .25mm solid #000; font-weight: 700; }
 .aim-sign { border-top: .25mm solid #000 !important; text-align: center; width: 35mm; }
 .aim-note { min-height: 8mm; }
+@media print {
+ html, body { width: 297mm !important; }
+ .print-format { width: 287mm !important; max-width: 287mm !important; }
+}
 </style>
 {% set gross = doc.custom_total_gross or doc.total or 0 %}
 {% set discount = doc.custom_total_discount or doc.discount_amount or 0 %}
@@ -33,39 +43,30 @@
 <div class="aim-title">{{ title }}{{ branch_title }}</div>
 <table class="aim-head">
  <tr>
-  <td style="width:9%" class="aim-label">Voucher No.</td><td style="width:17%">{{ doc.name }}</td>
-  <td style="width:38%" rowspan="3" class="aim-company">{{ doc.supplier_name or doc.supplier }}<br><span style="font-weight:400">{{ doc.company }}</span></td>
-  <td style="width:12%" class="aim-summary">Gross Amount</td><td style="width:10%" class="aim-summary">{{ frappe.utils.fmt_money(gross, currency=doc.currency) }}</td>
+  <td style="width:9%" class="aim-label">Voucher No.</td><td style="width:23%">{{ doc.name }}</td>
+  <td style="width:43%" rowspan="4" class="aim-company">{{ doc.supplier_name or doc.supplier }}<br><span style="font-weight:400">{{ doc.company }}</span></td>
+  <td style="width:25%" class="aim-status">{{ doc.owner }}</td>
  </tr>
- <tr><td class="aim-label">Voucher Date</td><td>{{ frappe.utils.formatdate(doc.posting_date) }}</td><td class="aim-summary">Total Discount</td><td class="aim-summary">{{ frappe.utils.fmt_money(discount, currency=doc.currency) }}</td></tr>
+ <tr><td class="aim-label">Voucher Date</td><td>{{ frappe.utils.formatdate(doc.posting_date) }}</td><td class="aim-status">{{ doc.docstatus == 1 and 'POSTED' or (doc.docstatus == 2 and 'CANCELLED' or 'DRAFT') }}</td></tr>
  <tr>
   <td class="aim-label">Inv. No.</td><td>{{ doc.bill_no or doc.supplier_delivery_note or '' }}</td>
-  <td class="aim-status">{{ doc.owner }} &nbsp;&nbsp; {{ doc.docstatus == 1 and 'POSTED' or (doc.docstatus == 2 and 'CANCELLED' or 'DRAFT') }}</td>
-  <td class="aim-summary">Invoice Line Total</td><td class="aim-summary">{{ frappe.utils.fmt_money(doc.custom_grand_line_total or doc.grand_total or 0, currency=doc.currency) }}</td>
- </tr>
- <tr>
-  <td class="aim-label">Inv. Date</td><td>{{ frappe.utils.formatdate(doc.bill_date or doc.posting_date) }}</td>
   <td class="aim-status">Page <span class="page"></span></td>
-  <td class="aim-summary">GST Amount</td><td class="aim-summary">{{ frappe.utils.fmt_money(gst, currency=doc.currency) }}</td>
  </tr>
  <tr>
-  <td class="aim-label">Supplier</td><td colspan="2">{{ doc.supplier }}</td>
-  <td class="aim-summary">Advance Tax Amount</td><td class="aim-summary">{{ frappe.utils.fmt_money(advance_tax, currency=doc.currency) }}</td>
+  <td class="aim-label">Inv. Date</td><td>{{ frappe.utils.formatdate(doc.bill_date or doc.posting_date) }}</td><td></td>
  </tr>
- <tr>
-  <td class="aim-label">Reference</td><td colspan="2">{{ doc.remarks or doc.instructions or '' }}</td>
-  <td class="aim-summary">Trade Offer</td><td class="aim-summary">{{ frappe.utils.fmt_money(trade_offer, currency=doc.currency) }}</td>
- </tr>
+ <tr><td class="aim-label">Supplier</td><td colspan="3">{{ doc.supplier }}</td></tr>
+ <tr><td class="aim-label">Reference</td><td colspan="3">{{ doc.remarks or doc.instructions or '' }}</td></tr>
 </table>
 <table class="aim-grid">
  <thead><tr>
-  <th style="width:2%">S#</th><th style="width:8%">Barcode</th><th style="width:12%">Description</th>
-  <th style="width:4%">Qty</th><th style="width:4%">Inv.<br>Qty</th><th style="width:3%">Sch<br>Qty</th>
-  <th style="width:6%">Vendor<br>Rate</th><th style="width:4%">Disc.<br>%</th><th style="width:3%">GST<br>%</th>
-  <th style="width:5%">GST<br>Amount</th><th style="width:4%">Adv.<br>Tax %</th><th style="width:5%">Adv.<br>Tax Amt</th>
-  <th style="width:5%">New Cost<br>Price</th><th style="width:5%">Old Cost<br>Price</th><th style="width:6%">Line<br>Total</th>
-  <th style="width:6%">Gross<br>Total</th><th style="width:5%">New Sale<br>Price</th><th style="width:5%">Old Sale<br>Price</th>
-  <th style="width:4%">MRP</th><th style="width:5%">Margin<br>Amt</th><th style="width:4%">Margin<br>%</th>
+  <th style="width:2%">S#</th><th style="width:7%">Barcode</th><th style="width:10%">Description</th>
+  <th style="width:3.5%">Qty</th><th style="width:3.5%">Inv.<br>Qty</th><th style="width:3.5%">Sch<br>Qty</th>
+  <th style="width:5.5%">Vendor<br>Rate</th><th style="width:3%">Disc.<br>%</th><th style="width:2.5%">GST<br>%</th>
+  <th style="width:5%">GST<br>Amount</th><th style="width:3%">Adv.<br>Tax %</th><th style="width:5%">Adv.<br>Tax Amt</th>
+  <th style="width:5%">New Cost<br>Price</th><th style="width:5%">Old Cost<br>Price</th><th style="width:6.5%">Line<br>Total</th>
+  <th style="width:6.5%">Gross<br>Total</th><th style="width:5%">New Sale<br>Price</th><th style="width:5%">Old Sale<br>Price</th>
+  <th style="width:4.5%">MRP</th><th style="width:5.5%">Margin<br>Amt</th><th style="width:3.5%">Margin<br>%</th>
  </tr></thead>
  <tbody>
  {% for row in doc.items %}
@@ -100,8 +101,8 @@
    <td class="num">{{ frappe.utils.flt(qty, 2) }}</td><td class="num">{{ frappe.utils.flt(inv_qty, 2) }}</td><td class="num">{{ frappe.utils.flt(scheme_qty, 2) }}</td>
    <td class="num">{{ frappe.utils.fmt_money(vendor_rate, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.flt(discount_per, 2) }}</td><td class="num">{{ frappe.utils.flt(gst_per, 2) }}</td>
    <td class="num">{{ frappe.utils.fmt_money(gst_amount, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.flt(advance_tax_per, 2) }}</td><td class="num">{{ frappe.utils.fmt_money(advance_tax_amount, currency=doc.currency) }}</td>
-   <td class="num">{{ frappe.utils.fmt_money(new_cost, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(old_cost, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(line_total, currency=doc.currency) }}</td>
-   <td class="num">{{ frappe.utils.fmt_money(gross_total, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(sale, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(old_sale, currency=doc.currency) }}</td>
+   <td class="num">{{ frappe.utils.fmt_money(new_cost, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(old_cost, currency=doc.currency) }}</td><td class="num line-total">{{ frappe.utils.fmt_money(line_total, currency=doc.currency) }}</td>
+   <td class="num line-total">{{ frappe.utils.fmt_money(gross_total, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(sale, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(old_sale, currency=doc.currency) }}</td>
    <td class="num">{{ frappe.utils.fmt_money(row.custom_mrp or 0, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(margin, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.flt(margin_perc, 2) }}</td>
   </tr>
  {% endfor %}
@@ -117,12 +118,26 @@
    <td></td>
    <td class="num">{{ frappe.utils.fmt_money(totals.advance_tax, currency=doc.currency) }}</td>
    <td colspan="2"></td>
-   <td class="num">{{ frappe.utils.fmt_money(totals.line, currency=doc.currency) }}</td>
-   <td class="num">{{ frappe.utils.fmt_money(totals.gross, currency=doc.currency) }}</td>
+   <td class="num line-total">{{ frappe.utils.fmt_money(totals.line, currency=doc.currency) }}</td>
+   <td class="num line-total">{{ frappe.utils.fmt_money(totals.gross, currency=doc.currency) }}</td>
    <td colspan="5"></td>
   </tr>
  </tfoot>
 </table>
 <table class="aim-bottom">
- <tr><td style="width:58%" class="aim-note"><span class="aim-label">Note:</span> {{ doc.remarks or doc.instructions or '' }}</td><td style="width:25%; text-align:right"><span class="aim-label">Advance Tax Amount:</span> {{ frappe.utils.fmt_money(advance_tax, currency=doc.currency) }}<br><span class="aim-label">Total After Advance Tax:</span> {{ frappe.utils.fmt_money((doc.custom_grand_line_total or doc.grand_total or 0) - advance_tax, currency=doc.currency) }}</td><td style="width:5%"></td><td class="aim-sign">Signature</td></tr>
+ <tr>
+  <td style="width:47%" class="aim-note"><span class="aim-label">Note:</span> {{ doc.remarks or doc.instructions or '' }}</td>
+  <td style="width:31%">
+   <table class="aim-summary">
+    <tr><td class="summary-label">Gross Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(gross, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">Total Discount</td><td class="summary-value">{{ frappe.utils.fmt_money(discount, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">GST Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(gst, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">Advance Tax Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(advance_tax, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">Trade Offer</td><td class="summary-value">{{ frappe.utils.fmt_money(trade_offer, currency=doc.currency) }}</td></tr>
+    <tr class="grand-total"><td class="summary-label">Invoice Line Total</td><td class="summary-value">{{ frappe.utils.fmt_money(doc.custom_grand_line_total or doc.grand_total or 0, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">Total After Advance Tax</td><td class="summary-value">{{ frappe.utils.fmt_money((doc.custom_grand_line_total or doc.grand_total or 0) - advance_tax, currency=doc.currency) }}</td></tr>
+   </table>
+  </td>
+  <td style="width:5%"></td><td class="aim-sign">Signature</td>
+ </tr>
 </table>
