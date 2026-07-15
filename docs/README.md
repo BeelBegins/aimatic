@@ -36,12 +36,17 @@ branches.
 
 ### Point of Sale (POS terminals)
 
-Stores use an offline-capable POS terminal application (a separate desktop app, not part of
-this Frappe site) that keeps working even if the internet connection drops. Two distinct
-logins exist on each terminal:
+Stores use an offline-capable POS application that ships as an Electron desktop app and a
+Capacitor Android app. Both use ERPNext as the source of truth and can continue queuing sales
+when connectivity drops, but they deliberately authenticate differently:
 
-- **Cashiers** log in with their own username/password to open a till, ring up sales and
-  process refunds (if their role allows it), and close out their shift at the end of the day.
+- **Desktop terminals** retain their machine credentials in the background; cashiers still log
+  in individually to open a till, ring up sales, process permitted refunds, and close shifts.
+- **Android terminals** never ask for or store an ERPNext API key/API secret. A supervisor first
+  opens its POS Profile and generates a short-lived, one-time QR code. The Android enrollment
+  screen scans it directly, with copy/paste available as a fallback. Cashiers then sign
+  in through ERPNext in the system browser, and the device stores only the resulting session
+  material in Android's protected credential storage. Disabling the enrolled device revokes it.
 - **Administrators/Supervisors** use a separate, more secure step-up login (valid for only
   5 minutes) to perform sensitive actions like resetting a cashier's PIN — this login requires
   a secure (HTTPS) connection and is fully logged for audit purposes.
@@ -153,6 +158,8 @@ At a high level, bringing a new branch or site online involves:
 2. Assigning staff to that branch (via a default Branch permission) so their sales/purchases
    post to the right books automatically.
 3. Setting up POS Profile(s) and terminal(s) for that branch.
+   Android terminals additionally require a supervisor-generated one-time enrollment QR; the
+   public OAuth client is installed automatically by the Aimatic migration.
 4. If migrating from the old iPOS software, running the item and supplier import scripts in
    `ipos_data_migration/` for that site.
 5. The first time a Purchase Receipt for that branch applies a branch price update, its own

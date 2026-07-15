@@ -114,6 +114,7 @@ doctype_js = {
     "Stock Entry": "public/js/label_printing_source_buttons.js",
     "Sales Invoice": "public/js/label_printing_source_buttons.js",
     "Supplier": "public/js/supplier_vendor_performance.js",
+    "POS Profile": "public/js/pos_profile_device_enrollment.js",
 }
 
 jinja = {

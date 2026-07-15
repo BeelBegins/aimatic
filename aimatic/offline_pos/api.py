@@ -419,6 +419,17 @@ def _hash_device_token(token):
     return sha256_hash(token or "")
 
 
+def _device_enrollment_qr_data_uri(enrollment_value):
+    """Render the one-time enrollment value locally; never send it to a
+    third-party QR service."""
+    from frappe.twofactor import get_qr_svg_code
+
+    encoded_svg = get_qr_svg_code(enrollment_value)
+    if isinstance(encoded_svg, bytes):
+        encoded_svg = encoded_svg.decode()
+    return f"data:image/svg+xml;base64,{encoded_svg}"
+
+
 def _get_pos_android_oauth_client_id():
     """Return the public OAuth client identifier needed by the APK.
 
@@ -550,11 +561,17 @@ def generate_device_enrollment_code(pos_profile):
 
     _audit_device_action(frappe.session.user, None, pos.name, "enrollment_code_issued")
 
+    site_url = frappe.utils.get_url()
+    enrollment_value = json.dumps(
+        {"url": site_url, "token": token}, separators=(",", ":")
+    )
     return {
-        "url": frappe.utils.get_url(),
+        "url": site_url,
         "token": token,
         "pos_profile": pos.name,
         "expires_at": str(expires_at),
+        "enrollment_value": enrollment_value,
+        "qr_code": _device_enrollment_qr_data_uri(enrollment_value),
     }
 
 
