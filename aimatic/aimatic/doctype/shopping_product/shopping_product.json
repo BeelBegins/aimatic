@@ -1,0 +1,16 @@
+{
+ "actions": [], "allow_rename": 0, "autoname": "field:item", "creation": "2026-07-15 00:00:00.000000", "doctype": "DocType", "module": "Aimatic", "name": "Shopping Product", "engine": "InnoDB",
+ "field_order": ["item", "enabled", "featured", "category", "public_name", "public_description", "image", "display_order"],
+ "fields": [
+  {"fieldname": "item", "fieldtype": "Link", "label": "Item", "options": "Item", "reqd": 1, "unique": 1},
+  {"default": "1", "fieldname": "enabled", "fieldtype": "Check", "in_list_view": 1, "label": "Enabled"},
+  {"default": "0", "fieldname": "featured", "fieldtype": "Check", "in_list_view": 1, "label": "Featured"},
+  {"fieldname": "category", "fieldtype": "Link", "in_list_view": 1, "label": "Category", "options": "Item Group", "reqd": 1},
+  {"fieldname": "public_name", "fieldtype": "Data", "in_list_view": 1, "label": "Public Name"},
+  {"fieldname": "public_description", "fieldtype": "Small Text", "label": "Public Description"},
+  {"fieldname": "image", "fieldtype": "Attach Image", "label": "Public Image"},
+  {"default": "0", "fieldname": "display_order", "fieldtype": "Int", "label": "Display Order"}
+ ],
+ "modified": "2026-07-15 00:00:00.000000", "modified_by": "Administrator", "owner": "Administrator",
+ "permissions": [{"create": 1, "delete": 1, "read": 1, "report": 1, "write": 1, "role": "System Manager"}], "sort_field": "display_order", "sort_order": "ASC", "states": []
+}

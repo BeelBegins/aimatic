@@ -1,0 +1,16 @@
+{
+ "actions": [], "allow_rename": 0, "autoname": "field:request_id", "creation": "2026-07-15 00:00:00.000000", "doctype": "DocType", "document_type": "System", "module": "Aimatic", "name": "Shopping Order Request", "engine": "InnoDB",
+ "field_order": ["request_id", "user", "customer", "sales_order", "delivery_method", "payment_method", "status", "created_at"],
+ "fields": [
+  {"fieldname": "request_id", "fieldtype": "Data", "label": "Request ID", "read_only": 1, "reqd": 1, "unique": 1},
+  {"fieldname": "user", "fieldtype": "Link", "label": "Website User", "options": "User", "read_only": 1, "reqd": 1},
+  {"fieldname": "customer", "fieldtype": "Link", "label": "Customer", "options": "Customer", "read_only": 1, "reqd": 1},
+  {"fieldname": "sales_order", "fieldtype": "Link", "label": "Sales Order", "options": "Sales Order", "read_only": 1},
+  {"fieldname": "delivery_method", "fieldtype": "Data", "label": "Delivery Method", "read_only": 1, "reqd": 1},
+  {"fieldname": "payment_method", "fieldtype": "Data", "label": "Payment Method", "read_only": 1, "reqd": 1},
+  {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Processing\nCreated", "read_only": 1, "reqd": 1},
+  {"fieldname": "created_at", "fieldtype": "Datetime", "label": "Created At", "read_only": 1, "reqd": 1}
+ ],
+ "modified": "2026-07-15 00:00:00.000000", "modified_by": "Administrator", "owner": "Administrator",
+ "permissions": [{"delete": 1, "read": 1, "report": 1, "role": "System Manager"}], "sort_field": "creation", "sort_order": "DESC", "states": []
+}

@@ -26,3 +26,4 @@ aimatic.patches.remove_demo_doctype
 aimatic.patches.create_pos_profile_terminal_id_field
 aimatic.patches.create_pos_oauth_client
 aimatic.patches.create_sales_oauth_client
+aimatic.patches.create_shopping_oauth_client

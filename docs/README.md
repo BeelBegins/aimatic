@@ -58,6 +58,10 @@ Every sale and refund is recorded against the correct branch and warehouse autom
 Stock and accounting only update once a cashier's shift is formally closed out at day's end —
 not the instant a sale happens — this is expected behavior, not a delay or a bug.
 
+On Android, the large synced item/barcode catalogue is stored separately from the small live
+cart and queue state. Existing installs migrate this automatically. This keeps barcode scans
+responsive because adding one item no longer rewrites the complete catalogue to disk.
+
 ### Mobile sales ordering
 
 Sales representatives use the separate Ai Matic Sales Android build. It signs each employee in
@@ -66,6 +70,15 @@ Branch, shows ERPNext customer balance/credit, customer pricing, and branch-ware
 and creates normal draft Sales Orders. Offline drafts retain one stable request ID; the server
 maps that ID to a single Sales Order so retries cannot create duplicates. Prices, taxes, stock
 policy, credit validation, permissions, company, and warehouse remain controlled by ERPNext.
+
+### Customer online shopping
+
+The separate Ai Matic Shopping Android/web build exposes only products explicitly enabled in
+`Shopping Product`, using the public Branch and Price List in `Shopping Settings`. Customers use
+a separate OAuth2 PKCE Website User linked to their Customer record. The first checkout mode is
+Cash on Delivery with Store Pickup. ERPNext recalculates a short-lived signed quote, checks stock
+and prices again at checkout, and creates one Sales Order per stable request ID. Customer APIs
+never return internal users, costs, warehouses, buying/accounts data, suppliers, or reports.
 
 ### Purchasing and receiving stock
 
