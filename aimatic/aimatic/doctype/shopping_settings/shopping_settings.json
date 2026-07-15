@@ -1,12 +1,16 @@
 {
  "actions": [], "allow_rename": 0, "creation": "2026-07-15 00:00:00.000000", "doctype": "DocType", "issingle": 1, "module": "Aimatic", "name": "Shopping Settings", "engine": "InnoDB",
- "field_order": ["enabled", "store_name", "default_branch", "price_list", "pickup_instructions"],
+ "field_order": ["enabled", "store_name", "default_branch", "price_list", "pickup_instructions", "allow_self_registration", "registration_customer_group", "registration_territory", "web_redirect_uri"],
  "fields": [
   {"default": "0", "fieldname": "enabled", "fieldtype": "Check", "label": "Enabled"},
   {"default": "Ai Matic", "fieldname": "store_name", "fieldtype": "Data", "label": "Store Name", "reqd": 1},
   {"fieldname": "default_branch", "fieldtype": "Link", "label": "Default Branch", "options": "Branch", "reqd": 1},
   {"fieldname": "price_list", "fieldtype": "Link", "label": "Public Price List", "options": "Price List"},
-  {"fieldname": "pickup_instructions", "fieldtype": "Small Text", "label": "Store Pickup Instructions"}
+  {"fieldname": "pickup_instructions", "fieldtype": "Small Text", "label": "Store Pickup Instructions"},
+  {"default": "0", "description": "Allow signed-in Website Users to create a new Customer account. Existing customers are never linked automatically.", "fieldname": "allow_self_registration", "fieldtype": "Check", "label": "Allow Customer Self Registration"},
+  {"depends_on": "allow_self_registration", "fieldname": "registration_customer_group", "fieldtype": "Link", "label": "Registration Customer Group", "options": "Customer Group"},
+  {"depends_on": "allow_self_registration", "fieldname": "registration_territory", "fieldtype": "Link", "label": "Registration Territory", "options": "Territory"},
+  {"description": "Exact HTTPS callback URL for the browser shopping build. Leave blank until the storefront domain is deployed.", "fieldname": "web_redirect_uri", "fieldtype": "Data", "label": "Web OAuth Redirect URI"}
  ],
  "modified": "2026-07-15 00:00:00.000000", "modified_by": "Administrator", "owner": "Administrator",
  "permissions": [{"create": 1, "read": 1, "write": 1, "role": "System Manager"}], "sort_field": "modified", "sort_order": "DESC", "states": []

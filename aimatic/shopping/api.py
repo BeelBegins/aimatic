@@ -3,11 +3,12 @@ import hashlib
 import hmac
 import json
 import secrets
+from urllib.parse import urlparse
 
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.utils import add_days, add_to_date, cint, flt, get_datetime, now_datetime, nowdate
+from frappe.utils import add_days, add_to_date, cint, flt, get_datetime, now_datetime, nowdate, strip_html_tags
 
 from aimatic.branch_management.utils import get_branch_defaults
 
@@ -46,6 +47,15 @@ def _customer_for_user():
 	if cint(frappe.db.get_value("Customer", customer, "disabled")):
 		frappe.throw(_("This customer account is disabled"), frappe.PermissionError)
 	return user, customer
+
+
+def _website_user():
+	user = frappe.session.user
+	if user in (None, "", "Guest"):
+		frappe.throw(_("Customer sign-in required"), frappe.AuthenticationError)
+	if frappe.db.get_value("User", user, "user_type") != "Website User":
+		frappe.throw(_("Shopping registration is available only to Website Users"), frappe.PermissionError)
+	return user
 
 
 def _product_rows(search=None, category=None, brand=None, item_code=None, offset=0, limit=30):
@@ -150,11 +160,26 @@ def _read_quote(token):
 
 
 @frappe.whitelist(allow_guest=True)
-def get_public_config():
+def get_public_config(platform="capacitor", origin=None):
 	client = frappe.db.get_value("OAuth Client", {"app_name": _OAUTH_APP}, ["name", "default_redirect_uri"], as_dict=True)
 	if not client:
 		frappe.throw(_("Ai Matic Shopping OAuth is not configured"))
-	return {"oauth_client_id": client.name, "redirect_uri": client.default_redirect_uri, "scope": "shopping-customer", "signup_url": f"{frappe.utils.get_url()}/login#signup"}
+	settings = frappe.get_single("Shopping Settings")
+	redirect_uri = client.default_redirect_uri
+	if platform == "web":
+		redirect_uri = (settings.web_redirect_uri or "").strip()
+		if not redirect_uri:
+			frappe.throw(_("The browser shopping callback is not configured"))
+		configured_origin = "{0.scheme}://{0.netloc}".format(urlparse(redirect_uri))
+		if not origin or origin.rstrip("/") != configured_origin:
+			frappe.throw(_("This storefront origin is not allowed"), frappe.PermissionError)
+	return {
+		"oauth_client_id": client.name,
+		"redirect_uri": redirect_uri,
+		"scope": "shopping-customer",
+		"signup_url": f"{frappe.utils.get_url()}/login#signup",
+		"allow_self_registration": bool(cint(settings.allow_self_registration)),
+	}
 
 
 @frappe.whitelist(allow_guest=True)
@@ -187,6 +212,42 @@ def get_customer_account():
 	user, customer = _customer_for_user()
 	addresses = frappe.get_all("Dynamic Link", filters={"link_doctype": "Customer", "link_name": customer, "parenttype": "Address"}, pluck="parent")
 	return {"user": user, "customer": customer, "customer_name": frappe.db.get_value("Customer", customer, "customer_name"), "addresses": [{"name": name, "label": frappe.db.get_value("Address", name, "address_title") or name} for name in addresses]}
+
+
+@frappe.whitelist()
+@rate_limit(limit=5, seconds=3600)
+def register_customer(customer_name, mobile_no=None):
+	user = _website_user()
+	settings = frappe.get_single("Shopping Settings")
+	if not cint(settings.enabled) or not cint(settings.allow_self_registration):
+		frappe.throw(_("Customer self-registration is not enabled"), frappe.PermissionError)
+	if not settings.registration_customer_group or not settings.registration_territory:
+		frappe.throw(_("Customer registration is not configured"))
+
+	# Serialize registration for this User. Retrying returns the created Customer;
+	# an existing unrelated Customer is never claimed by email, mobile, or name.
+	frappe.db.sql("select name from `tabUser` where name=%s for update", user)
+	existing = frappe.db.get_value("Portal User", {"user": user, "parenttype": "Customer", "parentfield": "portal_users"}, "parent")
+	if existing:
+		return {"customer": existing, "customer_name": frappe.db.get_value("Customer", existing, "customer_name"), "created": False}
+
+	clean_name = strip_html_tags((customer_name or "").strip())[:140]
+	clean_mobile = strip_html_tags((mobile_no or "").strip())[:30]
+	if len(clean_name) < 2:
+		frappe.throw(_("Customer name must contain at least two characters"))
+
+	customer = frappe.get_doc({
+		"doctype": "Customer",
+		"customer_name": clean_name,
+		"customer_type": "Individual",
+		"customer_group": settings.registration_customer_group,
+		"territory": settings.registration_territory,
+		"email_id": user,
+		"mobile_no": clean_mobile or None,
+		"portal_users": [{"user": user}],
+	})
+	customer.insert(ignore_permissions=True)
+	return {"customer": customer.name, "customer_name": customer.customer_name, "created": True}
 
 
 @frappe.whitelist()

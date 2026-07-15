@@ -75,10 +75,14 @@ policy, credit validation, permissions, company, and warehouse remain controlled
 
 The separate Ai Matic Shopping Android/web build exposes only products explicitly enabled in
 `Shopping Product`, using the public Branch and Price List in `Shopping Settings`. Customers use
-a separate OAuth2 PKCE Website User linked to their Customer record. The first checkout mode is
-Cash on Delivery with Store Pickup. ERPNext recalculates a short-lived signed quote, checks stock
-and prices again at checkout, and creates one Sales Order per stable request ID. Customer APIs
-never return internal users, costs, warehouses, buying/accounts data, suppliers, or reports.
+a separate OAuth2 PKCE Website User linked to their Customer record. Stores may enable safe
+self-registration with a Customer Group and Territory: a signed-in Website User can create a new
+Customer for themselves, but the system never takes over an existing customer merely because an
+email, mobile number, or name matches. The browser build is accepted only from the exact HTTPS
+callback configured by the implementer. The first checkout mode is Cash on Delivery with Store
+Pickup. ERPNext recalculates a short-lived signed quote, checks stock and prices again at checkout,
+and creates one Sales Order per stable request ID. Customer APIs never return internal users,
+costs, warehouses, buying/accounts data, suppliers, or reports.
 
 ### Purchasing and receiving stock
 
