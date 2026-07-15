@@ -334,7 +334,7 @@ fixtures = [
 # Testing
 # -------
 
-# before_tests = "aimatic.install.before_tests"
+before_tests = "aimatic.install.before_tests"
 
 # Extend DocType Class
 # ------------------------------
