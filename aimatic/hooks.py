@@ -90,13 +90,16 @@ doc_events = {
         "after_insert": "aimatic.branch_management.events.sync_branch_to_user",
         "after_delete": "aimatic.branch_management.events.sync_branch_to_user",
     },
-    # Disabling a POS Device in Desk must kill that device's live OAuth
-    # session immediately, not just be caught by require_active_device() on
-    # its next API call.
+    # Record enable/disable changes. The Android auth hook below enforces the
+    # new state on the device's next token or API request and revokes the token.
     "POS Device": {
-        "on_update": "aimatic.offline_pos.device_events.on_pos_device_update",
+        "on_update": "aimatic.aimatic.offline_pos.device_events.on_pos_device_update",
     },
 }
+
+auth_hooks = [
+    "aimatic.aimatic.offline_pos.device_auth.validate_android_pos_device_auth",
+]
 
 # Redirects frappe.integrations.oauth2.get_token to our own implementation so
 # refresh-token rotation/replay detection (aimatic.aimatic.oauth.validator)

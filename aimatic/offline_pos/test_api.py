@@ -124,6 +124,72 @@ class TestAndroidBearerSecurity(_AimTestCase):
                 "OAuth Client", {"app_name": "Aimatic POS Android"}, "name"
             )
 
+    def test_device_proof_binds_request_to_enabled_device(self):
+        from aimatic.aimatic.offline_pos.device_auth import (
+            hash_device_token,
+            validate_device_proof,
+        )
+
+        device = SimpleNamespace(
+            enabled=1,
+            pos_profile="Main POS",
+            device_token_hash=hash_device_token("device-proof"),
+        )
+        with patch(
+            "aimatic.aimatic.offline_pos.device_auth.frappe.db.get_value",
+            return_value=device,
+        ):
+            self.assertEqual(
+                validate_device_proof("device-1", "device-proof"),
+                "Main POS",
+            )
+
+    def test_invalid_device_proof_is_rejected(self):
+        from aimatic.aimatic.offline_pos.device_auth import (
+            hash_device_token,
+            validate_device_proof,
+        )
+
+        device = SimpleNamespace(
+            enabled=1,
+            pos_profile="Main POS",
+            device_token_hash=hash_device_token("correct-proof"),
+        )
+        with (
+            patch(
+                "aimatic.aimatic.offline_pos.device_auth.frappe.db.get_value",
+                return_value=device,
+            ),
+            patch("aimatic.aimatic.offline_pos.device_auth._audit_device_failure"),
+            self.assertRaises(frappe.AuthenticationError),
+        ):
+            validate_device_proof("device-1", "wrong-proof")
+
+    def test_device_update_audit_includes_required_timestamp(self):
+        from aimatic.aimatic.offline_pos.device_events import on_pos_device_update
+
+        doc = SimpleNamespace(
+            enabled=0,
+            hardware_id="device-1",
+            pos_profile="Main POS",
+            has_value_changed=lambda field: field == "enabled",
+        )
+        inserted = {}
+
+        class AuditDoc:
+            def insert(self, ignore_permissions=False):
+                inserted["ignore_permissions"] = ignore_permissions
+
+        def get_doc(value):
+            inserted.update(value)
+            return AuditDoc()
+
+        with patch("aimatic.aimatic.offline_pos.device_events.frappe.get_doc", side_effect=get_doc):
+            on_pos_device_update(doc, "on_update")
+
+        self.assertEqual(inserted["status"], "device_disabled")
+        self.assertTrue(inserted["created_at"])
+
 
 def _create_opening_entry(pos_profile_name, user="Administrator"):
     """Submit a POS Opening Entry for the given profile and user."""

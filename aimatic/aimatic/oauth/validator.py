@@ -1,5 +1,6 @@
 import frappe
 from frappe.oauth import OAuthWebRequestValidator
+from frappe.utils import now_datetime
 
 
 class AimaticOAuthRequestValidator(OAuthWebRequestValidator):
@@ -53,6 +54,7 @@ class AimaticOAuthRequestValidator(OAuthWebRequestValidator):
                 "doctype": "POS Device Audit Log",
                 "user": existing.user if frappe.db.exists("User", existing.user) else None,
                 "status": "refresh_reuse_detected",
+                "created_at": now_datetime(),
             }).insert(ignore_permissions=True)
             frappe.db.commit()
             return False

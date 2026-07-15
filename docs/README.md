@@ -45,8 +45,11 @@ when connectivity drops, but they deliberately authenticate differently:
 - **Android terminals** never ask for or store an ERPNext API key/API secret. A supervisor first
   opens its POS Profile and generates a short-lived, one-time QR code. The Android enrollment
   screen scans it directly, with copy/paste available as a fallback. Cashiers then sign
-  in through ERPNext in the system browser, and the device stores only the resulting session
-  material in Android's protected credential storage. Disabling the enrolled device revokes it.
+  in through ERPNext in the system browser. Enrollment also issues a random device proof whose
+  hash alone is kept on the server; the proof and session material are kept in Android's protected
+  credential storage. The proof is not an ERPNext API credential and cannot sign in a cashier.
+  Every Android token and API request must prove the device is still enabled, so disabling it
+  blocks its next online call and signs it out without changing Electron terminals.
 - **Administrators/Supervisors** use a separate, more secure step-up login (valid for only
   5 minutes) to perform sensitive actions like resetting a cashier's PIN — this login requires
   a secure (HTTPS) connection and is fully logged for audit purposes.

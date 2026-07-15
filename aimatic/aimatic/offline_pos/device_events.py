@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import now_datetime
 
 
 def on_pos_device_update(doc, method):
@@ -19,4 +20,5 @@ def on_pos_device_update(doc, method):
         "hardware_id": doc.hardware_id,
         "pos_profile": doc.pos_profile,
         "status": "device_enabled" if doc.enabled else "device_disabled",
+        "created_at": now_datetime(),
     }).insert(ignore_permissions=True)

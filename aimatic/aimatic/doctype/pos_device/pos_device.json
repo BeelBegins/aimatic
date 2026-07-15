@@ -9,6 +9,7 @@
  "field_order": [
   "hardware_id",
   "pos_profile",
+  "device_token_hash",
   "branch",
   "enabled",
   "enrolled_at",
@@ -35,6 +36,13 @@
    "label": "POS Profile",
    "options": "POS Profile",
    "reqd": 1
+  },
+  {
+   "fieldname": "device_token_hash",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Device Token Hash",
+   "read_only": 1
   },
   {
    "fetch_from": "pos_profile.custom_terminal_id",

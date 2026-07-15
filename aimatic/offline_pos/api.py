@@ -9,6 +9,7 @@ from frappe.utils.data import sha256_hash
 from frappe.utils.password import check_password
 
 from aimatic.pos_shared import returned_qty_by_row
+from aimatic.aimatic.offline_pos.device_auth import hash_device_token, validate_device_proof
 
 _MAX_PAGE_SIZE = 1000
 _ALLOWED_POS_ADMIN_ACTIONS = {"setup_pin", "reset_pin", "change_credentials"}
@@ -416,7 +417,7 @@ _POS_ANDROID_OAUTH_APP_NAME = "Aimatic POS Android"
 
 
 def _hash_device_token(token):
-    return sha256_hash(token or "")
+    return hash_device_token(token)
 
 
 def _device_enrollment_qr_data_uri(enrollment_value):
@@ -479,6 +480,10 @@ def require_active_device(hardware_id):
     return device.pos_profile
 
 
+def _request_device_profile():
+    return getattr(frappe.local, "aimatic_pos_profile", None)
+
+
 def _is_bearer_authenticated_request():
     """True for Android's per-cashier OAuth session, False for Electron's
     terminal-token session. Electron sends `Authorization: token key:secret`
@@ -492,6 +497,26 @@ def _is_bearer_authenticated_request():
         # must retain the legacy terminal-token/cashier_user behavior.
         return False
     return (request.headers.get("Authorization") or "").startswith("Bearer ")
+
+
+def _enforce_bearer_profile(pos_profile):
+    """Keep Android OAuth requests inside the enrolled device's POS Profile.
+
+    The auth hook has already authenticated the device proof and recorded its
+    bound profile. Electron's terminal-token requests deliberately bypass this
+    check and retain their existing behaviour.
+    """
+    if not _is_bearer_authenticated_request():
+        return
+
+    bound_profile = _request_device_profile()
+    if not bound_profile:
+        frappe.throw(_("An enrolled Android POS device is required"), frappe.AuthenticationError)
+    if bound_profile != pos_profile:
+        frappe.throw(
+            _("This device is not enrolled for POS Profile {0}").format(pos_profile),
+            frappe.PermissionError,
+        )
 
 
 def _resolve_cashier_user(cashier_user, pos_profile, hardware_id, is_bearer):
@@ -512,10 +537,16 @@ def _resolve_cashier_user(cashier_user, pos_profile, hardware_id, is_bearer):
 
     if frappe.session.user in (None, "", "Guest"):
         frappe.throw(_("Authentication required"), frappe.AuthenticationError)
-    if not hardware_id:
-        frappe.throw(_("hardware_id is required for device sessions"), frappe.PermissionError)
-
-    bound_profile = require_active_device(hardware_id)
+    request_hardware_id = getattr(frappe.local, "aimatic_pos_hardware_id", None)
+    if hardware_id and request_hardware_id and hardware_id != request_hardware_id:
+        frappe.throw(_("Request hardware ID does not match the enrolled device"), frappe.PermissionError)
+    bound_profile = _request_device_profile()
+    if not bound_profile:
+        bound_profile = (
+            validate_device_proof(hardware_id=hardware_id)
+            if request_hardware_id
+            else require_active_device(hardware_id)
+        )
     if bound_profile != pos_profile:
         frappe.throw(
             _("This device is not enrolled for POS Profile {0}").format(pos_profile),
@@ -608,10 +639,13 @@ def redeem_device_enrollment(token, hardware_id):
     enrollment.hardware_id = hardware_id
     enrollment.save(ignore_permissions=True)
 
+    device_token = secrets.token_urlsafe(32)
+    device_token_hash = _hash_device_token(device_token)
     existing = frappe.db.exists("POS Device", hardware_id)
     if existing:
         frappe.db.set_value("POS Device", hardware_id, {
             "pos_profile": enrollment.pos_profile,
+            "device_token_hash": device_token_hash,
             "enabled": 1,
             "enrolled_at": now_datetime(),
             "enrolled_by": enrollment.created_by_user,
@@ -623,6 +657,7 @@ def redeem_device_enrollment(token, hardware_id):
             "doctype": "POS Device",
             "hardware_id": hardware_id,
             "pos_profile": enrollment.pos_profile,
+            "device_token_hash": device_token_hash,
             "enabled": 1,
             "enrolled_at": now_datetime(),
             "enrolled_by": enrollment.created_by_user,
@@ -638,6 +673,7 @@ def redeem_device_enrollment(token, hardware_id):
         "branch": getattr(pos, "custom_branch", "") or getattr(pos, "branch", "") or "",
         "warehouse": pos.warehouse,
         "oauth_client_id": _get_pos_android_oauth_client_id(),
+        "device_token": device_token,
     }
 
 
@@ -1039,6 +1075,7 @@ def preview_cart(
     without being finalized.
     """
     _require_login()
+    _enforce_bearer_profile(pos_profile)
 
     pos = _load_pos_profile(pos_profile)
     _validate_pos_opening_entry(pos.name)
@@ -1601,6 +1638,7 @@ def get_customer_benefits(pos_profile, customer):
     Returns zero/None values when the customer is not enrolled.
     """
     _require_login()
+    _enforce_bearer_profile(pos_profile)
 
     pos = _load_pos_profile(pos_profile)
     cust = _load_customer(customer)
@@ -1655,11 +1693,13 @@ def get_active_pos_session(pos_profile, cashier_user):
     cashier_user.
     """
     _require_login()
+    is_bearer = _is_bearer_authenticated_request()
 
     if not pos_profile:
         frappe.throw(_("pos_profile is required"))
-    if not cashier_user:
+    if not cashier_user and not is_bearer:
         frappe.throw(_("cashier_user is required"))
+    cashier_user = _resolve_cashier_user(cashier_user, pos_profile, None, is_bearer)
 
     # All submitted open entries for this profile — for the match and diagnostics
     profile_open = frappe.get_all(
@@ -1731,15 +1771,20 @@ def close_pos_session(opening_entry, cashier_user, closing_balances, notes=None)
     ERPNext documents on the server.
     """
     _require_login()
+    is_bearer = _is_bearer_authenticated_request()
     frappe.has_permission("POS Closing Entry", "create", throw=True)
 
-    if not cashier_user:
+    if not cashier_user and not is_bearer:
         frappe.throw(_("cashier_user is required"), frappe.PermissionError)
 
     try:
         opening = frappe.get_doc("POS Opening Entry", opening_entry)
     except frappe.DoesNotExistError:
         frappe.throw(_("Invalid POS Opening Entry: {0}").format(opening_entry))
+
+    cashier_user = _resolve_cashier_user(
+        cashier_user, opening.pos_profile, None, is_bearer
+    )
 
     if opening.user != cashier_user:
         frappe.throw(
@@ -1964,6 +2009,14 @@ def get_pos_closing_summary(opening_entry, cashier_user):
     cashier's invoices.
     """
     _require_login()
+    is_bearer = _is_bearer_authenticated_request()
+
+    opening_profile = frappe.db.get_value("POS Opening Entry", opening_entry, "pos_profile")
+    if not opening_profile:
+        frappe.throw(_("Invalid POS Opening Entry: {0}").format(opening_entry))
+    cashier_user = _resolve_cashier_user(
+        cashier_user, opening_profile, None, is_bearer
+    )
 
     opening = _get_open_pos_opening_entry_for_cashier(opening_entry, cashier_user)
 
@@ -2058,6 +2111,7 @@ def start_pos_session(pos_profile, cashier_user, opening_balances=None):
                       Electron should send this JSON-stringified.
     """
     _require_login()
+    is_bearer = _is_bearer_authenticated_request()
 
     if not frappe.has_permission("POS Opening Entry", "create"):
         frappe.throw(_("Not permitted to create POS Opening Entry"), frappe.PermissionError)
@@ -2065,6 +2119,7 @@ def start_pos_session(pos_profile, cashier_user, opening_balances=None):
         frappe.throw(_("Not permitted to submit POS Opening Entry"), frappe.PermissionError)
 
     pos = _get_pos_profile_or_throw(pos_profile)
+    cashier_user = _resolve_cashier_user(cashier_user, pos.name, None, is_bearer)
     _validate_cashier_identity(cashier_user, pos)
 
     if isinstance(opening_balances, str):
@@ -2613,6 +2668,7 @@ def get_pos_invoice_for_refund(invoice_name):
 
     original = frappe.get_doc("POS Invoice", invoice_name)
     original.check_permission("read")
+    _enforce_bearer_profile(original.pos_profile)
 
     if original.docstatus != 1:
         frappe.throw(_("Original POS Invoice must be submitted"))
