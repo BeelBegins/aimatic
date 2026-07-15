@@ -43,7 +43,7 @@ class TestShoppingApi(FrappeTestCase):
 	def test_native_public_config_exposes_no_secret(self):
 		config = api.get_public_config()
 		self.assertTrue(config["oauth_client_id"])
-		self.assertTrue(config["redirect_uri"].startswith("tech.aimatic.shopping://"))
+		self.assertEqual(config["redirect_uri"], "com.beelbegins.aimaticshopping://oauth/callback")
 		self.assertNotIn("client_secret", config)
 
 	def test_website_user_registration_is_retry_safe(self):

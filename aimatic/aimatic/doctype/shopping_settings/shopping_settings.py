@@ -26,7 +26,7 @@ class ShoppingSettings(Document):
 		if not client_name:
 			return
 		client = frappe.get_doc("OAuth Client", client_name)
-		native_uri = "tech.aimatic.shopping://oauth/callback"
+		native_uri = "com.beelbegins.aimaticshopping://oauth/callback"
 		redirects = [native_uri]
 		if self.web_redirect_uri:
 			redirects.append(self.web_redirect_uri.strip())
