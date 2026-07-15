@@ -65,9 +65,11 @@ responsive because adding one item no longer rewrites the complete catalogue to 
 ### Mobile sales ordering
 
 Sales representatives use the separate Ai Matic Sales Android build. It signs each employee in
-through OAuth2 PKCE without an API key or secret, restricts ordinary users to their assigned
-Branch, shows ERPNext customer balance/credit, customer pricing, and branch-warehouse stock,
-and creates normal draft Sales Orders. Offline drafts retain one stable request ID; the server
+through OAuth2 PKCE without an API key or secret. Standard ERPNext Company, Warehouse, Stock
+Settings, and Selling Settings defaults work even when no Branch is configured. Where Ai Matic
+Branch management is configured, ordinary users remain restricted to their assigned Branch and
+Branch defaults are used as a fallback. The app shows customer balance/credit, customer pricing,
+and warehouse stock and creates normal draft Sales Orders. Offline drafts retain one stable request ID; the server
 maps that ID to a single Sales Order so retries cannot create duplicates. Prices, taxes, stock
 policy, credit validation, permissions, company, and warehouse remain controlled by ERPNext.
 

@@ -122,6 +122,11 @@ def apply_branch_defaults(doc, method=None):
 		doc.branch = _infer_stock_entry_branch(doc)
 
 	if not doc.branch:
+		# Companies that have not adopted Ai Matic Branch management keep normal
+		# ERPNext Company/Warehouse behavior. Branch enforcement starts only after
+		# at least one Branch is configured for the document's Company.
+		if doc.company and not frappe.db.exists("Branch", {"company": doc.company}):
+			return
 		if can_override:
 			return
 		frappe.throw(

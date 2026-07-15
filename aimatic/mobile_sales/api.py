@@ -33,34 +33,94 @@ def _permitted_branch(branch=None):
 		if not frappe.db.exists("Branch", branch):
 			frappe.throw(_("Invalid Branch: {0}").format(branch))
 		return branch
-	if default:
-		return default
-	if user_can_override():
-		branches = frappe.get_list("Branch", fields=["name"], limit_page_length=2)
-		if len(branches) == 1:
-			return branches[0].name
-	frappe.throw(_("Select an allowed Branch"), frappe.PermissionError)
+	return default or None
 
 
-def _branch_context(branch=None):
-	branch = _permitted_branch(branch)
-	doc = frappe.get_cached_doc("Branch", branch)
-	defaults = get_branch_defaults(branch)
-	warehouse = defaults.get("finished_goods_warehouse")
+def _warehouse_doc(warehouse, company=None, required=False):
 	if not warehouse:
-		frappe.throw(_("Branch {0} has no Finished Goods Warehouse").format(branch))
-	price_list = doc.get("default_selling_price_list") or frappe.db.get_single_value(
-		"Selling Settings", "selling_price_list"
+		return None
+	doc = frappe.get_doc("Warehouse", warehouse)
+	try:
+		doc.check_permission("read")
+	except frappe.PermissionError:
+		if required:
+			raise
+		return None
+	if cint(doc.disabled) or cint(doc.is_group) or (company and doc.company != company):
+		if required:
+			frappe.throw(_("Warehouse {0} is not an active stock warehouse for Company {1}").format(warehouse, company))
+		return None
+	return doc
+
+
+def _default_company(branch_doc=None, warehouse_doc=None, fallback_branch_doc=None):
+	if warehouse_doc:
+		return warehouse_doc.company
+	if branch_doc:
+		return branch_doc.company
+	company = frappe.defaults.get_user_default("Company") or frappe.defaults.get_global_default("default_company")
+	if company:
+		return company
+	if fallback_branch_doc:
+		return fallback_branch_doc.company
+	companies = frappe.get_list("Company", pluck="name", limit_page_length=2)
+	if len(companies) == 1:
+		return companies[0]
+	frappe.throw(_("Select a default Company or Warehouse in ERPNext"))
+
+
+def _default_warehouse(company, branch=None, requested=None):
+	if requested:
+		return _warehouse_doc(requested, company, required=True).name
+
+	# Preserve ERPNext's standard user/global defaults before consulting Ai Matic Branch settings.
+	for candidate in (
+		frappe.defaults.get_user_default("Warehouse"),
+		frappe.db.get_single_value("Stock Settings", "default_warehouse"),
+	):
+		doc = _warehouse_doc(candidate, company)
+		if doc:
+			return doc.name
+
+	if branch:
+		candidate = get_branch_defaults(branch).get("finished_goods_warehouse")
+		doc = _warehouse_doc(candidate, company)
+		if doc:
+			return doc.name
+
+	warehouses = frappe.get_list(
+		"Warehouse",
+		filters={"company": company, "disabled": 0, "is_group": 0},
+		pluck="name",
+		limit_page_length=2,
+	)
+	if len(warehouses) == 1:
+		return warehouses[0]
+	frappe.throw(_("Select a Warehouse. No unambiguous ERPNext default is available for Company {0}").format(company))
+
+
+def _sales_context(branch=None, warehouse=None):
+	requested_branch = branch
+	branch = _permitted_branch(branch)
+	branch_doc = frappe.get_cached_doc("Branch", branch) if branch else None
+	requested_warehouse = _warehouse_doc(warehouse, required=True) if warehouse else None
+	company = _default_company(branch_doc if requested_branch else None, requested_warehouse, branch_doc)
+	if branch_doc and branch_doc.company != company:
+		branch = None
+		branch_doc = None
+	warehouse = _default_warehouse(company, branch, warehouse)
+	price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list") or (
+		branch_doc.get("default_selling_price_list") if branch_doc else None
 	)
 	if not price_list:
-		frappe.throw(_("No selling Price List is configured for Branch {0}").format(branch))
+		frappe.throw(_("Configure the Selling Price List in ERPNext Selling Settings"))
 	return frappe._dict(
 		branch=branch,
-		company=doc.company,
+		company=company,
 		warehouse=warehouse,
 		price_list=price_list,
 		currency=frappe.db.get_value("Price List", price_list, "currency")
-		or frappe.db.get_value("Company", doc.company, "default_currency"),
+		or frappe.db.get_value("Company", company, "default_currency"),
 	)
 
 
@@ -114,23 +174,25 @@ def _parse_items(items):
 	return result
 
 
-def _make_order(branch, customer, items, delivery_date=None, po_no=None, remarks=None):
-	context = _branch_context(branch)
+def _make_order(branch, warehouse, customer, items, delivery_date=None, po_no=None, remarks=None):
+	context = _sales_context(branch, warehouse)
 	customer_doc = _customer_doc(customer)
 	price_list = _customer_price_list(customer_doc, context.price_list)
 	delivery_date = delivery_date or add_days(nowdate(), 1)
-	doc = frappe.get_doc({
+	values = {
 		"doctype": "Sales Order",
 		"customer": customer_doc.name,
 		"company": context.company,
-		"branch": context.branch,
 		"set_warehouse": context.warehouse,
 		"selling_price_list": price_list,
 		"delivery_date": delivery_date,
 		"po_no": po_no,
 		"remarks": remarks,
 		"order_type": "Sales",
-	})
+	}
+	if context.branch:
+		values["branch"] = context.branch
+	doc = frappe.get_doc(values)
 	for item in _parse_items(items):
 		doc.append("items", {
 			"item_code": item["item_code"],
@@ -151,7 +213,7 @@ def _order_response(doc, credit=None, duplicate=False):
 		"status": doc.status,
 		"docstatus": doc.docstatus,
 		"customer": doc.customer,
-		"branch": doc.branch,
+		"branch": doc.get("branch"),
 		"warehouse": doc.set_warehouse,
 		"price_list": doc.selling_price_list,
 		"currency": doc.currency,
@@ -183,11 +245,15 @@ def get_public_config():
 
 
 @frappe.whitelist()
-def get_context(branch=None):
+def get_context(branch=None, warehouse=None):
 	user = _require_sales_user()
-	context = _branch_context(branch)
-	branches = frappe.get_list("Branch", fields=["name", "company"], order_by="name", limit_page_length=500) if user_can_override() else [{"name": context.branch, "company": context.company}]
-	return {"user": user, "full_name": frappe.utils.get_fullname(user), "roles": frappe.get_roles(user), "branches": branches, **context}
+	context = _sales_context(branch, warehouse)
+	default_branch = get_user_default_branch()
+	branches = frappe.get_list("Branch", fields=["name", "company"], order_by="name", limit_page_length=500) if user_can_override() else (
+		[{"name": default_branch, "company": frappe.db.get_value("Branch", default_branch, "company")}] if default_branch else []
+	)
+	warehouses = frappe.get_list("Warehouse", filters={"company": context.company, "disabled": 0, "is_group": 0}, fields=["name", "company"], order_by="name", limit_page_length=500)
+	return {"user": user, "full_name": frappe.utils.get_fullname(user), "roles": frappe.get_roles(user), "branches": branches, "warehouses": warehouses, **context}
 
 
 @frappe.whitelist()
@@ -202,18 +268,18 @@ def search_customers(search=None, offset=0, limit=20):
 
 
 @frappe.whitelist()
-def get_customer_context(customer, branch=None):
+def get_customer_context(customer, branch=None, warehouse=None):
 	_require_sales_user()
-	context = _branch_context(branch)
+	context = _sales_context(branch, warehouse)
 	doc = _customer_doc(customer)
 	credit = _credit_context(doc.name, context.company)
 	return {"name": doc.name, "customer_name": doc.customer_name, "mobile_no": doc.mobile_no, "email_id": doc.email_id, "price_list": _customer_price_list(doc, context.price_list), **credit}
 
 
 @frappe.whitelist()
-def search_items(branch=None, customer=None, search=None, barcode=None, offset=0, limit=30):
+def search_items(branch=None, warehouse=None, customer=None, search=None, barcode=None, offset=0, limit=30):
 	_require_sales_user()
-	context = _branch_context(branch)
+	context = _sales_context(branch, warehouse)
 	customer_doc = _customer_doc(customer) if customer else None
 	price_list = _customer_price_list(customer_doc, context.price_list) if customer_doc else context.price_list
 	if barcode:
@@ -229,14 +295,14 @@ def search_items(branch=None, customer=None, search=None, barcode=None, offset=0
 
 
 @frappe.whitelist()
-def preview_order(branch, customer, items, delivery_date=None, po_no=None, remarks=None):
+def preview_order(customer, items, branch=None, warehouse=None, delivery_date=None, po_no=None, remarks=None):
 	_require_sales_user()
-	doc, _context, credit = _make_order(branch, customer, items, delivery_date, po_no, remarks)
+	doc, _context, credit = _make_order(branch, warehouse, customer, items, delivery_date, po_no, remarks)
 	return _order_response(doc, credit)
 
 
 @frappe.whitelist()
-def create_order(request_id, branch, customer, items, delivery_date=None, po_no=None, remarks=None):
+def create_order(request_id, customer, items, branch=None, warehouse=None, delivery_date=None, po_no=None, remarks=None):
 	user = _require_sales_user()
 	if not request_id or len(request_id) > 140:
 		frappe.throw(_("A valid request_id is required"))
@@ -252,7 +318,7 @@ def create_order(request_id, branch, customer, items, delivery_date=None, po_no=
 			return _order_response(doc, duplicate=True)
 		frappe.throw(_("This request is already being processed"))
 	frappe.get_doc({"doctype": "Mobile Sales Order Request", "request_id": request_id, "user": user, "status": "Processing", "created_at": now_datetime()}).insert(ignore_permissions=True)
-	doc, _context, credit = _make_order(branch, customer, items, delivery_date, po_no, remarks)
+	doc, _context, credit = _make_order(branch, warehouse, customer, items, delivery_date, po_no, remarks)
 	doc.insert()
 	frappe.db.set_value("Mobile Sales Order Request", request_id, {"sales_order": doc.name, "status": "Created"})
 	return _order_response(doc, credit)
