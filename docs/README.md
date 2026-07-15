@@ -11,6 +11,8 @@ all get oriented without reading source code. For the technical "how it's wired"
 (hooks, doctypes, gotchas learned the hard way), see `CLAUDE.md` at the root of this bench —
 this guide and that file are meant to be read together, not as duplicates of each other.
 
+The customer storefront for the `siezal` site is served at `https://shop.aimatic.tech/`. System Managers can use `https://shop.aimatic.tech/uploadimageproduct` to upload a Shopping Product photo, run local background removal, compare the original and transparent result, and approve the public image. Processing uses an isolated `rembg`/U²-Netp Python 3.12 environment under `/home/nabeel/.local/share/aimatic-bgremove`; it has no external paid API and must not be installed into the Frappe environment.
+
 ## Who this guide is for
 
 - **Business owners / operations staff** — read the feature sections below to understand what

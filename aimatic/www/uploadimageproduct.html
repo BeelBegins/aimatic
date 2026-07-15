@@ -1,0 +1,75 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<style>
+  .studio{max-width:1120px;margin:32px auto;padding:0 18px;color:#19201e}.studio h1{font-size:clamp(28px,4vw,46px);margin:4px 0}.studio .lead{color:#64706c;max-width:720px}.studio-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.8fr);gap:20px;margin-top:24px}.studio-card{background:#fff;border:1px solid #dce4df;border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(20,50,40,.06)}.studio label{display:grid;gap:7px;margin:0 0 16px;font-weight:650}.studio select,.studio input{width:100%;min-height:48px;border:1px solid #b8c5bf;border-radius:11px;padding:10px 12px;background:#fff}.studio button{min-height:48px;border:0;border-radius:11px;padding:10px 18px;font-weight:750;cursor:pointer}.studio .primary{background:#12634e;color:#fff}.studio .secondary{background:#eef4f1;color:#17493c}.studio button:disabled{opacity:.5;cursor:not-allowed}.preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.preview{min-height:250px;border-radius:14px;border:1px dashed #b8c5bf;display:grid;place-items:center;overflow:hidden;background-color:#f7f8f6;background-image:linear-gradient(45deg,#e7ebe8 25%,transparent 25%),linear-gradient(-45deg,#e7ebe8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e7ebe8 75%),linear-gradient(-45deg,transparent 75%,#e7ebe8 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0}.preview img{width:100%;height:100%;max-height:380px;object-fit:contain}.preview span{background:#fff;padding:7px 10px;border-radius:8px}.status{margin:14px 0;padding:12px 14px;border-radius:11px;background:#eef4f1}.status.error{background:#fff0ee;color:#9c2820}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.privacy{font-size:13px;color:#64706c}@media(max-width:760px){.studio-grid{grid-template-columns:1fr}.preview-grid{grid-template-columns:1fr}.preview{min-height:220px}}
+</style>
+<main class="studio">
+  <p>AI MATIC · ADMIN TOOL</p>
+  <h1>Product Image Studio</h1>
+  <p class="lead">Upload a product photo, remove its background locally on this server, compare the result, then approve it for the public Shopping catalogue.</p>
+  <div class="studio-grid">
+    <section class="studio-card">
+      <label>Shopping product
+        <select id="product"><option value="">Loading products…</option></select>
+      </label>
+      <label>Source image
+        <input id="image" type="file" accept="image/jpeg,image/png,image/webp" capture="environment">
+      </label>
+      <p class="privacy">JPG, PNG or WebP, up to 12 MB. Processing stays on this server. The original is retained.</p>
+      <div id="status" class="status" role="status">Choose a product and image.</div>
+      <div class="actions">
+        <button id="process" class="primary">Remove background</button>
+        <button id="approve" class="secondary" disabled>Approve product image</button>
+      </div>
+    </section>
+    <section class="studio-card">
+      <div class="preview-grid">
+        <div><h3>Original</h3><div class="preview" id="original"><span>No image</span></div></div>
+        <div><h3>Processed</h3><div class="preview" id="processed"><span>Waiting</span></div></div>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+(() => {
+  const csrf = {{ csrf_token|tojson }};
+  const product = document.querySelector('#product');
+  const image = document.querySelector('#image');
+  const processButton = document.querySelector('#process');
+  const approveButton = document.querySelector('#approve');
+  const status = document.querySelector('#status');
+  const original = document.querySelector('#original');
+  const processed = document.querySelector('#processed');
+  let jobId = '';
+  const setStatus = (message, error=false) => { status.textContent=message; status.classList.toggle('error',error); };
+  const call = async (method, args={}) => {
+    const response = await fetch(`/api/method/${method}`, {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-Frappe-CSRF-Token':csrf},body:JSON.stringify(args)});
+    const value = await response.json().catch(()=>({}));
+    if (!response.ok || value.exc) throw new Error(value._server_messages ? JSON.parse(value._server_messages).map(JSON.parse).map(x=>x.message).join(' ') : value.message || 'Request failed');
+    return value.message;
+  };
+  const loadProducts = async () => {
+    try {
+      const result=await call('aimatic.shopping.product_images.list_products');
+      product.innerHTML='<option value="">Select a published product</option>'+result.products.map(row=>`<option value="${row.name}">${row.public_name||row.item} · ${row.category}</option>`).join('');
+    } catch(error) { setStatus(error.message,true); }
+  };
+  image.addEventListener('change',()=>{const file=image.files[0];if(file){original.innerHTML=`<img alt="Original preview" src="${URL.createObjectURL(file)}">`;processed.innerHTML='<span>Waiting</span>';approveButton.disabled=true;}});
+  processButton.addEventListener('click',async()=>{
+    const file=image.files[0];if(!product.value||!file)return setStatus('Choose a Shopping Product and source image.',true);
+    processButton.disabled=true;approveButton.disabled=true;setStatus('Uploading securely…');
+    try{
+      const form=new FormData();form.append('file',file);form.append('is_private','0');form.append('doctype','Shopping Product');form.append('docname',product.value);
+      const uploadResponse=await fetch('/api/method/upload_file',{method:'POST',credentials:'same-origin',headers:{'X-Frappe-CSRF-Token':csrf},body:form});
+      const upload=await uploadResponse.json();if(!uploadResponse.ok||upload.exc)throw new Error(upload.message||'Upload failed');
+      const started=await call('aimatic.shopping.product_images.start_background_removal',{product:product.value,file_name:upload.message.name});
+      jobId=started.job_id;setStatus(started.message);poll();
+    }catch(error){processButton.disabled=false;setStatus(error.message,true);}
+  });
+  const poll=async()=>{try{const result=await call('aimatic.shopping.product_images.get_background_removal_status',{job_id:jobId});setStatus(result.message,result.status==='failed');if(result.status==='ready'){processed.innerHTML=`<img alt="Processed preview" src="${result.result_url}?v=${Date.now()}">`;approveButton.disabled=false;processButton.disabled=false;}else if(result.status==='failed'){processButton.disabled=false;}else setTimeout(poll,1200);}catch(error){processButton.disabled=false;setStatus(error.message,true);}};
+  approveButton.addEventListener('click',async()=>{approveButton.disabled=true;try{const result=await call('aimatic.shopping.product_images.approve_background_removal',{job_id:jobId});setStatus('Product image approved and published.');}catch(error){approveButton.disabled=false;setStatus(error.message,true);}});
+  loadProducts();
+})();
+</script>
+{% endblock %}

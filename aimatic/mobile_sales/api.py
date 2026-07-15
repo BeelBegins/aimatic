@@ -142,6 +142,29 @@ def _customer_price_list(customer, branch_price_list):
 	) or branch_price_list
 
 
+def _item_stock_and_rates(item_codes, warehouse, price_list):
+	if not item_codes:
+		return {}, {}
+	bins = frappe.get_all(
+		"Bin",
+		filters={"item_code": ["in", item_codes], "warehouse": warehouse},
+		fields=["item_code", "actual_qty", "reserved_qty"],
+		limit_page_length=len(item_codes),
+	)
+	prices = frappe.get_all(
+		"Item Price",
+		filters={"item_code": ["in", item_codes], "price_list": price_list, "selling": 1},
+		fields=["item_code", "price_list_rate"],
+		order_by="modified desc",
+		limit_page_length=max(len(item_codes) * 3, 100),
+	)
+	stock_by_item = {row.item_code: row for row in bins}
+	rate_by_item = {}
+	for row in prices:
+		rate_by_item.setdefault(row.item_code, flt(row.price_list_rate))
+	return stock_by_item, rate_by_item
+
+
 def _credit_context(customer, company):
 	from erpnext.accounts.utils import get_balance_on
 	from erpnext.selling.doctype.customer.customer import get_credit_limit
@@ -277,7 +300,7 @@ def get_customer_context(customer, branch=None, warehouse=None):
 	context = _sales_context(branch, warehouse)
 	doc = _customer_doc(customer)
 	credit = _credit_context(doc.name, context.company)
-	return {"name": doc.name, "customer_name": doc.customer_name, "mobile_no": doc.mobile_no, "email_id": doc.email_id, "price_list": _customer_price_list(doc, context.price_list), **credit}
+	return {"name": doc.name, "customer_name": doc.customer_name, "mobile_no": doc.mobile_no, "email_id": doc.email_id, "territory": doc.territory, "customer_group": doc.customer_group, "price_list": _customer_price_list(doc, context.price_list), **credit}
 
 
 @frappe.whitelist()
@@ -292,9 +315,10 @@ def search_items(branch=None, warehouse=None, customer=None, search=None, barcod
 	else:
 		filters = {"disabled": 0, "is_sales_item": 1}
 	rows = frappe.get_list("Item", filters=filters, or_filters={"name": ["like", f"%{search}%"], "item_name": ["like", f"%{search}%"]} if search else None, fields=["name", "item_name", "item_group", "brand", "stock_uom", "image"], start=cint(offset), page_length=_page_length(limit), order_by="item_name")
+	stock_by_item, rate_by_item = _item_stock_and_rates([row.name for row in rows], context.warehouse, price_list)
 	for row in rows:
-		stock = frappe.db.get_value("Bin", {"item_code": row.name, "warehouse": context.warehouse}, ["actual_qty", "reserved_qty"], as_dict=True) or {}
-		row.update({"warehouse": context.warehouse, "actual_qty": flt(stock.get("actual_qty")), "available_qty": flt(stock.get("actual_qty")) - flt(stock.get("reserved_qty")), "price_list": price_list, "rate": flt(frappe.db.get_value("Item Price", {"item_code": row.name, "price_list": price_list, "selling": 1}, "price_list_rate"))})
+		stock = stock_by_item.get(row.name) or {}
+		row.update({"warehouse": context.warehouse, "actual_qty": flt(stock.get("actual_qty")), "available_qty": flt(stock.get("actual_qty")) - flt(stock.get("reserved_qty")), "price_list": price_list, "rate": rate_by_item.get(row.name, 0)})
 	return {"items": rows, "price_list": price_list, "warehouse": context.warehouse, "currency": context.currency}
 
 
