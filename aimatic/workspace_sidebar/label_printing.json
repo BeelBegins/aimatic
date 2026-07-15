@@ -1,0 +1,53 @@
+{
+ "app": "aimatic",
+ "creation": "2026-07-16 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "header_icon": "tag",
+ "idx": 0,
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "home",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Home",
+   "link_to": "Label Printing",
+   "link_type": "Workspace",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "printer",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Label Print Job",
+   "link_to": "AIM Label Print Job",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "tag",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Label Template",
+   "link_to": "AIM Label Template",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-07-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Label Printing",
+ "name": "Label Printing",
+ "owner": "Administrator",
+ "standard": 1,
+ "title": "Label Printing"
+}

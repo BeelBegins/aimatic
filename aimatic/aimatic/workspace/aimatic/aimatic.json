@@ -1,0 +1,338 @@
+{
+ "app": "aimatic",
+ "charts": [],
+ "content": "[{\"id\": \"aimHeader1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Aimatic</b></span>\", \"col\": 12}}, {\"id\": \"aimShortcut1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Vendor Performance\", \"col\": 4}}, {\"id\": \"aimShortcut2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Label Printing\", \"col\": 4}}, {\"id\": \"aimShortcut3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimSpacer1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"aimHeader2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Modules</b></span>\", \"col\": 12}}, {\"id\": \"aimCard1\", \"type\": \"card\", \"data\": {\"card_name\": \"POS & Devices\", \"col\": 4}}, {\"id\": \"aimCard2\", \"type\": \"card\", \"data\": {\"card_name\": \"Loyalty & Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimCard3\", \"type\": \"card\", \"data\": {\"card_name\": \"FBR / Tax\", \"col\": 4}}, {\"id\": \"aimCard4\", \"type\": \"card\", \"data\": {\"card_name\": \"Pricing\", \"col\": 4}}, {\"id\": \"aimCard5\", \"type\": \"card\", \"data\": {\"card_name\": \"Restaurant\", \"col\": 4}}, {\"id\": \"aimCard6\", \"type\": \"card\", \"data\": {\"card_name\": \"Shopping\", \"col\": 4}}, {\"id\": \"aimCard7\", \"type\": \"card\", \"data\": {\"card_name\": \"Mobile Sales\", \"col\": 4}}]",
+ "creation": "2026-07-16 00:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "store",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Aimatic",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS & Devices",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Device",
+   "link_count": 0,
+   "link_to": "POS Device",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Device Enrollment",
+   "link_count": 0,
+   "link_to": "POS Device Enrollment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Device Audit Log",
+   "link_count": 0,
+   "link_to": "POS Device Audit Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Cashier Login Log",
+   "link_count": 0,
+   "link_to": "POS Cashier Login Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Admin Authorization",
+   "link_count": 0,
+   "link_to": "POS Admin Authorization",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Admin Audit Log",
+   "link_count": 0,
+   "link_to": "POS Admin Audit Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Loyalty & Gift Vouchers",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Gift Voucher",
+   "link_count": 0,
+   "link_to": "Gift Voucher",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Gift Voucher Criteria",
+   "link_count": 0,
+   "link_to": "Gift Voucher Criteria",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "FBR / Tax",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "FBR Integration Settings",
+   "link_count": 0,
+   "link_to": "FBR Integration Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "FBR Tax Category",
+   "link_count": 0,
+   "link_to": "FBR Tax Category",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Tax Formula",
+   "link_count": 0,
+   "link_to": "Tax Formula",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Pricing",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item Price Update Log",
+   "link_count": 0,
+   "link_to": "Item Price Update Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant Profile",
+   "link_count": 0,
+   "link_to": "Restaurant Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant Floor",
+   "link_count": 0,
+   "link_to": "Restaurant Floor",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant Table",
+   "link_count": 0,
+   "link_to": "Restaurant Table",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant Menu Item",
+   "link_count": 0,
+   "link_to": "Restaurant Menu Item",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant Modifier Group",
+   "link_count": 0,
+   "link_to": "Restaurant Modifier Group",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant Order",
+   "link_count": 0,
+   "link_to": "Restaurant Order",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Restaurant Kitchen Ticket",
+   "link_count": 0,
+   "link_to": "Restaurant Kitchen Ticket",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shopping",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shopping Settings",
+   "link_count": 0,
+   "link_to": "Shopping Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shopping Product",
+   "link_count": 0,
+   "link_to": "Shopping Product",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Shopping Order Request",
+   "link_count": 0,
+   "link_to": "Shopping Order Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Mobile Sales",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Mobile Sales Order Request",
+   "link_count": 0,
+   "link_to": "Mobile Sales Order Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-07-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Aimatic",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [],
+ "sequence_id": 90.0,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "label": "Vendor Performance",
+   "type": "URL",
+   "url": "/app/vendor-performance"
+  },
+  {
+   "color": "Grey",
+   "label": "Label Printing",
+   "type": "URL",
+   "url": "/app/label-printing"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "Gift Vouchers",
+   "link_to": "Gift Voucher",
+   "type": "DocType"
+  }
+ ],
+ "title": "Aimatic",
+ "type": "Workspace"
+}
