@@ -69,7 +69,7 @@ def _default_company(branch_doc=None, warehouse_doc=None, fallback_branch_doc=No
 	frappe.throw(_("Select a default Company or Warehouse in ERPNext"))
 
 
-def _default_warehouse(company, branch=None, requested=None):
+def _default_warehouse(company, branch=None, requested=None, required=True):
 	if requested:
 		return _warehouse_doc(requested, company, required=True).name
 
@@ -96,10 +96,12 @@ def _default_warehouse(company, branch=None, requested=None):
 	)
 	if len(warehouses) == 1:
 		return warehouses[0]
-	frappe.throw(_("Select a Warehouse. No unambiguous ERPNext default is available for Company {0}").format(company))
+	if required:
+		frappe.throw(_("Select a Warehouse for Company {0}").format(company))
+	return None
 
 
-def _sales_context(branch=None, warehouse=None):
+def _sales_context(branch=None, warehouse=None, require_warehouse=True):
 	requested_branch = branch
 	branch = _permitted_branch(branch)
 	branch_doc = frappe.get_cached_doc("Branch", branch) if branch else None
@@ -108,7 +110,7 @@ def _sales_context(branch=None, warehouse=None):
 	if branch_doc and branch_doc.company != company:
 		branch = None
 		branch_doc = None
-	warehouse = _default_warehouse(company, branch, warehouse)
+	warehouse = _default_warehouse(company, branch, warehouse, require_warehouse)
 	price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list") or (
 		branch_doc.get("default_selling_price_list") if branch_doc else None
 	)
@@ -247,7 +249,9 @@ def get_public_config():
 @frappe.whitelist()
 def get_context(branch=None, warehouse=None):
 	user = _require_sales_user()
-	context = _sales_context(branch, warehouse)
+	# Initial login must return the available choices even when ERPNext has
+	# several warehouses and no default. Transaction endpoints stay strict.
+	context = _sales_context(branch, warehouse, require_warehouse=False)
 	default_branch = get_user_default_branch()
 	branches = frappe.get_list("Branch", fields=["name", "company"], order_by="name", limit_page_length=500) if user_can_override() else (
 		[{"name": default_branch, "company": frappe.db.get_value("Branch", default_branch, "company")}] if default_branch else []
