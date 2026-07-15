@@ -25,3 +25,4 @@ aimatic.patches.rename_purchase_stock_debit_note_layouts
 aimatic.patches.remove_demo_doctype
 aimatic.patches.create_pos_profile_terminal_id_field
 aimatic.patches.create_pos_oauth_client
+aimatic.patches.create_sales_oauth_client

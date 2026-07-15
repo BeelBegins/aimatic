@@ -58,6 +58,15 @@ Every sale and refund is recorded against the correct branch and warehouse autom
 Stock and accounting only update once a cashier's shift is formally closed out at day's end —
 not the instant a sale happens — this is expected behavior, not a delay or a bug.
 
+### Mobile sales ordering
+
+Sales representatives use the separate Ai Matic Sales Android build. It signs each employee in
+through OAuth2 PKCE without an API key or secret, restricts ordinary users to their assigned
+Branch, shows ERPNext customer balance/credit, customer pricing, and branch-warehouse stock,
+and creates normal draft Sales Orders. Offline drafts retain one stable request ID; the server
+maps that ID to a single Sales Order so retries cannot create duplicates. Prices, taxes, stock
+policy, credit validation, permissions, company, and warehouse remain controlled by ERPNext.
+
 ### Purchasing and receiving stock
 
 When a delivery arrives from a supplier, it's recorded as a Purchase Receipt (and later billed
