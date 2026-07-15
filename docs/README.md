@@ -212,6 +212,8 @@ Company and POS Profile, then add floors, tables, Restaurant Menu Items and any 
 The mapped POS Profile supplies the default customer, warehouse and selling Price List unless
 the Restaurant Profile explicitly overrides them. ERPNext stock, prices and the submitted POS
 Invoice remain authoritative; Restaurant Orders and Kitchen Tickets do not post accounting entries.
+See [`docs/restaurant.md`](restaurant.md) for the full setup order, role model, DocType map,
+API contract, troubleshooting guidance and deferred integration scope.
 
 For the exact technical steps (custom fields, patches, nginx/HTTPS configuration, etc.), see
 `CLAUDE.md`.
