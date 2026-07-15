@@ -55,7 +55,7 @@ html, body {
 /* ═══════════════  RECEIPT WRAPPER  ═══════════════ */
 .pos-receipt {
   font-family: 'Courier New', Courier, monospace;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: #000;
   background: #fff;
   width: 80mm;
@@ -78,24 +78,26 @@ html, body {
 }
 .rc-company {
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
   line-height: 1.2;
 }
 .rc-branch {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   margin-top: 1px;
 }
 .rc-addr {
-  font-size: 9.5px;
+  font-size: 10.5px;
+  font-weight: 500;
   line-height: 1.5;
-  color: #333;
+  color: #000;
   margin-top: 2px;
 }
 .rc-ntn {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   margin-top: 2px;
 }
@@ -104,7 +106,7 @@ html, body {
 .rc-title {
   text-align: center;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -116,7 +118,7 @@ html, body {
 
 /* ── meta rows ── */
 .rc-meta {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.55;
   margin-bottom: 1px;
 }
@@ -125,7 +127,7 @@ html, body {
   justify-content: space-between;
 }
 .rc-meta-row span { white-space: nowrap; }
-.rc-meta-lbl { color: #444; }
+.rc-meta-lbl { color: #000; font-weight: 700; }
 
 /* ── status stamps ── */
 .rc-stamp-cancel {
@@ -139,19 +141,19 @@ html, body {
 }
 .rc-stamp-draft {
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 2px;
   border: 2px dashed #555;
   padding: 2px 0;
   margin: 4px 0;
-  color: #555;
+  color: #000;
 }
 
 /* ═══════════════  ITEMS  ═══════════════ */
 .rc-col-hdr {
   display: flex;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   background: #eee;
@@ -167,7 +169,7 @@ html, body {
   border-bottom: 1px dotted #bbb;
 }
 .rc-item-name {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 800;
   line-height: 1.35;
   overflow: hidden;
@@ -177,24 +179,24 @@ html, body {
   word-break: break-word;
 }
 .rc-item-code {
-  font-size: 9.5px;
-  color: #222;
+  font-size: 10.5px;
+  color: #000;
   font-weight: 700;
   margin-top: 1px;
 }
 .rc-item-nums {
   display: flex;
-  font-size: 11px;
+  font-size: 11.5px;
   color: #000;
   font-weight: 700;
   margin-top: 2px;
 }
-.rc-item-nums .c-desc { flex: 1; min-width: 0; color: #111; font-size: 10px; }
+.rc-item-nums .c-desc { flex: 1; min-width: 0; color: #000; font-size: 10.5px; }
 .rc-item-nums .c-num  { width: 72px; text-align: right; flex-shrink: 0; }
 
 .rc-item-disc {
-  font-size: 9.5px;
-  color: #111;
+  font-size: 10.5px;
+  color: #000;
   font-weight: 700;
   padding: 0 2px 0 6px;
 }
@@ -205,11 +207,12 @@ html, body {
   display: flex;
   justify-content: space-between;
   padding: 1.5px 2px;
-  font-size: 10.5px;
+  font-size: 11.5px;
+  font-weight: 600;
 }
-.rc-tot-row.sub { font-size: 10.5px; color: #000; font-weight: 700; }
-.rc-tot-row.tax-total { font-size: 11px; color: #000; font-weight: 800; }
-.rc-tot-row.disc { font-size: 10.5px; color: #111; font-weight: 700; }
+.rc-tot-row.sub { font-size: 11.5px; color: #000; font-weight: 700; }
+.rc-tot-row.tax-total { font-size: 12px; color: #000; font-weight: 800; }
+.rc-tot-row.disc { font-size: 11.5px; color: #000; font-weight: 700; }
 .rc-tot-row.grand {
   font-weight: 700;
   font-size: 13px;
@@ -223,11 +226,11 @@ html, body {
   border: 1px solid #999;
   padding: 4px 5px;
   margin-top: 4px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .rc-pay-title {
   font-weight: 700;
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 2px;
@@ -236,17 +239,18 @@ html, body {
   display: flex;
   justify-content: space-between;
   padding: 1px 0;
+  font-weight: 600;
 }
 .rc-pay-row.total {
   font-weight: 700;
   border-top: 1px dashed #999;
   margin-top: 2px;
   padding-top: 2px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .rc-pay-row.change {
   font-weight: 700;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* ── in-words ── */
@@ -254,15 +258,18 @@ html, body {
   background: #f3f3f3;
   border: 1px dashed #aaa;
   padding: 4px 5px;
-  font-size: 9.5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #000;
   line-height: 1.5;
   margin-top: 4px;
   text-transform: uppercase;
   letter-spacing: 0.2px;
 }
 .rc-words-lbl {
-  font-size: 8.5px;
-  color: #666;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #000;
   text-transform: uppercase;
   margin-bottom: 1px;
 }
@@ -287,11 +294,11 @@ html, body {
   border: 1px solid #999;
   padding: 4px 5px;
   margin-top: 5px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .rc-loyalty-title {
   font-weight: 700;
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 2px;
@@ -309,12 +316,12 @@ html, body {
   border: 1px solid #000;
   padding: 5px 5px;
   margin-top: 5px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .rc-gv-title {
   text-align: center;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -345,7 +352,7 @@ html, body {
 }
 .rc-gv-note {
   text-align: center;
-  font-size: 8.5px;
+  font-size: 9.5px;
   color: #000;
   margin-top: 2px;
   line-height: 1.4;
@@ -356,12 +363,12 @@ html, body {
   border: 1px solid #888;
   padding: 5px 5px;
   margin-top: 5px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .rc-fbr-title {
   text-align: center;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -373,14 +380,14 @@ html, body {
   display: flex;
   justify-content: space-between;
   padding: 1px 0;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: #000;
   font-weight: 700;
 }
 .rc-fbr-inv {
   text-align: center;
   margin: 4px 0;
-  font-size: 9px;
+  font-size: 10px;
   word-break: break-all;
 }
 .rc-fbr-inv b {
@@ -421,20 +428,20 @@ html, body {
   border-top: 1px dashed #888;
   padding-top: 5px;
   line-height: 1.7;
-  font-size: 10.5px;
+  font-size: 11px;
   color: #000;
   font-weight: 600;
 }
 .rc-footer .rc-thankyou {
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: #000;
 }
 .rc-footer .rc-stars {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   margin-top: 3px;
 }
