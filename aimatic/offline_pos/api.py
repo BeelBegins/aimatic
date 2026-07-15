@@ -12,7 +12,7 @@ from aimatic.pos_shared import returned_qty_by_row
 from aimatic.aimatic.offline_pos.device_auth import hash_device_token, validate_device_proof
 
 _MAX_PAGE_SIZE = 1000
-_ALLOWED_POS_ADMIN_ACTIONS = {"setup_pin", "reset_pin", "change_credentials"}
+_ALLOWED_POS_ADMIN_ACTIONS = {"setup_pin", "reset_pin", "change_credentials", "close_shift", "void_item"}
 _ALLOWED_POS_ADMIN_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_REFUND_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_CLOSE_SHIFT_ROLES = {"POS Supervisor", "System Manager"}
@@ -239,7 +239,7 @@ def _require_https_for_pos_admin_authorization():
 
 
 @frappe.whitelist(allow_guest=True)
-@rate_limit(key="username", limit=5, seconds=5 * 60)
+@rate_limit(key="username", limit=5, seconds=30)
 def provision_terminal_credentials(username, password):
     """First-run Electron setup: exchange an ERPNext username+password for that
     user's terminal api_key/api_secret, so the desktop app never requires
@@ -358,13 +358,17 @@ def authorize_pos_admin_action(username, password, action, terminal_id):
     }
 
 
-@frappe.whitelist()
-def consume_pos_admin_authorization(token, action, terminal_id):
-    _require_login()
-    _require_https_for_pos_admin_authorization()
+def _consume_pos_admin_authorization_token(token, action, terminal_id):
+    """Validate, single-use-consume, and audit a POS Admin Authorization
+    token. Shared by the whitelisted consume_pos_admin_authorization (called
+    directly by Electron for actions with no server document of their own,
+    e.g. void_item) and by close_pos_session (called in-process, in the same
+    DB transaction as the close itself, so a token is never burned if the
+    close subsequently fails/rolls back for an unrelated reason).
 
-    _validate_pos_admin_action_args(action, terminal_id)
-
+    Returns the consumed POS Admin Authorization doc. Raises
+    frappe.PermissionError/ValidationError on any failure, auditing each one.
+    """
     if not token:
         frappe.throw(_("Supervisor authorization token is required"))
 
@@ -400,6 +404,18 @@ def consume_pos_admin_authorization(token, action, terminal_id):
     auth.used = 1
     auth.save(ignore_permissions=True)
     _audit_pos_admin_action(auth.user, action, terminal_id, "token_consumed")
+
+    return auth
+
+
+@frappe.whitelist()
+def consume_pos_admin_authorization(token, action, terminal_id):
+    _require_login()
+    _require_https_for_pos_admin_authorization()
+
+    _validate_pos_admin_action_args(action, terminal_id)
+
+    _consume_pos_admin_authorization_token(token, action, terminal_id)
 
     return {"success": True}
 
@@ -756,6 +772,10 @@ def pos_cashier_login(username, password, terminal_id, pos_profile):
     can_offline_sale = True  # gated on _ALLOWED_CASHIER_ROLES above
     can_refund = bool(roles.intersection(_ALLOWED_REFUND_ROLES))
     can_close_shift = bool(roles.intersection(_ALLOWED_CLOSE_SHIFT_ROLES))
+    # Whether this session can void a cart line without a supervisor
+    # step-up prompt - same role set authorize_pos_admin_action itself
+    # requires, so a supervisor never has to authorize themselves.
+    can_void_items = bool(roles.intersection(_ALLOWED_POS_ADMIN_ROLES))
 
     offline_expires_at = add_to_date(now_datetime(), days=_CASHIER_OFFLINE_LOGIN_VALID_DAYS)
 
@@ -771,6 +791,7 @@ def pos_cashier_login(username, password, terminal_id, pos_profile):
         "can_start_shift": can_start_shift,
         "can_refund": can_refund,
         "can_close_shift": can_close_shift,
+        "can_void_items": can_void_items,
         "can_offline_sale": can_offline_sale,
         "offline_login_expires_at": offline_expires_at.isoformat(),
         "require_pin_setup": True,
@@ -809,6 +830,7 @@ def get_cashier_context(pos_profile, hardware_id):
 
     can_refund = bool(roles.intersection(_ALLOWED_REFUND_ROLES))
     can_close_shift = bool(roles.intersection(_ALLOWED_CLOSE_SHIFT_ROLES))
+    can_void_items = bool(roles.intersection(_ALLOWED_POS_ADMIN_ROLES))
     offline_expires_at = add_to_date(now_datetime(), days=_CASHIER_OFFLINE_LOGIN_VALID_DAYS)
 
     _audit_cashier_login(user, hardware_id, pos.name, "success", offline_expires_at)
@@ -823,6 +845,7 @@ def get_cashier_context(pos_profile, hardware_id):
         "can_start_shift": True,
         "can_refund": can_refund,
         "can_close_shift": can_close_shift,
+        "can_void_items": can_void_items,
         "can_offline_sale": True,
         "offline_login_expires_at": offline_expires_at.isoformat(),
         "require_pin_setup": True,
@@ -1756,15 +1779,24 @@ def get_active_pos_session(pos_profile, cashier_user):
 
 
 @frappe.whitelist()
-def close_pos_session(opening_entry, cashier_user, closing_balances, notes=None):
+def close_pos_session(opening_entry, cashier_user, closing_balances, notes=None, supervisor_token=None):
     """Create and submit a POS Closing Entry for a specific cashier's shift.
 
     The authenticated caller is the terminal's own fixed API identity.
-    cashier_user must match the Opening Entry's owning cashier and must hold
-    a close-shift role (POS Supervisor or System Manager) — a plain POS User
-    can start a shift (see start_pos_session) but cannot close one here. This
-    never closes a different cashier's shift, even one open on the same
+    cashier_user must match the Opening Entry's owning cashier. This never
+    closes a different cashier's shift, even one open on the same
     terminal/POS Profile.
+
+    cashier_user must hold a close-shift role (POS Supervisor or System
+    Manager) OR supply a valid, unused, unexpired supervisor_token minted for
+    this POS Profile's terminal via authorize_pos_admin_action(action=
+    "close_shift") — a plain POS User can start a shift (see
+    start_pos_session) but cannot close one alone; a supervisor must
+    authorize it (their own credentials, not the cashier's), without the
+    cashier having to log out. The token is consumed here, in the same DB
+    transaction as the close itself, so a token is never burned if the close
+    subsequently fails/rolls back for an unrelated reason (e.g. a
+    misconfigured account elsewhere in the chain).
 
     The client supplies only its counted amount for each payment mode.  Invoice
     totals, expected amounts, and the opening balance are always derived from
@@ -1795,7 +1827,24 @@ def close_pos_session(opening_entry, cashier_user, closing_balances, notes=None)
         )
 
     pos = _get_pos_profile_or_throw(opening.pos_profile)
-    _validate_cashier_identity(cashier_user, pos, required_roles=_ALLOWED_CLOSE_SHIFT_ROLES)
+    cashier_roles = _validate_cashier_identity(cashier_user, pos, required_roles=_ALLOWED_CASHIER_ROLES)
+
+    if not cashier_roles.intersection(_ALLOWED_CLOSE_SHIFT_ROLES):
+        terminal_id = pos.get("custom_terminal_id")
+        if not terminal_id:
+            frappe.throw(
+                _("POS Profile {0} has no Terminal ID assigned - supervisor authorization cannot be verified.").format(
+                    pos.name
+                )
+            )
+        if not supervisor_token:
+            frappe.throw(
+                _("Supervisor authorization is required to close this shift."), frappe.PermissionError
+            )
+        # Same HTTPS requirement authorize_pos_admin_action enforces when minting
+        # the token - consuming it over plain HTTP would defeat that protection.
+        _require_https_for_pos_admin_authorization()
+        _consume_pos_admin_authorization_token(supervisor_token, action="close_shift", terminal_id=terminal_id)
 
     if opening.company != pos.company:
         frappe.throw(

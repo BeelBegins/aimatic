@@ -244,6 +244,10 @@ def _make_restricted_pos_profile(restrict_to_user):
         "write_off_limit": ref.write_off_limit,
         "cost_center": ref.cost_center,
         "branch": ref.get("branch"),  # mandatory accounting dimension on this site
+        # Deterministic, not copied from ref - close_pos_session's supervisor-token
+        # path (and authorize_pos_admin_action/consume_pos_admin_authorization)
+        # binds a token to this exact value, so tests need a real one.
+        "custom_terminal_id": "TEST-TERM-1",
     })
     for d in ref.get("payments") or []:
         pos.append("payments", {"mode_of_payment": d.mode_of_payment, "default": d.default or 0})
@@ -1168,6 +1172,158 @@ def _make_cashier(roles=("POS User",), enabled=1, password="Cashier@12345"):
     return email, password
 
 
+def _https_request():
+    """Context manager satisfying _require_https_for_pos_admin_authorization -
+    there is no real HTTP request in a console/test context, so
+    frappe.local.request is normally absent (_is_https_request returns False).
+    Patches only the .request attribute on the real frappe.local (not the
+    whole object - frappe.local is a shared thread-local proxy other Frappe
+    internals rely on for .site/.controllers/etc mid-call, e.g. frappe.get_doc
+    inside close_pos_session; replacing it wholesale breaks those unrelated to
+    the HTTPS check this is actually testing)."""
+    return patch.object(
+        frappe.local,
+        "request",
+        SimpleNamespace(scheme="https", headers={}),
+        create=True,
+    )
+
+
+class TestPosAdminAuthorization(_AimTestCase):
+    """authorize_pos_admin_action / consume_pos_admin_authorization - the
+    supervisor step-up primitive shared by close_shift (offline_pos/api.py's
+    close_pos_session) and void_item (Electron client only, no server
+    document of its own)."""
+
+    def test_authorize_success(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request():
+            result = authorize_pos_admin_action(supervisor, password, "void_item", "TEST-TERM-1")
+
+        self.assertIn("token", result)
+        self.assertTrue(result["token"])
+        self.assertIn("expires_at", result)
+        auth = frappe.get_all(
+            "POS Admin Authorization",
+            filters={"user": supervisor, "action": "void_item", "terminal_id": "TEST-TERM-1"},
+            fields=["used"],
+        )
+        self.assertEqual(len(auth), 1)
+        self.assertEqual(auth[0].used, 0)
+        log = frappe.get_all(
+            "POS Admin Audit Log",
+            filters={"user": supervisor, "action": "void_item", "status": "success"},
+        )
+        self.assertEqual(len(log), 1)
+
+    def test_authorize_wrong_password(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action
+
+        supervisor, _password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request(), self.assertRaises(frappe.AuthenticationError):
+            authorize_pos_admin_action(supervisor, "definitely-wrong", "void_item", "TEST-TERM-1")
+
+    def test_authorize_disabled_user(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",), enabled=0)
+        with _https_request(), self.assertRaises(frappe.AuthenticationError):
+            authorize_pos_admin_action(supervisor, password, "void_item", "TEST-TERM-1")
+
+    def test_authorize_missing_role(self):
+        """A plain POS User cannot authorize - only POS Supervisor/System Manager can."""
+        from aimatic.offline_pos.api import authorize_pos_admin_action
+
+        cashier, password = _make_cashier(roles=("POS User",))
+        with _https_request(), self.assertRaises(FrappePermissionError):
+            authorize_pos_admin_action(cashier, password, "void_item", "TEST-TERM-1")
+
+    def test_authorize_invalid_action(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request(), self.assertRaises(frappe.ValidationError):
+            authorize_pos_admin_action(supervisor, password, "not_a_real_action", "TEST-TERM-1")
+
+    def test_authorize_requires_https(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with self.assertRaises(frappe.ValidationError):
+            authorize_pos_admin_action(supervisor, password, "void_item", "TEST-TERM-1")
+
+    def test_consume_success(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action, consume_pos_admin_authorization
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request():
+            minted = authorize_pos_admin_action(supervisor, password, "void_item", "TEST-TERM-1")
+            result = consume_pos_admin_authorization(minted["token"], "void_item", "TEST-TERM-1")
+
+        self.assertTrue(result["success"])
+        used = frappe.get_all(
+            "POS Admin Authorization",
+            filters={"user": supervisor, "action": "void_item", "terminal_id": "TEST-TERM-1"},
+            fields=["used"],
+        )[0]
+        self.assertEqual(used.used, 1)
+
+    def test_consume_invalid_token(self):
+        from aimatic.offline_pos.api import consume_pos_admin_authorization
+
+        with _https_request(), self.assertRaises(FrappePermissionError):
+            consume_pos_admin_authorization("not-a-real-token", "void_item", "TEST-TERM-1")
+
+    def test_consume_wrong_action_blocked(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action, consume_pos_admin_authorization
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request():
+            minted = authorize_pos_admin_action(supervisor, password, "void_item", "TEST-TERM-1")
+            with self.assertRaises(FrappePermissionError):
+                consume_pos_admin_authorization(minted["token"], "close_shift", "TEST-TERM-1")
+
+    def test_consume_wrong_terminal_blocked(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action, consume_pos_admin_authorization
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request():
+            minted = authorize_pos_admin_action(supervisor, password, "void_item", "TEST-TERM-1")
+            with self.assertRaises(FrappePermissionError):
+                consume_pos_admin_authorization(minted["token"], "void_item", "OTHER-TERMINAL")
+
+    def test_consume_reused_token_blocked(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action, consume_pos_admin_authorization
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request():
+            minted = authorize_pos_admin_action(supervisor, password, "void_item", "TEST-TERM-1")
+            consume_pos_admin_authorization(minted["token"], "void_item", "TEST-TERM-1")
+            with self.assertRaises(FrappePermissionError):
+                consume_pos_admin_authorization(minted["token"], "void_item", "TEST-TERM-1")
+
+    def test_consume_expired_token_blocked(self):
+        from frappe.utils import add_to_date, now_datetime
+
+        from aimatic.offline_pos.api import authorize_pos_admin_action, consume_pos_admin_authorization
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request():
+            minted = authorize_pos_admin_action(supervisor, password, "void_item", "TEST-TERM-1")
+            auth_name = frappe.db.get_value(
+                "POS Admin Authorization",
+                {"user": supervisor, "action": "void_item", "terminal_id": "TEST-TERM-1"},
+                "name",
+            )
+            frappe.db.set_value(
+                "POS Admin Authorization", auth_name, "expires_at", add_to_date(now_datetime(), minutes=-1)
+            )
+            with self.assertRaises(FrappePermissionError):
+                consume_pos_admin_authorization(minted["token"], "void_item", "TEST-TERM-1")
+
+
 class TestPosCashierLogin(_AimTestCase):
     """pos_cashier_login: credential/role/profile checks, no session created."""
 
@@ -1359,6 +1515,97 @@ class TestClosePosSessionCashier(_AimTestCase):
 
         with self.assertRaises(FrappePermissionError):
             close_pos_session(opening.name, other_supervisor, [])
+
+        self.assertEqual(
+            frappe.db.get_value("POS Opening Entry", opening.name, "status"), "Open"
+        )
+
+    @_require_fixtures
+    def test_close_shift_pos_user_with_valid_supervisor_token_allowed(self):
+        """The core new behavior: a plain POS User's own shift closes once a
+        separate supervisor has authorized it - the cashier never needs to
+        hold the close-shift role themselves."""
+        from aimatic.offline_pos.api import authorize_pos_admin_action, close_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        supervisor, supervisor_password = _make_cashier(roles=("POS Supervisor",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        with _https_request():
+            minted = authorize_pos_admin_action(
+                supervisor, supervisor_password, "close_shift", "TEST-TERM-1"
+            )
+            result = close_pos_session(opening.name, cashier, [], supervisor_token=minted["token"])
+
+        self.assertEqual(result["status"], "Closed")
+        self.assertEqual(result["cashier_user"], cashier)
+        self.assertEqual(
+            frappe.db.get_value("POS Opening Entry", opening.name, "status"), "Closed"
+        )
+        # Token is single-use - the same shift/token pair can't be replayed.
+        used = frappe.db.get_value(
+            "POS Admin Authorization",
+            {"user": supervisor, "action": "close_shift", "terminal_id": "TEST-TERM-1"},
+            "used",
+        )
+        self.assertEqual(used, 1)
+
+    @_require_fixtures
+    def test_close_shift_pos_user_invalid_token_blocked(self):
+        from aimatic.offline_pos.api import close_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        with _https_request(), self.assertRaises(FrappePermissionError):
+            close_pos_session(opening.name, cashier, [], supervisor_token="not-a-real-token")
+
+        self.assertEqual(
+            frappe.db.get_value("POS Opening Entry", opening.name, "status"), "Open"
+        )
+
+    @_require_fixtures
+    def test_close_shift_pos_user_reused_token_blocked(self):
+        """A token already spent on one close (or any other consumption)
+        cannot be replayed to close a second shift."""
+        from aimatic.offline_pos.api import authorize_pos_admin_action, close_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        supervisor, supervisor_password = _make_cashier(roles=("POS Supervisor",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        with _https_request():
+            minted = authorize_pos_admin_action(
+                supervisor, supervisor_password, "close_shift", "TEST-TERM-1"
+            )
+            close_pos_session(opening.name, cashier, [], supervisor_token=minted["token"])
+
+            opening2 = _create_opening_entry(profile, user=cashier)
+            with self.assertRaises(FrappePermissionError):
+                close_pos_session(opening2.name, cashier, [], supervisor_token=minted["token"])
+
+    @_require_fixtures
+    def test_close_shift_pos_user_wrong_terminal_token_blocked(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action, close_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        supervisor, supervisor_password = _make_cashier(roles=("POS Supervisor",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        with _https_request():
+            minted = authorize_pos_admin_action(
+                supervisor, supervisor_password, "close_shift", "OTHER-TERMINAL"
+            )
+            with self.assertRaises(FrappePermissionError):
+                close_pos_session(opening.name, cashier, [], supervisor_token=minted["token"])
 
         self.assertEqual(
             frappe.db.get_value("POS Opening Entry", opening.name, "status"), "Open"
