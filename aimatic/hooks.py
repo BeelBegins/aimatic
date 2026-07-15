@@ -77,6 +77,13 @@ doc_events = {
     "Branch": {
         "validate": "aimatic.branch_management.events.validate_branch_company_consistency",
     },
+    # POS Invoice is excluded from apply_branch_defaults (built server-side from
+    # POS Profile already) - this is the one remaining check that a POS Profile
+    # isn't pointed at a group Cost Center, which ERPNext would otherwise only
+    # reject much later, at shift-close GL-entry time.
+    "POS Profile": {
+        "validate": "aimatic.branch_management.events.validate_pos_profile_cost_center",
+    },
     # Tax ID/NTN is the entry field. Supplier save no longer validates or
     # reformats tax_id; tax_ntn remains a read-only mirror of the entered value.
     # FBR NTN verification is an explicit button action on the Supplier form,
@@ -169,6 +176,17 @@ fixtures = [
     {"doctype": "Tax Formula"},
     # Reference GST categories for FBR e-invoicing - configuration, no secrets.
     {"doctype": "FBR Tax Category"},
+    # Custom DocPerm: ERPNext's own default DocPerm for POS Opening Entry/POS
+    # Closing Entry only grants System Manager/Sales Manager/Administrator -
+    # POS User and POS Supervisor have zero permission on either doctype out
+    # of the box, even though offline_pos/api.py's own role model
+    # (_ALLOWED_CASHIER_ROLES/_ALLOWED_CLOSE_SHIFT_ROLES) clearly intends POS
+    # User to start shifts and POS Supervisor to close them. Discovered
+    # 2026-07-15 testing a real cashier account: frappe.has_permission
+    # returned False on all four create/submit checks despite the correct
+    # roles being assigned. Custom DocPerm rows here grant exactly that,
+    # without touching erpnext's own doctype JSON.
+    {"doctype": "Custom DocPerm", "filters": [["parent", "in", ["POS Opening Entry", "POS Closing Entry"]]]},
     # NOTE: FBR Integration Settings is deliberately NOT a fixture - it holds
     # a security_token (Password) plus real sandbox/production URLs per
     # company+branch. Only its schema is git-tracked (doctype file below);

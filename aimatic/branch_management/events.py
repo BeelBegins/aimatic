@@ -208,6 +208,35 @@ def validate_branch_company_consistency(doc, method=None):
 			)
 
 
+def validate_pos_profile_cost_center(doc, method=None):
+	"""
+	A POS Profile's cost_center is used directly for every invoice built from
+	it - POS Invoice is excluded from apply_branch_defaults above (see its
+	docstring), so this is the one place left that can catch a misconfigured
+	POS Profile. A group Cost Center is pickable in the dropdown like any
+	other, but ERPNext rejects it at GL-entry time - for a POS Profile that
+	only surfaces when a shift is closed and its invoices are consolidated
+	into a Sales Invoice, by which point it's buried under POS Closing
+	Entry's own failure-handling (a real incident: HSM-002 was pointed at the
+	auto-created root Cost Center instead of a leaf one under it, and the
+	resulting error only appeared as an unrelated "Could not find Reference
+	Name" LinkValidationError from the rollback path, not the real Cost
+	Center error). Catching it here, at save time, is far cheaper.
+	"""
+
+	if not doc.cost_center:
+		return
+
+	if frappe.db.get_value("Cost Center", doc.cost_center, "is_group"):
+		frappe.throw(
+			_(
+				"Cost Center {0} is a group Cost Center and cannot be used for "
+				"transactions. Pick a specific (non-group) Cost Center for this "
+				"POS Profile."
+			).format(frappe.bold(doc.cost_center))
+		)
+
+
 def sync_branch_to_user(doc, method=None):
 	"""
 	Mirror a user's default Branch (assigned via User Permission, the actual
