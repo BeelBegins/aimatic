@@ -5,6 +5,7 @@ aimatic.patches.create_pos_supervisor_role
 aimatic.patches.create_pos_user_role
 aimatic.patches.create_label_printing_roles
 aimatic.patches.create_buying_price_control_role
+aimatic.patches.create_restaurant_roles
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
@@ -27,3 +28,4 @@ aimatic.patches.create_pos_profile_terminal_id_field
 aimatic.patches.create_pos_oauth_client
 aimatic.patches.create_sales_oauth_client
 aimatic.patches.create_shopping_oauth_client
+aimatic.patches.create_restaurant_oauth_client

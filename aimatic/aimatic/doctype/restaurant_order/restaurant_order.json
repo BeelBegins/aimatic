@@ -1,0 +1,37 @@
+{
+ "actions":[], "allow_rename":0, "autoname":"naming_series:", "creation":"2026-07-15 00:00:00.000000", "doctype":"DocType", "engine":"InnoDB", "module":"Aimatic", "name":"Restaurant Order", "naming_rule":"By \"Naming Series\" field", "track_changes":1,
+ "field_order":["naming_series","status","restaurant_profile","branch","company","floor","restaurant_table","waiter","guest_count","opened_at","section_sales","pos_profile","customer","warehouse","price_list","currency","pos_invoice","bill_requested_at","closed_at","section_items","items","section_totals","net_total","total_taxes_and_charges","grand_total"],
+ "fields":[
+  {"default":"REST-ORD-.YYYY.-.#####","fieldname":"naming_series","fieldtype":"Select","label":"Naming Series","options":"REST-ORD-.YYYY.-.#####","reqd":1},
+  {"default":"Open","fieldname":"status","fieldtype":"Select","label":"Status","options":"Open\nSent to Kitchen\nBill Requested\nClosed\nCancelled","reqd":1,"in_list_view":1},
+  {"fieldname":"restaurant_profile","fieldtype":"Link","label":"Restaurant Profile","options":"Restaurant Profile","reqd":1},
+  {"fieldname":"branch","fieldtype":"Link","label":"Branch","options":"Branch","reqd":1,"in_list_view":1},
+  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1},
+  {"fieldname":"floor","fieldtype":"Link","label":"Floor","options":"Restaurant Floor","reqd":1,"in_list_view":1},
+  {"fieldname":"restaurant_table","fieldtype":"Link","label":"Table","options":"Restaurant Table","reqd":1,"in_list_view":1},
+  {"fieldname":"waiter","fieldtype":"Link","label":"Waiter","options":"User","reqd":1,"in_list_view":1},
+  {"default":"1","fieldname":"guest_count","fieldtype":"Int","label":"Guest Count","reqd":1},
+  {"fieldname":"opened_at","fieldtype":"Datetime","label":"Opened At","read_only":1},
+  {"fieldname":"section_sales","fieldtype":"Section Break","label":"ERPNext Context"},
+  {"fieldname":"pos_profile","fieldtype":"Link","label":"POS Profile","options":"POS Profile","reqd":1,"read_only":1},
+  {"fieldname":"customer","fieldtype":"Link","label":"Customer","options":"Customer","read_only":1},
+  {"fieldname":"warehouse","fieldtype":"Link","label":"Warehouse","options":"Warehouse","reqd":1,"read_only":1},
+  {"fieldname":"price_list","fieldtype":"Link","label":"Price List","options":"Price List","reqd":1,"read_only":1},
+  {"fieldname":"currency","fieldtype":"Link","label":"Currency","options":"Currency","reqd":1,"read_only":1},
+  {"fieldname":"pos_invoice","fieldtype":"Link","label":"POS Invoice","options":"POS Invoice","read_only":1},
+  {"fieldname":"bill_requested_at","fieldtype":"Datetime","label":"Bill Requested At","read_only":1},
+  {"fieldname":"closed_at","fieldtype":"Datetime","label":"Closed At","read_only":1},
+  {"fieldname":"section_items","fieldtype":"Section Break","label":"Order Items"},
+  {"fieldname":"items","fieldtype":"Table","label":"Items","options":"Restaurant Order Item"},
+  {"fieldname":"section_totals","fieldtype":"Section Break","label":"Totals"},
+  {"default":"0","fieldname":"net_total","fieldtype":"Currency","label":"Net Total","read_only":1},
+  {"default":"0","fieldname":"total_taxes_and_charges","fieldtype":"Currency","label":"Taxes and Charges","read_only":1},
+  {"default":"0","fieldname":"grand_total","fieldtype":"Currency","label":"Grand Total","read_only":1}
+ ],
+ "permissions":[
+  {"role":"Restaurant Waiter","read":1,"report":1},
+  {"role":"Restaurant Manager","read":1,"report":1},
+  {"role":"Kitchen User","read":1},
+  {"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"report":1}
+ ], "sort_field":"modified", "sort_order":"DESC", "states":[]
+}

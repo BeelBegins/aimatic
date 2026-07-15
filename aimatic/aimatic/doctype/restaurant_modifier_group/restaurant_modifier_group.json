@@ -1,0 +1,14 @@
+{
+ "actions":[], "allow_rename":1, "autoname":"field:group_name", "creation":"2026-07-15 00:00:00.000000", "doctype":"DocType", "engine":"InnoDB", "module":"Aimatic", "name":"Restaurant Modifier Group",
+ "field_order":["group_name","required","allow_multiple","minimum_selections","maximum_selections","disabled","options"],
+ "fields":[
+  {"fieldname":"group_name","fieldtype":"Data","label":"Group Name","reqd":1,"unique":1,"in_list_view":1},
+  {"default":"0","fieldname":"required","fieldtype":"Check","label":"Required"},
+  {"default":"0","fieldname":"allow_multiple","fieldtype":"Check","label":"Allow Multiple"},
+  {"default":"0","fieldname":"minimum_selections","fieldtype":"Int","label":"Minimum Selections"},
+  {"default":"1","fieldname":"maximum_selections","fieldtype":"Int","label":"Maximum Selections"},
+  {"default":"0","fieldname":"disabled","fieldtype":"Check","label":"Disabled","in_list_view":1},
+  {"fieldname":"options","fieldtype":"Table","label":"Options","options":"Restaurant Modifier Option","reqd":1}
+ ],
+ "permissions":[{"role":"Restaurant Manager","read":1,"write":1,"create":1,"delete":1,"report":1},{"role":"Restaurant Waiter","read":1},{"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"report":1}], "sort_field":"group_name", "sort_order":"ASC", "states":[]
+}

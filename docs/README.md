@@ -185,6 +185,12 @@ and per-site scripts used for this.
   genuinely need it (e.g. inter-branch stock transfers).
 - **POS Supervisor** — can process refunds and close a shift on the POS terminal, in addition
   to normal cashier actions.
+- **Restaurant Waiter** — signs in to the separate Restaurant Android app, sees only permitted
+  Restaurant Profiles/tables, opens table orders, sends idempotent kitchen tickets, and requests bills.
+- **Kitchen User** — updates queued kitchen tickets through the restricted Restaurant service;
+  it does not grant general ERPNext Desk access.
+- **Restaurant Manager** — configures Restaurant Profiles, floors, tables, menu items/modifiers,
+  and can supervise restaurant orders and kitchen status.
 
 ## Setting up a new branch or site
 
@@ -200,6 +206,12 @@ At a high level, bringing a new branch or site online involves:
    `ipos_data_migration/` for that site.
 5. The first time a Purchase Receipt for that branch applies a branch price update, its own
    Selling Price List is created and populated automatically — no separate setup step needed.
+
+For Restaurant service, also create one enabled Restaurant Profile mapped to the Branch,
+Company and POS Profile, then add floors, tables, Restaurant Menu Items and any modifier groups.
+The mapped POS Profile supplies the default customer, warehouse and selling Price List unless
+the Restaurant Profile explicitly overrides them. ERPNext stock, prices and the submitted POS
+Invoice remain authoritative; Restaurant Orders and Kitchen Tickets do not post accounting entries.
 
 For the exact technical steps (custom fields, patches, nginx/HTTPS configuration, etc.), see
 `CLAUDE.md`.

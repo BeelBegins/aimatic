@@ -1,0 +1,19 @@
+{
+ "actions": [], "allow_rename": 1, "autoname": "field:profile_name", "creation": "2026-07-15 00:00:00.000000", "doctype": "DocType", "engine": "InnoDB", "module": "Aimatic", "name": "Restaurant Profile",
+ "field_order": ["profile_name", "enabled", "branch", "company", "pos_profile", "default_customer", "section_menu", "menu_price_list", "warehouse"],
+ "fields": [
+  {"fieldname":"profile_name","fieldtype":"Data","label":"Profile Name","reqd":1,"unique":1,"in_list_view":1},
+  {"default":"1","fieldname":"enabled","fieldtype":"Check","label":"Enabled","in_list_view":1},
+  {"fieldname":"branch","fieldtype":"Link","label":"Branch","options":"Branch","reqd":1,"in_list_view":1},
+  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1},
+  {"fieldname":"pos_profile","fieldtype":"Link","label":"POS Profile","options":"POS Profile","reqd":1,"unique":1,"in_list_view":1},
+  {"fieldname":"default_customer","fieldtype":"Link","label":"Default Customer","options":"Customer"},
+  {"fieldname":"section_menu","fieldtype":"Section Break","label":"Menu and Stock"},
+  {"fieldname":"menu_price_list","fieldtype":"Link","label":"Menu Price List","options":"Price List","description":"Falls back to the POS Profile selling price list."},
+  {"fieldname":"warehouse","fieldtype":"Link","label":"Warehouse","options":"Warehouse","description":"Falls back to the POS Profile warehouse."}
+ ],
+ "permissions": [
+  {"role":"Restaurant Manager","read":1,"write":1,"create":1,"delete":1,"report":1},
+  {"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"report":1}
+ ], "sort_field":"profile_name", "sort_order":"ASC", "states": []
+}

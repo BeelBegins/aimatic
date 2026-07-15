@@ -1,0 +1,12 @@
+{
+ "actions": [], "allow_rename": 1, "autoname":"naming_series:", "creation":"2026-07-15 00:00:00.000000", "doctype":"DocType", "engine":"InnoDB", "module":"Aimatic", "name":"Restaurant Floor", "naming_rule":"By \"Naming Series\" field",
+ "field_order":["naming_series","title","branch","display_order","disabled"],
+ "fields":[
+  {"default":"REST-FLR-.####","fieldname":"naming_series","fieldtype":"Select","label":"Naming Series","options":"REST-FLR-.####","reqd":1},
+  {"fieldname":"title","fieldtype":"Data","label":"Floor Title","reqd":1,"in_list_view":1},
+  {"fieldname":"branch","fieldtype":"Link","label":"Branch","options":"Branch","reqd":1,"in_list_view":1},
+  {"default":"0","fieldname":"display_order","fieldtype":"Int","label":"Display Order"},
+  {"default":"0","fieldname":"disabled","fieldtype":"Check","label":"Disabled","in_list_view":1}
+ ],
+ "permissions":[{"role":"Restaurant Manager","read":1,"write":1,"create":1,"delete":1,"report":1},{"role":"Restaurant Waiter","read":1},{"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"report":1}], "sort_field":"display_order", "sort_order":"ASC", "states":[]
+}

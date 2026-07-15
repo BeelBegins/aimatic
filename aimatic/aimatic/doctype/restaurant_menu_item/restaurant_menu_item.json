@@ -1,0 +1,20 @@
+{
+ "actions":[], "allow_rename":0, "autoname":"field:item", "creation":"2026-07-15 00:00:00.000000", "doctype":"DocType", "engine":"InnoDB", "module":"Aimatic", "name":"Restaurant Menu Item",
+ "field_order":["item","enabled","menu_name","description","image","category","kitchen_station","preparation_minutes","column_flags","vegetarian","spicy","popular","modifier_groups"],
+ "fields":[
+  {"fieldname":"item","fieldtype":"Link","label":"Item","options":"Item","reqd":1,"unique":1,"in_list_view":1},
+  {"default":"1","fieldname":"enabled","fieldtype":"Check","label":"Enabled","in_list_view":1},
+  {"fieldname":"menu_name","fieldtype":"Data","label":"Menu Name","in_list_view":1},
+  {"fieldname":"description","fieldtype":"Small Text","label":"Description"},
+  {"fieldname":"image","fieldtype":"Attach Image","label":"Image"},
+  {"fieldname":"category","fieldtype":"Link","label":"Category","options":"Item Group","reqd":1,"in_list_view":1},
+  {"fieldname":"kitchen_station","fieldtype":"Data","label":"Kitchen Station","reqd":1},
+  {"default":"10","fieldname":"preparation_minutes","fieldtype":"Int","label":"Preparation Minutes"},
+  {"fieldname":"column_flags","fieldtype":"Column Break"},
+  {"default":"0","fieldname":"vegetarian","fieldtype":"Check","label":"Vegetarian"},
+  {"default":"0","fieldname":"spicy","fieldtype":"Check","label":"Spicy"},
+  {"default":"0","fieldname":"popular","fieldtype":"Check","label":"Popular"},
+  {"fieldname":"modifier_groups","fieldtype":"Table","label":"Modifier Groups","options":"Restaurant Menu Modifier Group"}
+ ],
+ "permissions":[{"role":"Restaurant Manager","read":1,"write":1,"create":1,"delete":1,"report":1},{"role":"Restaurant Waiter","read":1},{"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"report":1}], "sort_field":"modified", "sort_order":"DESC", "states":[]
+}

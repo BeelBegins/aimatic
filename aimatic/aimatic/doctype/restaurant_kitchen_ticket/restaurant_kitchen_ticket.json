@@ -1,0 +1,22 @@
+{
+ "actions":[], "allow_rename":0, "autoname":"naming_series:", "creation":"2026-07-15 00:00:00.000000", "doctype":"DocType", "engine":"InnoDB", "module":"Aimatic", "name":"Restaurant Kitchen Ticket", "naming_rule":"By \"Naming Series\" field", "track_changes":1,
+ "field_order":["naming_series","request_id","restaurant_order","status","branch","floor","restaurant_table","waiter","sent_at","items"],
+ "fields":[
+  {"default":"REST-KOT-.YYYY.-.#####","fieldname":"naming_series","fieldtype":"Select","label":"Naming Series","options":"REST-KOT-.YYYY.-.#####","reqd":1},
+  {"fieldname":"request_id","fieldtype":"Data","label":"Request ID","reqd":1,"unique":1,"read_only":1},
+  {"fieldname":"restaurant_order","fieldtype":"Link","label":"Restaurant Order","options":"Restaurant Order","reqd":1,"read_only":1,"in_list_view":1},
+  {"default":"Queued","fieldname":"status","fieldtype":"Select","label":"Status","options":"Queued\nPreparing\nReady\nServed\nCancelled","reqd":1,"in_list_view":1},
+  {"fieldname":"branch","fieldtype":"Link","label":"Branch","options":"Branch","reqd":1,"read_only":1},
+  {"fieldname":"floor","fieldtype":"Link","label":"Floor","options":"Restaurant Floor","reqd":1,"read_only":1},
+  {"fieldname":"restaurant_table","fieldtype":"Link","label":"Table","options":"Restaurant Table","reqd":1,"read_only":1,"in_list_view":1},
+  {"fieldname":"waiter","fieldtype":"Link","label":"Waiter","options":"User","reqd":1,"read_only":1},
+  {"fieldname":"sent_at","fieldtype":"Datetime","label":"Sent At","read_only":1,"in_list_view":1},
+  {"fieldname":"items","fieldtype":"Table","label":"Items","options":"Restaurant Kitchen Ticket Item","reqd":1,"read_only":1}
+ ],
+ "permissions":[
+  {"role":"Restaurant Waiter","read":1,"report":1},
+  {"role":"Restaurant Manager","read":1,"write":1,"report":1},
+  {"role":"Kitchen User","read":1,"write":1,"report":1},
+  {"role":"System Manager","read":1,"write":1,"create":1,"delete":1,"report":1}
+ ], "sort_field":"sent_at", "sort_order":"DESC", "states":[]
+}

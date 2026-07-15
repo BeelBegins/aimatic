@@ -139,7 +139,7 @@ jinja = {
 # does NOT need an after_install entry - see the printingformats note in
 # CLAUDE.md for how those ship via Frappe's own native module-doc sync
 # instead.
-after_install = "aimatic.label_printing.setup.after_install"
+after_install = "aimatic.setup.after_install"
 
 _fixture_exclusions = json.loads(
     (Path(__file__).with_name("fixture_exclusions.json")).read_text(encoding="utf-8")

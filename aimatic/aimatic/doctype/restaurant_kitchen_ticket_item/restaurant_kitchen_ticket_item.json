@@ -1,0 +1,13 @@
+{
+ "actions":[], "creation":"2026-07-15 00:00:00.000000", "doctype":"DocType", "editable_grid":1, "engine":"InnoDB", "istable":1, "module":"Aimatic", "name":"Restaurant Kitchen Ticket Item",
+ "field_order":["order_item_row","item","item_name","qty","notes","modifiers_json","kitchen_station"],
+ "fields":[
+  {"fieldname":"order_item_row","fieldtype":"Data","label":"Order Item Row","reqd":1,"read_only":1},
+  {"fieldname":"item","fieldtype":"Link","label":"Item","options":"Item","reqd":1,"read_only":1,"in_list_view":1},
+  {"fieldname":"item_name","fieldtype":"Data","label":"Item Name","read_only":1,"in_list_view":1},
+  {"fieldname":"qty","fieldtype":"Float","label":"Quantity","reqd":1,"read_only":1,"in_list_view":1},
+  {"fieldname":"notes","fieldtype":"Small Text","label":"Cooking Instructions","read_only":1},
+  {"fieldname":"modifiers_json","fieldtype":"Code","label":"Modifiers Snapshot","options":"JSON","read_only":1},
+  {"fieldname":"kitchen_station","fieldtype":"Data","label":"Kitchen Station","read_only":1}
+ ], "permissions":[], "states":[]
+}
