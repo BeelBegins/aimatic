@@ -1502,6 +1502,23 @@ def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
         if not mode:
             frappe.throw(_("Each payment row must have mode_of_payment"))
 
+        if mode == "Gift Voucher":
+            # "Gift Voucher" is a server-only mode this function itself
+            # appends via gift_voucher_amount - never something a client can
+            # submit as one of its own payment rows, regardless of what a
+            # misconfigured POS Profile's payment list happens to allow (a
+            # real incident: siezal's POS Profiles once had it configured
+            # there, which would have let this exact check silently accept a
+            # cashier-typed "Gift Voucher" payment of any amount backed by no
+            # real voucher). Reject unconditionally rather than trusting
+            # allowed_modes alone.
+            frappe.throw(
+                _(
+                    "'Gift Voucher' is not a selectable payment mode - redeem a "
+                    "gift voucher via its code instead."
+                )
+            )
+
         if mode not in allowed_modes:
             frappe.throw(
                 _("Payment mode '{0}' is not allowed in POS Profile {1}").format(

@@ -82,7 +82,10 @@ doc_events = {
     # isn't pointed at a group Cost Center, which ERPNext would otherwise only
     # reject much later, at shift-close GL-entry time.
     "POS Profile": {
-        "validate": "aimatic.branch_management.events.validate_pos_profile_cost_center",
+        "validate": [
+            "aimatic.branch_management.events.validate_pos_profile_cost_center",
+            "aimatic.gift_voucher.events.validate_pos_profile_no_manual_gift_voucher_payment",
+        ],
     },
     # Tax ID/NTN is the entry field. Supplier save no longer validates or
     # reformats tax_id; tax_ntn remains a read-only mirror of the entered value.
