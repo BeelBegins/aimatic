@@ -93,6 +93,34 @@ def get_existing_barcodes():
     return {row.barcode: row.parent for row in data if row.barcode}
 
 
+def get_item_tax_rate(item_code, tax_rate_cache):
+    """Look up an item's FBR tax rate (0 for Exempt/no category), cached per
+    item_code since this is called once per stock row and items repeat."""
+    if item_code not in tax_rate_cache:
+        category = frappe.db.get_value("Item", item_code, "custom_fbr_tax_category")
+        tax_rate_cache[item_code] = (
+            as_float(frappe.db.get_value("FBR Tax Category", category, "tax_rate"))
+            if category
+            else 0.0
+        )
+    return tax_rate_cache[item_code]
+
+
+def exclusive_rate(inclusive_rate, tax_rate):
+    """Back tax out of a tax-inclusive rate, using the exact same formula as
+    fbr_pos.tax_calculator.calculate_fbr_item's sales-side reverse calculation
+    (sales_tax = inclusive_value * tax_rate / (100 + tax_rate)) -- source
+    CurCost is tax-inclusive. Exempt items (tax_rate 0) pass through
+    unchanged. NOTE: this fix was added 2026-07-16, after hsm's own import
+    already ran with the unfixed (tax-inclusive) rate -- this correction
+    only protects a future re-run or a new site copying this script, it does
+    not retroactively correct hsm's already-imported stock valuation."""
+    if inclusive_rate <= 0 or tax_rate <= 0:
+        return inclusive_rate
+    sales_tax = inclusive_rate * tax_rate / (100 + tax_rate)
+    return round(inclusive_rate - sales_tax, 2)
+
+
 def create_item(row, fbr_categories, existing_barcodes):
     first_barcode = str(row.get("ItemCode", "")).strip()
     second_barcode = str(row.get("RefCode", "")).strip()
@@ -267,6 +295,7 @@ def run():
     stock_rows = []
     negative_stock_rows = []
     failures = []
+    tax_rate_cache = {}
 
     for index, row in enumerate(rows, start=1):
         try:
@@ -282,7 +311,9 @@ def run():
                 stats["selling_prices_created"] += 1
 
             qty = as_float(row.get("Onhand"))
-            rate = as_float(row.get("CurCost"))
+            rate = exclusive_rate(
+                as_float(row.get("CurCost")), get_item_tax_rate(item_name, tax_rate_cache)
+            )
             if qty > 0:
                 stock_rows.append({"item_code": item_name, "qty": qty, "rate": rate})
                 stats["stock_rows_prepared"] += 1

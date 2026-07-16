@@ -64,11 +64,20 @@ Current scope: item, barcode, price, FBR category, and stock import only. Suppli
 ### Stock Entry
 
 - Quantity from `Onhand`
-- Valuation rate from `CurCost`
+- Valuation rate from `CurCost` — **must be reverse-calculated to tax-exclusive first, never used
+  as-is.** Fixed 2026-07-16: `CurCost` in the source workbook is tax-inclusive, but both prior
+  reference scripts (`import_siezal_items.py`, `import_hsmitems.py`) used it directly as the Stock
+  Entry `basic_rate`/`valuation_rate` with no adjustment — this inflated the imported stock's cost
+  basis by the embedded tax on every row, which flows straight into COGS (`Stock Ledger Entry`
+  valuation) once that stock sells, without a matching inflation on the Sales side (`net_total`
+  is tax-exclusive) — this is what caused `siezal`'s reported COGS to run higher than Sales. See
+  "Tax-exclusive valuation rate" below for the exact fix and formula; **any new per-site import
+  script must include this step, not just copy the old rate-assignment line.**
 - Zero valuation must be allowed on stock-entry rows when source `CurCost` is `0`
 - **Negative `Onhand` is genuine negative stock, not a sign/export artifact** (confirmed on `hsm`)
-  and must be imported too, as a `Material Issue` (`qty = abs(Onhand)`, `basic_rate = CurCost`) —
-  don't just filter it out with `if qty > 0`. Skipping negative rows silently understates the
+  and must be imported too, as a `Material Issue` (`qty = abs(Onhand)`, `basic_rate` = the same
+  tax-exclusive rate) — don't just filter it out with `if qty > 0`. Skipping negative rows
+  silently understates the
   imported stock value versus the source file's own `SUM(Onhand*CurCost)` (this is exactly how the
   `hsm` gap was first caught: the reported total didn't match a plain Excel `SUMPRODUCT` over the
   whole sheet). Confirm this is genuine negative stock for the specific legacy system before
@@ -80,6 +89,36 @@ Current scope: item, barcode, price, FBR category, and stock import only. Suppli
   `frappe.db.set_value` per item, committed before the Stock Entry) so the outgoing transaction has
   something to draw its rate from — verified working end-to-end on `hsm` before being written into
   the reference script.
+
+### Tax-exclusive valuation rate (fixed 2026-07-16)
+
+Both reference scripts now reverse-calculate `CurCost` before using it as a Stock Entry rate,
+using the **identical formula** `fbr_pos/tax_calculator.py:calculate_fbr_item` already uses for
+the sales-side reverse calculation (same rule the app already applies elsewhere, not a new one
+invented for this script):
+
+```
+sales_tax = inclusive_rate * tax_rate / (100 + tax_rate)
+exclusive_rate = inclusive_rate - sales_tax
+```
+
+`tax_rate` comes from the item's own `custom_fbr_tax_category` (set from `Fbr_Tax_Category`
+during `create_item`, which always runs before stock rows are captured in both scripts — the
+category is already committed by the time the rate is read). Exempt items (`tax_rate = 0`) pass
+through unchanged, matching the sales-side calculator's own behavior.
+
+**Known caveat, not fully closed**: this only works correctly for rows where `Fbr_Tax_Category`
+was actually populated in the source workbook. A row with a blank/invalid category leaves
+`Item.custom_fbr_tax_category` unset at this point in the script, so `tax_rate` resolves to `0`
+and `CurCost` passes through **unchanged** for that item — same bug as before, just narrowed to
+whichever rows have no category. Check the source file's `Fbr_Tax_Category` fill rate before a
+new import and treat a high blank-rate as a data-quality issue to fix in the source, not something
+this script can compensate for.
+
+**Not retroactively fixed**: this only protects a *future* run of these scripts. `siezal`'s
+already-imported stock, and `hsm`'s (imported before this fix existed), still carry the original
+tax-inclusive valuation — correcting historical Stock Ledger Entries is a separate, explicit
+decision, not something to do as a side effect of fixing the script.
 
 ## Legacy Header Mapping
 
@@ -99,7 +138,8 @@ Current scope: item, barcode, price, FBR category, and stock import only. Suppli
 ### Pricing mapping
 
 - `Slprice` -> Item Price in `Standard Selling`
-- `CurCost` -> not Item Price; use only as Stock Entry valuation rate
+- `CurCost` -> not Item Price; use only as Stock Entry valuation rate, and only after reverse-
+  calculating it to tax-exclusive (see "Tax-exclusive valuation rate" above) — never the raw value
 - `MRP` -> `Item.custom_mrp` fallback chain (source data can have `MRP` stored as literal `0`,
   confirmed on `siezal`: 1,289 of 16,491 rows): use source `MRP` if it is nonzero; else derive
   `rp x 1.18` if `rp` is nonzero; else keep whatever is in the source as-is (`0`/blank) — do **not**
@@ -109,7 +149,8 @@ Current scope: item, barcode, price, FBR category, and stock import only. Suppli
 ### Stock loading mapping
 
 - `Onhand` -> stock quantity loaded through Stock Entry
-- `CurCost` -> valuation rate used in the same Stock Entry
+- `CurCost` -> valuation rate used in the same Stock Entry, tax-exclusive (see above — reverse-
+  calculated using the item's own FBR tax rate, not used raw)
 
 ### Category / Item Group mapping (only when source file has `CatName`/`SubCatName`)
 
@@ -196,8 +237,10 @@ For this import format:
 4. Create `Standard Selling` Item Price from `Slprice`.
 5. Create stock through Stock Entry using:
    - quantity = `Onhand`
-   - valuation rate = `CurCost`
-   - allow zero valuation when `CurCost = 0`
+   - valuation rate = `CurCost` reverse-calculated to tax-exclusive using the item's own FBR tax
+     rate (`sales_tax = CurCost * tax_rate / (100 + tax_rate)`, `rate = CurCost - sales_tax`) —
+     never `CurCost` raw
+   - allow zero valuation when the resulting rate is `0`
 6. Validate imported rows against `MRP` and optional `rp` logic where needed.
 
 ## Confirmed Non-Mappings
@@ -206,7 +249,11 @@ For this import format:
 - Do not import `CurCost` into buying price lists.
 - Do not import `DISCOUNTPRICE`.
 - Do not import `Stock_Value`.
-- Do not import old GST columns.
+- Do not import old GST columns (`Old_GSTTYPE`, `Old_Sales_GSTPer`, `Old_Purchase_GSTPer`) — the
+  tax-exclusive valuation rate fix above deliberately uses the item's *current* `custom_fbr_tax_category`
+  rate instead of these legacy per-row percentages, for consistency with how the sales side
+  calculates tax everywhere else in the app; don't resurrect these columns as an alternative source
+  for the reverse calculation.
 - Do not derive any UOM structure from `QTY`.
 - Do not auto-link Supplier as Item default supplier.
 - Do not import Supplier data in this phase.
