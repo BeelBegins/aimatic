@@ -1,9 +1,11 @@
 # Aimatic — Application Guide
 
-Aimatic is the custom retail app that turns Frappe/ERPNext into a multi-branch supermarket
-system: point-of-sale, purchasing, pricing, Pakistan FBR e-invoicing, barcode/shelf labels,
-loyalty and gift vouchers, supplier management, and vendor performance reporting, all built
-on top of one shared Branch → Warehouse → Cost Center structure.
+Aimatic is the shared backend behind a portfolio of retail-tech products — multi-branch
+point-of-sale, distributor/sales-rep order booking, customer online shopping, and restaurant
+table service — plus everything underneath them: purchasing, pricing, Pakistan FBR
+e-invoicing, barcode/shelf labels, loyalty and gift vouchers, supplier management, and vendor
+performance reporting, all built on one shared Branch → Warehouse → Cost Center structure. See
+"The product portfolio" below for how the pieces fit together.
 
 This guide explains **what the app does and why**, in plain language, so that business
 owners, implementers setting up a new site or branch, and developers new to the codebase can
@@ -12,6 +14,47 @@ all get oriented without reading source code. For the technical "how it's wired"
 this guide and that file are meant to be read together, not as duplicates of each other.
 
 The customer storefront for the `siezal` site is served at `https://shop.aimatic.tech/`. System Managers can use `https://shop.aimatic.tech/uploadimageproduct` to upload a Shopping Product photo, run local background removal, compare the original and transparent result, and approve the public image. Processing uses an isolated `rembg`/U²-Netp Python 3.12 environment under `/home/nabeel/.local/share/aimatic-bgremove`; it has no external paid API and must not be installed into the Frappe environment.
+
+## The product portfolio
+
+Aimatic isn't a single point-of-sale app — it's the shared backend for a portfolio of four
+focused, customer-facing products, all backed by the same business rules, the same
+stock/pricing/tax engine, and the same Branch → Warehouse → Cost Center structure:
+
+| Product | Who uses it | What it does | Status |
+|---|---|---|---|
+| **Retail POS** | Store cashiers, branch supervisors | Ring up sales at the counter — desktop and Android, offline-capable. | **Current focus** — live in production across all three sites, actively developed. |
+| **Distributor / sales ordering** | Sales representatives / field staff | Take orders from customers out in the field and place draft Sales Orders against real stock and pricing. | Built (backend + Android app exist and work) — not the current focus of active development. |
+| **Online shopping (e-commerce)** | End customers | Browse an enabled product catalogue and check out for pickup or cash-on-delivery. | Built (backend + Android/web app exist and work, storefront is live) — not the current focus of active development. |
+| **Restaurant management** | Waiters, kitchen staff, restaurant managers | Table-side ordering, kitchen ticket dispatch, and bill requests for a restaurant floor. | Built (backend + Android app exist and work) — not the current focus of active development. |
+
+The other three products aren't hypothetical or unfinished scaffolding — they have real, working
+implementations (see their own sections below). But **Retail is where active development effort
+is currently concentrated**; the other three are a foundation to build on when that work resumes,
+not something currently being iterated on. Don't read the table above as "four equally live
+priorities" — it's one active product plus three already-built ones waiting for their turn.
+
+**Why one backend, four apps — the architecture principle behind everything in this codebase:**
+every product talks to the same ERPNext/aimatic backend as the single source of truth for
+prices, stock, taxes, credit, and permissions. Each product gets its own focused client app —
+a separate, isolated build with its own login and its own restricted API surface — but never
+its own copy of business logic. A price, a tax rule, or a stock check is computed once, in one
+place, and every product simply asks the backend for the answer rather than recalculating it
+independently. This is deliberate, not an accident of how the code grew: it means a pricing or
+tax-compliance fix made once protects every product at once, and it's why each client app's API
+surface is scoped to "only what that product needs" (see each product's own section below)
+rather than one shared, do-everything API.
+
+**What this means for future development:** a new feature, or a new product line, should extend
+this same shape — add the business logic once to the shared backend, then expose only the
+minimum surface a client actually needs. Duplicating logic into a client app, or letting one
+product's client trust its own calculation over the backend's, breaks the guarantee that every
+product agrees on price, stock, and tax at all times.
+
+For the live, numbers-driven view across the portfolio — today's sales by branch, vendor
+performance, gross margin — use the Sales Dashboard and Vendor Performance tools described
+below; this document describes what the system *is*, not a snapshot of what it's currently
+doing.
 
 ## Who this guide is for
 
@@ -90,6 +133,21 @@ callback configured by the implementer. The first checkout mode is Cash on Deliv
 Pickup. ERPNext recalculates a short-lived signed quote, checks stock and prices again at checkout,
 and creates one Sales Order per stable request ID. Customer APIs never return internal users,
 costs, warehouses, buying/accounts data, suppliers, or reports.
+
+### Restaurant table service
+
+The separate Ai Matic Restaurant Android app gives waiters and kitchen staff a focused ordering
+flow for a restaurant floor. A Restaurant Profile ties one Branch, Company, and POS Profile
+together with its own floors, tables, menu items, and modifier groups; ERPNext remains the
+source of truth for prices, stock, taxes, customers, and the submitted POS Invoice — Restaurant
+Orders and kitchen tickets themselves don't post any accounting entries. Waiters sign in through
+the same secure login pattern as the other apps, see only the tables and orders they're
+permitted to use, open and update orders, and send kitchen tickets that can't be accidentally
+duplicated even if a request is retried after a dropped connection. Kitchen staff advance those
+tickets through a simple status flow and have no access to the wider back-office system beyond
+that. Table transfers, bill splitting, and a few other advanced flows are intentionally not
+built yet. See [`docs/restaurant.md`](restaurant.md) for the full setup order, role model, and
+troubleshooting guidance.
 
 ### Purchasing and receiving stock
 
