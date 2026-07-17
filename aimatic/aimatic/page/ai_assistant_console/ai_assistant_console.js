@@ -615,11 +615,47 @@ aimatic.AiAssistantPage = class AiAssistantPage {
             questions = aimatic.AI_ASSISTANT_ROLE_BUTTONS['Sales Manager'];
         }
 
+        const $container = this.$suggested.empty();
+        const count = questions.length;
+
+        const $header = $(`
+            <div class="ai-assistant-suggested-header">
+                <span class="ai-assistant-suggested-icon">${frappe.utils.icon('lightbulb', 'xs')}</span>
+                <span class="ai-assistant-suggested-label">${__('Suggested Questions')}</span>
+                <span class="ai-assistant-suggested-count">(${count})</span>
+                <span class="ai-assistant-suggested-chevron">${frappe.utils.icon('chevron-down', 'xs')}</span>
+            </div>
+        `).appendTo($container);
+
+        const $list = $('<div class="ai-assistant-suggested-list" hidden></div>').appendTo($container);
+
         questions.forEach((q) => {
             $(`<button class="btn btn-default btn-xs ai-assistant-suggested-btn">${frappe.utils.escape_html(q)}</button>`)
-                .on('click', () => this.send_message(q))
-                .appendTo(this.$suggested);
+                .on('click', () => {
+                    this.send_message(q);
+                    this._collapse_suggested();
+                })
+                .appendTo($list);
         });
+
+        $header.on('click', () => this._toggle_suggested($header, $list));
+    }
+
+    _toggle_suggested($header, $list) {
+        const isExpanded = !$list.prop('hidden');
+        $list.prop('hidden', isExpanded);
+        $header.toggleClass('expanded', !isExpanded);
+        $header.find('.ai-assistant-suggested-chevron').html(
+            frappe.utils.icon(isExpanded ? 'chevron-down' : 'chevron-up', 'xs')
+        );
+    }
+
+    _collapse_suggested() {
+        const $header = this.$suggested.find('.ai-assistant-suggested-header');
+        const $list = this.$suggested.find('.ai-assistant-suggested-list');
+        if (!$list.prop('hidden')) {
+            this._toggle_suggested($header, $list);
+        }
     }
 
     bind_events() {
