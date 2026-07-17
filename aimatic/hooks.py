@@ -334,23 +334,11 @@ fixtures = [
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"aimatic.tasks.all"
-# 	],
-# 	"daily": [
-# 		"aimatic.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"aimatic.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"aimatic.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"aimatic.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"aimatic.ai.tasks.purge_old_ai_messages",
+	],
+}
 
 # Testing
 # -------

@@ -16,28 +16,51 @@ def _find_matching_criteria(company, branch, grand_total):
             "min_value": ["<=", grand_total],
             "max_value": [">=", grand_total],
         },
-        fields=["name", "percentage", "validity_days"],
+        fields=["name", "percentage", "validity_days", "minimum_redemption_value"],
         order_by="min_value desc",
         limit=1,
     )
     return matches[0] if matches else None
 
 
+def _net_of_same_sale_redemptions(doc):
+    """grand_total minus any Gift Voucher payment row and any loyalty points
+    redeemed on this same invoice. Both are payment-style reductions (ERPNext
+    adds loyalty_amount to paid_amount; the Gift Voucher redemption is a Mode
+    of Payment row) that never touch grand_total/net_total by design - so
+    without this, a sale that only clears a bracket because of value already
+    given back on this same bill would mint another voucher on top of it.
+    """
+    redeemed_via_voucher = flt(
+        sum(
+            flt(p.amount) for p in (doc.payments or [])
+            if p.mode_of_payment == "Gift Voucher"
+        ),
+        2,
+    )
+    loyalty_amount = flt(getattr(doc, "loyalty_amount", 0) or 0, 2)
+    return flt(flt(doc.grand_total, 2) - redeemed_via_voucher - loyalty_amount, 2)
+
+
 def on_submit_issue_gift_voucher(doc, method=None):
-    """Auto-issue a Gift Voucher when a (non-return) sale's grand total falls
-    into a configured Gift Voucher Criteria bracket for its company/branch.
+    """Auto-issue a Gift Voucher when a (non-return) sale's grand total, net
+    of any Gift Voucher or loyalty points redeemed on this same sale, falls
+    into a configured Gift Voucher Criteria bracket for its company/branch
+    and clears that bracket's own minimum redemption value.
     """
     if cint(getattr(doc, "is_return", 0)):
         return
 
     branch = get_invoice_branch(doc)
-    grand_total = flt(doc.grand_total, 2)
+    net_total = _net_of_same_sale_redemptions(doc)
 
-    match = _find_matching_criteria(doc.company, branch, grand_total)
+    match = _find_matching_criteria(doc.company, branch, net_total)
     if not match:
         return
+    if net_total < flt(match.minimum_redemption_value, 2):
+        return
 
-    amount = flt(grand_total * flt(match.percentage) / 100.0, 2)
+    amount = flt(net_total * flt(match.percentage) / 100.0, 2)
     if amount <= 0:
         return
 

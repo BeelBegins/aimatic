@@ -300,7 +300,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-16 01:15:00.000000",
+ "modified": "2026-07-17 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Aimatic",
@@ -337,6 +337,12 @@
    "label": "Sales Dashboard",
    "type": "URL",
    "url": "/app/sales-dashboard-console"
+  },
+  {
+   "color": "Purple",
+   "label": "AI Assistant",
+   "type": "URL",
+   "url": "/app/ai-assistant-console"
   }
  ],
  "title": "Aimatic",

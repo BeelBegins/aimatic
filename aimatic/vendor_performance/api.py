@@ -742,37 +742,28 @@ def _get_sales_summary(item_codes: list[str], company: str, date_from, date_to, 
     if not item_codes:
         return {'sales_qty': 0, 'sales_amount': 0, 'doc_count': 0}
 
-    si_branch_clause = 'AND si.branch = %(branch)s' if branch else ''
+    # POS Invoice only, deliberately not unioned with Sales Invoice Item: every
+    # submitted Sales Invoice on this bench is itself a POS-consolidation output
+    # (either a POS Closing Entry's consolidated_invoice or its
+    # consolidated_credit_note for returns - confirmed on szl 2026-07-17, zero
+    # standalone Sales Invoices exist), so unioning it back in here double-counts
+    # the same underlying sale a second time. See the "Revenue double-counting
+    # gotcha" note under the ai/ module in CLAUDE.md for the full investigation.
     pi_branch_clause = 'AND pi.branch = %(branch)s' if branch else ''
     rows = frappe.db.sql(
         f'''
         SELECT
-            SUM(sales_qty) AS sales_qty,
-            SUM(sales_amount) AS sales_amount,
-            COUNT(DISTINCT docname) AS doc_count
-        FROM (
-            SELECT si.name AS docname, sii.stock_qty AS sales_qty, sii.base_net_amount AS sales_amount
-            FROM `tabSales Invoice Item` sii
-            INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
-            WHERE si.docstatus = 1
-              AND IFNULL(si.is_return, 0) = 0
-              AND si.company = %(company)s
-              AND si.posting_date BETWEEN %(date_from)s AND %(date_to)s
-              AND sii.item_code IN %(item_codes)s
-              {si_branch_clause}
-
-            UNION ALL
-
-            SELECT pi.name AS docname, pii.stock_qty AS sales_qty, pii.base_net_amount AS sales_amount
-            FROM `tabPOS Invoice Item` pii
-            INNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent
-            WHERE pi.docstatus = 1
-              AND IFNULL(pi.is_return, 0) = 0
-              AND pi.company = %(company)s
-              AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
-              AND pii.item_code IN %(item_codes)s
-              {pi_branch_clause}
-        ) sales_union
+            SUM(pii.stock_qty) AS sales_qty,
+            SUM(pii.base_net_amount) AS sales_amount,
+            COUNT(DISTINCT pi.name) AS doc_count
+        FROM `tabPOS Invoice Item` pii
+        INNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent
+        WHERE pi.docstatus = 1
+          AND IFNULL(pi.is_return, 0) = 0
+          AND pi.company = %(company)s
+          AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
+          AND pii.item_code IN %(item_codes)s
+          {pi_branch_clause}
         ''',
         {'company': company, 'date_from': date_from, 'date_to': date_to, 'item_codes': tuple(item_codes), 'branch': branch},
         as_dict=True,
@@ -995,37 +986,24 @@ def _get_recent_sales(item_codes: list[str], company: str, date_from, date_to, l
     if not item_codes:
         return []
 
-    si_branch_clause = 'AND si.branch = %(branch)s' if branch else ''
+    # POS Invoice only - see _get_sales_summary's comment above (and CLAUDE.md's
+    # "Revenue double-counting gotcha" note): every submitted Sales Invoice here is
+    # itself a POS-consolidation output, so including it would show the same sale
+    # twice in this "recent sales" list, not just double-count a sum.
     pi_branch_clause = 'AND pi.branch = %(branch)s' if branch else ''
     rows = frappe.db.sql(
         f'''
-        SELECT *
-        FROM (
-            SELECT 'Sales Invoice' AS doctype, si.name, si.posting_date, si.customer, si.base_grand_total AS invoice_amount, SUM(sii.base_net_amount) AS vendor_amount
-            FROM `tabSales Invoice` si
-            INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
-            WHERE si.docstatus = 1
-              AND IFNULL(si.is_return, 0) = 0
-              AND si.company = %(company)s
-              AND si.posting_date BETWEEN %(date_from)s AND %(date_to)s
-              AND sii.item_code IN %(item_codes)s
-              {si_branch_clause}
-            GROUP BY si.name, si.posting_date, si.customer, si.base_grand_total
-
-            UNION ALL
-
-            SELECT 'POS Invoice' AS doctype, pi.name, pi.posting_date, pi.customer, pi.base_grand_total AS invoice_amount, SUM(pii.base_net_amount) AS vendor_amount
-            FROM `tabPOS Invoice` pi
-            INNER JOIN `tabPOS Invoice Item` pii ON pii.parent = pi.name
-            WHERE pi.docstatus = 1
-              AND IFNULL(pi.is_return, 0) = 0
-              AND pi.company = %(company)s
-              AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
-              AND pii.item_code IN %(item_codes)s
-              {pi_branch_clause}
-            GROUP BY pi.name, pi.posting_date, pi.customer, pi.base_grand_total
-        ) sales_docs
-        ORDER BY posting_date DESC, name DESC
+        SELECT 'POS Invoice' AS doctype, pi.name, pi.posting_date, pi.customer, pi.base_grand_total AS invoice_amount, SUM(pii.base_net_amount) AS vendor_amount
+        FROM `tabPOS Invoice` pi
+        INNER JOIN `tabPOS Invoice Item` pii ON pii.parent = pi.name
+        WHERE pi.docstatus = 1
+          AND IFNULL(pi.is_return, 0) = 0
+          AND pi.company = %(company)s
+          AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
+          AND pii.item_code IN %(item_codes)s
+          {pi_branch_clause}
+        GROUP BY pi.name, pi.posting_date, pi.customer, pi.base_grand_total
+        ORDER BY pi.posting_date DESC, pi.name DESC
         LIMIT %(limit)s
         ''',
         {'company': company, 'date_from': date_from, 'date_to': date_to, 'item_codes': tuple(item_codes), 'limit': cint(limit), 'branch': branch},
@@ -1048,35 +1026,22 @@ def _get_sales_by_item(item_codes: list[str], company: str, date_from, date_to, 
     if not item_codes:
         return {}
 
-    si_branch_clause = 'AND si.branch = %(branch)s' if branch else ''
+    # POS Invoice only - see _get_sales_summary's comment above (and CLAUDE.md's
+    # "Revenue double-counting gotcha" note): every submitted Sales Invoice here is
+    # itself a POS-consolidation output, so unioning it back in double-counts.
     pi_branch_clause = 'AND pi.branch = %(branch)s' if branch else ''
     rows = frappe.db.sql(
         f'''
-        SELECT item_code, SUM(sales_qty) AS sales_qty, SUM(sales_amount) AS sales_amount
-        FROM (
-            SELECT sii.item_code, sii.stock_qty AS sales_qty, sii.base_net_amount AS sales_amount
-            FROM `tabSales Invoice Item` sii
-            INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
-            WHERE si.docstatus = 1
-              AND IFNULL(si.is_return, 0) = 0
-              AND si.company = %(company)s
-              AND si.posting_date BETWEEN %(date_from)s AND %(date_to)s
-              AND sii.item_code IN %(item_codes)s
-              {si_branch_clause}
-
-            UNION ALL
-
-            SELECT pii.item_code, pii.stock_qty AS sales_qty, pii.base_net_amount AS sales_amount
-            FROM `tabPOS Invoice Item` pii
-            INNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent
-            WHERE pi.docstatus = 1
-              AND IFNULL(pi.is_return, 0) = 0
-              AND pi.company = %(company)s
-              AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
-              AND pii.item_code IN %(item_codes)s
-              {pi_branch_clause}
-        ) sales_rows
-        GROUP BY item_code
+        SELECT pii.item_code, SUM(pii.stock_qty) AS sales_qty, SUM(pii.base_net_amount) AS sales_amount
+        FROM `tabPOS Invoice Item` pii
+        INNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent
+        WHERE pi.docstatus = 1
+          AND IFNULL(pi.is_return, 0) = 0
+          AND pi.company = %(company)s
+          AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
+          AND pii.item_code IN %(item_codes)s
+          {pi_branch_clause}
+        GROUP BY pii.item_code
         ''',
         {'company': company, 'date_from': date_from, 'date_to': date_to, 'item_codes': tuple(item_codes), 'branch': branch},
         as_dict=True,
