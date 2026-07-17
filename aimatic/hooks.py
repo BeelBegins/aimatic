@@ -343,6 +343,8 @@ fixtures = [
 scheduler_events = {
 	"daily": [
 		"aimatic.ai.tasks.purge_old_ai_messages",
+		"aimatic.ai.tasks.run_scheduled_questions",
+		"aimatic.ai.tasks.check_alert_rules",
 	],
 }
 

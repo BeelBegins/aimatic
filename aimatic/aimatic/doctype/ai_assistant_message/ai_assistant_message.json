@@ -9,7 +9,10 @@
  "field_order": [
   "user",
   "role",
-  "content"
+  "content",
+  "conversation",
+  "feedback",
+  "feedback_note"
  ],
  "fields": [
   {
@@ -38,11 +41,32 @@
    "label": "Content",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "conversation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Conversation",
+   "options": "AI Assistant Conversation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "feedback",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Feedback",
+   "options": "\nup\ndown"
+  },
+  {
+   "fieldname": "feedback_note",
+   "fieldtype": "Small Text",
+   "label": "Feedback Note"
   }
  ],
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-07-17 00:00:00.000000",
+ "modified": "2026-07-18 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "AI Assistant Message",

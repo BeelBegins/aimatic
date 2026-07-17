@@ -1,0 +1,83 @@
+{% set title = 'STOCK ACKNOWLEDGEMENT' %}
+<style>
+@page { size: 297mm 210mm; margin: 5mm; }
+html, body { width: 297mm; margin: 0; padding: 0; }
+.print-format { width: 287mm !important; max-width: 287mm !important; min-height: 0 !important; margin: 0 auto !important; padding: 0 !important; font-family: Arial, Helvetica, sans-serif; font-size: 6.5pt; color: #000; }
+.aim-title { text-align: center; font-size: 10pt; font-weight: 700; margin: 0 0 1mm; }
+.aim-head { width: 100%; border-collapse: collapse; margin: 0 0 1mm; }
+.aim-head td { border: 0; padding: .35mm 1mm; vertical-align: top; }
+.aim-label { font-weight: 700; white-space: nowrap; }
+.aim-company { text-align: center; font-size: 8pt; font-weight: 700; }
+.aim-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.aim-grid th { border-top: .25mm solid #000; border-bottom: .25mm solid #000; padding: .65mm .35mm; font-size: 5.2pt; line-height: 1.05; text-align: center; vertical-align: bottom; }
+.aim-grid td { padding: .75mm .3mm; border-bottom: .1mm solid #bbb; vertical-align: middle; overflow: hidden; overflow-wrap: normal; word-break: normal; }
+.aim-grid .num { text-align: right; white-space: nowrap; font-size: 5.4pt; }
+.aim-grid .center { text-align: center; }
+.aim-grid .desc { text-align: left; overflow-wrap: anywhere; }
+.aim-grid .barcode { white-space: nowrap; font-size: 5pt; font-weight: 700; }
+.aim-sign-block { width: 100%; margin-top: 6mm; border-collapse: collapse; page-break-inside: avoid; }
+.aim-sign-block td { border: 0; padding: 0 3mm; text-align: center; vertical-align: bottom; }
+.aim-sign-line { min-height: 10mm; border-top: .25mm solid #000; margin: 0 2mm 1mm; }
+.aim-sign-caption { font-weight: 700; }
+@media print {
+ html, body { width: 297mm !important; }
+ .print-format { width: 287mm !important; max-width: 287mm !important; }
+}
+</style>
+{% set item_context = get_purchase_print_item_context(doc) %}
+<div class="aim-title">{{ title }}</div>
+<table class="aim-head">
+ <tr>
+  <td style="width:9%" class="aim-label">PR No.</td><td style="width:23%">{{ doc.name }}</td>
+  <td style="width:43%" rowspan="2" class="aim-company">{{ doc.supplier_name or doc.supplier }}<br><span style="font-weight:400">{{ doc.company }}</span></td>
+  <td style="width:9%" class="aim-label">Date</td><td style="width:16%">{{ frappe.utils.formatdate(doc.posting_date) }}</td>
+ </tr>
+ <tr>
+  <td class="aim-label">Warehouse</td><td>{{ doc.set_warehouse or '' }}</td>
+  <td class="aim-label">Branch</td><td>{{ doc.branch or '' }}</td>
+ </tr>
+</table>
+<table class="aim-grid">
+ <thead><tr>
+  <th style="width:3%">S#</th>
+  <th style="width:10%">Barcode</th>
+  <th style="width:29%">Item Description</th>
+  <th style="width:5%">UOM</th>
+  <th style="width:9%">Ordered<br>Qty</th>
+  <th style="width:9%">Received<br>Qty</th>
+  <th style="width:9%">Rejected<br>Qty</th>
+  <th style="width:26%">Remarks</th>
+ </tr></thead>
+ <tbody>
+ {% for row in doc.items %}
+  {% set row_ctx = item_context.get(row.name, {}) %}
+  {% set barcode = row.barcode or row_ctx.barcode or row.item_code or '' %}
+  <tr>
+   <td class="center">{{ loop.index }}</td>
+   <td class="barcode">{{ barcode }}</td>
+   <td class="desc">{{ row.item_name or row.description }}</td>
+   <td class="center">{{ row.uom or '' }}</td>
+   <td class="num">{{ frappe.utils.flt(row.qty, 2) }}</td>
+   <td class="num">{{ frappe.utils.flt(row.received_qty, 2) }}</td>
+   <td class="num">{{ frappe.utils.flt(row.rejected_qty, 2) }}</td>
+   <td></td>
+  </tr>
+ {% endfor %}
+ </tbody>
+</table>
+<table class="aim-sign-block">
+ <tr>
+  <td style="width:33%">
+   <div class="aim-sign-line">&nbsp;</div>
+   <div class="aim-sign-caption">Received By</div>
+  </td>
+  <td style="width:34%">
+   <div class="aim-sign-line">&nbsp;</div>
+   <div class="aim-sign-caption">Checked By (Store Incharge)</div>
+  </td>
+  <td style="width:33%">
+   <div class="aim-sign-line">&nbsp;</div>
+   <div class="aim-sign-caption">Approved By</div>
+  </td>
+ </tr>
+</table>
