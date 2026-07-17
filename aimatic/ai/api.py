@@ -74,6 +74,34 @@ def _build_system_prompt() -> str:
     )
 
 
+def _looks_like_raw_tool_json(content: str) -> bool:
+    """The free-tier model occasionally malforms a tool call: instead of using
+    the real OpenAI tool_calls protocol, it writes what should have been the
+    call's arguments as plain assistant `content` text, e.g. literally
+    '{"company": "Test Company", "days": 30}' (sometimes duplicated on
+    separate lines). Since that message has no tool_calls, ask()'s loop would
+    otherwise treat it as the final natural-language answer and ship raw JSON
+    to the user - confirmed live, reproducible (intermittently) with phrasing
+    like "what should I order tomorrow". Detected structurally: every
+    non-blank line must itself be a valid JSON object with no surrounding
+    prose - a real answer never satisfies that."""
+    if not content or not content.strip():
+        return False
+    lines = [line.strip() for line in content.strip().splitlines() if line.strip()]
+    if not lines:
+        return False
+    for line in lines:
+        if not (line.startswith("{") and line.endswith("}")):
+            return False
+        try:
+            parsed = json.loads(line)
+        except (TypeError, ValueError):
+            return False
+        if not isinstance(parsed, dict):
+            return False
+    return True
+
+
 def _parse_history(history: str | None) -> list[dict]:
     """Only ever accepts plain {role: user|assistant, content} text turns - never
     raw tool-call internals from a prior request - so a client can't smuggle
@@ -131,6 +159,22 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
         tool_calls = assistant_message.get("tool_calls")
         if not tool_calls:
             reply = assistant_message.get("content") or ""
+            if _looks_like_raw_tool_json(reply):
+                frappe.log_error(
+                    title="AI Assistant: malformed tool-call text corrected",
+                    message=f"question={message!r} raw_content={reply!r}",
+                )
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Your last reply was not a valid answer - it looked like raw "
+                        "tool-call arguments written as plain text instead of either a "
+                        "real tool call or a natural-language answer. Please either call "
+                        "the appropriate tool now, or answer the question in plain "
+                        "language using data you already have from previous tool results."
+                    ),
+                })
+                continue
             _log_turn("user", message, conversation)
             _log_turn("assistant", reply, conversation)
 
