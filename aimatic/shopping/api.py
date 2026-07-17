@@ -256,6 +256,54 @@ def get_addresses():
 
 
 @frappe.whitelist()
+@rate_limit(limit=3, seconds=3600)
+def request_account_deletion():
+	"""Logs a customer-initiated account/data deletion request for admin
+	follow-up - this does NOT delete or anonymize anything itself. Real
+	Customer records are linked to Sales Orders/Invoices that may need to be
+	retained for tax/accounting record-keeping, so the actual purge is a
+	reviewed admin action, not an automatic one. Satisfies the Play Store
+	requirement that an app with real user accounts provide a discoverable
+	way to request deletion; see aimatic.tech/data-deletion.html for the
+	public-facing description of this same process.
+	"""
+	user, customer = _customer_for_user()
+
+	existing = frappe.db.get_value(
+		"Shopping Account Deletion Request",
+		{"customer": customer, "status": ["in", ["Requested", "In Review"]]},
+		"name",
+	)
+	if existing:
+		return {"name": existing, "status": frappe.db.get_value("Shopping Account Deletion Request", existing, "status"), "already_requested": True}
+
+	customer_doc = frappe.db.get_value("Customer", customer, ["email_id", "mobile_no"], as_dict=True) or {}
+	request = frappe.get_doc({
+		"doctype": "Shopping Account Deletion Request",
+		"customer": customer,
+		"user": user,
+		"email": customer_doc.get("email_id") or user,
+		"mobile_no": customer_doc.get("mobile_no"),
+		"status": "Requested",
+	})
+	request.insert(ignore_permissions=True)
+	return {"name": request.name, "status": "Requested", "already_requested": False}
+
+
+@frappe.whitelist()
+def get_account_deletion_status():
+	_user, customer = _customer_for_user()
+	row = frappe.db.get_value(
+		"Shopping Account Deletion Request",
+		{"customer": customer},
+		["name", "status", "creation"],
+		order_by="creation desc",
+		as_dict=True,
+	)
+	return {"request": row}
+
+
+@frappe.whitelist()
 @rate_limit(limit=30, seconds=60)
 def quote_cart(branch=None, delivery_method=None, address_name=None, items=None):
 	_user, customer = _customer_for_user()
