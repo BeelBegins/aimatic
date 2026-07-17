@@ -55,6 +55,7 @@ doc_events = {
         "before_validate": [
             "aimatic.branch_management.events.apply_branch_defaults",
             "aimatic.purchase_printing.populate_old_purchase_snapshot",
+            "aimatic.purchase_history_autofill.events.autofill_purchase_receipt_item_fields",
         ],
         # shelf_pricing: Shelf Price must not undercut cost before the
         # receipt is allowed to submit. The actual branch/Foodpanda price
@@ -122,7 +123,12 @@ override_whitelisted_methods = {
 # Receipt, Delivery Note, Stock Entry, and Sales Invoice via client script
 # only. None of these doctypes are ever modified server-side.
 doctype_js = {
-    "Purchase Receipt": "public/js/purchase_receipt_label_printing.js",
+    "Purchase Receipt": [
+        "public/js/purchase_receipt_label_printing.js",
+        # Live preview only - see purchase_history_autofill/events.py for
+        # the actual server-side guarantee this mirrors.
+        "public/js/purchase_receipt_history_autofill.js",
+    ],
     "Delivery Note": "public/js/label_printing_source_buttons.js",
     "Stock Entry": "public/js/label_printing_source_buttons.js",
     "Sales Invoice": "public/js/label_printing_source_buttons.js",
