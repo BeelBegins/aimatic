@@ -195,7 +195,42 @@ fixtures = [
     # returned False on all four create/submit checks despite the correct
     # roles being assigned. Custom DocPerm rows here grant exactly that,
     # without touching erpnext's own doctype JSON.
-    {"doctype": "Custom DocPerm", "filters": [["parent", "in", ["POS Opening Entry", "POS Closing Entry"]]]},
+    #
+    # Second batch (2026-07-19): the Electron POS terminal's own startup/settings
+    # flow (Posapplication's core/pos-config.ts, core/catalog-sync.ts,
+    # core/sale-refund.ts) reads several master-data doctypes directly over
+    # Frappe's generic /api/resource REST endpoint - not through offline_pos's
+    # whitelisted, already-permission-checked methods - so those calls are
+    # subject to each doctype's own standard DocPerm. None of POS Profile,
+    # Company, Sales Taxes and Charges Template, Mode of Payment, Coupon Code,
+    # Customer Group, Territory, Item, Item Price, Bin, Branch, or Print Format
+    # grant POS User/POS Supervisor anything out of the box (core ERPNext
+    # expects POS-role users to go through the native POS Awesome page's
+    # server-side RPCs instead, which bypass doctype permissions internally -
+    # this Electron client doesn't). Confirmed live on szl 2026-07-19: a
+    # cashier with only POS User+POS Supervisor could authenticate (API
+    # key/secret) but "Test Login" then failed to load POS Profiles/terminal
+    # ID/assigned warehouse, only working once given every role in the system.
+    # Customer additionally needs create (walk-in customer registration from
+    # the terminal); everything else here is read-only.
+    # Filtered on role too, not just parent doctype - Company/Customer/Branch/Mode of
+    # Payment etc. already carry plenty of pre-existing Custom DocPerm rows for other
+    # roles (Accounts Manager, HR Manager, Sales User, ...) that have nothing to do with
+    # this POS-terminal fix and were never fixture-tracked; a parent-only filter would
+    # sweep those in too and risk duplicate rows on sites where they already exist under
+    # a different auto-generated name once `migrate` syncs this fixture.
+    {
+        "doctype": "Custom DocPerm",
+        "filters": [
+            ["parent", "in", [
+                "POS Opening Entry", "POS Closing Entry", "POS Profile", "Company",
+                "Sales Taxes and Charges Template", "Mode of Payment", "Coupon Code",
+                "Customer", "Customer Group", "Territory", "Item", "Item Price", "Bin",
+                "Branch", "Print Format",
+            ]],
+            ["role", "in", ["POS User", "POS Supervisor"]],
+        ],
+    },
     # NOTE: FBR Integration Settings is deliberately NOT a fixture - it holds
     # a security_token (Password) plus real sandbox/production URLs per
     # company+branch. Only its schema is git-tracked (doctype file below);
