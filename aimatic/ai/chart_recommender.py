@@ -7,6 +7,8 @@ tools.py, so logic is per-tool and explicit.
 
 from __future__ import annotations
 
+from frappe.utils import flt
+
 from aimatic.ai.response_schema import Chart, ChartData, ChartOptions
 
 # Bar charts stay readable up to about this many bars before labels get
@@ -269,6 +271,174 @@ def _chart_get_receivables_overview(result: dict) -> None:
     return None
 
 
+def _chart_get_payables_aging(result: dict) -> Chart | None:
+    buckets = result.get("buckets") or {}
+    if not buckets:
+        return None
+    labels = ["0-30", "31-60", "61-90", "90+"]
+    values = [flt(buckets.get(l, 0)) for l in labels]
+    if all(v == 0 for v in values):
+        return None
+    return Chart(
+        id="chart_get_payables_aging",
+        type="bar",
+        title="Payables Aging Buckets",
+        data=ChartData(
+            labels=labels,
+            datasets=[{"label": "Outstanding", "data": values}],
+        ),
+        options=ChartOptions(),
+        auto_selected=True,
+    )
+
+
+def _chart_get_receivables_aging(result: dict) -> Chart | None:
+    buckets = result.get("buckets") or {}
+    if not buckets:
+        return None
+    labels = ["0-30", "31-60", "61-90", "90+"]
+    values = [flt(buckets.get(l, 0)) for l in labels]
+    if all(v == 0 for v in values):
+        return None
+    return Chart(
+        id="chart_get_receivables_aging",
+        type="bar",
+        title="Receivables Aging Buckets",
+        data=ChartData(
+            labels=labels,
+            datasets=[{"label": "Outstanding", "data": values}],
+        ),
+        options=ChartOptions(),
+        auto_selected=True,
+    )
+
+
+def _chart_get_cash_and_bank_balance(result: dict) -> Chart | None:
+    accounts = result.get("accounts") or []
+    if not accounts:
+        return None
+    # Top 10 by absolute balance
+    sorted_acc = sorted(accounts, key=lambda x: abs(flt(x["balance"])), reverse=True)[:10]
+    labels = [a["account"] for a in sorted_acc]
+    values = [flt(a["balance"]) for a in sorted_acc]
+    return Chart(
+        id="chart_get_cash_and_bank_balance",
+        type="bar",
+        title="Cash & Bank Balances (Top 10)",
+        data=ChartData(
+            labels=labels,
+            datasets=[{"label": "Balance", "data": values}],
+        ),
+        options=ChartOptions(),
+        auto_selected=True,
+    )
+
+
+# No chart for get_profit_and_loss_overview (just a few KPIs)
+
+
+def _chart_get_expense_breakdown(result: dict) -> Chart | None:
+    accounts = (result.get("top_accounts") or [])[:_MAX_CHART_BARS]
+    if not accounts:
+        return None
+    labels = [a["account"] for a in accounts]
+    values = [flt(a["amount"]) for a in accounts]
+    return Chart(
+        id="chart_get_expense_breakdown",
+        type="bar",
+        title="Top Expense Accounts",
+        data=ChartData(
+            labels=labels,
+            datasets=[{"label": "Amount", "data": values}],
+        ),
+        options=ChartOptions(),
+        auto_selected=True,
+    )
+
+
+def _chart_get_trial_balance_summary(result: dict) -> Chart | None:
+    categories = ["Assets", "Liabilities", "Equity", "Income (Period)", "Expense (Period)"]
+    values = [
+        flt(result.get("asset_balance", 0)),
+        flt(result.get("liability_balance", 0)),
+        flt(result.get("equity_balance", 0)),
+        flt(result.get("income_balance", 0)),
+        flt(result.get("expense_balance", 0)),
+    ]
+    if all(v == 0 for v in values):
+        return None
+    return Chart(
+        id="chart_get_trial_balance_summary",
+        type="bar",
+        title="Trial Balance Summary",
+        data=ChartData(
+            labels=categories,
+            datasets=[{"label": "Balance", "data": values}],
+        ),
+        options=ChartOptions(),
+        auto_selected=True,
+    )
+
+
+def _chart_get_tax_liability_overview(result: dict) -> Chart | None:
+    accounts = (result.get("tax_accounts") or [])[:_MAX_CHART_BARS]
+    if not accounts:
+        return None
+    labels = [a["account"] for a in accounts]
+    values = [flt(a["balance"]) for a in accounts]
+    return Chart(
+        id="chart_get_tax_liability_overview",
+        type="bar",
+        title="Tax Account Balances",
+        data=ChartData(
+            labels=labels,
+            datasets=[{"label": "Balance", "data": values}],
+        ),
+        options=ChartOptions(),
+        auto_selected=True,
+    )
+
+
+def _chart_get_payment_entry_summary(result: dict) -> Chart | None:
+    by_mode = result.get("by_mode") or []
+    if not by_mode:
+        return None
+    # Aggregate by mode_of_payment (sum amount across payment types)
+    mode_totals: dict[str, float] = {}
+    for row in by_mode:
+        mode = row["mode_of_payment"]
+        mode_totals[mode] = mode_totals.get(mode, 0) + flt(row["amount"])
+    labels = list(mode_totals.keys())
+    values = list(mode_totals.values())
+    return Chart(
+        id="chart_get_payment_entry_summary",
+        type="pie",
+        title="Payments by Mode",
+        data=ChartData(
+            labels=labels,
+            datasets=[{"label": "Amount", "data": values}],
+        ),
+        options=ChartOptions(),
+        auto_selected=True,
+    )
+
+
+def _chart_get_branch_profit_and_loss(result: dict) -> Chart | None:
+    branches = result.get("branches") or []
+    if len(branches) < 2:
+        return None
+    labels = [b["branch"] for b in branches]
+    data = [flt(b["net_profit"]) for b in branches]
+    return Chart(
+        id="chart_get_branch_profit_and_loss",
+        title="Net Profit by Branch",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": "Net Profit", "data": data}]),
+        options=ChartOptions(horizontal=True, yAxis={"format": "currency"}),
+        auto_selected=True,
+    )
+
+
 _CHART_DISPATCH: dict[str, callable] = {
     "get_sales_overview": _chart_get_sales_overview,
     "get_top_selling_items": _chart_get_top_selling_items,
@@ -286,6 +456,14 @@ _CHART_DISPATCH: dict[str, callable] = {
     "get_top_customers": _chart_get_top_customers,
     "get_item_price_history": _chart_get_item_price_history,
     "get_receivables_overview": _chart_get_receivables_overview,
+    "get_payables_aging": _chart_get_payables_aging,
+    "get_receivables_aging": _chart_get_receivables_aging,
+    "get_cash_and_bank_balance": _chart_get_cash_and_bank_balance,
+    "get_expense_breakdown": _chart_get_expense_breakdown,
+    "get_trial_balance_summary": _chart_get_trial_balance_summary,
+    "get_tax_liability_overview": _chart_get_tax_liability_overview,
+    "get_payment_entry_summary": _chart_get_payment_entry_summary,
+    "get_branch_profit_and_loss": _chart_get_branch_profit_and_loss,
 }
 
 

@@ -666,41 +666,42 @@ def get_top_selling_items(date_from: str | None = None, date_to: str | None = No
 
 
 def get_outstanding_payables_overview(limit: int = 10) -> dict:
-    """Total outstanding payable plus the top N suppliers by amount owed - extends
-    the outstanding-amount figure already in get_purchase_overview/rank_vendors but
-    explicitly sorted by what's owed (those sort by margin/purchase volume)."""
+    """Total outstanding payable plus the top N suppliers by amount owed.
+
+    Sourced from GL Entry (party_type='Supplier'), NOT Purchase Invoice.outstanding_amount -
+    a real bug found live on siezal (2026-07-18): Purchase Invoice-only sourcing showed
+    PKR 0.00 total payable while the real Creditors-account balance was ~PKR 35.5M, because
+    siezal's supplier debt is carried almost entirely via legacy per-row opening-balance
+    Journal Entries from the iPOS migration (see supplierimport.md / CLAUDE.md), not
+    Purchase Invoices - siezal had zero submitted Purchase Invoices at the time. GL Entry
+    is the only source that captures Purchase Invoice, Journal Entry, and Payment Entry
+    postings against a supplier uniformly, matching how ERPNext's own Accounts Payable
+    report computes real outstanding balance."""
     limit = max(1, min(cint(limit or 10), 30))
     company = _resolve_company()
     currency = frappe.get_cached_value("Company", company, "default_currency")
 
-    total_row = frappe.db.sql(
+    per_supplier_balance = frappe.db.sql(
         """
-        SELECT COALESCE(SUM(outstanding_amount), 0) AS outstanding_amount, COUNT(*) AS invoice_count
-        FROM `tabPurchase Invoice`
-        WHERE docstatus = 1 AND IFNULL(is_return, 0) = 0 AND company = %(company)s AND outstanding_amount > 0
+        SELECT party AS supplier, SUM(credit - debit) AS outstanding_amount, COUNT(DISTINCT voucher_no) AS voucher_count
+        FROM `tabGL Entry`
+        WHERE party_type = 'Supplier' AND is_cancelled = 0 AND company = %(company)s
+        GROUP BY party
+        HAVING SUM(credit - debit) > 0
+        ORDER BY outstanding_amount DESC
         """,
         {"company": company},
         as_dict=True,
-    )[0]
-
-    supplier_rows = frappe.db.sql(
-        """
-        SELECT supplier, SUM(outstanding_amount) AS outstanding_amount, COUNT(*) AS invoice_count
-        FROM `tabPurchase Invoice`
-        WHERE docstatus = 1 AND IFNULL(is_return, 0) = 0 AND company = %(company)s AND outstanding_amount > 0
-        GROUP BY supplier
-        ORDER BY outstanding_amount DESC
-        LIMIT %(limit)s
-        """,
-        {"company": company, "limit": limit},
-        as_dict=True,
     )
+    total_outstanding_amount = sum(flt(r.outstanding_amount) for r in per_supplier_balance)
+    supplier_rows = per_supplier_balance[:limit]
+
     return {
         "company": company,
         "currency": currency,
-        "total_outstanding_amount": flt(total_row.outstanding_amount),
-        "total_outstanding_invoice_count": cint(total_row.invoice_count),
-        "top_suppliers": [{"supplier": r.supplier, "outstanding_amount": flt(r.outstanding_amount), "invoice_count": cint(r.invoice_count)} for r in supplier_rows],
+        "total_outstanding_amount": flt(total_outstanding_amount),
+        "total_outstanding_invoice_count": len(per_supplier_balance),
+        "top_suppliers": [{"supplier": r.supplier, "outstanding_amount": flt(r.outstanding_amount), "invoice_count": cint(r.voucher_count)} for r in supplier_rows],
     }
 
 

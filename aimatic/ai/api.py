@@ -12,11 +12,12 @@ from aimatic.ai.nemotron_client import NemotronError, get_chat_completion, get_c
 from aimatic.ai.tools import TOOL_DISPATCH as _CORE_DISPATCH, TOOL_SPECS as _CORE_SPECS
 from aimatic.ai.tools import _resolve_company, _resolve_branch_filter
 from aimatic.ai.tools_extended import TOOL_DISPATCH as _EXTENDED_DISPATCH, TOOL_SPECS as _EXTENDED_SPECS
+from aimatic.ai.tools_accounts import TOOL_DISPATCH as _ACCOUNTS_DISPATCH, TOOL_SPECS as _ACCOUNTS_SPECS
 from aimatic.ai.dynamic_report import DYNAMIC_REPORT_DISPATCH, TOOL_SPECS as _DYNAMIC_REPORT_SPECS
 from aimatic.ai.answer_builder import build_response
 
-TOOL_SPECS = _CORE_SPECS + _EXTENDED_SPECS + _DYNAMIC_REPORT_SPECS
-TOOL_DISPATCH = {**_CORE_DISPATCH, **_EXTENDED_DISPATCH, **DYNAMIC_REPORT_DISPATCH}
+TOOL_SPECS = _CORE_SPECS + _EXTENDED_SPECS + _ACCOUNTS_SPECS + _DYNAMIC_REPORT_SPECS
+TOOL_DISPATCH = {**_CORE_DISPATCH, **_EXTENDED_DISPATCH, **_ACCOUNTS_DISPATCH, **DYNAMIC_REPORT_DISPATCH}
 
 _ALLOWED_ROLES = {"System Manager", "Sales Manager", "Accounts Manager", "POS Supervisor"}
 _MAX_TOOL_ITERATIONS = 5
@@ -70,7 +71,16 @@ def _build_system_prompt() -> str:
         "are in the company's default currency. When a question doesn't specify a date range, "
         "assume today; when it says things like \"this month\" or \"last week\", resolve them into "
         "concrete dates yourself using today's date above before calling a tool. Keep answers "
-        "concise and concrete - lead with the number, then brief context."
+        "concise and concrete - lead with the number, then brief context. "
+        "Always prefer a purpose-built tool (e.g. get_outstanding_payables_overview, "
+        "get_payables_aging, get_sales_overview) over run_dynamic_report whenever one matches the "
+        "question - run_dynamic_report is a last-resort fallback for questions no specific tool "
+        "covers, not a first choice. If a purpose-built tool returns no data, trust that result "
+        "and answer accordingly rather than retrying the same or a different doctype via "
+        "run_dynamic_report - a real business figure (like total outstanding payable) is almost "
+        "always better sourced from ledger balances (a purpose-built tool) than from a single "
+        "transactional doctype, which can legitimately have zero rows even when the real figure "
+        "is nonzero."
     )
 
 

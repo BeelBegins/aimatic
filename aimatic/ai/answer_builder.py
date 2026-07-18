@@ -263,6 +263,347 @@ def _kpis_for_run_dynamic_report(result: dict) -> list[KPI]:
     )]
 
 
+def _kpis_for_get_payables_aging(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    total = result.get("total_outstanding_amount")
+    if total is not None:
+        kpis.append(KPI(
+            key="get_payables_aging_total_outstanding",
+            label="Total Outstanding Payable",
+            value=flt(total),
+            format="currency",
+            currency=currency,
+            severity="warning" if flt(total) > 0 else "info",
+        ))
+    # Overdue (31+ days) as a KPI
+    overdue = flt(result.get("buckets", {}).get("31-60", 0)) + flt(result.get("buckets", {}).get("61-90", 0)) + flt(result.get("buckets", {}).get("90+", 0))
+    if overdue:
+        kpis.append(KPI(
+            key="get_payables_aging_overdue",
+            label="Overdue Payables (31+ days)",
+            value=overdue,
+            format="currency",
+            currency=currency,
+            severity="critical" if overdue > 0 else "info",
+        ))
+    return kpis
+
+
+def _table_for_get_payables_aging(result: dict) -> Table | None:
+    suppliers = result.get("top_suppliers") or []
+    if not suppliers:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_payables_aging",
+        title="Top Suppliers by Outstanding (Aged)",
+        columns=[
+            TableColumn(key="supplier", label="Supplier", type="link", doctype="Supplier"),
+            TableColumn(key="outstanding_amount", label="Total Outstanding", type="currency", currency=currency),
+            TableColumn(key="bucket_0_30", label="0-30 Days", type="currency", currency=currency),
+            TableColumn(key="bucket_31_60", label="31-60 Days", type="currency", currency=currency),
+            TableColumn(key="bucket_61_90", label="61-90 Days", type="currency", currency=currency),
+            TableColumn(key="bucket_90_plus", label="90+ Days", type="currency", currency=currency),
+        ],
+        rows=suppliers,
+    )
+
+
+def _kpis_for_get_receivables_aging(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    total = result.get("total_outstanding_amount")
+    if total is not None:
+        kpis.append(KPI(
+            key="get_receivables_aging_total_outstanding",
+            label="Total Outstanding Receivable",
+            value=flt(total),
+            format="currency",
+            currency=currency,
+            severity="warning" if flt(total) > 0 else "info",
+        ))
+    overdue = flt(result.get("buckets", {}).get("31-60", 0)) + flt(result.get("buckets", {}).get("61-90", 0)) + flt(result.get("buckets", {}).get("90+", 0))
+    if overdue:
+        kpis.append(KPI(
+            key="get_receivables_aging_overdue",
+            label="Overdue Receivables (31+ days)",
+            value=overdue,
+            format="currency",
+            currency=currency,
+            severity="critical" if overdue > 0 else "info",
+        ))
+    return kpis
+
+
+def _table_for_get_receivables_aging(result: dict) -> Table | None:
+    customers = result.get("top_customers") or []
+    if not customers:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_receivables_aging",
+        title="Top Customers by Outstanding (Aged)",
+        columns=[
+            TableColumn(key="customer", label="Customer", type="link", doctype="Customer"),
+            TableColumn(key="customer_name", label="Customer Name", type="text"),
+            TableColumn(key="outstanding_amount", label="Total Outstanding", type="currency", currency=currency),
+            TableColumn(key="bucket_0_30", label="0-30 Days", type="currency", currency=currency),
+            TableColumn(key="bucket_31_60", label="31-60 Days", type="currency", currency=currency),
+            TableColumn(key="bucket_61_90", label="61-90 Days", type="currency", currency=currency),
+            TableColumn(key="bucket_90_plus", label="90+ Days", type="currency", currency=currency),
+        ],
+        rows=customers,
+    )
+
+
+def _kpis_for_get_cash_and_bank_balance(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    total = result.get("total_balance")
+    if total is not None:
+        kpis.append(KPI(
+            key="get_cash_and_bank_balance_total",
+            label="Total Cash & Bank Balance",
+            value=flt(total),
+            format="currency",
+            currency=currency,
+            severity="info",
+        ))
+    return kpis
+
+
+def _table_for_get_cash_and_bank_balance(result: dict) -> Table | None:
+    accounts = result.get("accounts") or []
+    if not accounts:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_cash_and_bank_balance",
+        title="Cash & Bank Account Balances",
+        columns=[
+            TableColumn(key="account", label="Account", type="link", doctype="Account"),
+            TableColumn(key="account_type", label="Type", type="text"),
+            TableColumn(key="balance", label="Balance", type="currency", currency=currency),
+        ],
+        rows=accounts,
+    )
+
+
+def _kpis_for_get_profit_and_loss_overview(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    for key, label, severity in [
+        ("total_income", "Total Income", "info"),
+        ("total_expense", "Total Expense", "info"),
+        ("net_profit", "Net Profit", "critical" if flt(result.get("net_profit", 0)) < 0 else "info"),
+        ("net_margin_pct", "Net Margin %", "warning" if flt(result.get("net_margin_pct", 0)) < 10 else "info"),
+    ]:
+        val = result.get(key)
+        if val is not None:
+            fmt = "percent" if key == "net_margin_pct" else "currency"
+            kpis.append(KPI(
+                key=f"get_profit_and_loss_overview_{key}",
+                label=label,
+                value=flt(val),
+                format=fmt,
+                currency=currency if fmt == "currency" else None,
+                severity=severity,
+            ))
+    return kpis
+
+
+# No table for P&L overview (it's a few headline numbers)
+
+
+def _kpis_for_get_expense_breakdown(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    total = result.get("total_expense")
+    if total is not None:
+        kpis.append(KPI(
+            key="get_expense_breakdown_total_expense",
+            label="Total Expense",
+            value=flt(total),
+            format="currency",
+            currency=currency,
+            severity="info",
+        ))
+    return kpis
+
+
+def _table_for_get_expense_breakdown(result: dict) -> Table | None:
+    accounts = result.get("top_accounts") or []
+    if not accounts:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_expense_breakdown",
+        title="Top Expense Accounts",
+        columns=[
+            TableColumn(key="account", label="Account", type="link", doctype="Account"),
+            TableColumn(key="amount", label="Amount", type="currency", currency=currency),
+        ],
+        rows=accounts,
+    )
+
+
+def _kpis_for_get_trial_balance_summary(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    for key, label in [
+        ("asset_balance", "Total Assets"),
+        ("liability_balance", "Total Liabilities"),
+        ("equity_balance", "Total Equity"),
+        ("income_balance", "Period Income"),
+        ("expense_balance", "Period Expense"),
+        ("balance_check", "Balance Check (Assets - Liab - Equity)"),
+    ]:
+        val = result.get(key)
+        if val is not None:
+            # balance_check is expected to be nonzero in normal operation - it's
+            # Assets minus (Liabilities + Equity), and Income/Expense are period
+            # balances rather than being folded into Equity until a fiscal-year
+            # closing entry runs. A large swing between calls can still be a
+            # useful data-quality signal, but a flat nonzero value alone is not
+            # an error, so this never escalates past "info".
+            kpis.append(KPI(
+                key=f"get_trial_balance_summary_{key}",
+                label=label,
+                value=flt(val),
+                format="currency",
+                currency=currency,
+                severity="info",
+            ))
+    return kpis
+
+
+def _table_for_get_trial_balance_summary(result: dict) -> Table | None:
+    # We can present the five balances as a table
+    rows = [
+        {"category": "Assets", "balance": result.get("asset_balance", 0)},
+        {"category": "Liabilities", "balance": result.get("liability_balance", 0)},
+        {"category": "Equity", "balance": result.get("equity_balance", 0)},
+        {"category": "Income (Period)", "balance": result.get("income_balance", 0)},
+        {"category": "Expense (Period)", "balance": result.get("expense_balance", 0)},
+    ]
+    currency = result.get("currency")
+    return Table(
+        id="table_get_trial_balance_summary",
+        title="Trial Balance Summary",
+        columns=[
+            TableColumn(key="category", label="Category", type="text"),
+            TableColumn(key="balance", label="Balance", type="currency", currency=currency),
+        ],
+        rows=rows,
+    )
+
+
+def _kpis_for_get_tax_liability_overview(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    total = result.get("total_tax_balance")
+    if total is not None:
+        kpis.append(KPI(
+            key="get_tax_liability_overview_total",
+            label="Total Tax Liability",
+            value=flt(total),
+            format="currency",
+            currency=currency,
+            severity="warning" if flt(total) > 0 else "info",
+        ))
+    return kpis
+
+
+def _table_for_get_tax_liability_overview(result: dict) -> Table | None:
+    accounts = result.get("tax_accounts") or []
+    if not accounts:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_tax_liability_overview",
+        title="Tax Account Balances",
+        columns=[
+            TableColumn(key="account", label="Account", type="link", doctype="Account"),
+            TableColumn(key="balance", label="Balance", type="currency", currency=currency),
+        ],
+        rows=accounts,
+    )
+
+
+def _kpis_for_get_payment_entry_summary(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    for key, label, sev in [
+        ("total_received", "Total Received", "info"),
+        ("total_paid", "Total Paid", "info"),
+        ("net_cash_flow", "Net Cash Flow", "critical" if flt(result.get("net_cash_flow", 0)) < 0 else "info"),
+    ]:
+        val = result.get(key)
+        if val is not None:
+            kpis.append(KPI(
+                key=f"get_payment_entry_summary_{key}",
+                label=label,
+                value=flt(val),
+                format="currency",
+                currency=currency,
+                severity=sev,
+            ))
+    return kpis
+
+
+def _table_for_get_payment_entry_summary(result: dict) -> Table | None:
+    by_mode = result.get("by_mode") or []
+    if not by_mode:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_payment_entry_summary",
+        title="Payments by Mode",
+        columns=[
+            TableColumn(key="mode_of_payment", label="Mode of Payment", type="text"),
+            TableColumn(key="payment_type", label="Type", type="text"),
+            TableColumn(key="amount", label="Amount", type="currency", currency=currency),
+            TableColumn(key="txn_count", label="Transactions", type="int"),
+        ],
+        rows=by_mode,
+    )
+
+
+def _kpis_for_get_branch_profit_and_loss(result: dict) -> list[KPI]:
+    total_net_profit = flt(result.get("total_net_profit", 0))
+    currency = result.get("currency")
+    return [
+        KPI(
+            key="get_branch_profit_and_loss_total_net_profit",
+            label="Total Net Profit (All Branches)",
+            value=total_net_profit,
+            format="currency",
+            currency=currency,
+            severity="critical" if total_net_profit < 0 else "info",
+        )
+    ]
+
+
+def _table_for_get_branch_profit_and_loss(result: dict) -> Table | None:
+    branches = result.get("branches") or []
+    if not branches:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_branch_profit_and_loss",
+        title="Profit & Loss by Branch",
+        columns=[
+            TableColumn(key="branch", label="Branch", type="text"),
+            TableColumn(key="total_income", label="Total Income", type="currency", currency=currency),
+            TableColumn(key="total_expense", label="Total Expense", type="currency", currency=currency),
+            TableColumn(key="net_profit", label="Net Profit", type="currency", currency=currency),
+            TableColumn(key="net_margin_pct", label="Net Margin %", type="percent"),
+        ],
+        rows=branches,
+    )
+
+
 _KPI_DISPATCH: dict[str, callable] = {
     "run_dynamic_report": _kpis_for_run_dynamic_report,
     "get_sales_overview": _kpis_for_get_sales_overview,
@@ -281,6 +622,15 @@ _KPI_DISPATCH: dict[str, callable] = {
     "get_dead_stock_detail": _kpis_for_get_dead_stock_detail,
     "get_top_customers": _kpis_for_get_top_customers,
     "get_receivables_overview": _kpis_for_get_receivables_overview,
+    "get_payables_aging": _kpis_for_get_payables_aging,
+    "get_receivables_aging": _kpis_for_get_receivables_aging,
+    "get_cash_and_bank_balance": _kpis_for_get_cash_and_bank_balance,
+    "get_profit_and_loss_overview": _kpis_for_get_profit_and_loss_overview,
+    "get_expense_breakdown": _kpis_for_get_expense_breakdown,
+    "get_trial_balance_summary": _kpis_for_get_trial_balance_summary,
+    "get_tax_liability_overview": _kpis_for_get_tax_liability_overview,
+    "get_payment_entry_summary": _kpis_for_get_payment_entry_summary,
+    "get_branch_profit_and_loss": _kpis_for_get_branch_profit_and_loss,
 }
 
 
@@ -632,6 +982,14 @@ _TABLE_DISPATCH: dict[str, callable] = {
     # Tools with no list-shaped data return None implicitly
     "get_purchase_overview": lambda r: None,
     "get_gross_margin_overview": lambda r: None,
+    "get_payables_aging": _table_for_get_payables_aging,
+    "get_receivables_aging": _table_for_get_receivables_aging,
+    "get_cash_and_bank_balance": _table_for_get_cash_and_bank_balance,
+    "get_expense_breakdown": _table_for_get_expense_breakdown,
+    "get_trial_balance_summary": _table_for_get_trial_balance_summary,
+    "get_tax_liability_overview": _table_for_get_tax_liability_overview,
+    "get_payment_entry_summary": _table_for_get_payment_entry_summary,
+    "get_branch_profit_and_loss": _table_for_get_branch_profit_and_loss,
 }
 
 
