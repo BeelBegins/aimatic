@@ -19,6 +19,26 @@ _ALLOWED_CLOSE_SHIFT_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_CASHIER_ROLES = {"POS User", "POS Supervisor", "System Manager"}
 _CASHIER_OFFLINE_LOGIN_VALID_DAYS = 7
 
+# Master-data doctypes the terminal client is allowed to read via
+# get_terminal_resource/list_terminal_resources below - see those functions'
+# docstrings. Explicit and reviewable in one place, same reasoning as the
+# existing get_item_barcodes/get_uom_conversions endpoints just below.
+_TERMINAL_MASTER_DATA_DOCTYPES = {
+    "POS Profile",
+    "Company",
+    "Sales Taxes and Charges Template",
+    "Mode of Payment",
+    "Coupon Code",
+    "Customer",
+    "Customer Group",
+    "Territory",
+    "Item",
+    "Item Price",
+    "Bin",
+    "Branch",
+    "Print Format",
+}
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers — auth, validation, document loading
@@ -1078,6 +1098,123 @@ def get_uom_conversions(limit_start=0, limit_page_length=500, modified_after=Non
     next_start = start + len(rows) if has_more else None
 
     return {"rows": rows, "next_start": next_start, "has_more": has_more}
+
+
+@frappe.whitelist()
+def get_terminal_resource(doctype, name):
+    """Single-document master-data read for the POS terminal client, in place
+    of Frappe's generic GET /api/resource/<doctype>/<name>.
+
+    Core ERPNext's own DocPerm for doctypes like POS Profile/Company/Coupon
+    Code/Customer grants nothing to POS User/POS Supervisor - those roles are
+    meant to go through the native POS Awesome page's permission-bypassing
+    RPCs, not raw doctype reads. This terminal client used to call the raw
+    REST endpoint directly, which 403'd for a cashier with only POS
+    User/POS Supervisor until aimatic/fixtures/custom_docperm.json's second
+    batch (2026-07-19) widened those roles' Desk-wide read access as an
+    interim fix. This endpoint is the intended, narrower replacement - same
+    idea as get_item_barcodes/get_uom_conversions above: read via a reviewable,
+    explicitly allowlisted method instead of a Desk-wide permission grant. The
+    Custom DocPerm grants are left in place as a safety net for terminals
+    still running an older client build that calls /api/resource directly;
+    see the offline-pos skill for the planned cleanup once the fleet is
+    confirmed on a client version built after this endpoint existed.
+    """
+    _require_login()
+    if doctype not in _TERMINAL_MASTER_DATA_DOCTYPES:
+        frappe.throw(_("This terminal is not permitted to read {0}").format(doctype), frappe.PermissionError)
+    return frappe.get_doc(doctype, name).as_dict()
+
+
+@frappe.whitelist()
+def list_terminal_resources(doctype, fields=None, filters=None, limit_start=0, limit_page_length=500):
+    """Paged master-data list read for the POS terminal client, in place of
+    Frappe's generic GET /api/resource/<doctype>?fields=...&filters=....
+    See get_terminal_resource above for why this exists.
+    """
+    _require_login()
+    if doctype not in _TERMINAL_MASTER_DATA_DOCTYPES:
+        frappe.throw(_("This terminal is not permitted to list {0}").format(doctype), frappe.PermissionError)
+
+    if isinstance(fields, str):
+        fields = json.loads(fields)
+    if isinstance(filters, str):
+        filters = json.loads(filters)
+
+    try:
+        start = int(limit_start or 0)
+        page_length = min(int(limit_page_length or 500), _MAX_PAGE_SIZE)
+    except Exception:
+        start = 0
+        page_length = 500
+
+    return frappe.get_list(
+        doctype,
+        fields=fields or ["name"],
+        filters=filters or {},
+        limit_start=start,
+        limit_page_length=page_length,
+        order_by="modified asc",
+        ignore_permissions=True,
+    )
+
+
+@frappe.whitelist(methods=["POST"])
+def create_walkin_customer(customer_name, customer_group=None, territory=None,
+                            mobile_no=None, email_id=None, tax_id=None, default_price_list=None):
+    """Create a walk-in Customer from the terminal, in place of a raw POST to
+    /api/resource/Customer (core DocPerm grants POS User/POS Supervisor no
+    create access there either - see get_terminal_resource above). Duplicate
+    normalized-mobile rejection is enforced by
+    customer_validation.validate_customer's own Customer.validate hook, not
+    reimplemented here.
+    """
+    _require_login()
+    if not customer_name:
+        frappe.throw(_("Customer Name is required."))
+
+    doc = frappe.get_doc({
+        "doctype": "Customer",
+        "customer_name": customer_name,
+        "customer_type": "Individual",
+        "customer_group": customer_group,
+        "territory": territory,
+        "mobile_no": mobile_no,
+        "email_id": email_id,
+        "tax_id": tax_id,
+    })
+    if default_price_list:
+        doc.default_price_list = default_price_list
+    doc.insert(ignore_permissions=True)
+    return doc.as_dict()
+
+
+@frappe.whitelist()
+def diagnose_terminal_permissions():
+    """Structured pass/fail for the current session's access to every
+    doctype the terminal client needs, for the Settings screen to surface
+    directly (e.g. "Customer: FAIL") instead of the generic "POS Profile
+    load failed" error this bug used to produce.
+
+    Checks frappe.has_permission (the raw /api/resource-relevant check), not
+    just whether get_terminal_resource's allowlist would let the call
+    through - a terminal still running a client build from before that
+    endpoint existed hits raw REST directly, so this diagnostic reflects
+    that path too, not only the newer RPC path.
+    """
+    _require_login()
+    doctypes = sorted(_TERMINAL_MASTER_DATA_DOCTYPES)
+    results = {dt: bool(frappe.has_permission(dt, ptype="read")) for dt in doctypes}
+    results["Customer (create)"] = bool(frappe.has_permission("Customer", ptype="create"))
+    failures = [k for k, v in results.items() if not v]
+
+    return {
+        "user": frappe.session.user,
+        "roles": frappe.get_roles(),
+        "results": results,
+        "all_ok": not failures,
+        "failures": failures,
+    }
 
 
 @frappe.whitelist()

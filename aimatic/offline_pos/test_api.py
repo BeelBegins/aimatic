@@ -1825,6 +1825,49 @@ class TestSubmitPosRefundCashier(_AimTestCase):
                 _require_refund_permission(pos, "someone_else@example.com")
 
 
+class TestCashierMasterDataPermissions(_AimTestCase):
+    """Regression test for the 2026-07-19 permission gap: the Electron client's
+    Settings screen reads several master-data doctypes directly over Frappe's
+    generic /api/resource REST endpoint (not through this module's whitelisted
+    methods), so each read is subject to that doctype's own core DocPerm. Core
+    ERPNext grants POS User/POS Supervisor nothing on any of these doctypes -
+    fixed via Custom DocPerm fixtures (aimatic/fixtures/custom_docperm.json).
+    This catches a future regression (fixture drift, an ERPNext upgrade
+    resetting Custom DocPerm) automatically instead of only surfacing when a
+    real cashier fails to load their POS Profile.
+    """
+
+    _READ_ONLY_DOCTYPES = [
+        "POS Profile", "Company", "Sales Taxes and Charges Template",
+        "Mode of Payment", "Coupon Code", "Customer Group", "Territory",
+        "Item", "Item Price", "Bin", "Branch", "Print Format",
+    ]
+
+    def test_pos_user_and_supervisor_can_read_terminal_master_data(self):
+        email, _ = _make_cashier(roles=("POS User", "POS Supervisor"))
+        for doctype in self._READ_ONLY_DOCTYPES:
+            with self.subTest(doctype=doctype):
+                self.assertTrue(
+                    frappe.has_permission(doctype, ptype="read", user=email),
+                    f"POS User/POS Supervisor lost read access to {doctype}",
+                )
+
+    def test_pos_user_and_supervisor_can_read_and_create_customer(self):
+        email, _ = _make_cashier(roles=("POS User", "POS Supervisor"))
+        self.assertTrue(frappe.has_permission("Customer", ptype="read", user=email))
+        self.assertTrue(frappe.has_permission("Customer", ptype="create", user=email))
+
+    def test_pos_user_alone_has_the_same_master_data_access(self):
+        """POS Supervisor is a superset in practice, but the Custom DocPerm
+        grants are separate rows per role - verify POS User alone (no
+        Supervisor) also passes, so an edit that only touches one of the two
+        roles' rows is still caught."""
+        email, _ = _make_cashier(roles=("POS User",))
+        for doctype in self._READ_ONLY_DOCTYPES + ["Customer"]:
+            with self.subTest(doctype=doctype):
+                self.assertTrue(frappe.has_permission(doctype, ptype="read", user=email))
+
+
 class _patch_fbr:
     """Stubs build_pos_payload and apply_fbr_accounting_rows so tests do not
     need FBR Integration Settings configured in the database.
