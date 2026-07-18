@@ -353,6 +353,44 @@ def create_order(request_id, customer, items, branch=None, warehouse=None, deliv
 
 
 @frappe.whitelist()
+def update_order(order, items, delivery_date=None, po_no=None, remarks=None):
+	"""Edits an existing Sales Order still sitting as a Draft (docstatus=0).
+	Only reachable for Draft orders - once submitted/cancelled, ERPNext's own
+	docstatus immutability is the guard, not anything here. Recomputes items/
+	pricing/tax the same way _make_order does for a new order (never trusts
+	a client-supplied rate/amount), using the order's own existing branch/
+	warehouse/price list rather than accepting them from the client, since
+	those were already fixed when the order was first created.
+	"""
+	_require_sales_user()
+	doc = frappe.get_doc("Sales Order", order)
+	doc.check_permission("write")
+	if doc.docstatus != 0:
+		frappe.throw(_("Only Draft orders can be edited - {0} has already been submitted or cancelled").format(order))
+
+	warehouse = doc.set_warehouse
+	doc.set("items", [])
+	for item in _parse_items(items):
+		doc.append("items", {
+			"item_code": item["item_code"],
+			"qty": item["qty"],
+			"uom": item["uom"],
+			"delivery_date": item["delivery_date"] or delivery_date or doc.delivery_date,
+			"warehouse": warehouse,
+		})
+	if delivery_date:
+		doc.delivery_date = delivery_date
+	if po_no is not None:
+		doc.po_no = po_no
+	if remarks is not None:
+		doc.remarks = remarks
+	doc.run_method("set_missing_values")
+	doc.run_method("calculate_taxes_and_totals")
+	doc.save()
+	return _order_response(doc)
+
+
+@frappe.whitelist()
 def get_orders(customer=None, offset=0, limit=20):
 	_require_sales_user()
 	filters = {"customer": customer} if customer else {}
