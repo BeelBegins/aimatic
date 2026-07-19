@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import frappe
 from frappe import _
@@ -23,6 +24,53 @@ _ALLOWED_ROLES = {"System Manager", "Sales Manager", "Accounts Manager", "POS Su
 _MAX_TOOL_ITERATIONS = 5
 _MAX_HISTORY_TURNS = 20
 _HISTORY_RESTORE_LIMIT = 40
+_MAX_RECIPIENTS = 20
+
+
+def _validate_recipients(recipients: str) -> str:
+    """Validates the comma-separated recipient list for Scheduled Question /
+    AI Alert Rule email delivery. Every recipient must be an existing,
+    enabled Frappe User who already holds one of _ALLOWED_ROLES - not just
+    any registered account (e.g. a portal Customer/Supplier User) - since
+    these emails carry the same confidential financial data (payables,
+    margins, vendor performance, sales) the assistant itself is role-gated
+    on. Without this, any of the 4 allowed roles could point a Scheduled
+    Question/Alert Rule at an arbitrary address and have it silently
+    exfiltrated on a recurring schedule with no guardrail at all - real gap
+    found in the original create_scheduled_question/create_alert_rule
+    (neither validated `recipients` in any way). Rejects the whole save
+    (rather than silently dropping bad entries) so a typo doesn't quietly
+    produce an empty recipient list."""
+    if not recipients or not recipients.strip():
+        return ""
+
+    raw_list = [r.strip() for r in recipients.split(",") if r.strip()]
+    if not raw_list:
+        return ""
+    if len(raw_list) > _MAX_RECIPIENTS:
+        frappe.throw(_("Maximum {0} recipients allowed.").format(_MAX_RECIPIENTS))
+
+    seen = set()
+    deduped = []
+    for r in raw_list:
+        key = r.lower()
+        if key not in seen:
+            seen.add(key)
+            deduped.append(r)
+
+    invalid = []
+    for r in deduped:
+        user = frappe.db.get_value("User", {"name": r, "enabled": 1}, "name")
+        if not user or not (set(frappe.get_roles(user)) & _ALLOWED_ROLES):
+            invalid.append(r)
+
+    if invalid:
+        frappe.throw(_(
+            "These recipients are not valid: {0}. Each recipient must be an "
+            "existing, enabled user with access to the AI Assistant."
+        ).format(", ".join(invalid)))
+
+    return ", ".join(deduped)
 
 
 @frappe.whitelist()
@@ -73,14 +121,25 @@ def _build_system_prompt() -> str:
         "concrete dates yourself using today's date above before calling a tool. Keep answers "
         "concise and concrete - lead with the number, then brief context. "
         "Always prefer a purpose-built tool (e.g. get_outstanding_payables_overview, "
-        "get_payables_aging, get_sales_overview) over run_dynamic_report whenever one matches the "
-        "question - run_dynamic_report is a last-resort fallback for questions no specific tool "
-        "covers, not a first choice. If a purpose-built tool returns no data, trust that result "
+        "get_payables_aging, get_sales_overview, get_purchase_overview, get_receivables_overview, "
+        "rank_vendors, get_cash_and_bank_balance, get_branch_profit_and_loss) over "
+        "run_dynamic_report whenever one matches the question - "
+        "check every purpose-built tool's own description first, since one almost always exists "
+        "for a specific named business metric (a ranking, a balance, an aging breakdown, a "
+        "margin). run_dynamic_report is a last-resort fallback only for questions no specific "
+        "tool's description covers, never a first choice, and never chosen just because its own "
+        "doctype list happens to include the relevant doctype. If a purpose-built tool returns no "
+        "data, trust that result "
         "and answer accordingly rather than retrying the same or a different doctype via "
         "run_dynamic_report - a real business figure (like total outstanding payable) is almost "
         "always better sourced from ledger balances (a purpose-built tool) than from a single "
         "transactional doctype, which can legitimately have zero rows even when the real figure "
-        "is nonzero."
+        "is nonzero. Every tool you can use is already provided to you through the function-"
+        "calling mechanism - never write a tool's name out in your reply while reasoning about "
+        "whether one exists or is available; if a question needs data, actually invoke a tool "
+        "via a real function call before answering, even if you are unsure which one fits best - "
+        "picking the closest match and calling it is always correct, describing tool options in "
+        "plain text instead of calling one is never a valid answer."
     )
 
 
@@ -110,6 +169,44 @@ def _looks_like_raw_tool_json(content: str) -> bool:
         if not isinstance(parsed, dict):
             return False
     return True
+
+
+_TOOL_NAME_PATTERN = re.compile(r"\b(?:get|rank|run)_[a-z_]+\b")
+
+
+def _looks_like_tool_hallucination(content: str, tool_results: dict) -> bool:
+    """A second, distinct free-tier failure mode from _looks_like_raw_tool_json:
+    instead of malforming a tool call, the model sometimes reasons about tool
+    selection in plain prose instead of ever actually calling one. Confirmed
+    live on siezal in two different shapes:
+      1. Asking "What is our current cash and bank balance?" (a question the
+         real get_cash_and_bank_balance tool directly answers) reproducibly
+         (2/2 attempts) returned a wall of text listing dozens of variations
+         of "get_branch_stock_valuation_summary_comparison" - a tool name
+         that has never existed in this codebase.
+      2. Asking "What are our overdue payables broken down by aging bucket?"
+         (answered directly by the real get_payables_aging tool) returned
+         several paragraphs of visible chain-of-thought ("Looking at the
+         available tools... I don't see a specific get_payables_aging...
+         Let me try using run_dynamic_report...") that correctly *named*
+         several real tools (including get_payables_aging itself) while
+         still never issuing an actual tool call.
+    Both shapes left the answer with zero kpis/charts/tables - what actually
+    made the "Cash & Bank Balance"/"Payables Aging" AI Dashboard widgets
+    look permanently incomplete rather than just stale.
+
+    Broadened to fire on ANY tool-name-shaped identifier in the content -
+    not just ones absent from TOOL_DISPATCH - because case 2 shows the model
+    can narrate real tool names while still failing to call one; a genuine
+    natural-language answer to a data question has no reason to ever spell
+    out a snake_case get_/rank_/run_ identifier verbatim (it talks about
+    "cash balance", not "get_cash_and_bank_balance"). Only fires when
+    tool_results is still completely empty this turn - a model that has
+    already gathered real data from a genuine tool call is extremely
+    unlikely to be narrating tool selection in its final answer."""
+    if tool_results or not content:
+        return False
+    return bool(_TOOL_NAME_PATTERN.search(content))
 
 
 def _parse_history(history: str | None) -> list[dict]:
@@ -185,6 +282,48 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
                     ),
                 })
                 continue
+            if _looks_like_tool_hallucination(reply, tool_results):
+                frappe.log_error(
+                    title="AI Assistant: tool hallucination corrected",
+                    message=f"question={message!r} raw_content={reply!r}",
+                )
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "You did not make a real tool call. Do not describe, list, or guess "
+                        "at tool names in plain text - the tools you can use are already "
+                        "provided to you through the function-calling mechanism, not named in "
+                        "this conversation. Pick the tool that most closely matches the "
+                        "question and call it now via a real tool call, even if you are "
+                        "unsure it is the exact right one."
+                    ),
+                })
+                continue
+            if not tool_results and not reply.strip():
+                # A third free-tier failure mode, distinct from the two above: the
+                # model returns a completely empty content string with no tool_calls
+                # at all - no tool-shaped text to catch, just nothing. Without this
+                # guard ask() would treat "" as a valid final answer, and callers like
+                # refresh_saved_report() save unconditionally on any non-throwing
+                # result - silently downgrading a widget that previously had real
+                # data to an empty NO_TOOL_DATA snapshot. Confirmed live on siezal
+                # (2026-07-19): a refresh of the "Outstanding Receivables" widget hit
+                # this exact path and overwrote a correct PKR 0.00 answer with blank
+                # kpis/tables.
+                frappe.log_error(
+                    title="AI Assistant: empty non-answer corrected",
+                    message=f"question={message!r}",
+                )
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "You returned an empty reply without calling a tool. Call the "
+                        "tool that best matches the question now, or if you already have "
+                        "enough information from earlier tool results, answer in plain "
+                        "language - do not reply with nothing."
+                    ),
+                })
+                continue
             _log_turn("user", message, conversation)
             _log_turn("assistant", reply, conversation)
 
@@ -210,7 +349,14 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
             function = call.get("function") or {}
             name = function.get("name")
             result = _dispatch_tool_call(call)
-            if name in TOOL_DISPATCH and "error" not in result:
+            if name in TOOL_DISPATCH and "error" not in result and name not in tool_results:
+                # Keep the FIRST call's result per tool name. A comparison-style
+                # question ("this month vs last month") makes the model call the
+                # same tool twice with different date ranges; the first call is
+                # the period the question actually asked about, later calls are
+                # supplementary context for the model's own prose. Overwriting
+                # here (last-call-wins) let a zero-result comparison call clobber
+                # the real KPI/table/chart data built from the first call.
                 tool_results[name] = result
             messages.append({"role": "tool", "tool_call_id": call.get("id"), "content": json.dumps(result, default=str)})
 
@@ -297,20 +443,46 @@ def list_conversations(limit: int = 50):
 
 
 @frappe.whitelist()
-def get_conversation_messages(conversation: str):
-    """A specific conversation's full transcript, in order - used to resume a
-    past analysis from the conversation-history list, distinct from
-    get_recent_history's flat "last N messages regardless of grouping" view."""
+def get_conversation_messages(conversation: str, limit: int = 100, before: str | None = None):
+    """A specific conversation's transcript, cursor-paginated (newest page
+    first) - used to resume a past analysis from the conversation-history
+    list, distinct from get_recent_history's flat "last N messages
+    regardless of grouping" view. Previously fetched the ENTIRE transcript
+    unbounded in one query/DOM render - fine for a short conversation but an
+    unbounded query plus an unbounded single-shot DOM append for a
+    long-lived, heavily-used one. `limit` (capped at 200) bounds each page;
+    `before` is the `creation` timestamp of the oldest message already
+    loaded, used by the client to page further back via "Load older
+    messages" (see ai_assistant_console.js's _load_conversation_page).
+    Returns messages in ascending order within the page, plus `has_more` so
+    the client knows whether an older page exists."""
     _check_role()
     _check_conversation_ownership(conversation)
+
+    limit = max(1, min(cint(limit or 100), 200))
+    filters = {"conversation": conversation}
+    if before:
+        filters["creation"] = ["<", before]
+
     rows = frappe.get_all(
         "AI Assistant Message",
-        filters={"conversation": conversation},
-        fields=["role", "content", "feedback"],
-        order_by="creation asc",
+        filters=filters,
+        fields=["role", "content", "feedback", "creation"],
+        order_by="creation desc",
+        limit=limit + 1,
         ignore_permissions=True,
     )
-    return {"messages": [{"role": r.role, "content": r.content, "feedback": r.feedback} for r in rows]}
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    rows.reverse()
+
+    return {
+        "messages": [
+            {"role": r.role, "content": r.content, "feedback": r.feedback, "creation": str(r.creation)}
+            for r in rows
+        ],
+        "has_more": has_more,
+    }
 
 
 @frappe.whitelist()
@@ -503,6 +675,26 @@ def refresh_saved_report(name: str):
     # Call the module-level ask() directly (same module) to get a fresh StructuredResponse dict
     fresh = ask(message=doc.question)
 
+    # Don't let a transient free-tier degraded answer (no tool called at all, despite
+    # the retry guards in ask()) permanently overwrite a snapshot that previously had
+    # real data - ask() can still return a technically-valid, non-throwing but
+    # data-empty response after exhausting its own retry budget. Persisting that would
+    # silently regress a working widget to blank on every future dashboard load, worse
+    # than just leaving the last good snapshot in place. The degraded result is still
+    # returned to the caller for this one refresh so the UI can show the outcome/retry,
+    # it's just not written to the document.
+    fresh_is_empty = not (fresh.get("kpis") or fresh.get("charts") or fresh.get("tables"))
+    old_had_data = False
+    if fresh_is_empty and doc.response_snapshot:
+        old = json.loads(doc.response_snapshot)
+        old_had_data = bool(old.get("kpis") or old.get("charts") or old.get("tables"))
+    if fresh_is_empty and old_had_data:
+        frappe.log_error(
+            title="AI Assistant: refresh produced no data, snapshot kept",
+            message=f"saved_report={name!r} question={doc.question!r}",
+        )
+        return fresh
+
     # Update snapshots
     doc.response_snapshot = json.dumps(fresh, default=str)
     doc.last_refreshed = now_datetime()
@@ -531,7 +723,9 @@ def create_dashboard(title: str):
 
 @frappe.whitelist()
 def list_dashboards():
-    """Current user's own dashboards with widget counts."""
+    """Current user's own dashboards with widget counts. Widget counts are
+    batched in one grouped query rather than one frappe.db.count per
+    dashboard row (N+1 for a user with many dashboards)."""
     _check_role()
     rows = frappe.get_all(
         "AI Dashboard",
@@ -540,29 +734,62 @@ def list_dashboards():
         order_by="creation desc",
         ignore_permissions=True,
     )
-    result = []
-    for r in rows:
-        widget_count = frappe.db.count("AI Dashboard Widget", {"parent": r.name})
-        result.append({"name": r.name, "title": r.title, "widget_count": widget_count})
-    return {"dashboards": result}
+    if not rows:
+        return {"dashboards": []}
+
+    dashboard_names = [r.name for r in rows]
+    counts = frappe.db.sql(
+        """
+        SELECT parent, COUNT(*) AS cnt
+        FROM `tabAI Dashboard Widget`
+        WHERE parent IN %(names)s
+        GROUP BY parent
+        """,
+        {"names": dashboard_names},
+        as_dict=True,
+    )
+    count_map = {c.parent: c.cnt for c in counts}
+
+    return {
+        "dashboards": [
+            {"name": r.name, "title": r.title, "widget_count": count_map.get(r.name, 0)}
+            for r in rows
+        ]
+    }
 
 
 @frappe.whitelist()
 def get_dashboard(name: str):
-    """Ownership-checked dashboard with widgets enriched from linked saved reports."""
+    """Ownership-checked dashboard with widgets enriched from linked saved
+    reports. Saved reports are batch-fetched in one query rather than one
+    frappe.get_doc per widget (N+1 for a dashboard with many widgets)."""
     _check_role()
     _check_dashboard_ownership(name)
     doc = frappe.get_doc("AI Dashboard", name)
 
+    if not doc.widgets:
+        return {"name": doc.name, "title": doc.title, "widgets": []}
+
+    saved_report_names = [w.saved_report for w in doc.widgets]
+    saved_reports = frappe.get_all(
+        "AI Saved Report",
+        filters={"name": ["in", saved_report_names]},
+        fields=["name", "title", "response_snapshot"],
+        ignore_permissions=True,
+    )
+    sr_map = {sr.name: sr for sr in saved_reports}
+
     widgets = []
     for w in doc.widgets:
-        sr_doc = frappe.get_doc("AI Saved Report", w.saved_report)
+        sr = sr_map.get(w.saved_report)
+        if not sr:
+            continue  # orphaned widget (saved report deleted out from under it) - skip
         widgets.append({
             "name": w.name,  # child row's own name for later removal
             "saved_report": w.saved_report,
             "size": w.size,
-            "title": sr_doc.title or "",
-            "response_snapshot": json.loads(sr_doc.response_snapshot or "{}"),
+            "title": sr.title or "",
+            "response_snapshot": json.loads(sr.response_snapshot or "{}"),
         })
 
     return {
@@ -707,7 +934,7 @@ def create_scheduled_question(question: str, frequency: str, recipients: str) ->
         "doctype": "Scheduled Question",
         "question": question,
         "frequency": frequency,
-        "recipients": recipients,
+        "recipients": _validate_recipients(recipients),
         "user": frappe.session.user,
         "enabled": 1,
     })
@@ -744,7 +971,7 @@ def update_scheduled_question(
             frappe.throw(_("Invalid frequency. Must be Daily, Weekly, or Monthly."))
         doc.frequency = frequency
     if recipients is not None:
-        doc.recipients = recipients
+        doc.recipients = _validate_recipients(recipients)
     if enabled is not None:
         doc.enabled = enabled
     doc.save(ignore_permissions=True)
@@ -772,7 +999,7 @@ def create_alert_rule(rule_name: str, recipients: str, threshold_override: str |
     doc = frappe.get_doc({
         "doctype": "AI Alert Rule",
         "rule_name": rule_name,
-        "recipients": recipients,
+        "recipients": _validate_recipients(recipients),
         "user": frappe.session.user,
         "enabled": 1,
         "threshold_override": threshold_override or "",
@@ -803,7 +1030,7 @@ def update_alert_rule(
     _check_alert_rule_ownership(name)
     doc = frappe.get_doc("AI Alert Rule", name)
     if recipients is not None:
-        doc.recipients = recipients
+        doc.recipients = _validate_recipients(recipients)
     if enabled is not None:
         doc.enabled = enabled
     if threshold_override is not None:

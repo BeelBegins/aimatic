@@ -127,6 +127,35 @@
     border-radius: var(--border-radius-md, 6px);
 }
 
+/* Context bar mobile collapse */
+.ai-assistant-context-bar-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-color);
+    background: var(--control-bg);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.ai-assistant-context-bar-toggle:hover {
+    background: var(--control-bg-hover);
+}
+
+.ai-assistant-context-bar-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    width: 100%;
+}
+
 /* Suggested Questions - collapsed-by-default panel */
 .ai-assistant-suggested-questions {
     padding: 0;
@@ -809,8 +838,9 @@
 
 .ai-assistant-conv-row {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
     padding: 6px 8px;
     border-radius: var(--border-radius-md, 6px);
     cursor: pointer;
@@ -824,6 +854,13 @@
 .ai-assistant-conv-row.active {
     background: var(--control-bg);
     font-weight: 600;
+}
+
+.ai-assistant-conv-row-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
 }
 
 .ai-assistant-conv-pin-icon {
@@ -840,10 +877,20 @@
     white-space: nowrap;
 }
 
+.ai-assistant-conv-meta {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
 .ai-assistant-conv-actions {
     display: none;
     flex: 0 0 auto;
     gap: 4px;
+    margin-top: 2px;
 }
 
 .ai-assistant-conv-row:hover .ai-assistant-conv-actions {
@@ -1122,3 +1169,295 @@
 .ai-assistant-widget-body .ai-assistant-table-wrap {
     margin: 8px 0 0;
 }
+
+/* ============================================================
+   RESPONSIVE BREAKPOINTS
+   ============================================================ */
+
+/* Tablet: 600px – 1023px */
+@media (max-width: 1023px) {
+    .ai-assistant-layout {
+        height: calc(100vh - 120px);
+    }
+
+    /* Sidebars become off-canvas drawers */
+    .ai-assistant-sidebar,
+    .ai-assistant-right-panel {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        z-index: 1050;
+        height: 100vh;
+        max-height: 100vh;
+        overflow-y: auto;
+        box-shadow: 0 0 30px rgba(0,0,0,0.15);
+        flex: none;
+        width: 280px;
+        max-width: 85vw;
+        display: flex !important; /* override .collapsed display:none when open */
+    }
+
+    .ai-assistant-sidebar {
+        left: 0;
+        border-right: 1px solid var(--border-color);
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+    }
+
+    .ai-assistant-sidebar:not(.collapsed) {
+        transform: translateX(0);
+    }
+
+    .ai-assistant-right-panel {
+        right: 0;
+        border-left: 1px solid var(--border-color);
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+    }
+
+    .ai-assistant-right-panel:not(.collapsed) {
+        transform: translateX(0);
+    }
+
+    /* Rails stay in-flow but only show the toggle button */
+    .ai-assistant-sidebar-rail,
+    .ai-assistant-right-panel-rail {
+        flex: 0 0 40px;
+        width: 40px;
+    }
+
+    .ai-assistant-sidebar-rail .ai-assistant-sidebar-collapse,
+    .ai-assistant-right-panel-rail .ai-assistant-right-panel-collapse {
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        min-height: 36px;
+    }
+
+    /* Container takes full width */
+    .ai-assistant-container {
+        flex: 1 1 100%;
+        min-width: 0;
+        padding: 0 var(--padding-md, 16px);
+    }
+
+    /* Backdrop */
+    .ai-assistant-drawer-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 1040;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+    }
+
+    .ai-assistant-drawer-backdrop.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Context bar mobile collapse */
+    .ai-assistant-context-bar-toggle {
+        display: flex;
+    }
+
+    .ai-assistant-context-bar-fields {
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border-color);
+        margin-top: 8px;
+        width: 100%;
+    }
+
+    .ai-assistant-context-bar-fields.expanded {
+        display: flex;
+    }
+
+    .ai-assistant-context-bar-fields .frappe-control {
+        min-width: 0;
+        max-width: none;
+        width: 100%;
+    }
+
+    /* Bubbles wider */
+    .ai-assistant-bubble {
+        max-width: 90%;
+    }
+
+    /* Touch targets */
+    .ai-assistant-mic-btn,
+    .ai-assistant-send,
+    .ai-assistant-suggested-btn,
+    .ai-assistant-followup-chip,
+    .ai-assistant-conv-actions button,
+    .ai-assistant-widget-remove,
+    .ai-assistant-sidebar-collapse,
+    .ai-assistant-right-panel-collapse,
+    .ai-assistant-context-bar-toggle,
+    .ai-assistant-voice-lang,
+    .ai-assistant-voice-discard,
+    .ai-assistant-save-report,
+    .ai-assistant-new-btn,
+    .ai-assistant-new-dashboard-btn,
+    .ai-assistant-back-to-chat,
+    .ai-assistant-load-older-btn,
+    .ai-assistant-export-csv,
+    .ai-assistant-export-xlsx {
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    .ai-assistant-input-row {
+        gap: 6px;
+    }
+
+    .ai-assistant-mic-btn {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* Mobile: <600px */
+@media (max-width: 599px) {
+    .ai-assistant-layout {
+        height: calc(100vh - 80px);
+    }
+
+    .ai-assistant-sidebar,
+    .ai-assistant-right-panel {
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .ai-assistant-container {
+        padding: 0 var(--padding-sm, 12px);
+    }
+
+    .ai-assistant-intro {
+        font-size: var(--text-xs);
+        padding: 6px 0 10px;
+    }
+
+    .ai-assistant-bubble {
+        max-width: 95%;
+        padding: 8px 12px;
+        font-size: var(--text-sm);
+    }
+
+    .ai-assistant-input-row {
+        padding: 8px 0;
+    }
+
+    .ai-assistant-input {
+        font-size: var(--text-sm);
+        padding: 8px 12px;
+    }
+
+    .ai-assistant-send {
+        padding: 8px 16px;
+        font-size: var(--text-sm);
+    }
+
+    /* Dashboard widgets single column */
+    .ai-assistant-widget-sm,
+    .ai-assistant-widget-md,
+    .ai-assistant-widget-lg {
+        flex: 0 0 100%;
+        min-width: 0;
+    }
+
+    .ai-assistant-dashboard-view {
+        padding: 0 var(--padding-sm, 12px);
+    }
+
+    .ai-assistant-dashboard-view-header {
+        padding: 8px 0;
+    }
+
+    .ai-assistant-dashboard-view-title {
+        font-size: var(--text-base, 1rem);
+    }
+
+    /* KPI cards single column on very narrow */
+    .ai-assistant-kpi-row {
+        grid-template-columns: 1fr;
+    }
+
+    /* Suggested questions full width buttons */
+    .ai-assistant-suggested-btn {
+        flex: 1 1 100%;
+        text-align: left;
+        justify-content: flex-start;
+    }
+
+    /* Follow-up chips wrap */
+    .ai-assistant-followup-chip {
+        flex: 1 1 calc(50% - 3px);
+        text-align: center;
+    }
+}
+
+/* Desktop ≥1024px: sidebars default collapsed */
+@media (min-width: 1024px) {
+    .ai-assistant-sidebar.collapsed,
+    .ai-assistant-right-panel.collapsed {
+        display: none;
+    }
+
+    .ai-assistant-sidebar:not(.collapsed),
+    .ai-assistant-right-panel:not(.collapsed) {
+        display: flex;
+    }
+
+    /* Ensure rails are visible */
+    .ai-assistant-sidebar-rail,
+    .ai-assistant-right-panel-rail {
+        display: flex;
+    }
+
+    /* Backdrop hidden on desktop */
+    .ai-assistant-drawer-backdrop {
+        display: none !important;
+    }
+
+    /* Context bar toggle hidden on desktop */
+    .ai-assistant-context-bar-toggle {
+        display: none !important;
+    }
+
+    .ai-assistant-context-bar-fields {
+        display: flex !important;
+    }
+}
+
+/* Print */
+@media print {
+    .ai-assistant-sidebar-rail,
+    .ai-assistant-right-panel-rail,
+    .ai-assistant-input-row,
+    .ai-assistant-voice-status,
+    .ai-assistant-suggested-questions,
+    .ai-assistant-context-bar,
+    .ai-assistant-dashboard-view-header button {
+        display: none !important;
+    }
+    .ai-assistant-layout {
+        height: auto;
+        min-height: 0;
+    }
+    .ai-assistant-sidebar,
+    .ai-assistant-right-panel {
+        position: static !important;
+        transform: none !important;
+        box-shadow: none !important;
+        width: 260px;
+        flex: 0 0 260px;
+        display: flex !important;
+    }
+}
+
+

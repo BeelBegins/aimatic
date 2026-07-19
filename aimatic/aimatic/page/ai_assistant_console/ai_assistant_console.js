@@ -112,7 +112,9 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         this.recording_start_ms = null;
         this.duration_interval = null;
         this.build_layout();
+        this.restore_panel_states();
         this.bind_events();
+        this.bind_global_events();
         this.init_voice();
     }
 
@@ -172,6 +174,11 @@ aimatic.AiAssistantPage = class AiAssistantPage {
             </div>
         `).appendTo(this.page.main.empty());
 
+        // Shared backdrop for the off-canvas drawers (tablet/mobile only, see CSS)
+        // - position:fixed takes it out of .ai-assistant-layout's flex flow, so it
+        // can just be a plain sibling here without any extra wrapper markup.
+        this.$backdrop = $('<div class="ai-assistant-drawer-backdrop"></div>').appendTo(this.$layout);
+
         this.$container = this.$layout.find('.ai-assistant-container');
         this.$sidebar = this.$layout.find('.ai-assistant-sidebar');
         this.$right_panel = this.$layout.find('.ai-assistant-right-panel');
@@ -191,6 +198,16 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         this.$voice_status = this.$container.find('.ai-assistant-voice-status');
 
         this.build_context_bar();
+
+        // Wrap the 5 Frappe fields build_context_bar() just added into a
+        // collapsible container + prepend a toggle button (mobile only, see
+        // CSS) - must run AFTER build_context_bar() populates $context_bar,
+        // not before, or there'd be nothing yet to move into the wrapper.
+        this.$context_bar_fields = $('<div class="ai-assistant-context-bar-fields"></div>').appendTo(this.$context_bar);
+        this.$context_bar_toggle = $('<button type="button" class="ai-assistant-context-bar-toggle"></button>').prependTo(this.$context_bar);
+        this.$context_bar.find('.frappe-control').appendTo(this.$context_bar_fields);
+        this.update_context_bar_toggle();
+
         this.build_suggested_questions();
         this.build_sidebar_events();
         this.refresh_dashboard_list();
@@ -211,7 +228,10 @@ aimatic.AiAssistantPage = class AiAssistantPage {
     }
 
     build_sidebar_events() {
-        this.$layout.find('.ai-assistant-new-btn').on('click', () => this.clear());
+        this.$layout.find('.ai-assistant-new-btn').on('click', () => {
+            this.clear();
+            this.close_drawers_if_mobile();
+        });
         // The toggle button lives in the always-visible rail (a sibling of
         // .ai-assistant-sidebar, never itself collapsed) specifically so it
         // stays clickable when the sidebar it controls is hidden - it used to
@@ -223,8 +243,17 @@ aimatic.AiAssistantPage = class AiAssistantPage {
             const $btn = $(e.currentTarget);
             $btn.attr('title', collapsed ? __('Expand') : __('Collapse'));
             $btn.html(collapsed ? frappe.utils.icon('chevrons-right', 'sm') : frappe.utils.icon('chevrons-left', 'sm'));
+            this.maybe_toggle_backdrop(this.$sidebar, collapsed);
+            this.persist_panel_state('left', collapsed);
         });
-        this.$layout.find('.ai-assistant-right-panel-collapse').on('click', () => this.$right_panel.toggleClass('collapsed'));
+        this.$layout.find('.ai-assistant-right-panel-collapse').on('click', (e) => {
+            const collapsed = this.$right_panel.toggleClass('collapsed').hasClass('collapsed');
+            const $btn = $(e.currentTarget);
+            $btn.attr('title', collapsed ? __('Expand') : __('Collapse'));
+            $btn.html(collapsed ? frappe.utils.icon('panel-left', 'sm') : frappe.utils.icon('panel-right', 'sm'));
+            this.maybe_toggle_backdrop(this.$right_panel, collapsed);
+            this.persist_panel_state('right', collapsed);
+        });
         // Same rail fix as the sidebar toggle above - this button lives in its
         // own persistent .ai-assistant-right-panel-rail sibling, not inside
         // .ai-assistant-right-panel itself, so it stays clickable once collapsed.
@@ -233,6 +262,131 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         // Phase 3: Dashboard section events
         this.$layout.find('.ai-assistant-new-dashboard-btn').on('click', () => this.create_dashboard());
         this.$layout.find('.ai-assistant-back-to-chat').on('click', () => this.hide_dashboard_view());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Responsive drawer helpers (tablet/mobile off-canvas sidebar + right
+    // panel, see the CSS breakpoints). Desktop keeps both panels as normal
+    // flex columns toggled by the same rail buttons/`.collapsed` class this
+    // app already used pre-redesign; below 1024px CSS turns `.collapsed`
+    // into "off-canvas" instead of "display:none", and these helpers add the
+    // backdrop + persistence on top of that same toggle.
+    // ─────────────────────────────────────────────────────────────────────
+
+    is_mobile_or_tablet() {
+        return window.matchMedia('(max-width: 1023px)').matches;
+    }
+
+    maybe_toggle_backdrop($panel, collapsed) {
+        if (!this.is_mobile_or_tablet()) return;
+        if (collapsed) {
+            const other_open = !this.$sidebar.hasClass('collapsed') || !this.$right_panel.hasClass('collapsed');
+            if (!other_open) this.$backdrop.removeClass('visible');
+        } else {
+            this.$backdrop.addClass('visible');
+        }
+    }
+
+    persist_panel_state(side, collapsed) {
+        localStorage.setItem(`ai_assistant_${side}_collapsed`, collapsed ? '1' : '0');
+    }
+
+    restore_panel_states() {
+        // Desktop: default COLLAPSED on first-ever visit (no stored value yet)
+        // so the chat gets full width; tablet/mobile: default hidden always,
+        // since an off-canvas drawer open by default on a small screen would
+        // just cover the chat. Either way, an explicit stored '0'/'1' from a
+        // previous manual toggle always wins.
+        const left = localStorage.getItem('ai_assistant_left_collapsed');
+        const right = localStorage.getItem('ai_assistant_right_collapsed');
+        if (this.is_mobile_or_tablet()) {
+            if (left !== '0') this.$sidebar.addClass('collapsed');
+            if (right !== '0') this.$right_panel.addClass('collapsed');
+        } else {
+            if (left === null) { this.$sidebar.addClass('collapsed'); this.persist_panel_state('left', true); }
+            else if (left === '1') this.$sidebar.addClass('collapsed');
+            if (right === null) { this.$right_panel.addClass('collapsed'); this.persist_panel_state('right', true); }
+            else if (right === '1') this.$right_panel.addClass('collapsed');
+        }
+        this.sync_rail_icons();
+    }
+
+    sync_rail_icons() {
+        const left_collapsed = this.$sidebar.hasClass('collapsed');
+        const right_collapsed = this.$right_panel.hasClass('collapsed');
+        this.$layout.find('.ai-assistant-sidebar-collapse')
+            .attr('title', left_collapsed ? __('Expand') : __('Collapse'))
+            .html(left_collapsed ? frappe.utils.icon('chevrons-right', 'sm') : frappe.utils.icon('chevrons-left', 'sm'));
+        this.$layout.find('.ai-assistant-right-panel-collapse')
+            .attr('title', right_collapsed ? __('Expand') : __('Collapse'))
+            .html(right_collapsed ? frappe.utils.icon('panel-left', 'sm') : frappe.utils.icon('panel-right', 'sm'));
+    }
+
+    // Closes whichever drawer is open (tablet/mobile only - a no-op on
+    // desktop, where the panels are docked, not overlays) - called after the
+    // user picks a conversation/dashboard/starts a new one, so they land on
+    // the content instead of the drawer still covering it.
+    close_drawers_if_mobile() {
+        if (!this.is_mobile_or_tablet()) return;
+        let closed_any = false;
+        if (!this.$sidebar.hasClass('collapsed')) {
+            this.$sidebar.addClass('collapsed');
+            this.persist_panel_state('left', true);
+            closed_any = true;
+        }
+        if (!this.$right_panel.hasClass('collapsed')) {
+            this.$right_panel.addClass('collapsed');
+            this.persist_panel_state('right', true);
+            closed_any = true;
+        }
+        if (closed_any) {
+            this.$backdrop.removeClass('visible');
+            this.sync_rail_icons();
+        }
+    }
+
+    bind_global_events() {
+        this.$backdrop.on('click', () => this.close_drawers_if_mobile());
+
+        $(document).on('keydown.ai_assistant', (e) => {
+            if (e.key === 'Escape' && this.is_mobile_or_tablet()) this.close_drawers_if_mobile();
+        });
+
+        this.$context_bar_toggle.on('click', () => {
+            this.$context_bar_fields.toggleClass('expanded');
+            this.update_context_bar_toggle();
+        });
+    }
+
+    update_context_bar_toggle() {
+        const expanded = this.$context_bar_fields.hasClass('expanded');
+        this.$context_bar_toggle.html(
+            (expanded ? frappe.utils.icon('chevron-up', 'xs') : frappe.utils.icon('chevron-down', 'xs')) +
+            ' ' + (expanded ? __('Hide Scope') : __('Show Scope'))
+        );
+        this.$context_bar_toggle.attr('aria-expanded', expanded);
+    }
+
+    // Datetime fields on this bench round-trip with microsecond precision
+    // (e.g. "2026-07-19 01:27:33.151565" - confirmed live against real
+    // AI Saved Report/AI Assistant Conversation data), which
+    // frappe.datetime.str_to_obj's format-string-based moment parsing isn't
+    // guaranteed to tolerate. Normalizing to ISO 8601 and using the native
+    // Date parser (which handles fractional seconds natively) sidesteps that
+    // risk entirely instead of depending on moment's leniency.
+    relative_time(datetime_str) {
+        if (!datetime_str) return '';
+        const then = new Date(datetime_str.replace(' ', 'T'));
+        if (isNaN(then.getTime())) return '';
+        const diff_sec = Math.floor((Date.now() - then.getTime()) / 1000);
+        if (diff_sec < 60) return __('Just now');
+        const diff_min = Math.floor(diff_sec / 60);
+        if (diff_min < 60) return __('{0} min ago', [diff_min]);
+        const diff_hr = Math.floor(diff_min / 60);
+        if (diff_hr < 24) return __('{0} hr ago', [diff_hr]);
+        const diff_day = Math.floor(diff_hr / 24);
+        if (diff_day < 7) return __('{0} day ago', [diff_day]);
+        return frappe.datetime.str_to_user(datetime_str);
     }
 
     refresh_conversation_list() {
@@ -317,7 +471,10 @@ aimatic.AiAssistantPage = class AiAssistantPage {
                     <span class="ai-assistant-dashboard-count small text-muted">(${db.widget_count || 0})</span>
                 </div>
             `);
-            $row.on('click', () => this.open_dashboard(db.name));
+            $row.on('click', () => {
+                this.open_dashboard(db.name);
+                this.close_drawers_if_mobile();
+            });
             this.$dashboard_list.append($row);
         });
     }
@@ -453,18 +610,27 @@ aimatic.AiAssistantPage = class AiAssistantPage {
             return;
         }
         conversations.forEach((conv) => {
+            const meta_html = conv.last_activity
+                ? `<div class="ai-assistant-conv-meta">${this.relative_time(conv.last_activity)}</div>`
+                : '';
             const $row = $(`
                 <div class="ai-assistant-conv-row ${conv.name === this.current_conversation ? 'active' : ''}" data-name="${frappe.utils.escape_html(conv.name)}">
-                    <span class="ai-assistant-conv-pin-icon">${conv.pinned ? frappe.utils.icon('pin', 'xs') : ''}</span>
-                    <span class="ai-assistant-conv-title">${frappe.utils.escape_html(conv.title)}</span>
-                    <span class="ai-assistant-conv-actions">
-                        <button class="btn-reset ai-assistant-conv-pin" title="${__('Pin')}">${frappe.utils.icon('pin', 'xs')}</button>
-                        <button class="btn-reset ai-assistant-conv-rename" title="${__('Rename')}">${frappe.utils.icon('pencil', 'xs')}</button>
-                        <button class="btn-reset ai-assistant-conv-delete" title="${__('Delete')}">${frappe.utils.icon('trash', 'xs')}</button>
-                    </span>
+                    <div class="ai-assistant-conv-row-top">
+                        <span class="ai-assistant-conv-pin-icon">${conv.pinned ? frappe.utils.icon('pin', 'xs') : ''}</span>
+                        <span class="ai-assistant-conv-title">${frappe.utils.escape_html(conv.title)}</span>
+                        <span class="ai-assistant-conv-actions">
+                            <button class="btn-reset ai-assistant-conv-pin" title="${__('Pin')}">${frappe.utils.icon('pin', 'xs')}</button>
+                            <button class="btn-reset ai-assistant-conv-rename" title="${__('Rename')}">${frappe.utils.icon('pencil', 'xs')}</button>
+                            <button class="btn-reset ai-assistant-conv-delete" title="${__('Delete')}">${frappe.utils.icon('trash', 'xs')}</button>
+                        </span>
+                    </div>
+                    ${meta_html}
                 </div>
             `);
-            $row.find('.ai-assistant-conv-title').on('click', () => this.open_conversation(conv.name));
+            $row.find('.ai-assistant-conv-title').on('click', () => {
+                this.open_conversation(conv.name);
+                this.close_drawers_if_mobile();
+            });
             $row.find('.ai-assistant-conv-pin').on('click', (e) => {
                 e.stopPropagation();
                 frappe.call({ method: 'aimatic.ai.api.pin_conversation', args: { conversation: conv.name, pinned: conv.pinned ? 0 : 1 } }).then(() => this.refresh_conversation_list());
@@ -490,45 +656,80 @@ aimatic.AiAssistantPage = class AiAssistantPage {
     }
 
     open_conversation(name) {
+        this.current_conversation = name;
+        this.history = [];
+        this.$messages.empty();
+        this._load_conversation_page(name, null, true);
+
+        this.$sidebar.find('.ai-assistant-conv-row').removeClass('active');
+        this.$sidebar.find(`.ai-assistant-conv-row[data-name="${name}"]`).addClass('active');
+    }
+
+    // Cursor-paginated conversation loading (get_conversation_messages caps
+    // each page at 100 rather than returning a whole long-lived
+    // conversation's unbounded transcript in one query/DOM append). The
+    // first page (before=null) appends and scrolls to bottom exactly like
+    // the old single-shot load; an older page (via the "Load older
+    // messages" button) prepends above the existing bubbles instead.
+    // Bubbles for one page are built into an array first and inserted as a
+    // single batch (jQuery preserves array order on append/prepend) - doing
+    // it one .prepend() call per message in a loop would insert each new
+    // bubble at the very top and silently reverse that page's order.
+    _load_conversation_page(conversation, before, is_first_page) {
         this.set_sending(true);
-        frappe.call({ method: 'aimatic.ai.api.get_conversation_messages', args: { conversation: name } }).then((r) => {
+        frappe.call({
+            method: 'aimatic.ai.api.get_conversation_messages',
+            args: { conversation: conversation, limit: 100, before: before },
+        }).then((r) => {
             this.set_sending(false);
-            this.current_conversation = name;
-            this.history = [];
-            this.$messages.empty();
-            const messages = (r.message && r.message.messages) || [];
-            messages.forEach((m) => {
-                this.history.push({ role: m.role, content: m.content });
-                this.append_bubble(m.role, m.content);
+            const data = r.message || {};
+            const messages = data.messages || [];
+            const has_more = !!data.has_more;
+
+            this.$messages.find('.ai-assistant-load-older-btn').remove();
+
+            const bubbles = messages.map((m) => {
+                if (is_first_page) {
+                    this.history.push({ role: m.role, content: m.content });
+                } else {
+                    this.history.unshift({ role: m.role, content: m.content });
+                }
+                return this.build_bubble(m.role, m.content)[0];
             });
-            this.$sidebar.find('.ai-assistant-conv-row').removeClass('active');
-            this.$sidebar.find(`.ai-assistant-conv-row[data-name="${name}"]`).addClass('active');
+
+            if (is_first_page) {
+                this.$messages.append(bubbles);
+                this.$messages.scrollTop(this.$messages[0].scrollHeight);
+            } else if (bubbles.length) {
+                this.$messages.prepend(bubbles);
+            }
+
+            if (has_more && messages.length) {
+                const oldest_creation = messages[0].creation;
+                const $btn = $(`<button type="button" class="btn btn-xs btn-default ai-assistant-load-older-btn">${__('Load older messages')}</button>`);
+                $btn.on('click', () => {
+                    $btn.prop('disabled', true).text(__('Loading…'));
+                    this._load_conversation_page(conversation, oldest_creation, false);
+                });
+                this.$messages.prepend($btn);
+            }
+        }).catch(() => {
+            this.set_sending(false);
         });
     }
 
     update_right_panel(response) {
+        // Company/Branch/Date Range are deliberately NOT repeated here - they're
+        // already live in the context bar right above the chat; this panel now
+        // only carries the two facts that aren't visible anywhere else.
         if (!this.$right_panel) return;
         const ctx = response.context || {};
         const sources = response.sources || [];
-        const branch_text = (ctx.branch && ctx.branch.length) ? ctx.branch.join(', ') : __('All branches');
-        const date_text = ctx.date_range ? `${ctx.date_range.from} — ${ctx.date_range.to}` : '';
         const sources_html = sources.length
             ? sources.map((s) => `<div class="ai-assistant-rp-source"><span class="ai-assistant-rp-source-type">${frappe.utils.escape_html(s.type)}</span> ${frappe.utils.escape_html(s.name)}</div>`).join('')
             : `<div class="small text-muted">${__('No specific data source (general knowledge answer).')}</div>`;
 
         this.$right_panel.find('.ai-assistant-right-panel-body').html(`
-            <div class="ai-assistant-rp-section">
-                <div class="ai-assistant-rp-label">${__('Company')}</div>
-                <div class="ai-assistant-rp-value">${frappe.utils.escape_html(ctx.company || '')}</div>
-            </div>
-            <div class="ai-assistant-rp-section">
-                <div class="ai-assistant-rp-label">${__('Branch')}</div>
-                <div class="ai-assistant-rp-value">${frappe.utils.escape_html(branch_text)}</div>
-            </div>
-            <div class="ai-assistant-rp-section">
-                <div class="ai-assistant-rp-label">${__('Date Range')}</div>
-                <div class="ai-assistant-rp-value">${frappe.utils.escape_html(date_text)}</div>
-            </div>
             <div class="ai-assistant-rp-section">
                 <div class="ai-assistant-rp-label">${__('Data Freshness')}</div>
                 <div class="ai-assistant-rp-value">${frappe.utils.escape_html(ctx.data_freshness || '')}</div>
@@ -982,7 +1183,7 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         this.$send.prop('disabled', sending).text(sending ? __('Thinking…') : __('Send'));
     }
 
-    append_bubble(role, content, is_error) {
+    build_bubble(role, content, is_error) {
         const $bubble = $(`
             <div class="ai-assistant-bubble ai-assistant-bubble-${role}${is_error ? ' ai-assistant-bubble-error' : ''}">
                 <div class="ai-assistant-bubble-role">${role === 'user' ? __('You') : __('Assistant')}</div>
@@ -990,7 +1191,11 @@ aimatic.AiAssistantPage = class AiAssistantPage {
             </div>
         `);
         $bubble.find('.ai-assistant-bubble-content').text(content);
-        this.$messages.append($bubble);
+        return $bubble;
+    }
+
+    append_bubble(role, content, is_error) {
+        this.$messages.append(this.build_bubble(role, content, is_error));
         this.$messages.scrollTop(this.$messages[0].scrollHeight);
     }
 

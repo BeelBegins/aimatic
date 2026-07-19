@@ -172,13 +172,26 @@ def get_purchase_overview(date_from: str | None = None, date_to: str | None = No
         as_dict=True,
     )[0]
 
+    # Sourced from GL Entry (party_type='Supplier'), NOT Purchase Invoice.outstanding_amount -
+    # same real bug as get_outstanding_payables_overview (see that function's docstring):
+    # a site whose supplier debt is carried mostly via legacy Journal Entries (e.g. siezal's
+    # iPOS migration opening balances) shows PKR 0 outstanding here if only Purchase Invoice
+    # rows are summed, even though the real Creditors-account balance is nonzero. GL Entry is
+    # the only source that captures Purchase Invoice, Journal Entry, and Payment Entry
+    # postings against a supplier uniformly.
+    gl_branch_clause = "AND branch IN %(branch_names)s" if branch_filter is not None else ""
+    gl_supplier_clause = "AND party = %(supplier)s" if supplier else ""
     outstanding_row = frappe.db.sql(
         f"""
-        SELECT COALESCE(SUM(outstanding_amount), 0) AS outstanding_amount
-        FROM `tabPurchase Invoice`
-        WHERE docstatus = 1 AND IFNULL(is_return, 0) = 0 AND company = %(company)s
-          AND outstanding_amount > 0
-          {branch_clause} {supplier_clause}
+        SELECT COALESCE(SUM(balance), 0) AS outstanding_amount
+        FROM (
+            SELECT party, SUM(credit - debit) AS balance
+            FROM `tabGL Entry`
+            WHERE party_type = 'Supplier' AND is_cancelled = 0 AND company = %(company)s
+              {gl_branch_clause} {gl_supplier_clause}
+            GROUP BY party
+            HAVING SUM(credit - debit) > 0
+        ) per_supplier
         """,
         params,
         as_dict=True,
@@ -210,7 +223,15 @@ def rank_vendors(date_from: str | None = None, date_to: str | None = None, order
     date_from, date_to = _get_date_range(date_from, date_to)
     currency = frappe.get_cached_value("Company", company, "default_currency")
 
-    purchase_rows = frappe.db.sql(
+    # Candidate suppliers come from Purchase Invoice AND Purchase Receipt, not Invoice
+    # alone - a real bug found live on siezal (2026-07-19): siezal has zero submitted
+    # Purchase Invoices (its purchase activity is recorded via Purchase Receipt), so an
+    # Invoice-only candidate query always returned `vendors: []`, permanently breaking
+    # this tool on that site regardless of what the model asked for. Invoice figures win
+    # when a supplier has both (avoids double-counting a receipt that was later
+    # invoiced); Receipt figures are the fallback for suppliers with receipt-only
+    # activity in the window.
+    invoice_rows = frappe.db.sql(
         """
         SELECT supplier, COUNT(*) AS doc_count, COALESCE(SUM(base_grand_total), 0) AS purchase_amount
         FROM `tabPurchase Invoice`
@@ -221,15 +242,37 @@ def rank_vendors(date_from: str | None = None, date_to: str | None = None, order
         {"company": company, "date_from": date_from, "date_to": date_to},
         as_dict=True,
     )
+    receipt_rows = frappe.db.sql(
+        """
+        SELECT supplier, COUNT(*) AS doc_count, COALESCE(SUM(base_grand_total), 0) AS purchase_amount
+        FROM `tabPurchase Receipt`
+        WHERE docstatus = 1 AND IFNULL(is_return, 0) = 0 AND company = %(company)s
+          AND posting_date BETWEEN %(date_from)s AND %(date_to)s
+        GROUP BY supplier
+        """,
+        {"company": company, "date_from": date_from, "date_to": date_to},
+        as_dict=True,
+    )
+    purchase_by_supplier = {r.supplier: r for r in receipt_rows}
+    purchase_by_supplier.update({r.supplier: r for r in invoice_rows})
+    purchase_rows = list(purchase_by_supplier.values())
     if not purchase_rows:
         return {"company": company, "currency": currency, "date_from": str(date_from), "date_to": str(date_to), "order": order, "vendors": []}
 
+    # Sourced from GL Entry, NOT Purchase Invoice.outstanding_amount - same class of
+    # bug already fixed for get_outstanding_payables_overview/get_purchase_overview
+    # (see their docstrings): a supplier's real debt can be carried via Journal Entry
+    # (e.g. legacy iPOS opening balances) rather than a Purchase Invoice.
     outstanding_rows = frappe.db.sql(
         """
-        SELECT supplier, COALESCE(SUM(outstanding_amount), 0) AS outstanding_amount
-        FROM `tabPurchase Invoice`
-        WHERE docstatus = 1 AND IFNULL(is_return, 0) = 0 AND company = %(company)s AND outstanding_amount > 0
-        GROUP BY supplier
+        SELECT party AS supplier, balance AS outstanding_amount
+        FROM (
+            SELECT party, SUM(credit - debit) AS balance
+            FROM `tabGL Entry`
+            WHERE party_type = 'Supplier' AND is_cancelled = 0 AND company = %(company)s
+            GROUP BY party
+            HAVING SUM(credit - debit) > 0
+        ) per_supplier
         """,
         {"company": company},
         as_dict=True,
