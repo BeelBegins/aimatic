@@ -42,6 +42,7 @@ doc_events = {
         "before_validate": [
             "aimatic.branch_management.events.apply_branch_defaults",
             "aimatic.purchase_printing.populate_old_purchase_snapshot",
+            "aimatic.purchase_history_autofill.events.autofill_purchase_order_item_fields",
         ],
     },
     "Purchase Invoice": {
@@ -126,8 +127,12 @@ doctype_js = {
     "Purchase Receipt": [
         "public/js/purchase_receipt_label_printing.js",
         # Live preview only - see purchase_history_autofill/events.py for
-        # the actual server-side guarantee this mirrors.
-        "public/js/purchase_receipt_history_autofill.js",
+        # the actual server-side guarantee this mirrors. Shared with
+        # Purchase Order below.
+        "public/js/purchase_history_autofill.js",
+    ],
+    "Purchase Order": [
+        "public/js/purchase_history_autofill.js",
     ],
     "Delivery Note": "public/js/label_printing_source_buttons.js",
     "Stock Entry": "public/js/label_printing_source_buttons.js",
