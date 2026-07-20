@@ -2158,7 +2158,20 @@ def close_pos_session(opening_entry, cashier_user, closing_balances, notes=None,
         if notes and not closing.meta.has_field("remarks"):
             closing.add_comment("Comment", text=notes)
         closing.flags.ignore_permissions = True
-        closing.submit()
+
+        # POSClosingEntry.on_submit creates/submits POS Invoice Merge Logs and
+        # consolidated Sales Invoices.  The Closing Entry's ignore_permissions
+        # flag is document-local and does not propagate to those nested docs.
+        # Run that already-authorized ERPNext accounting operation as the
+        # system user, then restore the terminal identity unconditionally.
+        # This also makes ERPNext enqueue >=10-invoice consolidation jobs as
+        # Administrator instead of the POS User transport account.
+        terminal_user = frappe.session.user
+        try:
+            frappe.set_user("Administrator")
+            closing.submit()
+        finally:
+            frappe.set_user(terminal_user)
     except Exception:
         # Keep a failed close from leaving a draft POS-CLO document behind.
         # Some framework/database paths can clear savepoints before this

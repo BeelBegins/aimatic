@@ -1511,6 +1511,55 @@ class TestClosePosSessionCashier(_AimTestCase):
         self.assertEqual(result["cashier_user"], cashier)
 
     @_require_fixtures
+    def test_plain_terminal_can_consolidate_shift_invoice_after_authorized_close(self):
+        """Closing permissions must cover ERPNext's nested Sales Invoice too,
+        not only the POS Closing Entry wrapper."""
+        from aimatic.offline_pos.api import close_pos_session, submit_online_sale
+
+        if not _STOCKED_ITEM_CODE:
+            raise unittest.SkipTest("No item with on-hand stock found on site")
+
+        cashier, _password = _make_cashier(roles=("POS Supervisor",))
+        terminal_user, _terminal_password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        with _patch_fbr(), patch(
+            "aimatic.fbr_pos.events.submit_pos_invoice_to_fbr", return_value=None
+        ):
+            sale = submit_online_sale(
+                terminal_invoice_id="TI-CLOSE-{0}".format(frappe.generate_hash(length=6)),
+                terminal_id="TERM-1",
+                pos_profile=profile,
+                opening_entry=opening.name,
+                customer=_CUSTOMER_NAME,
+                items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
+                payments=[{"mode_of_payment": "Cash", "amount": 999999}],
+                cashier_user=cashier,
+            )
+
+        original_user = frappe.session.user
+        try:
+            frappe.set_user(terminal_user)
+            self.assertFalse(frappe.has_permission("Sales Invoice", ptype="create"))
+            result = close_pos_session(opening.name, cashier, [])
+            self.assertEqual(frappe.session.user, terminal_user)
+        finally:
+            frappe.set_user(original_user)
+
+        merge_log = frappe.db.get_value(
+            "POS Invoice Merge Log",
+            {"pos_closing_entry": result["closing_entry"]},
+            "consolidated_invoice",
+        )
+        self.assertTrue(merge_log)
+        self.assertEqual(
+            frappe.db.get_value("POS Invoice", sale["pos_invoice"], "status"),
+            "Consolidated",
+        )
+
+    @_require_fixtures
     def test_close_shift_normal_cashier_blocked(self):
         """A plain POS User can open a shift but cannot close it here."""
         from aimatic.offline_pos.api import close_pos_session
