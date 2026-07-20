@@ -1486,6 +1486,31 @@ class TestClosePosSessionCashier(_AimTestCase):
         )
 
     @_require_fixtures
+    def test_supervisor_cashier_can_close_through_plain_pos_user_terminal(self):
+        """The terminal session is a transport identity; the human cashier's
+        POS Supervisor role is the close-shift authority."""
+        from aimatic.offline_pos.api import close_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS Supervisor",))
+        terminal_user, _terminal_password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        original_user = frappe.session.user
+        try:
+            frappe.set_user(terminal_user)
+            self.assertFalse(
+                frappe.has_permission("POS Closing Entry", ptype="create")
+            )
+            result = close_pos_session(opening.name, cashier, [])
+        finally:
+            frappe.set_user(original_user)
+
+        self.assertEqual(result["status"], "Closed")
+        self.assertEqual(result["cashier_user"], cashier)
+
+    @_require_fixtures
     def test_close_shift_normal_cashier_blocked(self):
         """A plain POS User can open a shift but cannot close it here."""
         from aimatic.offline_pos.api import close_pos_session
@@ -1551,6 +1576,39 @@ class TestClosePosSessionCashier(_AimTestCase):
             "used",
         )
         self.assertEqual(used, 1)
+
+    @_require_fixtures
+    def test_close_shift_token_does_not_require_terminal_user_closing_docperm(self):
+        """The fixed terminal API identity may be a plain POS User.  A valid
+        supervisor token authorizes the human cashier's close without also
+        granting the terminal identity broad POS Closing Entry DocPerm."""
+        from aimatic.offline_pos.api import authorize_pos_admin_action, close_pos_session
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        terminal_user, _terminal_password = _make_cashier(roles=("POS User",))
+        supervisor, supervisor_password = _make_cashier(roles=("POS Supervisor",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        with _https_request():
+            minted = authorize_pos_admin_action(
+                supervisor, supervisor_password, "close_shift", "TEST-TERM-1"
+            )
+            original_user = frappe.session.user
+            try:
+                frappe.set_user(terminal_user)
+                self.assertFalse(
+                    frappe.has_permission("POS Closing Entry", ptype="create")
+                )
+                result = close_pos_session(
+                    opening.name, cashier, [], supervisor_token=minted["token"]
+                )
+            finally:
+                frappe.set_user(original_user)
+
+        self.assertEqual(result["status"], "Closed")
+        self.assertEqual(result["cashier_user"], cashier)
 
     @_require_fixtures
     def test_close_shift_pos_user_invalid_token_blocked(self):

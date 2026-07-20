@@ -1972,7 +1972,6 @@ def close_pos_session(opening_entry, cashier_user, closing_balances, notes=None,
     """
     _require_login()
     is_bearer = _is_bearer_authenticated_request()
-    frappe.has_permission("POS Closing Entry", "create", throw=True)
 
     if not cashier_user and not is_bearer:
         frappe.throw(_("cashier_user is required"), frappe.PermissionError)
@@ -2147,9 +2146,18 @@ def close_pos_session(opening_entry, cashier_user, closing_balances, notes=None,
     savepoint = "close_pos_session_{0}".format(frappe.generate_hash(length=10))
     frappe.db.savepoint(savepoint)
     try:
-        closing.insert()
+        # The authenticated Electron caller is the terminal's fixed API
+        # identity, not the human cashier/supervisor.  Authorization was
+        # already enforced above against the opening-entry owner and either
+        # that cashier's close-shift role or a single-use supervisor token.
+        # Requiring the terminal identity's generic Custom DocPerm here made
+        # valid supervisor-authorized closes fail on production terminals
+        # whose API user intentionally has only POS User.  Keep generic Desk
+        # permissions narrow and bypass them only for this controlled RPC.
+        closing.insert(ignore_permissions=True)
         if notes and not closing.meta.has_field("remarks"):
             closing.add_comment("Comment", text=notes)
+        closing.flags.ignore_permissions = True
         closing.submit()
     except Exception:
         # Keep a failed close from leaving a draft POS-CLO document behind.
