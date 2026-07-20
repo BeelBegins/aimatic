@@ -1693,6 +1693,20 @@ def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
         if mode and amount > 0:
             doc.append("payments", {"mode_of_payment": mode, "amount": amount})
 
+    # total_paid can only exceed payable via a cash row (non-cash is capped
+    # above), so this is exactly the change owed back to the customer. ERPNext
+    # core never computes this itself - Sales/POS Invoice's own
+    # calculate_taxes_and_totals -> set_paid_amount() sums doc.payments into
+    # paid_amount (the gross tendered figure, change included) but leaves
+    # change_amount untouched; every other POS UI (e.g. POS Awesome) sets it
+    # client-side before submit, which this offline_pos flow never did until
+    # now, leaving printed receipts showing a permanent "Change: 0.00".
+    change_amount = flt(total_paid - payable, 2)
+    doc.change_amount = change_amount if change_amount > 0 else 0
+    doc.base_change_amount = flt(
+        doc.change_amount * flt(doc.get("conversion_rate") or 1), 2
+    )
+
 
 def _validate_cashier_for_sale(cashier_user, pos):
     """Re-validate a cashier at sale time; offline caches can go stale.

@@ -18,22 +18,22 @@
 /* ═══════════════  PAGE & GLOBALS  ═══════════════ */
 @page {
   size: 80mm auto;
-  margin: 0mm;
+  margin: 0mm 4mm 0mm 0mm;
   padding: 0mm;
 }
 html, body {
-  width: 80mm !important;
-  max-width: 80mm !important;
-  min-width: 80mm !important;
+  width: 76mm !important;
+  max-width: 76mm !important;
+  min-width: 76mm !important;
   margin: 0 !important;
   padding: 0 !important;
   background: #fff;
   height: auto !important;
 }
 .print-format {
-  width: 80mm !important;
-  max-width: 80mm !important;
-  min-width: 80mm !important;
+  width: 76mm !important;
+  max-width: 76mm !important;
+  min-width: 76mm !important;
   margin: 0 !important;
   padding: 0 !important;
   height: auto !important;
@@ -42,8 +42,8 @@ html, body {
 .page-break {
   page-break-after: avoid !important;
   page-break-inside: avoid !important;
-  width: 80mm !important;
-  max-width: 80mm !important;
+  width: 76mm !important;
+  max-width: 76mm !important;
   margin: 0 !important;
   padding: 0 !important;
   height: auto !important;
@@ -58,10 +58,10 @@ html, body {
   font-size: 12.5px;
   color: #000;
   background: #fff;
-  width: 80mm;
-  max-width: 80mm;
+  width: 76mm;
+  max-width: 76mm;
   margin: 0 auto;
-  padding: 5px 10px 12px 10px;
+  padding: 5px 8px 12px 8px;
   line-height: 1.45;
 }
 
@@ -599,6 +599,14 @@ html, body {
     <div class="rc-fbr-inv"><b>FBR Invoice No.</b>{{ doc.custom_fbr_invoice_number }}</div>
     <div class="rc-fbr-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&amp;data={{ doc.custom_fbr_invoice_number | urlencode }}" alt="FBR QR"></div>
     {% if doc.custom_fbr_usin %}<div class="rc-fbr-row"><span>USIN</span><span style="word-break:break-all; text-align:right; max-width:60%;">{{ doc.custom_fbr_usin }}</span></div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if doc.payments %}
+  <div class="rc-pay-section">
+    <div class="rc-pay-title">Tendered / Change</div>
+    <div class="rc-pay-row total"><span>Tendered Amount</span><span>{{ doc.get_formatted("paid_amount", doc) }}</span></div>
+    <div class="rc-pay-row change"><span>Change</span><span>{{ frappe.utils.fmt_money(doc.change_amount or 0, currency=doc.currency) }}</span></div>
   </div>
   {% endif %}
 

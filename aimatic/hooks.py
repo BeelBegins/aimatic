@@ -236,6 +236,36 @@ fixtures = [
             ["role", "in", ["POS User", "POS Supervisor"]],
         ],
     },
+    # POS Invoice itself (2026-07-20): the same class of gap as above, but discovered
+    # one step further down the same flow - a cashier with POS User could log in, open
+    # a shift, and preview a cart, but submit_online_sale's own
+    # `frappe.has_permission("POS Invoice", "create")` check threw "Not permitted to
+    # create POS Invoice", since ERPNext's stock POS Invoice DocPerm only grants
+    # Accounts Manager/Accounts User. Confirmed live on siezal against a real blocked
+    # cashier (cashier3@aimatic.tech, roles POS User only).
+    #
+    # Unlike the doctypes above, POS Invoice had ZERO pre-existing Custom DocPerm rows,
+    # so this is filtered on parent alone (no role restriction) rather than an
+    # allowlisted role subset: Frappe's permission engine treats "any Custom DocPerm
+    # row exists for this parent" as license to ignore that doctype's standard DocPerm
+    # entirely (frappe.permissions.get_valid_perms/get_doctypes_with_custom_docperms) -
+    # so fixture-syncing only the new POS User/POS Supervisor rows onto a site that
+    # doesn't already have this override would silently strip Accounts Manager/Accounts
+    # User/All's own POS Invoice permissions on that site. Capturing every role/permlevel
+    # row here (the ones Frappe itself copied forward from stock DocPerm the moment the
+    # first custom row was added, plus the new POS User/POS Supervisor grants) keeps
+    # this fixture a complete, safe drop-in for any site, present or future.
+    # Separate fixture file (via `prefix`) rather than a second block on the same
+    # "Custom DocPerm" doctype: export_fixtures derives the output filename purely
+    # from the doctype name (frappe.scrub), so two blocks for the same doctype
+    # write to the same file and the second silently clobbers the first - hit this
+    # empirically when the initial version of this filter (no prefix) reduced
+    # custom_docperm.json from ~30 rows down to just these 6 on export.
+    {
+        "doctype": "Custom DocPerm",
+        "filters": [["parent", "=", "POS Invoice"]],
+        "prefix": "pos_invoice",
+    },
     # NOTE: FBR Integration Settings is deliberately NOT a fixture - it holds
     # a security_token (Password) plus real sandbox/production URLs per
     # company+branch. Only its schema is git-tracked (doctype file below);

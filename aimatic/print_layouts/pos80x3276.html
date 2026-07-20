@@ -15,23 +15,23 @@
 <style>
 /* ═══════════════  PAGE & GLOBALS  ═══════════════ */
 @page {
-  size: 80mm 280mm;
+  size: 78mm 280mm;
   margin: 0mm;
   padding: 0mm;
 }
 html, body {
-  width: 80mm !important;
-  max-width: 80mm !important;
-  min-width: 80mm !important;
+  width: 78mm !important;
+  max-width: 78mm !important;
+  min-width: 78mm !important;
   margin: 0 !important;
   padding: 0 !important;
   background: #fff;
   height: auto !important;
 }
 .print-format {
-  width: 80mm !important;
-  max-width: 80mm !important;
-  min-width: 80mm !important;
+  width: 78mm !important;
+  max-width: 78mm !important;
+  min-width: 78mm !important;
   margin: 0 !important;
   padding: 0 !important;
   height: auto !important;
@@ -40,8 +40,8 @@ html, body {
 .page-break {
   page-break-after: avoid !important;
   page-break-inside: avoid !important;
-  width: 80mm !important;
-  max-width: 80mm !important;
+  width: 78mm !important;
+  max-width: 78mm !important;
   margin: 0 !important;
   padding: 0 !important;
   height: auto !important;
@@ -56,10 +56,10 @@ html, body {
   font-size: 12.5px;
   color: #000;
   background: #fff;
-  width: 80mm;
-  max-width: 80mm;
+  width: 78mm;
+  max-width: 78mm;
   margin: 0 auto;
-  padding: 5px 10px 12px 10px;
+  padding: 5px 8px 12px 8px;
   line-height: 1.45;
 }
 
@@ -85,7 +85,7 @@ html, body {
 .rc-branch {
   font-size: 11px;
   font-weight: 600;
-  margin-top: 1px;
+  margin-top: 0px;
 }
 .rc-addr {
   font-size: 10.5px;
@@ -533,6 +533,14 @@ html, body {
     <div class="rc-fbr-row"><span>Grand Total</span><span>{{ doc.get_formatted("grand_total", doc) }}</span></div>
     {%- if ns.fbr_sales_tax -%}<div class="rc-fbr-row"><span>FBR Sales Tax</span><span>{{ frappe.utils.fmt_money(ns.fbr_sales_tax, currency=doc.currency) }}</span></div>{%- elif ns.fbr_tax_total -%}<div class="rc-fbr-row"><span>Total GST</span><span>{{ frappe.utils.fmt_money(ns.fbr_tax_total, currency=doc.currency) }}</span></div>{%- endif -%}
     {%- if ns.fbr_pos_fee -%}<div class="rc-fbr-row"><span>FBR POS Fee</span><span>{{ frappe.utils.fmt_money(ns.fbr_pos_fee, currency=doc.currency) }}</span></div>{%- endif -%}
+  </div>
+  {% endif %}
+
+  {% if doc.payments %}
+  <div class="rc-pay-section">
+    <div class="rc-pay-title">Tendered / Change</div>
+    <div class="rc-pay-row total"><span>Tendered Amount</span><span>{{ doc.get_formatted("paid_amount", doc) }}</span></div>
+    <div class="rc-pay-row change"><span>Change</span><span>{{ frappe.utils.fmt_money(doc.change_amount or 0, currency=doc.currency) }}</span></div>
   </div>
   {% endif %}
 
