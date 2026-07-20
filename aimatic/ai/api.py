@@ -299,7 +299,7 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
                     ),
                 })
                 continue
-            if not tool_results and not reply.strip():
+            if not reply.strip():
                 # A third free-tier failure mode, distinct from the two above: the
                 # model returns a completely empty content string with no tool_calls
                 # at all - no tool-shaped text to catch, just nothing. Without this
@@ -310,9 +310,24 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
                 # (2026-07-19): a refresh of the "Outstanding Receivables" widget hit
                 # this exact path and overwrote a correct PKR 0.00 answer with blank
                 # kpis/tables.
+                #
+                # Deliberately NOT gated on `not tool_results` (the original condition
+                # here) - a second, distinct sub-case reaches the exact same crash: the
+                # model successfully calls a real tool (tool_results has data) but then
+                # returns empty content on its closing turn. That sub-case skipped every
+                # guard, fell through to _log_turn("assistant", "", ...), and threw
+                # frappe.MandatoryError (content is mandatory on AI Assistant Message) -
+                # swallowed by _log_turn's own except-Exception, so the turn silently
+                # vanished from conversation history and the structured answer shipped
+                # with a blank summary (Answer.summary is reply_text verbatim). Confirmed
+                # via two real "AI Assistant Message log failed" Error Log entries on
+                # siezal (2026-07-19, role='assistant', content=''). The retry costs one
+                # iteration either way, and the model still has any tool results in its
+                # own context, so it only needs to produce closing prose, not re-call
+                # anything.
                 frappe.log_error(
                     title="AI Assistant: empty non-answer corrected",
-                    message=f"question={message!r}",
+                    message=f"question={message!r} tool_results_so_far={sorted(tool_results.keys())!r}",
                 )
                 messages.append({
                     "role": "user",
