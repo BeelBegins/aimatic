@@ -116,6 +116,93 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         this.bind_events();
         this.bind_global_events();
         this.init_voice();
+        this.init_settings();
+    }
+
+    init_settings() {
+        // Available to every allowed role (not just System Manager) so a
+        // disabled assistant shows a clear banner instead of every user
+        // hitting a cryptic per-message error - see get_ai_integration_settings.
+        frappe.call({ method: 'aimatic.ai.api.get_ai_integration_settings' }).then((r) => {
+            this.apply_enabled_state(r.message && r.message.enabled !== false);
+        });
+
+        if ((frappe.user_roles || []).includes('System Manager')) {
+            this.page.add_menu_item(__('AI Settings'), () => this.open_settings_dialog());
+        }
+    }
+
+    apply_enabled_state(enabled) {
+        this.$container.find('.ai-assistant-disabled-banner').remove();
+        if (!enabled) {
+            $(`<div class="ai-assistant-disabled-banner">${frappe.utils.icon('alert-triangle', 'xs')} ${__('AI Assistant is currently disabled by an administrator.')}</div>`)
+                .insertBefore(this.$container.find('.ai-assistant-context-bar'));
+        }
+        this.$input.prop('disabled', !enabled);
+        this.$send.prop('disabled', !enabled);
+        this.$mic_btn.prop('disabled', !enabled);
+    }
+
+    open_settings_dialog() {
+        frappe.call({ method: 'aimatic.ai.api.get_ai_integration_settings' }).then((settings_r) => {
+            frappe.call({ method: 'aimatic.ai.api.list_available_free_models' }).then((models_r) => {
+                const settings = settings_r.message || {};
+                const models = models_r.message || [];
+                const options = models.map((m) => ({
+                    value: m.id,
+                    label: `${m.name} — ${Math.round((m.context_length || 0) / 1000)}K context (free)`,
+                }));
+
+                const dialog = new frappe.ui.Dialog({
+                    title: __('AI Assistant Settings'),
+                    fields: [
+                        {
+                            fieldname: 'enabled',
+                            fieldtype: 'Check',
+                            label: __('Enabled'),
+                            default: settings.enabled ? 1 : 0,
+                        },
+                        {
+                            fieldname: 'model',
+                            fieldtype: 'Select',
+                            label: __('Model'),
+                            options: options.map((o) => o.value).join('\n'),
+                            default: settings.model || (options[0] && options[0].value) || '',
+                            description: __('Only currently free, tool-calling-capable OpenRouter models are listed.'),
+                        },
+                        {
+                            fieldname: 'model_note',
+                            fieldtype: 'HTML',
+                            options: `<p class="text-muted small">${__('The OpenRouter API key itself is configured on the server and is not shown or editable here.')}</p>`,
+                        },
+                    ],
+                    primary_action_label: __('Save'),
+                    primary_action: (values) => {
+                        frappe.call({
+                            method: 'aimatic.ai.api.update_ai_integration_settings',
+                            args: { enabled: values.enabled, model: values.model },
+                        }).then(() => {
+                            frappe.show_alert({ message: __('Saved'), indicator: 'green' });
+                            this.apply_enabled_state(!!values.enabled);
+                            dialog.hide();
+                        });
+                    },
+                });
+
+                // Custom labels (with context length) don't fit a plain Select's
+                // "\n"-joined options string, which only supports value==label -
+                // swap in a real <select> with separate value/label after the
+                // dialog builds the field from that options string.
+                if (options.length) {
+                    const $select = dialog.get_field('model').$input;
+                    $select.empty();
+                    options.forEach((o) => $select.append(`<option value="${frappe.utils.escape_html(o.value)}">${frappe.utils.escape_html(o.label)}</option>`));
+                    $select.val(settings.model || options[0].value);
+                }
+
+                dialog.show();
+            });
+        });
     }
 
     build_layout() {

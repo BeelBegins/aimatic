@@ -4,6 +4,7 @@ import json
 import re
 
 import frappe
+import requests
 from frappe import _
 from frappe.utils import cint, now_datetime, today
 from frappe.utils.csvutils import build_csv_response
@@ -87,6 +88,84 @@ def ping():
         frappe.throw(str(e))
 
     return {"reply": reply}
+
+
+_OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
+_MODELS_CACHE_KEY = "aimatic_ai_free_models"
+_MODELS_CACHE_SECONDS = 6 * 60 * 60
+
+
+@frappe.whitelist()
+def get_ai_integration_settings():
+    """Available to any of the 4 assistant roles (not just System Manager) so
+    the console can show every user whether the assistant is currently
+    enabled, even though only System Manager can change it (see
+    update_ai_integration_settings). Never returns the API key - it isn't
+    stored on this doctype at all, only in site config."""
+    _check_role()
+    settings = frappe.get_cached_doc("AI Integration Settings")
+    return {"enabled": bool(settings.enabled), "model": settings.model or ""}
+
+
+@frappe.whitelist()
+def update_ai_integration_settings(enabled, model: str | None = None):
+    """System Manager only - this controls org-wide assistant availability and
+    cost, not just the caller's own session. A bad `model` slug isn't
+    validated here; it fails loudly on the next real ask()/ping() call via the
+    normal NemotronError -> user-facing error path, same as any other
+    OpenRouter error this module already surfaces."""
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Not permitted."), frappe.PermissionError)
+
+    frappe.db.set_single_value(
+        "AI Integration Settings",
+        {"enabled": cint(enabled), "model": (model or "").strip()},
+    )
+    return {"ok": True}
+
+
+@frappe.whitelist()
+def list_available_free_models(force_refresh=False):
+    """System Manager only. Returns OpenRouter's currently free, tool-calling-
+    capable models (this assistant is entirely tool-call driven, so a model
+    without function-calling support isn't usable here regardless of price).
+    Cached for 6 hours in Redis (shared across every gunicorn worker and all
+    sites on this bench) since this is a live external call, not something to
+    repeat on every dialog open."""
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Not permitted."), frappe.PermissionError)
+
+    if not cint(force_refresh):
+        cached = frappe.cache().get_value(_MODELS_CACHE_KEY)
+        if cached is not None:
+            return cached
+
+    try:
+        response = requests.get(_OPENROUTER_MODELS_URL, timeout=15)
+    except requests.RequestException as e:
+        raise NemotronError(f"Could not reach OpenRouter: {e}")
+
+    if response.status_code != 200:
+        raise NemotronError(f"OpenRouter returned {response.status_code}: {response.text}")
+
+    try:
+        data = response.json()["data"]
+    except (KeyError, TypeError, ValueError):
+        raise NemotronError(f"Unexpected OpenRouter response shape: {response.text}")
+
+    models = [
+        {
+            "id": m["id"],
+            "name": m.get("name") or m["id"],
+            "context_length": m.get("context_length") or 0,
+        }
+        for m in data
+        if m.get("id", "").endswith(":free") and "tools" in (m.get("supported_parameters") or [])
+    ]
+    models.sort(key=lambda m: -m["context_length"])
+
+    frappe.cache().set_value(_MODELS_CACHE_KEY, models, expires_in_sec=_MODELS_CACHE_SECONDS)
+    return models
 
 
 def _check_role():

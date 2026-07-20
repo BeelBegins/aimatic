@@ -29,3 +29,4 @@ aimatic.patches.create_pos_oauth_client
 aimatic.patches.create_sales_oauth_client
 aimatic.patches.create_shopping_oauth_client
 aimatic.patches.create_restaurant_oauth_client
+aimatic.patches.ensure_ai_integration_settings_enabled

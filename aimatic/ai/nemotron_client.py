@@ -32,8 +32,25 @@ def _get_api_key() -> str:
     return api_key
 
 
+def _get_settings():
+    return frappe.get_cached_doc("AI Integration Settings")
+
+
+def _check_enabled() -> None:
+    if not _get_settings().enabled:
+        raise NemotronError(
+            "The AI Assistant is currently disabled. An administrator can "
+            "re-enable it from AI Integration Settings."
+        )
+
+
 def _get_model() -> str:
-    return frappe.conf.get("openrouter_nemotron_model") or DEFAULT_MODEL
+    # Highest priority: the live, frontend-editable setting (AI Integration
+    # Settings), so an admin can switch models without shell access. Falls
+    # back to the bench-wide site config key, then a hardcoded default -
+    # unchanged from before this field existed, so a site that never touches
+    # the new setting keeps working exactly as it did.
+    return _get_settings().model or frappe.conf.get("openrouter_nemotron_model") or DEFAULT_MODEL
 
 
 def get_chat_completion(
@@ -49,6 +66,7 @@ def get_chat_completion(
     tool-calling need to inspect `tool_calls`, not only the final content. Raises
     NemotronError on any failure (missing key, network error, non-2xx response,
     unexpected response shape) rather than returning a partial/empty result."""
+    _check_enabled()
     payload = {
         "model": model or _get_model(),
         "messages": messages,

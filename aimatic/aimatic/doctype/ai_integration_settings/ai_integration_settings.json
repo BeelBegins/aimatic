@@ -1,0 +1,50 @@
+{
+ "actions": [],
+ "creation": "2026-07-20 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "model",
+  "model_help"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "description": "OpenRouter model slug (e.g. nvidia/nemotron-3-ultra-550b-a55b:free). Leave blank to fall back to the site config value. Use the AI Assistant page's \"AI Settings\" menu to pick from the currently available free models instead of typing this by hand.",
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model"
+  },
+  {
+   "fieldname": "model_help",
+   "fieldtype": "HTML",
+   "options": "<p class=\"text-muted\">The OpenRouter API key itself is configured on the server (site config) and is not stored or shown here. Use this page to enable/disable the assistant and choose which model it uses.</p>"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-07-20 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "AI Integration Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

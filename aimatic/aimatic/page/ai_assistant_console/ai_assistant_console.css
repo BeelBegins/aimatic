@@ -23,6 +23,19 @@
     margin-bottom: 12px;
 }
 
+.ai-assistant-disabled-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border-radius: var(--border-radius-md, 8px);
+    background: var(--orange-100, #fff4e5);
+    border: 1px solid var(--orange-400, #ff9f1c);
+    color: var(--orange-700, #a15c00);
+    font-size: var(--text-sm);
+}
+
 .ai-assistant-kpi-buttons {
     display: flex;
     flex-wrap: wrap;
