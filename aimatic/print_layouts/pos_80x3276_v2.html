@@ -501,7 +501,7 @@ html, body {
   {% for item in doc.items %}
     <div class="rc-item">
       <div class="rc-item-name">{{ item.item_name }}</div>
-      <div class="rc-item-code">{{ item.item_code }}</div>
+      <div class="rc-item-code">{{ ctx.item_barcodes[item.name] }}</div>
       <div class="rc-item-nums">
         <span class="c-desc">&nbsp;</span>
         <span class="c-num">{{ item.qty | int }}{{ " " ~ item.uom if item.uom and item.uom != "Nos" else "" }}</span>

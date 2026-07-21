@@ -4,14 +4,36 @@ import frappe
 from frappe.utils import flt
 
 
+def _get_primary_barcodes(item_codes):
+    """First Item Barcode row per item code, same convention as
+    purchase_printing._get_primary_barcodes."""
+    if not item_codes:
+        return {}
+
+    rows = frappe.get_all(
+        "Item Barcode",
+        filters={"parent": ["in", item_codes]},
+        fields=["parent", "barcode", "idx"],
+        order_by="parent asc, idx asc",
+    )
+
+    barcodes = {}
+    for row in rows:
+        if row.parent and row.barcode and row.parent not in barcodes:
+            barcodes[row.parent] = row.barcode
+
+    return barcodes
+
+
 def get_pos_receipt_context(doc):
     """Everything the POS receipt print formats need beyond the invoice's
     own fields: the FBR sales-tax/service-fee amounts (matched by Sales
     Taxes and Charges row description, since there's no dedicated field for
     either), the per-item FBR totals, the receipt's applicable terms (the
     POS Profile's own Terms and Conditions if it has one, else the
-    invoice's), and any loyalty/gift-voucher activity tied to this specific
-    invoice.
+    invoice's), any loyalty/gift-voucher activity tied to this specific
+    invoice, and each row's printable barcode (the row's own scanned
+    `barcode` first, falling back to the item master's primary Item Barcode).
     """
     fbr_sales_tax = 0.0
     fbr_pos_fee = 0.0
@@ -37,7 +59,21 @@ def get_pos_receipt_context(doc):
             receipt_terms = frappe.db.get_value("Terms and Conditions", tc_name, "terms")
     receipt_terms = receipt_terms or doc.terms
 
+    item_codes = [item.item_code for item in doc.items if item.item_code]
+    master_barcodes = _get_primary_barcodes(item_codes)
+    item_barcodes = {
+        item.name: item.get("barcode") or master_barcodes.get(item.item_code) or item.item_code or ""
+        for item in doc.items
+    }
+
+    # A duplicate/reprint (Electron's "Duplicate Receipt" action, which tags
+    # its /printview request with ?is_duplicate=1) must never show Gift
+    # Voucher issuance/redemption again - it's not new, and re-showing the
+    # "You've Earned a Gift Voucher!" block on every reprint is misleading.
+    is_duplicate_print = bool(frappe.form_dict.get("is_duplicate"))
+
     return {
+        "item_barcodes": item_barcodes,
         "ntn": frappe.db.get_value("Company", doc.company, "tax_id"),
         "receipt_terms": receipt_terms,
         "fbr_sales_tax": fbr_sales_tax,
@@ -51,13 +87,17 @@ def get_pos_receipt_context(doc):
             ["loyalty_points", "purchase_amount"],
             as_dict=True,
         ),
-        "gift_voucher_redeemed": frappe.db.get_value(
+        "gift_voucher_redeemed": None
+        if is_duplicate_print
+        else frappe.db.get_value(
             "Gift Voucher",
             {"redeemed_against_invoice": doc.name},
             ["voucher_code", "amount"],
             as_dict=True,
         ),
-        "gift_voucher_issued": frappe.db.get_value(
+        "gift_voucher_issued": None
+        if is_duplicate_print
+        else frappe.db.get_value(
             "Gift Voucher",
             {"issued_against_invoice": doc.name},
             ["voucher_code", "amount", "expiry_date"],
