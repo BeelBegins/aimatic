@@ -143,26 +143,97 @@ def _customer_price_list(customer, branch_price_list):
 
 
 def _item_stock_and_rates(item_codes, warehouse, price_list):
+	"""Per-item stock (base UOM) plus alternate-UOM price/conversion context.
+
+	Returns (stock_by_item, rate_by_item, uom_by_item):
+	- stock_by_item / rate_by_item keep their original shape (rate_by_item is the item's
+	  price in its own stock_uom - previously this mixed rates from ANY uom together via a
+	  single "latest modified, whichever uom" query, which is the same class of bug as the
+	  missing UOM selector itself; fixed here as part of making per-UOM pricing correct).
+	- uom_by_item: {item_code: {"default_uom": str, "uoms": [{uom, conversion_factor, rate}]}}.
+	  A uom's rate prefers a dedicated Item Price row for that (item_code, uom, price_list);
+	  falling back to stock_uom_rate * conversion_factor, mirroring ERPNext's own
+	  get_price_list_rate fallback (erpnext/stock/get_item_details.py:1291) so client-shown
+	  estimates agree with what set_missing_values/calculate_taxes_and_totals compute
+	  server-side at submit time.
+	"""
 	if not item_codes:
-		return {}, {}
+		return {}, {}, {}
+
 	bins = frappe.get_all(
 		"Bin",
 		filters={"item_code": ["in", item_codes], "warehouse": warehouse},
 		fields=["item_code", "actual_qty", "reserved_qty"],
 		limit_page_length=len(item_codes),
 	)
+	stock_by_item = {row.item_code: row for row in bins}
+
+	items = frappe.get_all(
+		"Item",
+		filters={"name": ["in", item_codes]},
+		fields=["name", "stock_uom", "sales_uom"],
+		limit_page_length=len(item_codes),
+	)
+	conversions = frappe.get_all(
+		"UOM Conversion Detail",
+		filters={"parent": ["in", item_codes]},
+		fields=["parent", "uom", "conversion_factor"],
+		limit_page_length=max(len(item_codes) * 5, 100),
+	)
 	prices = frappe.get_all(
 		"Item Price",
 		filters={"item_code": ["in", item_codes], "price_list": price_list, "selling": 1},
-		fields=["item_code", "price_list_rate"],
+		fields=["item_code", "uom", "price_list_rate"],
 		order_by="modified desc",
-		limit_page_length=max(len(item_codes) * 3, 100),
+		limit_page_length=max(len(item_codes) * 5, 100),
 	)
-	stock_by_item = {row.item_code: row for row in bins}
-	rate_by_item = {}
+	uom_rate_by_item = {}
+	any_rate_by_item = {}
 	for row in prices:
-		rate_by_item.setdefault(row.item_code, flt(row.price_list_rate))
-	return stock_by_item, rate_by_item
+		if row.uom:
+			uom_rate_by_item.setdefault((row.item_code, row.uom), flt(row.price_list_rate))
+		any_rate_by_item.setdefault(row.item_code, flt(row.price_list_rate))
+
+	factors_by_item = {}
+	for row in conversions:
+		factors_by_item.setdefault(row.parent, {})[row.uom] = flt(row.conversion_factor) or 1.0
+
+	rate_by_item = {}
+	uom_by_item = {}
+	for item in items:
+		stock_rate = uom_rate_by_item.get((item.name, item.stock_uom))
+		if stock_rate is None:
+			# No Item Price row explicitly tagged with the stock UOM - fall back to
+			# whatever price exists for this item, same leniency the old code had.
+			stock_rate = any_rate_by_item.get(item.name, 0)
+		rate_by_item[item.name] = stock_rate
+
+		factors = dict(factors_by_item.get(item.name, {}))
+		factors.setdefault(item.stock_uom, 1.0)
+		uom_by_item[item.name] = {
+			"default_uom": item.sales_uom or item.stock_uom,
+			"uoms": [
+				{
+					"uom": uom,
+					"conversion_factor": factor,
+					"rate": uom_rate_by_item.get((item.name, uom), round(stock_rate * factor, 2)),
+				}
+				for uom, factor in factors.items()
+			],
+		}
+
+	return stock_by_item, rate_by_item, uom_by_item
+
+
+def _valid_item_uoms(item_code):
+	"""The set of UOMs a Sales Order line for this item may legally use."""
+	stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
+	alternates = frappe.get_all(
+		"UOM Conversion Detail",
+		filters={"parent": item_code},
+		pluck="uom",
+	)
+	return {stock_uom, *alternates} - {None}
 
 
 def _credit_context(customer, company):
@@ -190,10 +261,14 @@ def _parse_items(items):
 	for value in items:
 		if not isinstance(value, dict) or not value.get("item_code") or flt(value.get("qty")) <= 0:
 			frappe.throw(_("Every item requires an item_code and quantity greater than zero"))
+		item_code = value["item_code"]
+		uom = value.get("uom")
+		if uom and uom not in _valid_item_uoms(item_code):
+			frappe.throw(_("{0} is not a valid unit of measure for item {1}").format(uom, item_code))
 		result.append({
-			"item_code": value["item_code"],
+			"item_code": item_code,
 			"qty": flt(value["qty"]),
-			"uom": value.get("uom"),
+			"uom": uom,
 			"delivery_date": value.get("delivery_date"),
 		})
 	return result
@@ -315,10 +390,22 @@ def search_items(branch=None, warehouse=None, customer=None, search=None, barcod
 	else:
 		filters = {"disabled": 0, "is_sales_item": 1}
 	rows = frappe.get_list("Item", filters=filters, or_filters={"name": ["like", f"%{search}%"], "item_name": ["like", f"%{search}%"]} if search else None, fields=["name", "item_name", "item_group", "brand", "stock_uom", "image"], start=cint(offset), page_length=_page_length(limit), order_by="item_name")
-	stock_by_item, rate_by_item = _item_stock_and_rates([row.name for row in rows], context.warehouse, price_list)
+	stock_by_item, rate_by_item, uom_by_item = _item_stock_and_rates([row.name for row in rows], context.warehouse, price_list)
 	for row in rows:
 		stock = stock_by_item.get(row.name) or {}
-		row.update({"warehouse": context.warehouse, "actual_qty": flt(stock.get("actual_qty")), "available_qty": flt(stock.get("actual_qty")) - flt(stock.get("reserved_qty")), "price_list": price_list, "rate": rate_by_item.get(row.name, 0)})
+		available_qty = flt(stock.get("actual_qty")) - flt(stock.get("reserved_qty"))
+		uom_info = uom_by_item.get(row.name) or {"default_uom": row.stock_uom, "uoms": [{"uom": row.stock_uom, "conversion_factor": 1.0, "rate": rate_by_item.get(row.name, 0)}]}
+		for entry in uom_info["uoms"]:
+			entry["available_qty"] = flt(available_qty / entry["conversion_factor"]) if entry["conversion_factor"] else 0
+		row.update({
+			"warehouse": context.warehouse,
+			"actual_qty": flt(stock.get("actual_qty")),
+			"available_qty": available_qty,
+			"price_list": price_list,
+			"rate": rate_by_item.get(row.name, 0),
+			"default_uom": uom_info["default_uom"],
+			"uoms": uom_info["uoms"],
+		})
 	return {"items": rows, "price_list": price_list, "warehouse": context.warehouse, "currency": context.currency}
 
 
