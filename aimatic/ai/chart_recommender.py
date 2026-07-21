@@ -20,7 +20,7 @@ _MAX_CHART_BARS = 10
 
 def _chart_get_sales_overview(result: dict) -> Chart | None:
     """Horizontal bar of net_sales by branch from branch_breakdown."""
-    breakdown = result.get("branch_breakdown") or []
+    breakdown = (result.get("branch_breakdown") or [])[:_MAX_CHART_BARS]
     if len(breakdown) < 2:
         return None
     labels = [row["branch"] for row in breakdown]
@@ -439,6 +439,209 @@ def _chart_get_branch_profit_and_loss(result: dict) -> Chart | None:
     )
 
 
+def _chart_get_sales_trend(result: dict) -> Chart | None:
+    """Line chart of net_sales over successive trend buckets (chronological)."""
+    trend = result.get("trend") or []
+    if len(trend) < 2:
+        return None
+    labels = [row["bucket"] for row in trend]
+    data = [row["net_sales"] for row in trend]
+    return Chart(
+        id="chart_get_sales_trend",
+        title="Sales Trend",
+        type="line",
+        data=ChartData(labels=labels, datasets=[{"label": "Net Sales", "data": data}]),
+        options=ChartOptions(yAxis={"format": "currency"}),
+        auto_selected=True,
+    )
+
+
+def _chart_get_hourly_sales_pattern(result: dict) -> Chart | None:
+    """Bar chart of net_sales by weekday (7 bars, more legible than 24 hourly bars)."""
+    by_weekday = result.get("by_weekday") or []
+    if len(by_weekday) < 2:
+        return None
+    labels = [row["weekday"] for row in by_weekday]
+    data = [row["net_sales"] for row in by_weekday]
+    return Chart(
+        id="chart_get_hourly_sales_pattern",
+        title="Sales by Weekday",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": "Net Sales", "data": data}]),
+        options=ChartOptions(yAxis={"format": "currency"}),
+        auto_selected=True,
+    )
+
+
+def _chart_get_discount_overview(result: dict) -> Chart | None:
+    breakdown = (result.get("branch_breakdown") or [])[:_MAX_CHART_BARS]
+    if len(breakdown) < 2:
+        return None
+    labels = [row["branch"] for row in breakdown]
+    data = [row["discount_amount"] for row in breakdown]
+    return Chart(
+        id="chart_get_discount_overview",
+        title="Discount by Branch",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": "Discount Amount", "data": data}]),
+        options=ChartOptions(horizontal=True, yAxis={"format": "currency"}),
+        auto_selected=True,
+    )
+
+
+def _chart_get_sales_by_item_group(result: dict) -> Chart | None:
+    item_groups = (result.get("item_groups") or [])[:_MAX_CHART_BARS]
+    if len(item_groups) < 2:
+        return None
+    labels = [row["item_group"] for row in item_groups]
+    data = [row["sales_amount"] for row in item_groups]
+    return Chart(
+        id="chart_get_sales_by_item_group",
+        title="Sales by Item Group",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": "Sales Amount", "data": data}]),
+        options=ChartOptions(horizontal=True, yAxis={"format": "currency"}),
+        auto_selected=True,
+    )
+
+
+def _chart_get_selling_below_cost(result: dict) -> Chart | None:
+    items = (result.get("items") or [])[:_MAX_CHART_BARS]
+    if len(items) < 2:
+        return None
+    labels = [row["item_name"] for row in items]
+    data = [row["loss_per_unit"] for row in items]
+    return Chart(
+        id="chart_get_selling_below_cost",
+        title="Loss per Unit — Items Below Cost",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": "Loss / Unit", "data": data}]),
+        options=ChartOptions(horizontal=True, yAxis={"format": "currency"}),
+        auto_selected=True,
+    )
+
+
+def _chart_get_supplier_price_comparison(result: dict) -> Chart | None:
+    suppliers = (result.get("suppliers") or [])[:_MAX_CHART_BARS]
+    if len(suppliers) < 2:
+        return None
+    labels = [row["supplier"] for row in suppliers]
+    data = [row["rate"] for row in suppliers]
+    return Chart(
+        id="chart_get_supplier_price_comparison",
+        title=f"Purchase Rate by Supplier — {result.get('item_name', result.get('item_code', ''))}",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": "Rate", "data": data}]),
+        options=ChartOptions(horizontal=True, yAxis={"format": "currency"}),
+        auto_selected=True,
+    )
+
+
+def _chart_get_po_receipt_variance(result: dict) -> None:
+    return None
+
+
+def _chart_get_purchase_concentration(result: dict) -> Chart | None:
+    suppliers = (result.get("top_suppliers") or [])[:_MAX_CHART_BARS]
+    if len(suppliers) < 2:
+        return None
+    labels = [row["supplier"] for row in suppliers]
+    data = [row["amount"] for row in suppliers]
+    return Chart(
+        id="chart_get_purchase_concentration",
+        title="Purchase Spend by Top Suppliers",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": "Amount", "data": data}]),
+        options=ChartOptions(horizontal=True, yAxis={"format": "currency"}),
+        auto_selected=True,
+    )
+
+
+def _chart_get_stock_aging(result: dict) -> Chart | None:
+    items = [row for row in (result.get("items") or []) if row.get("days_since_last_receipt") is not None][:_MAX_CHART_BARS]
+    if len(items) < 2:
+        return None
+    labels = [row["item_name"] for row in items]
+    data = [row["days_since_last_receipt"] for row in items]
+    return Chart(
+        id="chart_get_stock_aging",
+        title="Stock Aging — Days Since Last Receipt",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": "Days Since Receipt", "data": data}]),
+        options=ChartOptions(horizontal=True, yAxis={"format": "number"}),
+        auto_selected=True,
+    )
+
+
+def _chart_get_reorder_recommendations(result: dict) -> Chart | None:
+    items = (result.get("items") or [])[:_MAX_CHART_BARS]
+    if len(items) < 2:
+        return None
+    labels = [row["item_name"] for row in items]
+    data = [row["days_of_stock"] for row in items]
+    return Chart(
+        id="chart_get_reorder_recommendations",
+        title="Days of Stock Remaining — Reorder Candidates",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": "Days of Stock", "data": data}]),
+        options=ChartOptions(horizontal=True, yAxis={"format": "number"}),
+        auto_selected=True,
+    )
+
+
+def _chart_get_negative_stock_check(result: dict) -> None:
+    return None
+
+
+def _chart_get_customer_activity_segments(result: dict) -> Chart | None:
+    segments = result.get("segments") or {}
+    labels = ["New", "Active", "Lapsing", "Lost"]
+    keys = ["new", "active", "lapsing", "lost"]
+    values = [flt(segments.get(k, 0)) for k in keys]
+    if all(v == 0 for v in values):
+        return None
+    return Chart(
+        id="chart_get_customer_activity_segments",
+        title="Customer Activity Segments",
+        type="donut",
+        data=ChartData(labels=labels, datasets=[{"label": "Customers", "data": values}]),
+        options=ChartOptions(),
+        auto_selected=True,
+    )
+
+
+def _chart_get_open_documents_overview(result: dict) -> None:
+    return None
+
+
+def _chart_run_analytics_query(result: dict) -> Chart | None:
+    """Bar chart of the first requested measure across dimension groups - only
+    when the query was actually grouped by a dimension (an ungrouped single
+    total is KPI-shaped instead, see _kpis_for_run_analytics_query)."""
+    rows = (result.get("rows") or [])[:_MAX_CHART_BARS]
+    if result.get("dimension") is None or len(rows) < 2:
+        return None
+    measures = result.get("measures") or []
+    if not measures:
+        return None
+    first_measure = measures[0]
+    labels = [str(r.get("dimension_value")) for r in rows]
+    data = [flt(r.get(first_measure)) for r in rows]
+    fmt = "percent" if "pct" in first_measure else ("currency" if any(t in first_measure for t in ("amount", "sales", "value")) else "number")
+    return Chart(
+        id="chart_run_analytics_query",
+        title=f"{first_measure.replace('_', ' ').title()} by {(result.get('dimension') or '').replace('_', ' ').title()}",
+        type="bar",
+        data=ChartData(labels=labels, datasets=[{"label": first_measure.replace("_", " ").title(), "data": data}]),
+        options=ChartOptions(horizontal=True, yAxis={"format": fmt}),
+        auto_selected=True,
+    )
+
+
+def _chart_drill_down_transactions(result: dict) -> None:
+    return None
+
+
 _CHART_DISPATCH: dict[str, callable] = {
     "get_sales_overview": _chart_get_sales_overview,
     "get_top_selling_items": _chart_get_top_selling_items,
@@ -464,6 +667,21 @@ _CHART_DISPATCH: dict[str, callable] = {
     "get_tax_liability_overview": _chart_get_tax_liability_overview,
     "get_payment_entry_summary": _chart_get_payment_entry_summary,
     "get_branch_profit_and_loss": _chart_get_branch_profit_and_loss,
+    "get_sales_trend": _chart_get_sales_trend,
+    "get_hourly_sales_pattern": _chart_get_hourly_sales_pattern,
+    "get_discount_overview": _chart_get_discount_overview,
+    "get_sales_by_item_group": _chart_get_sales_by_item_group,
+    "get_selling_below_cost": _chart_get_selling_below_cost,
+    "get_supplier_price_comparison": _chart_get_supplier_price_comparison,
+    "get_po_receipt_variance": _chart_get_po_receipt_variance,
+    "get_purchase_concentration": _chart_get_purchase_concentration,
+    "get_stock_aging": _chart_get_stock_aging,
+    "get_reorder_recommendations": _chart_get_reorder_recommendations,
+    "get_negative_stock_check": _chart_get_negative_stock_check,
+    "get_customer_activity_segments": _chart_get_customer_activity_segments,
+    "get_open_documents_overview": _chart_get_open_documents_overview,
+    "run_analytics_query": _chart_run_analytics_query,
+    "drill_down_transactions": _chart_drill_down_transactions,
 }
 
 

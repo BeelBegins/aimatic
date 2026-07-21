@@ -6,7 +6,7 @@ Confidence/intent/entities are honest placeholders, not real ML, until a later p
 from __future__ import annotations
 
 import frappe
-from frappe.utils import flt, getdate, now, today
+from frappe.utils import cint, flt, getdate, now, today
 
 from aimatic.ai.response_schema import (
     KPI,
@@ -604,6 +604,197 @@ def _table_for_get_branch_profit_and_loss(result: dict) -> Table | None:
     )
 
 
+def _kpis_for_get_sales_trend(result: dict) -> list[KPI]:
+    trend = result.get("trend") or []
+    if not trend:
+        return []
+    currency = result.get("currency")
+    total_net_sales = sum(flt(r.get("net_sales")) for r in trend)
+    return [KPI(
+        key="get_sales_trend_total_net_sales",
+        label="Total Net Sales (Trend Window)",
+        value=total_net_sales,
+        format="currency",
+        currency=currency,
+    )]
+
+
+def _kpis_for_get_hourly_sales_pattern(result: dict) -> list[KPI]:
+    return []
+
+
+def _kpis_for_get_discount_overview(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    if (total_discount := result.get("total_discount_amount")) is not None:
+        kpis.append(KPI(
+            key="get_discount_overview_total_discount_amount",
+            label="Total Discount Given",
+            value=flt(total_discount),
+            format="currency",
+            currency=currency,
+            severity="watch" if flt(total_discount) > 0 else None,
+        ))
+    if (pct := result.get("effective_discount_pct")) is not None:
+        kpis.append(KPI(
+            key="get_discount_overview_effective_discount_pct",
+            label="Effective Discount %",
+            value=flt(pct),
+            format="percent",
+        ))
+    return kpis
+
+
+def _kpis_for_get_sales_by_item_group(result: dict) -> list[KPI]:
+    return []
+
+
+def _kpis_for_get_selling_below_cost(result: dict) -> list[KPI]:
+    items = result.get("items") or []
+    return [KPI(
+        key="get_selling_below_cost_item_count",
+        label="Items Priced Below Cost",
+        value=float(len(items)),
+        format="number",
+        severity="warning" if items else None,
+    )]
+
+
+def _kpis_for_get_supplier_price_comparison(result: dict) -> list[KPI]:
+    return []
+
+
+def _kpis_for_get_po_receipt_variance(result: dict) -> list[KPI]:
+    lines = result.get("lines") or []
+    short_count = sum(1 for l in lines if flt(l.get("variance_qty")) < 0)
+    if not lines:
+        return []
+    return [KPI(
+        key="get_po_receipt_variance_short_lines",
+        label="Under-Delivered Lines",
+        value=float(short_count),
+        format="number",
+        severity="warning" if short_count else None,
+    )]
+
+
+def _kpis_for_get_purchase_concentration(result: dict) -> list[KPI]:
+    currency = result.get("currency")
+    kpis: list[KPI] = []
+    if (pct := result.get("concentration_pct")) is not None:
+        kpis.append(KPI(
+            key="get_purchase_concentration_pct",
+            label="Top-Supplier Concentration %",
+            value=flt(pct),
+            format="percent",
+            severity="watch" if flt(pct) > 60 else None,
+        ))
+    if (total_spend := result.get("total_spend")) is not None:
+        kpis.append(KPI(
+            key="get_purchase_concentration_total_spend",
+            label="Total Purchase Spend",
+            value=flt(total_spend),
+            format="currency",
+            currency=currency,
+        ))
+    return kpis
+
+
+def _kpis_for_get_stock_aging(result: dict) -> list[KPI]:
+    return []
+
+
+def _kpis_for_get_reorder_recommendations(result: dict) -> list[KPI]:
+    items = result.get("items") or []
+    return [KPI(
+        key="get_reorder_recommendations_item_count",
+        label="Items Below Reorder Point",
+        value=float(len(items)),
+        format="number",
+        severity="warning" if items else None,
+    )]
+
+
+def _kpis_for_get_negative_stock_check(result: dict) -> list[KPI]:
+    items = result.get("items") or []
+    return [KPI(
+        key="get_negative_stock_check_count",
+        label="Negative Stock Rows",
+        value=float(len(items)),
+        format="number",
+        severity="critical" if items else "info",
+    )]
+
+
+def _kpis_for_get_customer_activity_segments(result: dict) -> list[KPI]:
+    segments = result.get("segments") or {}
+    kpis: list[KPI] = []
+    if (total := result.get("total_customers")) is not None:
+        kpis.append(KPI(
+            key="get_customer_activity_segments_total",
+            label="Total Customers",
+            value=float(total),
+            format="number",
+        ))
+    if (lost := segments.get("lost")) is not None:
+        kpis.append(KPI(
+            key="get_customer_activity_segments_lost",
+            label="Lost Customers",
+            value=float(lost),
+            format="number",
+            severity="warning" if lost else None,
+        ))
+    return kpis
+
+
+def _kpis_for_list_frappe_reports(result: dict) -> list[KPI]:
+    return []
+
+
+def _kpis_for_run_frappe_report(result: dict) -> list[KPI]:
+    return []
+
+
+def _kpis_for_run_analytics_query(result: dict) -> list[KPI]:
+    """Only KPI-shaped when there's a single (ungrouped) row - a grouped
+    breakdown is table/chart-shaped instead, same convention as
+    _kpis_for_run_dynamic_report."""
+    rows = result.get("rows") or []
+    if result.get("dimension") is not None or len(rows) != 1:
+        return []
+    currency = result.get("currency")
+    row = rows[0]
+    kpis: list[KPI] = []
+    for m in result.get("measures") or []:
+        if m not in row or row[m] is None:
+            continue
+        is_currency = any(tok in m for tok in ("amount", "sales", "value"))
+        kpis.append(KPI(
+            key=f"run_analytics_query_{m}",
+            label=m.replace("_", " ").title(),
+            value=flt(row[m]),
+            format="currency" if is_currency else "number",
+            currency=currency if is_currency else None,
+        ))
+    return kpis
+
+
+def _kpis_for_drill_down_transactions(result: dict) -> list[KPI]:
+    return []
+
+
+def _kpis_for_get_open_documents_overview(result: dict) -> list[KPI]:
+    documents = result.get("documents") or []
+    total_draft = sum(cint(d.get("draft_count")) for d in documents) if documents else 0
+    total_stale = sum(cint(d.get("stale_count")) for d in documents) if documents else 0
+    stale_shifts = result.get("stale_shifts") or []
+    kpis = [
+        KPI(key="get_open_documents_overview_stale_docs", label="Stale Draft Documents", value=float(total_stale), format="number", severity="warning" if total_stale else None),
+        KPI(key="get_open_documents_overview_stale_shifts", label="Stale Open Shifts", value=float(len(stale_shifts)), format="number", severity="warning" if stale_shifts else None),
+    ]
+    return kpis
+
+
 _KPI_DISPATCH: dict[str, callable] = {
     "run_dynamic_report": _kpis_for_run_dynamic_report,
     "get_sales_overview": _kpis_for_get_sales_overview,
@@ -631,6 +822,23 @@ _KPI_DISPATCH: dict[str, callable] = {
     "get_tax_liability_overview": _kpis_for_get_tax_liability_overview,
     "get_payment_entry_summary": _kpis_for_get_payment_entry_summary,
     "get_branch_profit_and_loss": _kpis_for_get_branch_profit_and_loss,
+    "get_sales_trend": _kpis_for_get_sales_trend,
+    "get_hourly_sales_pattern": _kpis_for_get_hourly_sales_pattern,
+    "get_discount_overview": _kpis_for_get_discount_overview,
+    "get_sales_by_item_group": _kpis_for_get_sales_by_item_group,
+    "get_selling_below_cost": _kpis_for_get_selling_below_cost,
+    "get_supplier_price_comparison": _kpis_for_get_supplier_price_comparison,
+    "get_po_receipt_variance": _kpis_for_get_po_receipt_variance,
+    "get_purchase_concentration": _kpis_for_get_purchase_concentration,
+    "get_stock_aging": _kpis_for_get_stock_aging,
+    "get_reorder_recommendations": _kpis_for_get_reorder_recommendations,
+    "get_negative_stock_check": _kpis_for_get_negative_stock_check,
+    "get_customer_activity_segments": _kpis_for_get_customer_activity_segments,
+    "get_open_documents_overview": _kpis_for_get_open_documents_overview,
+    "list_frappe_reports": _kpis_for_list_frappe_reports,
+    "run_frappe_report": _kpis_for_run_frappe_report,
+    "run_analytics_query": _kpis_for_run_analytics_query,
+    "drill_down_transactions": _kpis_for_drill_down_transactions,
 }
 
 
@@ -963,6 +1171,378 @@ def _table_for_run_dynamic_report(result: dict) -> Table | None:
     )
 
 
+def _table_for_get_sales_trend(result: dict) -> Table | None:
+    trend = result.get("trend") or []
+    if not trend:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_sales_trend",
+        title="Sales Trend",
+        columns=[
+            TableColumn(key="bucket", label="Period", type="text"),
+            TableColumn(key="net_sales", label="Net Sales", type="currency", currency=currency),
+            TableColumn(key="txn_count", label="Transactions", type="int"),
+        ],
+        rows=trend,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_hourly_sales_pattern(result: dict) -> Table | None:
+    by_hour = result.get("by_hour") or []
+    if not by_hour:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_hourly_sales_pattern",
+        title="Sales by Hour of Day",
+        columns=[
+            TableColumn(key="hour", label="Hour", type="int"),
+            TableColumn(key="net_sales", label="Net Sales", type="currency", currency=currency),
+            TableColumn(key="txn_count", label="Transactions", type="int"),
+        ],
+        rows=by_hour,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_discount_overview(result: dict) -> Table | None:
+    breakdown = result.get("branch_breakdown") or []
+    if not breakdown:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_discount_overview",
+        title="Discount by Branch",
+        columns=[
+            TableColumn(key="branch", label="Branch", type="text"),
+            TableColumn(key="discount_amount", label="Discount Amount", type="currency", currency=currency),
+            TableColumn(key="net_sales", label="Net Sales", type="currency", currency=currency),
+        ],
+        rows=breakdown,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_sales_by_item_group(result: dict) -> Table | None:
+    item_groups = result.get("item_groups") or []
+    if not item_groups:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_sales_by_item_group",
+        title="Sales by Item Group",
+        columns=[
+            TableColumn(key="item_group", label="Item Group", type="text"),
+            TableColumn(key="sales_qty", label="Qty Sold", type="float"),
+            TableColumn(key="sales_amount", label="Sales Amount", type="currency", currency=currency),
+            TableColumn(key="share_pct", label="Share %", type="percent"),
+        ],
+        rows=item_groups,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_selling_below_cost(result: dict) -> Table | None:
+    items = result.get("items") or []
+    if not items:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_selling_below_cost",
+        title="Items Selling Below Cost",
+        columns=[
+            TableColumn(key="item_code", label="Item Code", type="link", doctype="Item"),
+            TableColumn(key="item_name", label="Item Name", type="text"),
+            TableColumn(key="price_list", label="Price List", type="text"),
+            TableColumn(key="selling_rate", label="Selling Rate", type="currency", currency=currency),
+            TableColumn(key="latest_cost", label="Latest Cost", type="currency", currency=currency),
+            TableColumn(key="loss_per_unit", label="Loss / Unit", type="currency", currency=currency),
+        ],
+        rows=items,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_supplier_price_comparison(result: dict) -> Table | None:
+    suppliers = result.get("suppliers") or []
+    if not suppliers:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_supplier_price_comparison",
+        title="Purchase Rate by Supplier",
+        columns=[
+            TableColumn(key="supplier", label="Supplier", type="link", doctype="Supplier"),
+            TableColumn(key="rate", label="Rate", type="currency", currency=currency),
+            TableColumn(key="date", label="As Of", type="date"),
+        ],
+        rows=suppliers,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_po_receipt_variance(result: dict) -> Table | None:
+    lines = result.get("lines") or []
+    if not lines:
+        return None
+    return Table(
+        id="table_get_po_receipt_variance",
+        title="PO vs Receipt Variance",
+        columns=[
+            TableColumn(key="po_name", label="Purchase Order", type="link", doctype="Purchase Order"),
+            TableColumn(key="supplier", label="Supplier", type="link", doctype="Supplier"),
+            TableColumn(key="item_code", label="Item", type="link", doctype="Item"),
+            TableColumn(key="ordered_qty", label="Ordered Qty", type="float"),
+            TableColumn(key="received_qty", label="Received Qty", type="float"),
+            TableColumn(key="variance_pct", label="Variance %", type="percent"),
+        ],
+        rows=lines,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_purchase_concentration(result: dict) -> Table | None:
+    suppliers = result.get("top_suppliers") or []
+    if not suppliers:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_purchase_concentration",
+        title="Top Suppliers by Purchase Spend",
+        columns=[
+            TableColumn(key="supplier", label="Supplier", type="link", doctype="Supplier"),
+            TableColumn(key="amount", label="Amount", type="currency", currency=currency),
+            TableColumn(key="share_pct", label="Share %", type="percent"),
+        ],
+        rows=suppliers,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_stock_aging(result: dict) -> Table | None:
+    items = result.get("items") or []
+    if not items:
+        return None
+    currency = result.get("currency")
+    return Table(
+        id="table_get_stock_aging",
+        title="Stock Aging",
+        columns=[
+            TableColumn(key="item_code", label="Item Code", type="link", doctype="Item"),
+            TableColumn(key="item_name", label="Item Name", type="text"),
+            TableColumn(key="stock_value", label="Stock Value", type="currency", currency=currency),
+            TableColumn(key="days_since_last_receipt", label="Days Since Last Receipt", type="int"),
+        ],
+        rows=items,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_reorder_recommendations(result: dict) -> Table | None:
+    items = result.get("items") or []
+    if not items:
+        return None
+    return Table(
+        id="table_get_reorder_recommendations",
+        title="Reorder Recommendations",
+        columns=[
+            TableColumn(key="item_code", label="Item Code", type="link", doctype="Item"),
+            TableColumn(key="item_name", label="Item Name", type="text"),
+            TableColumn(key="current_stock", label="Current Stock", type="float"),
+            TableColumn(key="days_of_stock", label="Days of Stock", type="float"),
+            TableColumn(key="suggested_order_qty", label="Suggested Order Qty", type="float"),
+        ],
+        rows=items,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_negative_stock_check(result: dict) -> Table | None:
+    items = result.get("items") or []
+    if not items:
+        return None
+    return Table(
+        id="table_get_negative_stock_check",
+        title="Negative Stock",
+        columns=[
+            TableColumn(key="item_code", label="Item Code", type="link", doctype="Item"),
+            TableColumn(key="item_name", label="Item Name", type="text"),
+            TableColumn(key="warehouse", label="Warehouse", type="link", doctype="Warehouse"),
+            TableColumn(key="actual_qty", label="Actual Qty", type="float"),
+        ],
+        rows=items,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_get_open_documents_overview(result: dict) -> Table | None:
+    documents = result.get("documents") or []
+    if not documents:
+        return None
+    return Table(
+        id="table_get_open_documents_overview",
+        title="Draft Documents by Type",
+        columns=[
+            TableColumn(key="doctype", label="Document Type", type="text"),
+            TableColumn(key="draft_count", label="Draft Count", type="int"),
+            TableColumn(key="stale_count", label="Stale Count", type="int"),
+            TableColumn(key="oldest_date", label="Oldest Draft", type="date"),
+        ],
+        rows=documents,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+_REPORT_FIELDTYPE_TO_COLTYPE = {
+    "Currency": "currency",
+    "Float": "float",
+    "Int": "int",
+    "Date": "date",
+    "Datetime": "date",
+    "Percent": "percent",
+    "Link": "link",
+}
+
+
+def _table_for_list_frappe_reports(result: dict) -> Table | None:
+    reports = result.get("reports") or []
+    if not reports:
+        return None
+    return Table(
+        id="table_list_frappe_reports",
+        title="Available Reports",
+        columns=[
+            TableColumn(key="report_name", label="Report", type="text"),
+            TableColumn(key="description", label="Description", type="text"),
+        ],
+        rows=reports,
+        sortable=True,
+        filterable=True,
+        exportable=False,
+    )
+
+
+def _table_for_run_frappe_report(result: dict) -> Table | None:
+    """Columns are built from the report's own returned column metadata
+    (fieldname/label/fieldtype/options) rather than inferred from row keys -
+    unlike run_dynamic_report, this tool's result already carries real schema."""
+    rows = result.get("rows") or []
+    if not rows:
+        return None
+    currency = None
+    columns_meta = result.get("columns") or []
+    columns = []
+    for c in columns_meta:
+        fieldname = c.get("fieldname")
+        if not fieldname:
+            continue
+        fieldtype = c.get("fieldtype") or "Data"
+        coltype = _REPORT_FIELDTYPE_TO_COLTYPE.get(fieldtype, "text")
+        if coltype == "link":
+            columns.append(TableColumn(key=fieldname, label=c.get("label") or fieldname, type="link", doctype=c.get("options")))
+        elif coltype == "currency":
+            columns.append(TableColumn(key=fieldname, label=c.get("label") or fieldname, type="currency", currency=currency))
+        else:
+            columns.append(TableColumn(key=fieldname, label=c.get("label") or fieldname, type=coltype))
+    if not columns:
+        columns = [TableColumn(key=k, label=k.replace("_", " ").title(), type="text") for k in rows[0].keys()]
+    return Table(
+        id="table_run_frappe_report",
+        title=result.get("report_name") or "Report",
+        columns=columns,
+        rows=rows,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _measure_column_type(measure_key: str) -> str:
+    if "pct" in measure_key:
+        return "percent"
+    if any(tok in measure_key for tok in ("amount", "sales", "value")):
+        return "currency"
+    return "float"
+
+
+def _table_for_run_analytics_query(result: dict) -> Table | None:
+    rows = result.get("rows") or []
+    if not rows or result.get("dimension") is None:
+        return None
+    currency = result.get("currency")
+    columns = [TableColumn(key="dimension_value", label=(result.get("dimension") or "Group").replace("_", " ").title(), type="text")]
+    for key in rows[0].keys():
+        if key == "dimension_value":
+            continue
+        col_type = _measure_column_type(key)
+        columns.append(TableColumn(key=key, label=key.replace("_", " ").title(), type=col_type, currency=currency if col_type == "currency" else None))
+    return Table(
+        id="table_run_analytics_query",
+        title=f"{result.get('dataset', 'Analytics').title()} — {', '.join(result.get('measures') or [])}",
+        columns=columns,
+        rows=rows,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
+def _table_for_drill_down_transactions(result: dict) -> Table | None:
+    rows = result.get("rows") or []
+    if not rows:
+        return None
+    link_fields = {"supplier": "Supplier", "customer": "Customer", "branch": "Branch", "item_code": "Item", "warehouse": "Warehouse", "name": result.get("doctype")}
+    currency_fields = {"amount", "debit", "credit", "qty_change"}
+    date_fields = {"posting_date"}
+    columns = []
+    for key in rows[0].keys():
+        if key in date_fields:
+            columns.append(TableColumn(key=key, label=key.replace("_", " ").title(), type="date"))
+        elif key in currency_fields and key != "qty_change":
+            columns.append(TableColumn(key=key, label=key.replace("_", " ").title(), type="currency"))
+        elif key == "qty_change":
+            columns.append(TableColumn(key=key, label="Qty Change", type="float"))
+        elif key in link_fields and link_fields.get(key):
+            columns.append(TableColumn(key=key, label=key.replace("_", " ").title(), type="link", doctype=link_fields[key]))
+        else:
+            columns.append(TableColumn(key=key, label=key.replace("_", " ").title(), type="text"))
+    return Table(
+        id="table_drill_down_transactions",
+        title=f"{result.get('dataset', 'Transactions').title()} Drill-Down",
+        columns=columns,
+        rows=rows,
+        sortable=True,
+        filterable=True,
+        exportable=True,
+    )
+
+
 _TABLE_DISPATCH: dict[str, callable] = {
     "run_dynamic_report": _table_for_run_dynamic_report,
     "get_sales_overview": _table_for_get_sales_overview,
@@ -990,6 +1570,23 @@ _TABLE_DISPATCH: dict[str, callable] = {
     "get_tax_liability_overview": _table_for_get_tax_liability_overview,
     "get_payment_entry_summary": _table_for_get_payment_entry_summary,
     "get_branch_profit_and_loss": _table_for_get_branch_profit_and_loss,
+    "get_sales_trend": _table_for_get_sales_trend,
+    "get_hourly_sales_pattern": _table_for_get_hourly_sales_pattern,
+    "get_discount_overview": _table_for_get_discount_overview,
+    "get_sales_by_item_group": _table_for_get_sales_by_item_group,
+    "get_selling_below_cost": _table_for_get_selling_below_cost,
+    "get_supplier_price_comparison": _table_for_get_supplier_price_comparison,
+    "get_po_receipt_variance": _table_for_get_po_receipt_variance,
+    "get_purchase_concentration": _table_for_get_purchase_concentration,
+    "get_stock_aging": _table_for_get_stock_aging,
+    "get_reorder_recommendations": _table_for_get_reorder_recommendations,
+    "get_negative_stock_check": _table_for_get_negative_stock_check,
+    "get_customer_activity_segments": lambda r: None,
+    "get_open_documents_overview": _table_for_get_open_documents_overview,
+    "list_frappe_reports": _table_for_list_frappe_reports,
+    "run_frappe_report": _table_for_run_frappe_report,
+    "run_analytics_query": _table_for_run_analytics_query,
+    "drill_down_transactions": _table_for_drill_down_transactions,
 }
 
 
@@ -1051,18 +1648,22 @@ def build_response(
     sales_tools = {
         "get_sales_overview", "get_branch_comparison", "get_top_selling_items",
         "get_payment_mode_split", "get_returns_overview", "get_active_shifts",
+        "get_sales_trend", "get_hourly_sales_pattern", "get_discount_overview",
+        "get_sales_by_item_group",
     }
     inventory_tools = {
         "get_inventory_vs_sales", "get_dead_stock_detail", "get_item_price_history",
-        "get_price_increases",
+        "get_price_increases", "get_stock_aging", "get_reorder_recommendations",
+        "get_negative_stock_check",
     }
     purchase_tools = {
         "get_purchase_overview", "rank_vendors", "get_outstanding_payables_overview",
+        "get_purchase_concentration", "get_po_receipt_variance", "get_supplier_price_comparison",
     }
     customer_tools = {
-        "get_top_customers", "get_receivables_overview",
+        "get_top_customers", "get_receivables_overview", "get_customer_activity_segments",
     }
-    margin_tools = {"get_gross_margin_overview"}
+    margin_tools = {"get_gross_margin_overview", "get_selling_below_cost"}
 
     if tool_names & sales_tools:
         follow_ups.append("Compare with last month")

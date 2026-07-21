@@ -222,6 +222,27 @@ slower than expected after a delivery (which can indicate a supplier under-deliv
 what was recorded as received). Every figure can optionally be narrowed down to one branch or
 warehouse.
 
+### AI business intelligence assistant
+
+Managers can ask business questions in plain language from the AI Assistant page and receive
+live KPI cards, charts, sortable tables, source details, and follow-up suggestions instead of
+manually assembling reports. It covers sales trends, margins and below-cost pricing, purchasing
+and supplier concentration, stock aging and reorder recommendations, customer activity,
+payables/receivables, cash, profit and loss, tax balances, and operational exceptions such as
+stale drafts or long-open shifts.
+
+For questions outside those certified metrics, the assistant can run an existing permitted
+ERPNext report or combine approved business measures and dimensions (for example, net sales by
+customer group this month versus last month), then drill down to the real documents behind a
+figure. Every path is read-only, locked to the user's company and branch visibility, capped to a
+safe result size, and limited to server-approved reports, datasets, measures, dimensions, and
+filters — it cannot invent SQL or create, submit, or modify ERP records. Answers can be saved,
+pinned to a personal dashboard, exported, scheduled by email, or used for alert rules. Dashboard
+widgets are saved snapshots, so opening or reloading a dashboard does not spend AI requests or
+silently change its figures. Use **Refresh Dashboard** when current figures are needed; it asks for
+confirmation, refreshes the widgets one at a time, shows progress, and keeps the previous snapshot
+for any widget whose AI refresh fails or returns no structured data.
+
 ### Legacy data migration
 
 When bringing a new store onto this system from the old "iPOS" software, item and supplier

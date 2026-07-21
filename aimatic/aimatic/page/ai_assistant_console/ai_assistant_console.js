@@ -244,6 +244,9 @@ aimatic.AiAssistantPage = class AiAssistantPage {
                     <div class="ai-assistant-dashboard-view-header">
                         <button class="btn btn-sm btn-default ai-assistant-back-to-chat">${frappe.utils.icon('chevrons-left', 'xs')} ${__('Back to Chat')}</button>
                         <h4 class="ai-assistant-dashboard-view-title"></h4>
+                        <button class="btn btn-sm btn-primary ai-assistant-refresh-dashboard" title="${__('Refresh every widget with current data')}" disabled>
+                            ${frappe.utils.icon('refresh', 'xs')} <span>${__('Refresh Dashboard')}</span>
+                        </button>
                     </div>
                     <div class="ai-assistant-dashboard-grid"></div>
                 </div>
@@ -275,6 +278,7 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         this.$dashboard_view = this.$layout.find('.ai-assistant-dashboard-view');
         this.$dashboard_grid = this.$layout.find('.ai-assistant-dashboard-grid');
         this.$dashboard_view_title = this.$layout.find('.ai-assistant-dashboard-view-title');
+        this.$dashboard_refresh = this.$layout.find('.ai-assistant-refresh-dashboard');
 
         this.$messages = this.$container.find('.ai-assistant-messages');
         this.$input = this.$container.find('.ai-assistant-input');
@@ -349,6 +353,7 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         // Phase 3: Dashboard section events
         this.$layout.find('.ai-assistant-new-dashboard-btn').on('click', () => this.create_dashboard());
         this.$layout.find('.ai-assistant-back-to-chat').on('click', () => this.hide_dashboard_view());
+        this.$dashboard_refresh.on('click', () => this.confirm_refresh_dashboard());
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -592,15 +597,112 @@ aimatic.AiAssistantPage = class AiAssistantPage {
 
     open_dashboard(name) {
         this.show_dashboard_view();
-        frappe.call({ method: 'aimatic.ai.api.get_dashboard', args: { name: name } }).then((r) => {
+        this.$dashboard_refresh.prop('disabled', true);
+        return frappe.call({ method: 'aimatic.ai.api.get_dashboard', args: { name: name } }).then((r) => {
             // get_dashboard returns {"name", "title", "widgets"} directly -
             // r.message itself IS the dashboard object, not r.message.dashboard.
             const dashboard = r.message;
             if (dashboard) {
+                this.current_dashboard = dashboard;
                 this.$dashboard_view_title.text(dashboard.title);
                 this.render_dashboard_view(dashboard);
+                this.$dashboard_refresh.prop('disabled', !(dashboard.widgets || []).length);
             }
+            return dashboard;
+        }).catch((error) => {
+            // Don't strand the control in a permanently-disabled state if
+            // the dashboard read itself fails. frappe.call already surfaces
+            // the server error; keep the previous dashboard usable for retry.
+            this.$dashboard_refresh.prop(
+                'disabled',
+                !(this.current_dashboard && (this.current_dashboard.widgets || []).length)
+            );
+            console.error('Dashboard load failed:', name, error);
+            return null;
         });
+    }
+
+    confirm_refresh_dashboard() {
+        const dashboard = this.current_dashboard;
+        if (!dashboard) return;
+
+        const reportNames = [...new Set(
+            (dashboard.widgets || []).map((widget) => widget.saved_report).filter(Boolean)
+        )];
+        if (!reportNames.length) {
+            frappe.show_alert({ message: __('This dashboard has no widgets to refresh'), indicator: 'orange' });
+            return;
+        }
+
+        frappe.confirm(
+            __('Refresh {0} dashboard widgets with current data? This uses one or more OpenRouter requests per widget and may take a few minutes.', [reportNames.length]),
+            () => this.refresh_dashboard(dashboard, reportNames)
+        );
+    }
+
+    async refresh_dashboard(dashboard, reportNames) {
+        if (this.dashboard_refresh_in_progress) return;
+        this.dashboard_refresh_in_progress = true;
+
+        const total = reportNames.length;
+        let refreshed = 0;
+        let noData = 0;
+        let failed = 0;
+
+        this.$dashboard_refresh.prop('disabled', true);
+
+        try {
+            // Refresh sequentially: all sites share one OpenRouter key and the
+            // free tier has a tight concurrency cap. A Promise.all here makes
+            // a multi-widget dashboard much more likely to hit HTTP 429s.
+            for (let index = 0; index < total; index++) {
+                this.$dashboard_refresh.html(
+                    frappe.utils.icon('refresh', 'xs') +
+                    ` <span>${__('Refreshing {0}/{1}', [index + 1, total])}</span>`
+                );
+
+                try {
+                    const result = await frappe.call({
+                        method: 'aimatic.ai.api.refresh_saved_report',
+                        args: { name: reportNames[index] },
+                    });
+                    const response = result.message || {};
+                    if ((response.kpis || []).length || (response.charts || []).length || (response.tables || []).length) {
+                        refreshed++;
+                    } else {
+                        // refresh_saved_report protects an existing good
+                        // snapshot when a transient model response has no
+                        // structured data. Report it without aborting the rest.
+                        noData++;
+                    }
+                } catch (error) {
+                    failed++;
+                    console.error('Dashboard widget refresh failed:', reportNames[index], error);
+                }
+            }
+
+            const reloadedDashboard = await this.open_dashboard(dashboard.name);
+            if (!reloadedDashboard) {
+                frappe.show_alert({
+                    message: __('Widget data was refreshed, but the dashboard could not reload. Please reopen it.'),
+                    indicator: 'orange',
+                }, 7);
+                return;
+            }
+
+            const skipped = noData + failed;
+            frappe.show_alert({
+                message: skipped
+                    ? __('Dashboard refreshed: {0} updated, {1} kept their previous snapshot.', [refreshed, skipped])
+                    : __('Dashboard refreshed: {0} widgets updated.', [refreshed]),
+                indicator: skipped ? 'orange' : 'green',
+            }, 7);
+        } finally {
+            this.dashboard_refresh_in_progress = false;
+            this.$dashboard_refresh
+                .html(frappe.utils.icon('refresh', 'xs') + ` <span>${__('Refresh Dashboard')}</span>`)
+                .prop('disabled', !(this.current_dashboard && (this.current_dashboard.widgets || []).length));
+        }
     }
 
     show_dashboard_view() {

@@ -1104,9 +1104,21 @@
 }
 
 .ai-assistant-dashboard-view-title {
+    flex: 1 1 auto;
+    min-width: 0;
     margin: 0;
     font-size: var(--text-lg, 1.125rem);
     color: var(--text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-assistant-refresh-dashboard {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
 .ai-assistant-dashboard-grid {
@@ -1388,10 +1400,13 @@
     }
 
     .ai-assistant-dashboard-view-header {
+        flex-wrap: wrap;
         padding: 8px 0;
     }
 
     .ai-assistant-dashboard-view-title {
+        flex: 1 1 100%;
+        order: -1;
         font-size: var(--text-base, 1rem);
     }
 
@@ -1472,5 +1487,4 @@
         display: flex !important;
     }
 }
-
 

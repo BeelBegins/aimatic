@@ -15,14 +15,17 @@ from aimatic.ai.tools import TOOL_DISPATCH as _CORE_DISPATCH, TOOL_SPECS as _COR
 from aimatic.ai.tools import _resolve_company, _resolve_branch_filter
 from aimatic.ai.tools_extended import TOOL_DISPATCH as _EXTENDED_DISPATCH, TOOL_SPECS as _EXTENDED_SPECS
 from aimatic.ai.tools_accounts import TOOL_DISPATCH as _ACCOUNTS_DISPATCH, TOOL_SPECS as _ACCOUNTS_SPECS
+from aimatic.ai.tools_expanded import TOOL_DISPATCH as _EXPANDED_DISPATCH, TOOL_SPECS as _EXPANDED_SPECS
+from aimatic.ai.report_runner import TOOL_DISPATCH as _REPORT_RUNNER_DISPATCH, TOOL_SPECS as _REPORT_RUNNER_SPECS
+from aimatic.ai.analytics_engine import TOOL_DISPATCH as _ANALYTICS_DISPATCH, TOOL_SPECS as _ANALYTICS_SPECS
 from aimatic.ai.dynamic_report import DYNAMIC_REPORT_DISPATCH, TOOL_SPECS as _DYNAMIC_REPORT_SPECS
 from aimatic.ai.answer_builder import build_response
 
-TOOL_SPECS = _CORE_SPECS + _EXTENDED_SPECS + _ACCOUNTS_SPECS + _DYNAMIC_REPORT_SPECS
-TOOL_DISPATCH = {**_CORE_DISPATCH, **_EXTENDED_DISPATCH, **_ACCOUNTS_DISPATCH, **DYNAMIC_REPORT_DISPATCH}
+TOOL_SPECS = _CORE_SPECS + _EXTENDED_SPECS + _ACCOUNTS_SPECS + _EXPANDED_SPECS + _REPORT_RUNNER_SPECS + _ANALYTICS_SPECS + _DYNAMIC_REPORT_SPECS
+TOOL_DISPATCH = {**_CORE_DISPATCH, **_EXTENDED_DISPATCH, **_ACCOUNTS_DISPATCH, **_EXPANDED_DISPATCH, **_REPORT_RUNNER_DISPATCH, **_ANALYTICS_DISPATCH, **DYNAMIC_REPORT_DISPATCH}
 
 _ALLOWED_ROLES = {"System Manager", "Sales Manager", "Accounts Manager", "POS Supervisor"}
-_MAX_TOOL_ITERATIONS = 5
+_MAX_TOOL_ITERATIONS = 8
 _MAX_HISTORY_TURNS = 20
 _HISTORY_RESTORE_LIMIT = 40
 _MAX_RECIPIENTS = 20
@@ -189,36 +192,65 @@ def _check_conversation_ownership(conversation: str) -> None:
 
 
 def _build_system_prompt() -> str:
+    """Phase 4e: restructured from a flat handful of named examples into named
+    categories, plus an explicit fallback priority order. The flat-example
+    pattern stopped scaling once the tool catalogue grew past ~25 (each new
+    real-world confusion case required hand-adding one more named example, per
+    this module's own documented history) - grouping by category gives the
+    model a narrowing strategy (pick the category, then the tool within it)
+    that keeps working as more tools are added, rather than one that only
+    covers whichever handful of tools happen to be spelled out."""
     company = frappe.defaults.get_user_default("Company") or frappe.defaults.get_default("company") or "the company"
     return (
         f"You are an analytics assistant for {company}, a retail business running on ERPNext. "
         f"Today's date is {today()}. "
-        "Answer questions about sales, purchases, vendors, and inventory using ONLY the provided "
-        "tools - never guess or estimate numbers yourself. All monetary figures returned by tools "
-        "are in the company's default currency. When a question doesn't specify a date range, "
-        "assume today; when it says things like \"this month\" or \"last week\", resolve them into "
-        "concrete dates yourself using today's date above before calling a tool. Keep answers "
-        "concise and concrete - lead with the number, then brief context. "
-        "Always prefer a purpose-built tool (e.g. get_outstanding_payables_overview, "
-        "get_payables_aging, get_sales_overview, get_purchase_overview, get_receivables_overview, "
-        "rank_vendors, get_cash_and_bank_balance, get_branch_profit_and_loss) over "
-        "run_dynamic_report whenever one matches the question - "
-        "check every purpose-built tool's own description first, since one almost always exists "
-        "for a specific named business metric (a ranking, a balance, an aging breakdown, a "
-        "margin). run_dynamic_report is a last-resort fallback only for questions no specific "
-        "tool's description covers, never a first choice, and never chosen just because its own "
-        "doctype list happens to include the relevant doctype. If a purpose-built tool returns no "
-        "data, trust that result "
-        "and answer accordingly rather than retrying the same or a different doctype via "
-        "run_dynamic_report - a real business figure (like total outstanding payable) is almost "
-        "always better sourced from ledger balances (a purpose-built tool) than from a single "
-        "transactional doctype, which can legitimately have zero rows even when the real figure "
-        "is nonzero. Every tool you can use is already provided to you through the function-"
-        "calling mechanism - never write a tool's name out in your reply while reasoning about "
-        "whether one exists or is available; if a question needs data, actually invoke a tool "
-        "via a real function call before answering, even if you are unsure which one fits best - "
-        "picking the closest match and calling it is always correct, describing tool options in "
-        "plain text instead of calling one is never a valid answer."
+        "Answer questions using ONLY the provided tools - never guess or estimate numbers "
+        "yourself. All monetary figures returned by tools are in the company's default currency. "
+        "When a question doesn't specify a date range, assume today; when it says things like "
+        "\"this month\" or \"last week\", resolve them into concrete dates yourself using today's "
+        "date above before calling a tool. Keep answers concise and concrete - lead with the "
+        "number, then brief context.\n\n"
+        "TOOL SELECTION - work top-down through these categories, and within a category prefer "
+        "the tool whose own description most specifically matches the question:\n"
+        "- Sales: get_sales_overview, get_sales_trend, get_branch_comparison, get_top_selling_items, "
+        "get_sales_by_item_group, get_hourly_sales_pattern, get_payment_mode_split, "
+        "get_discount_overview, get_returns_overview, get_active_shifts\n"
+        "- Profitability: get_gross_margin_overview, get_selling_below_cost, get_item_price_history, "
+        "get_price_increases\n"
+        "- Purchasing: get_purchase_overview, rank_vendors, get_supplier_price_comparison, "
+        "get_po_receipt_variance, get_purchase_concentration\n"
+        "- Inventory: get_inventory_vs_sales, get_reorder_recommendations (THE tool for "
+        "'what should I order/restock' questions), get_dead_stock_detail, get_stock_aging, "
+        "get_negative_stock_check\n"
+        "- Customers: get_top_customers, get_receivables_overview, get_customer_activity_segments\n"
+        "- Finance/Accounts: get_outstanding_payables_overview, get_payables_aging, "
+        "get_receivables_aging, get_cash_and_bank_balance, get_profit_and_loss_overview, "
+        "get_expense_breakdown, get_trial_balance_summary, get_tax_liability_overview, "
+        "get_payment_entry_summary, get_branch_profit_and_loss\n"
+        "- Operational: get_open_documents_overview\n\n"
+        "FALLBACK ORDER - only move to the next one if NO tool above matches the question, in "
+        "this order: (1) run_analytics_query - a governed dataset/measure/dimension query "
+        "(sales/purchases/inventory/payables) for combinations no fixed tool covers, e.g. "
+        "'net sales by customer group this month vs last month'; pair it with "
+        "drill_down_transactions when the question asks to see the underlying documents/"
+        "invoices behind a figure. (2) list_frappe_reports then run_frappe_report - existing "
+        "standard ERPNext reports (Stock Balance, Accounts Receivable, Sales Register, etc.) for "
+        "questions that map to a well-known report by name. (3) run_dynamic_report - last resort "
+        "only, a narrow whitelisted query over POS Invoice/Purchase Invoice/Purchase Receipt/Item/"
+        "Customer/Supplier.\n\n"
+        "A real business figure (like total outstanding payable, cash balance, or vendor margin) "
+        "is almost always better sourced from a purpose-built tool or ledger-based query than from "
+        "a single transactional doctype via run_dynamic_report, which can legitimately return zero "
+        "rows even when the real figure is nonzero (e.g. a site whose purchase activity is recorded "
+        "via Purchase Receipt rather than Purchase Invoice). If a purpose-built tool (or "
+        "run_analytics_query) returns no data, trust that result and answer accordingly rather than "
+        "retrying the same or a different doctype further down the fallback order. Every tool you "
+        "can use is already provided to you through the function-calling mechanism - never write a "
+        "tool's name out in your reply while reasoning about whether one exists or is available; if "
+        "a question needs data, actually invoke a tool via a real function call before answering, "
+        "even if you are unsure which one fits best - picking the closest match and calling it is "
+        "always correct, describing tool options in plain text instead of calling one is never a "
+        "valid answer."
     )
 
 
