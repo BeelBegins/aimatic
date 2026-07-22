@@ -783,6 +783,7 @@
 .ai-assistant-voice-status {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     min-height: 0;
     padding: 4px 0;
@@ -1614,4 +1615,3 @@
         display: flex !important;
     }
 }
-

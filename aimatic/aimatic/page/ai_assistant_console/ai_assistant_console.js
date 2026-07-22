@@ -1122,13 +1122,20 @@ aimatic.AiAssistantPage = class AiAssistantPage {
     // ─────────────────────────────────────────────────────────────────────
 
     init_voice() {
+        this.voice_lang = 'en-PK';
+        this.voice_should_listen = false;
+        this.voice_base_text = '';
+        this.voice_committed_transcript = '';
+        this.voice_session_final = '';
+        this.voice_session_interim = '';
+        this.voice_restart_timer = null;
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
             this.voice_state = 'unsupported';
             this.$mic_btn.prop('disabled', true).attr('title', __('Voice input is not supported in this browser.'));
             return;
         }
-        this.voice_lang = 'en-US';
         this.$mic_btn.on('click', () => {
             if (this.voice_state === 'recording') {
                 this.stop_recording();
@@ -1141,64 +1148,177 @@ aimatic.AiAssistantPage = class AiAssistantPage {
     start_recording() {
         if (this.voice_state === 'unsupported' || this.sending) return;
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        this.recognition = new SpeechRecognition();
-        this.recognition.lang = this.voice_lang;
-        this.recognition.interimResults = true;
-        this.recognition.continuous = true;
-
-        let finalTranscript = this.$input.val() ? this.$input.val() + ' ' : '';
-
-        this.recognition.onresult = (event) => {
-            let interim = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    finalTranscript += transcript + ' ';
-                } else {
-                    interim += transcript;
-                }
-            }
-            this.$input.val(finalTranscript + interim);
-        };
-
-        this.recognition.onerror = (event) => {
-            if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-                this.voice_state = 'permission_denied';
-            } else if (event.error === 'network') {
-                this.voice_state = 'network_error';
-            } else if (event.error === 'no-speech') {
-                // Not a real failure - just nothing heard yet, keep listening state as-is.
-                return;
-            } else {
-                this.voice_state = 'failed';
-            }
-            this.stop_recording(true);
-        };
-
-        this.recognition.onend = () => {
-            if (this.voice_state === 'recording') {
-                this.voice_state = 'ready';
-                this.render_voice_status();
-            }
-        };
-
-        try {
-            this.recognition.start();
-        } catch (e) {
-            this.voice_state = 'failed';
-            this.render_voice_status();
-            return;
-        }
-
+        this.voice_base_text = (this.$input.val() || '').trimEnd();
+        this.voice_committed_transcript = '';
+        this.reset_voice_session();
+        this.voice_should_listen = true;
         this.voice_state = 'recording';
         this.recording_start_ms = Date.now();
         this.render_voice_status();
         this.start_duration_timer();
         this.start_level_meter();
+        this.start_recognition_cycle();
     }
 
-    stop_recording(fromError) {
+    start_recognition_cycle() {
+        if (!this.voice_should_listen || this.voice_state !== 'recording') return;
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        this.recognition = recognition;
+        recognition.lang = this.voice_lang;
+        recognition.interimResults = true;
+        recognition.continuous = true;
+
+        recognition.onresult = (event) => {
+            if (this.recognition !== recognition) return;
+            let finalTranscript = '';
+            let interim = '';
+            // Rebuild this recognition cycle from all of its results. Appending
+            // only from resultIndex can duplicate a final phrase when Chrome
+            // re-emits results around a mobile pause or language restart.
+            for (let i = 0; i < event.results.length; i++) {
+                const transcript = (event.results[i][0].transcript || '').trim();
+                if (event.results[i].isFinal) {
+                    finalTranscript += (finalTranscript ? ' ' : '') + transcript;
+                } else {
+                    interim += (interim ? ' ' : '') + transcript;
+                }
+            }
+            this.voice_session_final = finalTranscript;
+            this.voice_session_interim = interim;
+            this.update_voice_input();
+        };
+
+        recognition.onerror = (event) => {
+            if (this.recognition !== recognition) return;
+            if (event.error === 'no-speech') {
+                // Mobile Chrome commonly ends a recognition cycle after a
+                // pause. onend restarts it while the user is still recording.
+                return;
+            }
+            if (event.error === 'aborted') {
+                // Expected when the user stops or changes language.
+                return;
+            }
+
+            this.voice_should_listen = false;
+            if (
+                event.error === 'not-allowed'
+                || event.error === 'permission-denied'
+                || event.error === 'service-not-allowed'
+            ) {
+                this.voice_state = 'permission_denied';
+            } else if (event.error === 'network') {
+                this.voice_state = 'network_error';
+            } else {
+                this.voice_state = 'failed';
+            }
+            this.cleanup_voice_capture();
+            this.render_voice_status();
+        };
+
+        recognition.onend = () => {
+            if (this.recognition === recognition) {
+                this.recognition = null;
+            }
+            this.commit_voice_session(true);
+
+            if (this.voice_should_listen && this.voice_state === 'recording') {
+                // continuous=true is only advisory; Android/mobile Chrome
+                // still ends after silence. Restart without ending dictation.
+                clearTimeout(this.voice_restart_timer);
+                this.voice_restart_timer = setTimeout(() => {
+                    this.voice_restart_timer = null;
+                    this.start_recognition_cycle();
+                }, 250);
+                return;
+            }
+
+            this.cleanup_voice_capture();
+            this.render_voice_status();
+        };
+
+        try {
+            recognition.start();
+        } catch (e) {
+            if (this.recognition === recognition) {
+                this.recognition = null;
+            }
+            this.voice_should_listen = false;
+            this.voice_state = 'failed';
+            this.cleanup_voice_capture();
+            this.render_voice_status();
+        }
+    }
+
+    reset_voice_session() {
+        this.voice_session_final = '';
+        this.voice_session_interim = '';
+    }
+
+    merge_voice_transcript(existing, addition) {
+        const left = (existing || '').trim();
+        const right = (addition || '').trim();
+        if (!left) return right;
+        if (!right) return left;
+
+        const leftWords = left.split(/\s+/);
+        const rightWords = right.split(/\s+/);
+        const normalize = (word) => word
+            .toLocaleLowerCase()
+            .replace(/[^a-z0-9\u0600-\u06ff]+/gi, '');
+        const maxOverlap = Math.min(leftWords.length, rightWords.length, 12);
+        let overlap = 0;
+        for (let size = maxOverlap; size > 0; size--) {
+            const leftTail = leftWords.slice(-size).map(normalize);
+            const rightHead = rightWords.slice(0, size).map(normalize);
+            if (leftTail.every((word, index) => word && word === rightHead[index])) {
+                overlap = size;
+                break;
+            }
+        }
+        return leftWords.concat(rightWords.slice(overlap)).join(' ');
+    }
+
+    commit_voice_session(includeInterim) {
+        const chunk = [
+            this.voice_session_final,
+            includeInterim ? this.voice_session_interim : '',
+        ].filter(Boolean).join(' ');
+        this.voice_committed_transcript = this.merge_voice_transcript(
+            this.voice_committed_transcript,
+            chunk
+        );
+        this.reset_voice_session();
+        this.update_voice_input();
+    }
+
+    update_voice_input() {
+        const liveTranscript = [
+            this.voice_committed_transcript,
+            this.voice_session_final,
+            this.voice_session_interim,
+        ].filter(Boolean).join(' ').trim();
+        const value = [this.voice_base_text, liveTranscript]
+            .filter(Boolean)
+            .join(' ');
+        this.$input.val(value).trigger('input');
+        const input = this.$input.get(0);
+        if (input) {
+            // Keep the newest recognized words visible on a one-row mobile
+            // textarea without focusing it (which would open the keyboard).
+            input.setSelectionRange(value.length, value.length);
+            input.scrollTop = input.scrollHeight;
+        }
+    }
+
+    stop_recording(fromError = false) {
+        this.voice_should_listen = false;
+        clearTimeout(this.voice_restart_timer);
+        this.voice_restart_timer = null;
+        this.commit_voice_session(true);
+
         if (this.recognition) {
             try {
                 this.recognition.stop();
@@ -1206,12 +1326,69 @@ aimatic.AiAssistantPage = class AiAssistantPage {
                 // already stopped
             }
         }
-        this.stop_duration_timer();
-        this.stop_level_meter();
         if (!fromError && this.voice_state === 'recording') {
             this.voice_state = 'ready';
         }
+        this.cleanup_voice_capture();
         this.render_voice_status();
+    }
+
+    cleanup_voice_capture() {
+        clearTimeout(this.voice_restart_timer);
+        this.voice_restart_timer = null;
+        this.stop_duration_timer();
+        this.stop_level_meter();
+    }
+
+    switch_voice_language(lang) {
+        if (this.voice_state !== 'recording' || lang === this.voice_lang) return;
+        this.voice_lang = lang;
+        this.commit_voice_session(true);
+        if (this.recognition) {
+            try {
+                this.recognition.stop();
+            } catch (e) {
+                // onend or the restart timer will open the new language cycle
+            }
+        } else {
+            clearTimeout(this.voice_restart_timer);
+            this.voice_restart_timer = setTimeout(() => {
+                this.voice_restart_timer = null;
+                this.start_recognition_cycle();
+            }, 50);
+        }
+        this.render_voice_status();
+    }
+
+    finish_voice_for_send() {
+        if (this.voice_state === 'recording') {
+            this.stop_recording();
+        }
+        const message = this.$input.val() || '';
+
+        // stop() may still emit a late final result. Once Send is explicitly
+        // tapped, freeze the reviewed text so a stale callback cannot refill
+        // the textarea after _send_message_now() clears it.
+        if (this.recognition) {
+            const recognition = this.recognition;
+            recognition.onresult = null;
+            recognition.onerror = null;
+            recognition.onend = null;
+            try {
+                recognition.abort();
+            } catch (e) {
+                // already stopped
+            }
+            this.recognition = null;
+        }
+        this.voice_should_listen = false;
+        this.cleanup_voice_capture();
+        this.voice_base_text = '';
+        this.voice_committed_transcript = '';
+        this.reset_voice_session();
+        this.voice_state = 'idle';
+        this.render_voice_status();
+        return message;
     }
 
     start_duration_timer() {
@@ -1291,25 +1468,30 @@ aimatic.AiAssistantPage = class AiAssistantPage {
             const secs = Math.floor((Date.now() - this.recording_start_ms) / 1000);
             const mm = String(Math.floor(secs / 60)).padStart(2, '0');
             const ss = String(secs % 60).padStart(2, '0');
+            const isUrdu = this.voice_lang === 'ur-PK';
+            const nextLang = isUrdu ? 'en-PK' : 'ur-PK';
+            const languageLabel = isUrdu ? __('Urdu') : __('English (Pakistan)');
+            const switchLabel = isUrdu ? __('Switch to English') : __('Switch to Urdu');
             this.$voice_status.html(`
                 <span class="ai-assistant-voice-rec-dot"></span>
                 <span class="ai-assistant-voice-duration">${mm}:${ss}</span>
                 <span class="ai-assistant-voice-bars">
                     ${[0, 1, 2, 3, 4].map(() => '<span class="ai-assistant-voice-bar"></span>').join('')}
                 </span>
-                <button class="btn btn-xs ai-assistant-voice-lang" data-lang="ur-PK">${__('Switch to Urdu')}</button>
+                <span class="small text-muted">${languageLabel}</span>
+                <button class="btn btn-xs ai-assistant-voice-lang" data-lang="${nextLang}">${switchLabel}</button>
                 <span class="small text-muted">${__('Recording - audio may be sent to your browser\'s speech service. Review the transcript before sending.')}</span>
             `);
             this.$voice_status.find('.ai-assistant-voice-lang').on('click', (e) => {
                 const lang = $(e.currentTarget).attr('data-lang');
-                this.voice_lang = lang;
-                this.stop_recording();
-                this.start_recording();
+                this.switch_voice_language(lang);
             });
         } else if (this.voice_state === 'ready') {
             this.$voice_status.html(`<span class="small text-muted">${__('Transcript ready below - edit if needed, then Send.')}</span> <button class="btn btn-xs ai-assistant-voice-discard">${__('Discard')}</button>`);
             this.$voice_status.find('.ai-assistant-voice-discard').on('click', () => {
-                this.$input.val('');
+                this.$input.val(this.voice_base_text || '').trigger('input');
+                this.voice_committed_transcript = '';
+                this.reset_voice_session();
                 this.voice_state = 'idle';
                 this.render_voice_status();
             });
@@ -1356,6 +1538,9 @@ aimatic.AiAssistantPage = class AiAssistantPage {
     }
 
     send_message(rawMessage) {
+        if (this.voice_state === 'recording' || this.voice_state === 'ready') {
+            rawMessage = this.finish_voice_for_send();
+        }
         const message = (rawMessage || '').trim();
         if (!message || this.sending) return;
 
