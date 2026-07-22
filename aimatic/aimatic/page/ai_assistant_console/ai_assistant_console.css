@@ -1124,6 +1124,7 @@
 .ai-assistant-dashboard-grid {
     display: flex;
     flex-wrap: wrap;
+    align-items: flex-start;
     gap: 16px;
     padding-bottom: 24px;
 }
@@ -1135,6 +1136,12 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    /* A widget is a glance, not a full answer replay (see render_dashboard_view's
+       own comment) - without a height cap, a widget holding a long table (e.g.
+       Dead Stock Risk's 30 rows) stretched every sibling in its flex row to match,
+       since flex's default align-items:stretch applies per-row. Capping height +
+       scrolling the body keeps every card glanceable and the grid visually even. */
+    max-height: 420px;
 }
 
 .ai-assistant-widget-sm {
@@ -1184,6 +1191,9 @@
 .ai-assistant-widget-body {
     padding: 12px;
     overflow-x: auto;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .ai-assistant-widget-body .ai-assistant-kpi-row {
