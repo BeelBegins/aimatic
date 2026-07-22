@@ -153,6 +153,27 @@ feed for Order Again. It returns item codes, quantities, and UOMs only as draft 
 re-runs customer context, catalogue/UOM, pricing, stock, tax, and credit validation before creation.
 A cached order can prepare an offline draft but cannot become authoritative without ERPNext.
 
+Active ERPNext Pricing Rules and Promotional Schemes appear in the Sales app as offer cards and item
+badges after server-side customer, company, warehouse, date, Item/Item Group, and Brand filtering.
+They are guidance only: ERPNext still applies the actual rule, free item, discount, tax, and final total
+during preview and order creation.
+
+Sales Managers plan field work through Mobile Sales Visit records in the Aimatic workspace. Each visit
+belongs to a Company, Customer, and assigned sales employee, with an optional Warehouse, time, address,
+route order, planned coordinates, and instructions. The employee's Visits screen supports an optional
+nearest-next route view, GPS check-in/check-out, notes, and up to three private photos. Offline events
+keep stable request IDs and replay in sequence, so connection loss cannot duplicate a visit action.
+
+New mobile orders capture the customer's signature and the device GPS location. ERPNext stores the PNG
+as a private Sales Order attachment and creates one immutable Mobile Sales Order Proof audit record with
+the employee, timestamp, coordinates, and accuracy. Editing any acknowledged order detail clears stale
+proof in the app. Sales Managers can inspect proof records but ordinary Sales Users cannot browse the
+proof table directly.
+
+The Sales Manager Profile includes a week/month dashboard sourced only from submitted, company-scoped
+ERPNext Sales Orders and Mobile Sales Visits. Revenue, order count, average order, completed visits,
+stock/visit/approval alerts, and team ranking are display-only server aggregates.
+
 Items can be found by code, name, category, or brand. When an Item has alternate units with valid
 conversion factors, the salesperson can choose the unit before adding it and sees the package
 conversion, matching price, and available stock. Unconfigured or invalid alternate units stay hidden.

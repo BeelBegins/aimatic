@@ -370,6 +370,66 @@
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "map-pin",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Mobile Sales Visit",
+   "link_to": "Mobile Sales Visit",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "map",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Mobile Sales Delivery Location",
+   "link_to": "Mobile Sales Delivery Location",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "package",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Mobile Sales Assortment",
+   "link_to": "Mobile Sales Assortment",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "check-circle",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Mobile Sales Discount Approval",
+   "link_to": "Mobile Sales Discount Approval",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "file-lock",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Mobile Sales Order Proof",
+   "link_to": "Mobile Sales Order Proof",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
   }
  ],
  "modified": "2026-07-16 00:00:00.000000",

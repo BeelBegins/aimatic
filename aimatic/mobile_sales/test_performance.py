@@ -219,3 +219,33 @@ class TestMobileSalesDiscountApprovals(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			events.before_submit_sales_order(frappe._dict(name="SO-1", additional_discount_percentage=11))
 		events.before_submit_sales_order(frappe._dict(name="SO-1", additional_discount_percentage=10))
+
+
+class TestMobileSalesPhaseThree(FrappeTestCase):
+	def test_order_proof_accepts_png_and_rejects_disguised_content(self):
+		valid = "data:image/png;base64,iVBORw0KGgo="
+		self.assertTrue(api._signature_bytes(valid).startswith(b"\x89PNG"))
+		with self.assertRaises(frappe.ValidationError):
+			api._signature_bytes("data:image/png;base64,dGV4dA==")
+
+	def test_order_proof_coordinates_are_bounded(self):
+		self.assertEqual(api._proof_coordinates("33.6844", "73.0479", "8.5"), (33.6844, 73.0479, 8.5))
+		with self.assertRaises(frappe.ValidationError):
+			api._proof_coordinates(91, 73, 1)
+
+	def test_route_optimizer_uses_nearest_next_visit(self):
+		rows = [
+			frappe._dict(name="far", planned_latitude=33.9, planned_longitude=73.2),
+			frappe._dict(name="near", planned_latitude=33.69, planned_longitude=73.05),
+		]
+		self.assertEqual([row.name for row in api._optimize_visit_route(rows, 33.6844, 73.0479)], ["near", "far"])
+
+	@patch("aimatic.mobile_sales.api.frappe.db.sql")
+	def test_manager_metrics_only_count_submitted_company_orders(self, sql):
+		sql.return_value = [frappe._dict(orders=4, revenue=10000)]
+		result = api._manager_order_metrics("Test Company", "2026-07-01", "2026-07-31", "Stores - TC")
+		self.assertEqual(result, {"orders": 4, "revenue": 10000, "average_order": 2500})
+		query = sql.call_args.args[0]
+		self.assertIn("docstatus = 1", query)
+		self.assertIn("company = %(company)s", query)
+		self.assertEqual(sql.call_args.args[1]["warehouse"], "Stores - TC")

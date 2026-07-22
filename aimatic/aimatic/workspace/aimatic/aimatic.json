@@ -298,6 +298,56 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Mobile Sales Visit",
+   "link_count": 0,
+   "link_to": "Mobile Sales Visit",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Mobile Sales Delivery Location",
+   "link_count": 0,
+   "link_to": "Mobile Sales Delivery Location",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Mobile Sales Assortment",
+   "link_count": 0,
+   "link_to": "Mobile Sales Assortment",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Mobile Sales Discount Approval",
+   "link_count": 0,
+   "link_to": "Mobile Sales Discount Approval",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Mobile Sales Order Proof",
+   "link_count": 0,
+   "link_to": "Mobile Sales Order Proof",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
  "modified": "2026-07-17 00:00:00.000000",

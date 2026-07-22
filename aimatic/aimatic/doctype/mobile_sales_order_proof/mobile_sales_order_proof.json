@@ -1,0 +1,36 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:sales_order",
+ "creation": "2026-07-22 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["sales_order", "captured_by", "captured_at", "location_section", "latitude", "longitude", "accuracy", "signature_section", "signature_file"],
+ "fields": [
+  {"fieldname": "sales_order", "fieldtype": "Link", "in_list_view": 1, "label": "Sales Order", "options": "Sales Order", "read_only": 1, "reqd": 1, "unique": 1},
+  {"fieldname": "captured_by", "fieldtype": "Link", "in_list_view": 1, "label": "Captured By", "options": "User", "read_only": 1, "reqd": 1},
+  {"fieldname": "captured_at", "fieldtype": "Datetime", "in_list_view": 1, "label": "Captured At", "read_only": 1, "reqd": 1},
+  {"fieldname": "location_section", "fieldtype": "Section Break", "label": "Location"},
+  {"fieldname": "latitude", "fieldtype": "Float", "label": "Latitude", "precision": "7", "read_only": 1, "reqd": 1},
+  {"fieldname": "longitude", "fieldtype": "Float", "label": "Longitude", "precision": "7", "read_only": 1, "reqd": 1},
+  {"fieldname": "accuracy", "fieldtype": "Float", "label": "Accuracy (m)", "precision": "2", "read_only": 1},
+  {"fieldname": "signature_section", "fieldtype": "Section Break", "label": "Customer Signature"},
+  {"fieldname": "signature_file", "fieldtype": "Attach", "label": "Signature", "read_only": 1, "reqd": 1}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-07-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Mobile Sales Order Proof",
+ "owner": "Administrator",
+ "permissions": [
+  {"export": 1, "print": 1, "read": 1, "report": 1, "role": "Sales Manager"},
+  {"export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager"}
+ ],
+ "sort_field": "captured_at",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "sales_order",
+ "track_changes": 1
+}
