@@ -118,6 +118,36 @@ and warehouse stock and creates normal draft Sales Orders. Offline drafts retain
 maps that ID to a single Sales Order so retries cannot create duplicates. Prices, taxes, stock
 policy, credit validation, permissions, company, and warehouse remain controlled by ERPNext.
 
+Sales Managers can configure optional customer catalogue filters through Mobile Sales Assortment.
+Each enabled row selects one Item or one Item Group; group rules include descendants. The restricted
+item search resolves the configured union server-side when the client activates the filter. Customers
+without enabled rules retain the full permitted sales catalogue. Deploying this DocType requires the
+normal `bench migrate` step on each target site.
+
+Sales Managers can also configure each customer's permitted shipping addresses through Mobile Sales
+Delivery Location. Every location must point to an enabled ERPNext Address already linked to that
+Customer. A location can be the default, allow selected weekdays, carry driver/receiving instructions,
+and define a minimum order value. The Sales app selects the default, shows the schedule and instructions,
+and warns below the minimum. ERPNext validates the chosen customer/location/date combination again and
+sets the standard Sales Order shipping address; stale or unrelated cached locations cannot be submitted.
+Leaving all weekdays unchecked means delivery is allowed on any day. This DocType is installed by the
+same normal `bench migrate` deployment step.
+
+Item search can include a three-month customer history summary derived from permission-filtered
+submitted Sales Orders. Quantities are aggregated by order in stock UOM, returned only after at least
+two orders, and converted by the client to the selected valid UOM as an optional draft suggestion.
+This history never supplies a rate, stock value, or final order total.
+
+Per-user discount limits are configured by Sales Managers through Mobile Sales Discount Authority.
+The restricted API applies the requested percentage to ERPNext's standard Sales Order discount fields
+and recalculates the document server-side. A request above the employee's limit requires a reason and
+creates one auditable Mobile Sales Discount Approval record for that Sales Order. Sales Managers see
+the pending queue in the Sales app and can approve or reject it; rejection requires a comment and
+removes the requested discount. Notification Log plus a live Frappe event alerts the requester and
+eligible managers while they are connected. A Sales Order `before_submit` hook blocks pending requests,
+rejected discounts that were reintroduced, and discounts raised above the approved percentage. These
+two DocTypes are installed by the same normal `bench migrate` deployment step.
+
 The restricted mobile Sales API also exposes a bounded, permission-filtered recent submitted-order
 feed for Order Again. It returns item codes, quantities, and UOMs only as draft seeds; the client then
 re-runs customer context, catalogue/UOM, pricing, stock, tax, and credit validation before creation.

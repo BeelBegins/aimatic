@@ -31,6 +31,7 @@ doc_events = {
     # aimatic.branch_management.events.apply_branch_defaults docstring.
     "Sales Order": {
         "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
+        "before_submit": "aimatic.mobile_sales.events.before_submit_sales_order",
     },
     "Sales Invoice": {
         "before_validate": "aimatic.branch_management.events.apply_branch_defaults",

@@ -3,7 +3,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from aimatic.mobile_sales import api
+from aimatic.mobile_sales import api, events
 
 
 class TestMobileSalesCataloguePerformance(FrappeTestCase):
@@ -65,3 +65,157 @@ class TestMobileSalesReorderFeed(FrappeTestCase):
 		customer_doc.return_value = frappe._dict(name="CUST-NEW")
 		self.assertEqual(api.get_customer_last_order("CUST-NEW"), {"order": None})
 		rows.assert_called_once_with(customer="CUST-NEW", limit=1)
+
+
+class TestMobileSalesCustomerHistory(FrappeTestCase):
+	@patch("aimatic.mobile_sales.api.frappe.get_all")
+	@patch("aimatic.mobile_sales.api.frappe.get_list")
+	@patch("aimatic.mobile_sales.api.nowdate", return_value="2026-07-22")
+	def test_history_uses_stock_uom_and_distinct_submitted_orders(self, _today, get_list, get_all):
+		get_list.return_value = [
+			frappe._dict(name="SO-2", transaction_date="2026-07-20"),
+			frappe._dict(name="SO-1", transaction_date="2026-06-20"),
+		]
+		get_all.return_value = [
+			frappe._dict(parent="SO-2", item_code="ITEM-1", stock_qty=24, stock_uom="Nos"),
+			frappe._dict(parent="SO-1", item_code="ITEM-1", stock_qty=12, stock_uom="Nos"),
+		]
+
+		result = api._customer_item_history_by_item("CUST-1", ["ITEM-1"], months=3)["ITEM-1"]
+
+		self.assertEqual(result["last_stock_qty"], 24)
+		self.assertEqual(result["avg_stock_qty"], 18)
+		self.assertEqual(result["frequency_per_month"], 0.67)
+		self.assertEqual(result["trend"], "up")
+		self.assertEqual(result["last_order_date"], "2026-07-20")
+
+	@patch("aimatic.mobile_sales.api.frappe.get_all")
+	@patch("aimatic.mobile_sales.api.frappe.get_list")
+	def test_single_order_does_not_claim_a_usual_quantity(self, get_list, get_all):
+		get_list.return_value = [frappe._dict(name="SO-1", transaction_date="2026-07-20")]
+		get_all.return_value = [frappe._dict(parent="SO-1", item_code="ITEM-1", stock_qty=12, stock_uom="Nos")]
+		self.assertEqual(api._customer_item_history_by_item("CUST-1", ["ITEM-1"]), {})
+
+
+class TestMobileSalesAssortments(FrappeTestCase):
+	@patch("aimatic.mobile_sales.api._expanded_item_groups", return_value=["Tools", "Power Tools"])
+	@patch("aimatic.mobile_sales.api.frappe.get_all")
+	def test_rules_are_deduplicated_and_marked_configured(self, get_all, _expanded):
+		get_all.return_value = [
+			frappe._dict(item="ITEM-1", item_group=None),
+			frappe._dict(item="ITEM-1", item_group=None),
+			frappe._dict(item=None, item_group="Tools"),
+		]
+		self.assertEqual(api._customer_assortment_rules("CUST-1"), {
+			"configured": True,
+			"items": ["ITEM-1"],
+			"item_groups": ["Tools"],
+			"expanded_item_groups": ["Tools", "Power Tools"],
+		})
+
+	@patch("aimatic.mobile_sales.api.frappe.get_list")
+	@patch("aimatic.mobile_sales.api._expanded_item_groups", return_value=["Tools", "Power Tools"])
+	def test_item_codes_resolve_explicit_items_and_group_descendants(self, _groups, get_list):
+		get_list.return_value = ["ITEM-1", "ITEM-2"]
+		rules = {"configured": True, "items": ["ITEM-1"], "item_groups": ["Tools"], "expanded_item_groups": ["Tools", "Power Tools"]}
+		self.assertEqual(api._assortment_item_codes(rules), ["ITEM-1", "ITEM-2"])
+		self.assertEqual(get_list.call_args.kwargs["or_filters"], {
+			"name": ["in", ["ITEM-1"]],
+			"item_group": ["in", ["Tools", "Power Tools"]],
+		})
+
+	def test_unconfigured_customer_keeps_full_catalogue(self):
+		self.assertIsNone(api._assortment_item_codes({"configured": False, "items": [], "item_groups": []}))
+
+
+class TestMobileSalesDeliveryRules(FrappeTestCase):
+	@patch("aimatic.mobile_sales.api.frappe.get_all")
+	def test_locations_only_expose_addresses_linked_to_customer(self, get_all):
+		get_all.side_effect = [
+			[
+				frappe._dict(
+					name="LOC-1",
+					location_name="Main Warehouse",
+					address="ADDR-1",
+					is_default=1,
+					instructions="Use gate two",
+					minimum_order_value=5000,
+					monday=1,
+					tuesday=0,
+					wednesday=1,
+					thursday=0,
+					friday=0,
+					saturday=0,
+					sunday=0,
+				),
+				frappe._dict(name="LOC-2", location_name="Unlinked", address="ADDR-2", is_default=0),
+			],
+			["ADDR-1"],
+			[
+				frappe._dict(
+					name="ADDR-1",
+					address_title="Customer",
+					address_line1="Plot 10",
+					address_line2=None,
+					city="Karachi",
+					county=None,
+					state="Sindh",
+					pincode="74000",
+					country="Pakistan",
+					phone="021-0000000",
+					email_id=None,
+				),
+			],
+		]
+
+		locations = api._customer_delivery_locations("CUST-1")
+
+		self.assertEqual(len(locations), 1)
+		self.assertEqual(locations[0]["name"], "LOC-1")
+		self.assertEqual(locations[0]["delivery_days"], ["Monday", "Wednesday"])
+		self.assertEqual(locations[0]["address"], "Plot 10, Karachi, Sindh, 74000, Pakistan")
+		self.assertEqual(locations[0]["minimum_order_value"], 5000)
+
+	@patch("aimatic.mobile_sales.api._customer_delivery_locations")
+	def test_default_location_is_selected_server_side(self, locations):
+		locations.return_value = [
+			{"name": "LOC-1", "is_default": False},
+			{"name": "LOC-2", "is_default": True},
+		]
+		self.assertEqual(api._delivery_location_rule("CUST-1")["name"], "LOC-2")
+		self.assertEqual(api._delivery_location_rule("CUST-1", "LOC-1")["name"], "LOC-1")
+
+	def test_unavailable_delivery_day_is_rejected(self):
+		rule = {"location_name": "Main Warehouse", "delivery_days": ["Monday", "Wednesday"]}
+		api._validate_delivery_date(rule, "2026-07-22")
+		with self.assertRaises(frappe.ValidationError):
+			api._validate_delivery_date(rule, "2026-07-23")
+
+
+class TestMobileSalesDiscountApprovals(FrappeTestCase):
+	@patch("aimatic.mobile_sales.api._discount_authority", return_value=5)
+	def test_discount_context_marks_only_excess_as_pending(self, _authority):
+		self.assertFalse(api._discount_context(5)["discount_requires_approval"])
+		self.assertTrue(api._discount_context(5.01)["discount_requires_approval"])
+		self.assertEqual(api._discount_context(4)["discount_authority_percent"], 5)
+
+	@patch("aimatic.mobile_sales.api._discount_authority", return_value=0)
+	def test_discount_percent_is_bounded(self, _authority):
+		with self.assertRaises(frappe.ValidationError):
+			api._discount_context(-1)
+		with self.assertRaises(frappe.ValidationError):
+			api._discount_context(101)
+
+	@patch("aimatic.mobile_sales.events.frappe.db.get_value")
+	def test_pending_mobile_discount_blocks_sales_order_submission(self, get_value):
+		get_value.return_value = frappe._dict(status="Pending", requested_percent=12)
+		doc = frappe._dict(name="SO-1", additional_discount_percentage=12)
+		with self.assertRaises(frappe.ValidationError):
+			events.before_submit_sales_order(doc)
+
+	@patch("aimatic.mobile_sales.events.frappe.db.get_value")
+	def test_approved_discount_cannot_be_increased_after_decision(self, get_value):
+		get_value.return_value = frappe._dict(status="Approved", requested_percent=10)
+		with self.assertRaises(frappe.ValidationError):
+			events.before_submit_sales_order(frappe._dict(name="SO-1", additional_discount_percentage=11))
+		events.before_submit_sales_order(frappe._dict(name="SO-1", additional_discount_percentage=10))

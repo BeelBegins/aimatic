@@ -1,0 +1,31 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-07-22 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["user", "enabled", "maximum_discount_percent", "notes"],
+ "fields": [
+  {"fieldname": "user", "fieldtype": "Link", "in_list_view": 1, "label": "Sales User", "options": "User", "reqd": 1},
+  {"default": "1", "fieldname": "enabled", "fieldtype": "Check", "in_list_view": 1, "label": "Enabled"},
+  {"default": "0", "description": "Discounts above this percentage require a Sales Manager decision.", "fieldname": "maximum_discount_percent", "fieldtype": "Percent", "in_list_view": 1, "label": "Maximum Discount Percent", "non_negative": 1, "reqd": 1},
+  {"fieldname": "notes", "fieldtype": "Small Text", "label": "Notes"}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-07-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Mobile Sales Discount Authority",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "share": 1, "write": 1, "role": "Sales Manager"},
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "share": 1, "write": 1, "role": "System Manager"}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "user",
+ "track_changes": 1
+}

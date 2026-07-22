@@ -1,0 +1,41 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-07-22 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["sales_order", "status", "request_section", "requested_by", "requested_percent", "authority_percent", "reason", "requested_at", "original_grand_total", "requested_grand_total", "decision_section", "decided_by", "decided_at", "decision_comment"],
+ "fields": [
+  {"fieldname": "sales_order", "fieldtype": "Link", "in_list_view": 1, "label": "Sales Order", "options": "Sales Order", "read_only": 1, "reqd": 1},
+  {"fieldname": "status", "fieldtype": "Select", "in_list_view": 1, "label": "Status", "options": "Pending\nApproved\nRejected\nWithdrawn", "read_only": 1, "reqd": 1},
+  {"fieldname": "request_section", "fieldtype": "Section Break", "label": "Request"},
+  {"fieldname": "requested_by", "fieldtype": "Link", "label": "Requested By", "options": "User", "read_only": 1, "reqd": 1},
+  {"fieldname": "requested_percent", "fieldtype": "Percent", "label": "Requested Discount", "read_only": 1, "reqd": 1},
+  {"fieldname": "authority_percent", "fieldtype": "Percent", "label": "Rep Authority", "read_only": 1},
+  {"fieldname": "reason", "fieldtype": "Small Text", "label": "Reason", "read_only": 1, "reqd": 1},
+  {"fieldname": "requested_at", "fieldtype": "Datetime", "label": "Requested At", "read_only": 1, "reqd": 1},
+  {"fieldname": "original_grand_total", "fieldtype": "Currency", "label": "Original Total", "read_only": 1},
+  {"fieldname": "requested_grand_total", "fieldtype": "Currency", "label": "Requested Total", "read_only": 1},
+  {"fieldname": "decision_section", "fieldtype": "Section Break", "label": "Decision"},
+  {"fieldname": "decided_by", "fieldtype": "Link", "label": "Decided By", "options": "User", "read_only": 1},
+  {"fieldname": "decided_at", "fieldtype": "Datetime", "label": "Decided At", "read_only": 1},
+  {"fieldname": "decision_comment", "fieldtype": "Small Text", "label": "Decision Comment", "read_only": 1}
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-07-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Mobile Sales Discount Approval",
+ "owner": "Administrator",
+ "permissions": [
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Sales Manager"},
+  {"email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager"}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "sales_order",
+ "track_changes": 1
+}
