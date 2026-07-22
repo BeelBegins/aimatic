@@ -37,6 +37,14 @@ aimatic.AI_ASSISTANT_KPI_BUTTONS = [
     { label: __('Gross Margin'), question: 'What\'s my overall gross margin this month?' },
 ];
 
+// These are existing user dashboards, not hardcoded KPI calculations. When
+// visible to the current user they get a direct, phone-friendly entry point at
+// the top of the console; the normal dashboard drawer remains available too.
+aimatic.AI_ASSISTANT_EXECUTIVE_DASHBOARDS = [
+    { title: 'Executive KPIs', icon: 'chart-bar-big' },
+    { title: 'Executive Overview', icon: 'chart-pie' },
+];
+
 aimatic.AI_ASSISTANT_ROLE_BUTTONS = {
     'Sales Manager': [
         'What were my sales today?',
@@ -226,6 +234,7 @@ aimatic.AiAssistantPage = class AiAssistantPage {
                     </div>
                 </div>
                 <div class="ai-assistant-container">
+                    <div class="ai-assistant-executive-shortcuts" aria-label="${__('Executive dashboards')}"></div>
                     <div class="ai-assistant-intro">
                         ${__('Ask about sales, purchases, vendors, inventory, or customers. Rich answers now include KPIs, charts, tables, and insights. Use the context bar to scope your question.')}
                     </div>
@@ -281,6 +290,7 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         this.$dashboard_refresh = this.$layout.find('.ai-assistant-refresh-dashboard');
 
         this.$messages = this.$container.find('.ai-assistant-messages');
+        this.$executive_shortcuts = this.$container.find('.ai-assistant-executive-shortcuts');
         this.$input = this.$container.find('.ai-assistant-input');
         this.$send = this.$container.find('.ai-assistant-send');
         this.$context_bar = this.$container.find('.ai-assistant-context-bar');
@@ -571,10 +581,50 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         });
     }
 
+    render_executive_shortcuts(dashboards) {
+        const byTitle = new Map((dashboards || []).map((dashboard) => [
+            (dashboard.title || '').trim().toLowerCase(),
+            dashboard,
+        ]));
+        const featured = aimatic.AI_ASSISTANT_EXECUTIVE_DASHBOARDS
+            .map((definition) => ({
+                definition,
+                dashboard: byTitle.get(definition.title.toLowerCase()),
+            }))
+            .filter((entry) => entry.dashboard);
+
+        this.$executive_shortcuts.empty().toggleClass('hidden', !featured.length);
+        if (!featured.length) return;
+
+        this.$executive_shortcuts.append(`
+            <div class="ai-assistant-executive-label">
+                ${frappe.utils.icon('briefcase', 'xs')}
+                <span>${__('Executive')}</span>
+            </div>
+            <div class="ai-assistant-executive-actions"></div>
+        `);
+        const $actions = this.$executive_shortcuts.find('.ai-assistant-executive-actions');
+        featured.forEach(({ definition, dashboard }) => {
+            const $button = $(
+                `<button type="button" class="btn btn-default ai-assistant-executive-shortcut">
+                    <span class="ai-assistant-executive-icon">${frappe.utils.icon(definition.icon, 'sm')}</span>
+                    <span class="ai-assistant-executive-text">
+                        <strong>${frappe.utils.escape_html(dashboard.title)}</strong>
+                        <small>${__('{0} widgets', [dashboard.widget_count || 0])}</small>
+                    </span>
+                    <span class="ai-assistant-executive-open">${frappe.utils.icon('chevron-right', 'xs')}</span>
+                </button>`
+            );
+            $button.on('click', () => this.open_dashboard(dashboard.name));
+            $actions.append($button);
+        });
+    }
+
     refresh_dashboard_list() {
         frappe.call({ method: 'aimatic.ai.api.list_dashboards' }).then((r) => {
             this.dashboards = (r.message && r.message.dashboards) || [];
             this.render_dashboard_list(this.dashboards);
+            this.render_executive_shortcuts(this.dashboards);
         });
     }
 

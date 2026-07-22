@@ -23,6 +23,92 @@
     margin-bottom: 12px;
 }
 
+/* Direct access to the two executive dashboards. The messages area is the
+   scrolling region, so this strip stays visible above a long conversation. */
+.ai-assistant-executive-shortcuts {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 10px;
+    margin: 0 0 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg, 10px);
+    background: linear-gradient(135deg, var(--card-bg, var(--fg-color)), var(--control-bg));
+}
+
+.ai-assistant-executive-shortcuts:empty {
+    display: none;
+}
+
+.ai-assistant-executive-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.ai-assistant-executive-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(170px, 1fr));
+    gap: 8px;
+    flex: 1 1 auto;
+}
+
+.ai-assistant-executive-shortcut {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 46px;
+    padding: 7px 10px;
+    text-align: left;
+    white-space: normal;
+}
+
+.ai-assistant-executive-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: var(--blue-600, #2563eb);
+    background: var(--blue-100, #dbeafe);
+}
+
+.ai-assistant-executive-text {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.ai-assistant-executive-text strong {
+    overflow: hidden;
+    color: var(--text-color);
+    font-size: var(--text-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-assistant-executive-text small {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 10px;
+}
+
+.ai-assistant-executive-open {
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: var(--text-muted);
+}
+
 .ai-assistant-disabled-banner {
     display: flex;
     align-items: center;
@@ -1324,6 +1410,7 @@
     }
 
     /* Touch targets */
+    .ai-assistant-executive-shortcut,
     .ai-assistant-mic-btn,
     .ai-assistant-send,
     .ai-assistant-suggested-btn,
@@ -1370,6 +1457,36 @@
 
     .ai-assistant-container {
         padding: 0 var(--padding-sm, 12px);
+    }
+
+    .ai-assistant-executive-shortcuts {
+        display: block;
+        padding: 8px;
+        margin-bottom: 8px;
+    }
+
+    .ai-assistant-executive-label {
+        margin: 0 0 6px 2px;
+    }
+
+    .ai-assistant-executive-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ai-assistant-executive-shortcut {
+        gap: 6px;
+        min-width: 0;
+        min-height: 52px;
+        padding: 7px 8px;
+    }
+
+    .ai-assistant-executive-icon,
+    .ai-assistant-executive-open {
+        display: none;
+    }
+
+    .ai-assistant-executive-text strong {
+        font-size: 12px;
     }
 
     .ai-assistant-intro {
