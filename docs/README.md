@@ -307,6 +307,23 @@ silently change its figures. Use **Refresh Dashboard** when current figures are 
 confirmation, refreshes the widgets one at a time, shows progress, and keeps the previous snapshot
 for any widget whose AI refresh fails or returns no structured data.
 
+### Retail finance setup and controls
+
+Accounts staff and System Managers can open **Aimatic → Finance Setup** to run a read-only
+readiness review for a company. It checks the Company/chart of accounts, store Branch → Cost
+Center → Warehouse mappings, POS Profile accounting context, cash/bank and payment mappings,
+receivable/payable accounts, inventory valuation foundation, tax setup, and forward Branch
+coverage. The page never changes accounts or entries; its buttons open the relevant ERPNext
+records for an authorized user to review.
+
+The complete framework and missing-feature register are in
+[`docs/retail-finance-setup.md`](retail-finance-setup.md). Existing supplier, inventory, and
+accounting openings from the iPOS cutover are the accepted baseline. Unavailable history is not
+reconstructed; reporting proceeds forward. Store balance sheets, deposit reconciliation, petty
+cash controls, head-office allocation, physical shrinkage, supplier rebates, certified branch
+EBITDA, and stock/POS/subledger-to-GL reconciliations remain explicit separate work rather than
+being presented as finished.
+
 ### Legacy data migration
 
 When bringing a new store onto this system from the old "iPOS" software, item and supplier
@@ -349,6 +366,8 @@ At a high level, bringing a new branch or site online involves:
    `ipos_data_migration/` for that site.
 5. The first time a Purchase Receipt for that branch applies a branch price update, its own
    Selling Price List is created and populated automatically — no separate setup step needed.
+6. Open **Aimatic → Finance Setup**, run the readiness review, and resolve every critical block
+   before forward operations begin. Warnings must have a named owner and follow-up date.
 
 For Restaurant service, also create one enabled Restaurant Profile mapped to the Branch,
 Company and POS Profile, then add floors, tables, Restaurant Menu Items and any modifier groups.
