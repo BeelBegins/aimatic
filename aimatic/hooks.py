@@ -164,6 +164,7 @@ jinja = {
 # CLAUDE.md for how those ship via Frappe's own native module-doc sync
 # instead.
 after_install = "aimatic.setup.after_install"
+after_migrate = "aimatic.tax_formula_setup.after_migrate"
 
 _fixture_exclusions = json.loads(
     (Path(__file__).with_name("fixture_exclusions.json")).read_text(encoding="utf-8")
@@ -189,7 +190,13 @@ fixtures = [
     # GST/Advance Tax/FED formula definitions used by the Purchase Receipt/
     # Purchase Order tax-calc client scripts - configuration, not transactional
     # data, so it ships with the app rather than being recreated by hand on
-    # every new site.
+    # every new site. Account links are company-specific even though Tax
+    # Formula has no company field, so a fixture value can become invalid on
+    # another site. The after_migrate hook repairs only missing/dangling GST
+    # links on unambiguous single-company sites by selecting that company's
+    # enabled ``GST - <abbr>`` tax ledger. Existing valid mappings and all
+    # multi-company sites are left untouched; other account types are never
+    # guessed.
     {"doctype": "Tax Formula"},
     # Reference GST categories for FBR e-invoicing - configuration, no secrets.
     {"doctype": "FBR Tax Category"},
