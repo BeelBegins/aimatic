@@ -8,7 +8,10 @@ System of record: ERPNext / Aimatic
 
 This is the permanent specification for SIEZAL's retail-finance foundation and management-reporting roadmap. It distinguishes what is working, what is only partly reliable, and what must be implemented separately. The code-owned capability register is `aimatic/retail_finance_setup/registry.py`; this document explains the business contract.
 
-The **Retail Finance Setup** Desk console runs read-only checks. It does not create accounts, alter opening entries, backfill Branch values, or repair transactions. Its action buttons open the relevant ERPNext records so an authorized user can review the real setup.
+The **Retail Finance Setup** Desk console runs read-only checks and has one deliberately narrow,
+idempotent setup action: Accounts Managers/System Managers may initialize missing branch
+selling-only Price Lists. It does not create accounts, alter opening entries, backfill Branch
+accounting values, or repair transactions.
 
 ## Accepted cutover basis
 
@@ -25,7 +28,8 @@ The **Retail Finance Setup** Desk console runs read-only checks. It does not cre
 The future operator should be guided through this order, with a visible owner and completion evidence for each step:
 
 1. Company identity, fiscal year, currency, chart of accounts, receivable/payable controls, and default cost center.
-2. One Branch per store, one enabled leaf cost center per store, finished/rejected leaf warehouses, and the Branch Accounting Dimension.
+2. One Branch per store, one enabled leaf cost center per store, finished/rejected leaf warehouses,
+   the Branch Accounting Dimension, and one enabled selling-only `<Branch> Selling Price List`.
 3. POS Profiles and terminals mapped to the exact Branch, warehouse, and cost center; Modes of Payment mapped to company cash/bank accounts.
 4. Stock valuation policy, items, opening quantities and values, supplier/customer opening balances, and a balanced opening trial balance.
 5. Tax applicability, FBR settings, tax accounts, invoice sequence, and filing ownership.
@@ -78,7 +82,8 @@ These items remain registered even before development. A missing feature must be
 A company is ready for forward operations only when critical foundation checks have no blocking result. Current checks cover:
 
 - Company defaults and active leaf chart of accounts
-- Branch-to-cost-center-to-warehouse mappings and the Branch Accounting Dimension
+- Branch-to-cost-center-to-warehouse mappings, the Branch Accounting Dimension, and a valid
+  selling-only Price List for every Branch
 - Enabled POS Profile Branch/warehouse/cost-center mappings
 - Cash, bank, and Mode of Payment account availability
 - Receivable and payable control accounts

@@ -1603,7 +1603,7 @@
   "columns": 0,
   "default": null,
   "depends_on": null,
-  "description": "Branch-specific Selling Price List, auto-created and populated by shelf_pricing the first time a Purchase Receipt for this branch has its branch price update applied. Not hand-edited.",
+  "description": "Branch-specific selling-only Price List, auto-created and populated when the Branch is initialized. Not hand-edited.",
   "docstatus": 0,
   "doctype": "Custom Field",
   "dt": "Branch",

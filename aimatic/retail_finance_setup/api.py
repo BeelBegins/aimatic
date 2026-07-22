@@ -8,11 +8,17 @@ from aimatic.retail_finance_setup.checks import run_checks
 from aimatic.retail_finance_setup.registry import REGISTRY_VERSION, get_capabilities
 
 ALLOWED_ROLES = {"Accounts User", "Accounts Manager", "System Manager"}
+SETUP_ROLES = {"Accounts Manager", "System Manager"}
 
 
 def _require_access():
 	if not ALLOWED_ROLES.intersection(frappe.get_roles()):
 		frappe.throw(_("You need an Accounts or System Manager role to view finance readiness."), frappe.PermissionError)
+
+
+def _require_setup_access():
+	if not SETUP_ROLES.intersection(frappe.get_roles()):
+		frappe.throw(_("You need an Accounts Manager or System Manager role to initialize branch price lists."), frappe.PermissionError)
 
 
 def _resolve_company(company=None):
@@ -74,4 +80,29 @@ def get_readiness(company=None):
 		"checks": list(checks.values()),
 		"capabilities": capabilities,
 		"cutover_note": "Existing supplier, inventory, and accounting openings are the accepted baseline. No unavailable history is reconstructed; reporting proceeds forward.",
+	}
+
+
+@frappe.whitelist()
+def initialize_branch_selling_price_lists(company=None):
+	"""Initialize missing selling-only Price Lists for every company Branch."""
+	from aimatic.shelf_pricing.utils import get_or_create_branch_price_list
+
+	_require_setup_access()
+	company = _resolve_company(company)
+	branches = frappe.get_all("Branch", filters={"company": company}, fields=["name", "default_selling_price_list"])
+	results = []
+	initialized = 0
+	for branch in branches:
+		price_list = get_or_create_branch_price_list(branch.name)
+		was_initialized = not bool(branch.default_selling_price_list)
+		initialized += int(was_initialized)
+		results.append({"branch": branch.name, "price_list": price_list, "initialized": was_initialized})
+
+	return {
+		"company": company,
+		"branch_count": len(branches),
+		"initialized_count": initialized,
+		"already_configured_count": len(branches) - initialized,
+		"branches": results,
 	}

@@ -58,6 +58,17 @@ def check_stores(company):
 			issues.append(f"{branch.name}: warehouse is not an enabled leaf for this company")
 		elif _has_field("Warehouse", "custom_branch") and frappe.db.get_value("Warehouse", warehouse, "custom_branch") != branch.name:
 			issues.append(f"{branch.name}: warehouse Branch mapping does not match")
+		price_list = branch.get("default_selling_price_list")
+		if not price_list:
+			issues.append(f"{branch.name}: selling Price List is missing")
+		else:
+			price_list_details = frappe.db.get_value(
+				"Price List", price_list, ["selling", "buying", "enabled"], as_dict=True
+			)
+			if not price_list_details:
+				issues.append(f"{branch.name}: Price List {price_list} does not exist")
+			elif not price_list_details.selling or price_list_details.buying or not price_list_details.enabled:
+				issues.append(f"{branch.name}: Price List {price_list} must be enabled and selling-only")
 
 	dimension_ok = frappe.db.exists("Accounting Dimension", {"document_type": "Branch", "disabled": 0})
 	if not dimension_ok:

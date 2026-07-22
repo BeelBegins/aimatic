@@ -42,6 +42,12 @@ class TestRetailFinanceCapabilityRegistry(unittest.TestCase):
 		self.assertIn("accepted cutover baseline", opening["description"])
 		self.assertIn("Do not reconstruct", opening["guidance"])
 
+	def test_store_setup_contract_includes_branch_selling_price_list(self):
+		store = next(row for row in get_capabilities() if row["id"] == "store_accounting_dimension")
+		self.assertEqual(REGISTRY_VERSION, "1.1.0")
+		self.assertEqual(store["version"], "1.1.0")
+		self.assertIn("selling-only Price List", store["description"])
+
 
 if __name__ == "__main__":
 	unittest.main()

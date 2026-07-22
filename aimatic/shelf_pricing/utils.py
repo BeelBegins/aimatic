@@ -6,38 +6,105 @@ from frappe.utils import flt, now_datetime
 # SELLING_PRICE_LIST-constant style already used in ipos_data_migration
 # scripts for a similarly single, fixed price list.
 FOODPANDA_PRICE_LIST = "Foodpanda"
+BRANCH_PRICE_LIST_SUFFIX = " Selling Price List"
+BRANCH_BASELINE_FIELDS = (
+    "item_code",
+    "uom",
+    "packing_unit",
+    "item_name",
+    "brand",
+    "item_description",
+    "customer",
+    "batch_no",
+    "currency",
+    "price_list_rate",
+    "custom_latest_price_incl_taxes",
+    "custom_mrp",
+    "valid_from",
+    "lead_time_days",
+    "valid_upto",
+    "note",
+    "reference",
+)
 
 
 def _default_currency():
     return frappe.db.get_single_value("Global Defaults", "default_currency")
 
 
+def get_branch_price_list_name(branch):
+    return f"{branch}{BRANCH_PRICE_LIST_SUFFIX}"
+
+
+def _copy_branch_price_baseline(source_price_list, target_price_list):
+    """Copy a validated selling baseline in batches without N document inserts."""
+    rows = frappe.get_all(
+        "Item Price",
+        filters={"price_list": source_price_list, "selling": 1},
+        fields=list(BRANCH_BASELINE_FIELDS),
+    )
+    if not rows:
+        return 0
+
+    timestamp = now_datetime()
+    user = frappe.session.user or "Administrator"
+    fields = [
+        "name",
+        "owner",
+        "creation",
+        "modified",
+        "modified_by",
+        "docstatus",
+        "idx",
+        *BRANCH_BASELINE_FIELDS,
+        "price_list",
+        "supplier",
+        "buying",
+        "selling",
+    ]
+    values = [
+        (
+            frappe.generate_hash(length=10),
+            user,
+            timestamp,
+            timestamp,
+            user,
+            0,
+            index,
+            *(row.get(field) for field in BRANCH_BASELINE_FIELDS),
+            target_price_list,
+            None,
+            0,
+            1,
+        )
+        for index, row in enumerate(rows, start=1)
+    ]
+    frappe.db.bulk_insert("Item Price", fields, values, chunk_size=1000)
+    return len(values)
+
+
 def get_or_create_branch_price_list(branch):
-    """Return the Branch's own Selling Price List, creating and linking one
-    the first time it's needed - triggered lazily by an actual Purchase
-    Receipt's branch price update, never as a standalone migration step.
+    """Return the Branch's selling-only Price List, creating and linking one
+    during Branch initialization or as a safe fallback when first needed.
 
     On first creation, every active Item Price row from the global default
     Selling Settings.selling_price_list is copied in once so the branch
     starts from the existing price baseline, then every POS Profile for this
     branch is repointed onto the new list.
-
-    Known gap: a POS Profile added for this branch *after* the branch price
-    list already exists won't get auto-repointed here - only the moment of
-    first creation does that. Not worth a separate hook for until it's
-    actually hit in practice.
     """
     existing = frappe.db.get_value("Branch", branch, "default_selling_price_list")
     if existing:
+        _validate_selling_only_price_list(existing)
         return existing
 
-    price_list_name = f"Selling - {branch}"
+    price_list_name = get_branch_price_list_name(branch)
     if not frappe.db.exists("Price List", price_list_name):
         frappe.get_doc(
             {
                 "doctype": "Price List",
                 "price_list_name": price_list_name,
                 "selling": 1,
+                "buying": 0,
                 "currency": _default_currency(),
                 "enabled": 1,
             }
@@ -46,22 +113,9 @@ def get_or_create_branch_price_list(branch):
         default_price_list = (
             frappe.db.get_single_value("Selling Settings", "selling_price_list") or "Standard Selling"
         )
-        for row in frappe.get_all(
-            "Item Price",
-            filters={"price_list": default_price_list, "selling": 1},
-            fields=["item_code", "price_list_rate", "currency", "uom"],
-        ):
-            frappe.get_doc(
-                {
-                    "doctype": "Item Price",
-                    "item_code": row.item_code,
-                    "price_list": price_list_name,
-                    "selling": 1,
-                    "price_list_rate": row.price_list_rate,
-                    "currency": row.currency or _default_currency(),
-                    "uom": row.uom,
-                }
-            ).insert(ignore_permissions=True)
+        _copy_branch_price_baseline(default_price_list, price_list_name)
+    else:
+        _validate_selling_only_price_list(price_list_name)
 
     frappe.db.set_value("Branch", branch, "default_selling_price_list", price_list_name)
 
@@ -69,6 +123,18 @@ def get_or_create_branch_price_list(branch):
         frappe.db.set_value("POS Profile", pos_profile, "selling_price_list", price_list_name)
 
     return price_list_name
+
+
+def _validate_selling_only_price_list(price_list):
+    details = frappe.db.get_value(
+        "Price List", price_list, ["selling", "buying", "enabled"], as_dict=True
+    )
+    if not details:
+        frappe.throw(f"Branch Price List {price_list} does not exist.")
+    if not details.selling or details.buying or not details.enabled:
+        frappe.throw(
+            f"Branch Price List {price_list} must be enabled, Selling, and not Buying."
+        )
 
 
 def get_or_create_foodpanda_price_list():

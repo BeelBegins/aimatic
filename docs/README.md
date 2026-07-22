@@ -227,8 +227,9 @@ market conditions call for a different retail price than another's. When a Purch
 submitted, the person submitting it is asked two quick yes/no questions:
 
 1. *"Update this branch's selling price for these items?"* — if yes, the price and MRP
-   entered on the receipt are pushed to that branch's own price list (created automatically
-   the first time it's needed) and the item's MRP is updated everywhere.
+   entered on the receipt are pushed to that branch's own selling-only price list (created and
+   baseline-populated automatically when the Branch is initialized) and the item's MRP is updated
+   everywhere.
 2. *"Update the Foodpanda price for these items?"* — answered independently of the first
    question, since a store may sell in-branch and on Foodpanda on different schedules. For now
    the Foodpanda price is simply set equal to the item's MRP; a markup/commission formula can
@@ -364,8 +365,10 @@ At a high level, bringing a new branch or site online involves:
    public OAuth client is installed automatically by the Aimatic migration.
 4. If migrating from the old iPOS software, running the item and supplier import scripts in
    `ipos_data_migration/` for that site.
-5. The first time a Purchase Receipt for that branch applies a branch price update, its own
-   Selling Price List is created and populated automatically — no separate setup step needed.
+5. Saving a new Branch automatically creates and baseline-populates its enabled selling-only
+   `<Branch> Selling Price List`. For a branch created before this behavior existed, use Finance
+   Setup → **Initialize branch price lists**; the action is idempotent and never creates a buying
+   Price List.
 6. Open **Aimatic → Finance Setup**, run the readiness review, and resolve every critical block
    before forward operations begin. Warnings must have a named owner and follow-up date.
 

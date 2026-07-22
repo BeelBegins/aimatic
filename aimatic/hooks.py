@@ -79,6 +79,7 @@ doc_events = {
     },
     "Branch": {
         "validate": "aimatic.branch_management.events.validate_branch_company_consistency",
+        "after_insert": "aimatic.branch_management.events.initialize_branch_selling_price_list",
     },
     # POS Invoice is excluded from apply_branch_defaults (built server-side from
     # POS Profile already) - this is the one remaining check that a POS Profile
@@ -86,6 +87,7 @@ doc_events = {
     # reject much later, at shift-close GL-entry time.
     "POS Profile": {
         "validate": [
+            "aimatic.branch_management.events.apply_pos_profile_branch_price_list",
             "aimatic.branch_management.events.validate_pos_profile_cost_center",
             "aimatic.gift_voucher.events.validate_pos_profile_no_manual_gift_voucher_payment",
         ],

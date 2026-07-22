@@ -7,7 +7,7 @@ silently disappear from the implementation plan.
 
 from copy import deepcopy
 
-REGISTRY_VERSION = "1.0.0"
+REGISTRY_VERSION = "1.1.0"
 
 
 def _capability(
@@ -42,7 +42,7 @@ def _capability(
 _CAPABILITIES = (
 	_capability("capability_governance", "Capability governance", "Foundation", "implemented", "A versioned register keeps working, partial, and missing finance capabilities explicit.", "Increase a capability version whenever its setup contract, calculation, or evidence changes.", check_key="company"),
 	_capability("company_foundation", "Company and chart of accounts", "Foundation", "standard", "ERPNext company, currency, chart of accounts, and control accounts form the accounting base.", "Complete Company defaults and use active leaf accounts for posting.", critical=True, check_key="company", route="List/Company"),
-	_capability("store_accounting_dimension", "Store accounting dimension", "Foundation", "implemented", "Each store is represented by Branch with a matched cost center and operational warehouses.", "Create the Branch dimension, then map every store to one leaf cost center and its leaf warehouses.", critical=True, check_key="stores", route="List/Branch"),
+	_capability("store_accounting_dimension", "Store accounting dimension", "Foundation", "implemented", "Each store is represented by Branch with a matched cost center, operational warehouses, and its own selling-only Price List.", "Create the Branch dimension, then map every store to one leaf cost center and its leaf warehouses. Branch creation automatically initializes <Branch> Selling Price List; use Finance Setup initialization for older branches.", version="1.1.0", critical=True, check_key="stores", route="List/Branch"),
 	_capability("pos_cashier_controls", "POS and cashier controls", "Operations", "implemented", "POS Profiles carry the store, warehouse, and cost-center context used by cashier transactions.", "Every enabled POS Profile must have a Branch, matching leaf warehouse, and matching leaf cost center.", critical=True, check_key="pos", route="List/POS Profile"),
 	_capability("opening_balance_cutover", "Opening-balance cutover", "Foundation", "partial", "Supplier, inventory, and accounting openings are the accepted cutover baseline; operations and reporting continue forward from it.", "Do not reconstruct unavailable history or alter current iPOS migration entries. Build a guided opening wizard only for future site onboarding.", check_key="company", route="List/Journal Entry"),
 	_capability("store_profit_and_loss", "Store-wise profit and loss", "Management Reporting", "implemented", "Branch-tagged GL entries support store-level income and expense reporting.", "Keep all operational income and expense postings branch-tagged and reconcile exceptions.", check_key="reporting", route="query-report/Profit and Loss Statement"),

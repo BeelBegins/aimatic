@@ -12,6 +12,7 @@ aimatic.RetailFinanceSetupPage = class RetailFinanceSetupPage {
             single_column: true,
         });
         this.page.set_primary_action(__('Refresh checks'), () => this.refresh());
+        this.can_initialize = (frappe.user_roles || []).some((role) => ['Accounts Manager', 'System Manager'].includes(role));
         this.build_filters();
         this.$root = $('<div class="retail-finance-setup"></div>').appendTo(this.page.body);
         this.bind_events();
@@ -53,6 +54,7 @@ aimatic.RetailFinanceSetupPage = class RetailFinanceSetupPage {
             const id = $(event.currentTarget).attr('data-rf-details');
             this.$root.find(`[data-rf-detail-panel="${CSS.escape(id)}"]`).toggleClass('hidden');
         });
+        this.$root.on('click', '[data-rf-initialize-price-lists]', () => this.initialize_branch_price_lists());
     }
 
     async refresh() {
@@ -138,14 +140,51 @@ aimatic.RetailFinanceSetupPage = class RetailFinanceSetupPage {
 
     check_card(check) {
         const details = (check.details || []).map((detail) => `<li>${frappe.utils.escape_html(detail)}</li>`).join('');
+        const initializeAction = check.id === 'stores' && this.can_initialize
+            ? `<button class="btn btn-xs btn-primary" data-rf-initialize-price-lists>${__('Initialize branch price lists')}</button>`
+            : '';
         return `
             <article class="rf-check-card">
                 <div class="rf-card-title"><strong>${frappe.utils.escape_html(check.label)}</strong>${this.badge(check.status)}</div>
                 <p>${frappe.utils.escape_html(check.message)}</p>
                 ${details ? `<ul>${details}</ul>` : ''}
-                ${check.route ? `<button class="btn btn-xs btn-default" data-rf-route="${frappe.utils.escape_html(check.route)}">${__('Open relevant records')}</button>` : ''}
+                <div class="rf-actions">
+                    ${initializeAction}
+                    ${check.route ? `<button class="btn btn-xs btn-default" data-rf-route="${frappe.utils.escape_html(check.route)}">${__('Open relevant records')}</button>` : ''}
+                </div>
             </article>
         `;
+    }
+
+    initialize_branch_price_lists() {
+        const company = this.company_field.get_value();
+        if (!company) return;
+        frappe.confirm(
+            __('Create and link a selling-only Price List for every uninitialized branch in {0}?', [company]),
+            async () => {
+                frappe.dom.freeze(__('Initializing branch price lists...'));
+                try {
+                    const result = await frappe.xcall(
+                        'aimatic.retail_finance_setup.api.initialize_branch_selling_price_lists',
+                        { company }
+                    );
+                    frappe.show_alert({
+                        message: __('Initialized {0}; already configured {1}.', [result.initialized_count, result.already_configured_count]),
+                        indicator: 'green',
+                    }, 7);
+                    await this.refresh();
+                } catch (error) {
+                    console.error(error);
+                    frappe.msgprint({
+                        title: __('Branch price-list initialization failed'),
+                        message: error && error.message ? error.message : __('Unable to initialize branch price lists.'),
+                        indicator: 'red',
+                    });
+                } finally {
+                    frappe.dom.unfreeze();
+                }
+            }
+        );
     }
 
     render_capabilities() {
