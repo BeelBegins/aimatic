@@ -288,6 +288,22 @@ actually uploaded on that site; only the script itself is centralized.
   `"NULL"`/junk-row handling, spreadsheet footer-row filtering) and the `MRP` fallback chain
   documented above, all first introduced for `siezal`. Prefer this one as the starting point for a
   new site's script.
+- `update_siezal_item_brands.py` (2026-07-23) — the SIEZAL-safe version of the separate catalogue
+  brand pass. It reads `itemmastersto.xlsx` / `Query1` and joins the sheet's `ItemCode` to
+  `Item Barcode.barcode` (the source value is a barcode, not ERPNext `Item.item_code`), then assigns
+  `AiBrand`. It skips blank/`Generic` brands, codes shorter than 8 characters, and barcodes absent
+  from SIEZAL. It normalizes case/space/punctuation-only brand variants (`LU`/`Lu`, `CandyLand`/
+  `Candy Land`, `Mitchell's`/`Mitchells`), collects all votes before
+  writing, resolves a genuine multi-brand conflict only when one brand has a strict majority, and
+  leaves equal-count ties blank for manual review. It has a hard `TARGET_SITE = "siezal"` guard,
+  creates missing Brand masters, commits in batches, and is checked in with `DRY_RUN = True`.
+  Pre-write dry run: 231,419 source rows, 7,623 matching rows, 7,358 distinct matched Items, 7,318
+  assignable Items, 831 canonical brands, and 40 tied conflicts. The 2026-07-23 live pass created
+  831 Brand masters and assigned 7,318 Items; database verification then showed 16,491 Items total,
+  7,318 branded, 9,173 blank, and a repeat dry run reported all 7,318 as already correct with no
+  pending updates. The 40 ties were intentionally not guessed. Backup taken immediately before the
+  write: `sites/siezal/private/backups/20260723_013705-siezal-database.sql.gz` plus its matching
+  `20260723_013705-siezal-site_config_backup.json`.
 
 **When starting a new site's import, copy the most complete existing script into a new
 `import_<site>_items.py` in this same directory** rather than writing from scratch or leaving a
