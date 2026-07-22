@@ -60,6 +60,9 @@ def get_chat_completion(
     temperature: float = 0.2,
     max_tokens: int = 1024,
     model: str | None = None,
+    reasoning: dict | None = None,
+    timeout: int = DEFAULT_TIMEOUT,
+    return_metadata: bool = False,
 ) -> dict:
     """Multi-turn chat completion via OpenRouter, returning the raw assistant
     *message* dict (role/content/tool_calls) rather than just text - callers doing
@@ -77,6 +80,8 @@ def get_chat_completion(
         payload["tools"] = tools
     if tool_choice:
         payload["tool_choice"] = tool_choice
+    if reasoning is not None:
+        payload["reasoning"] = reasoning
 
     try:
         response = requests.post(
@@ -86,7 +91,7 @@ def get_chat_completion(
                 "Content-Type": "application/json",
             },
             data=json.dumps(payload),
-            timeout=DEFAULT_TIMEOUT,
+            timeout=timeout,
         )
     except requests.RequestException as e:
         raise NemotronError(f"OpenRouter request failed: {e}")
@@ -96,9 +101,16 @@ def get_chat_completion(
 
     data = response.json()
     try:
-        return data["choices"][0]["message"]
+        message = data["choices"][0]["message"]
     except (KeyError, IndexError, TypeError):
         raise NemotronError(f"Unexpected OpenRouter response shape: {data}")
+    if return_metadata:
+        return {
+            "message": message,
+            "usage": data.get("usage") or {},
+            "provider": data.get("provider") or "",
+        }
+    return message
 
 
 def get_completion(

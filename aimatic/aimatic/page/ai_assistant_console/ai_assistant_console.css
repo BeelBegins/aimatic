@@ -780,6 +780,10 @@
     color: var(--red-600, #b02a2a);
 }
 
+.ai-assistant-mic-btn.processing {
+    opacity: 0.65;
+}
+
 .ai-assistant-voice-status {
     display: flex;
     align-items: center;
@@ -830,14 +834,30 @@
     transition: transform 0.08s linear;
 }
 
-.ai-assistant-voice-lang {
+.ai-assistant-voice-discard {
     border-radius: 999px;
     font-size: var(--text-xs);
 }
 
-.ai-assistant-voice-discard {
+.ai-assistant-voice-model {
+    padding: 2px 7px;
     border-radius: 999px;
-    font-size: var(--text-xs);
+    background: var(--green-100, #e7f5ea);
+    color: var(--green-700, #216e39);
+    font-weight: 600;
+}
+
+.ai-assistant-voice-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--blue-500, #2490ef);
+    border-radius: 50%;
+    animation: ai-assistant-spin 0.8s linear infinite;
+}
+
+@keyframes ai-assistant-spin {
+    to { transform: rotate(360deg); }
 }
 
 .ai-assistant-voice-error {

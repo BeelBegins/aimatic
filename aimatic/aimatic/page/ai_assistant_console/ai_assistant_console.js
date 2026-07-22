@@ -1109,198 +1109,203 @@ aimatic.AiAssistantPage = class AiAssistantPage {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // Phase 2 voice input. Uses the browser's own SpeechRecognition (Web
-    // Speech API) - no new backend, per the architecture constraint that this
-    // app has no dedicated speech-to-text service. Note this means audio may
-    // be sent to the BROWSER VENDOR's own cloud recognition service (e.g.
-    // Chrome routes to Google) - not to any aimatic/OpenRouter backend. The
-    // transcript is never auto-submitted; it lands in the same editable
-    // textarea as typed text, so the user reviews/edits before Send.
-    // Mixed Urdu-English in one utterance isn't reliably supported by this
-    // API (it recognizes against one selected language per session) - a
-    // language toggle is offered instead of true code-switching detection.
+    // Voice input records in the browser, converts the recording to a compact
+    // mono WAV, then asks a live-verified zero-cost OpenRouter audio model for
+    // text. The transcript is always editable and is never auto-submitted.
     // ─────────────────────────────────────────────────────────────────────
 
     init_voice() {
-        this.voice_lang = 'en-PK';
-        this.voice_should_listen = false;
         this.voice_base_text = '';
         this.voice_committed_transcript = '';
-        this.voice_session_final = '';
-        this.voice_session_interim = '';
-        this.voice_restart_timer = null;
+        this.voice_model = '';
+        this.voice_error = '';
+        this.voice_request_id = 0;
+        this.media_recorder = null;
+        this.audio_chunks = [];
+        this.voice_max_timer = null;
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
+        if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder || !(window.AudioContext || window.webkitAudioContext)) {
             this.voice_state = 'unsupported';
-            this.$mic_btn.prop('disabled', true).attr('title', __('Voice input is not supported in this browser.'));
+            this.$mic_btn.prop('disabled', true).attr('title', __('Audio recording is not supported in this browser.'));
+            this.render_voice_status();
             return;
         }
         this.$mic_btn.on('click', () => {
             if (this.voice_state === 'recording') {
                 this.stop_recording();
-            } else {
+            } else if (this.voice_state !== 'processing') {
                 this.start_recording();
             }
         });
     }
 
-    start_recording() {
-        if (this.voice_state === 'unsupported' || this.sending) return;
+    async start_recording() {
+        if (this.voice_state === 'unsupported' || this.voice_state === 'processing' || this.sending) return;
 
+        const requestId = ++this.voice_request_id;
         this.voice_base_text = (this.$input.val() || '').trimEnd();
         this.voice_committed_transcript = '';
-        this.reset_voice_session();
-        this.voice_should_listen = true;
-        this.voice_state = 'recording';
-        this.recording_start_ms = Date.now();
-        this.render_voice_status();
-        this.start_duration_timer();
-        this.start_level_meter();
-        this.start_recognition_cycle();
+        this.voice_model = '';
+        this.voice_error = '';
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                },
+            });
+            if (requestId !== this.voice_request_id) {
+                stream.getTracks().forEach((track) => track.stop());
+                return;
+            }
+
+            const mimeType = this.get_recording_mime_type();
+            this.audio_stream = stream;
+            this.audio_chunks = [];
+            this.media_recorder = mimeType
+                ? new MediaRecorder(stream, { mimeType })
+                : new MediaRecorder(stream);
+            this.media_recorder.ondataavailable = (event) => {
+                if (event.data?.size) this.audio_chunks.push(event.data);
+            };
+            this.media_recorder.onerror = () => {
+                this.voice_request_id++;
+                this.voice_error = __('The browser could not record audio.');
+                this.voice_state = 'failed';
+                this.cleanup_voice_capture();
+                this.render_voice_status();
+            };
+            this.media_recorder.onstop = () => {
+                const blob = new Blob(this.audio_chunks, {
+                    type: this.media_recorder?.mimeType || mimeType || 'audio/webm',
+                });
+                this.media_recorder = null;
+                this.audio_chunks = [];
+                this.process_recorded_audio(blob, requestId);
+            };
+            this.media_recorder.start(250);
+            this.voice_state = 'recording';
+            this.recording_start_ms = Date.now();
+            this.render_voice_status();
+            this.start_duration_timer();
+            this.start_level_meter(stream);
+            this.voice_max_timer = setTimeout(() => this.stop_recording(), 45000);
+        } catch (e) {
+            this.voice_state = (e?.name === 'NotAllowedError' || e?.name === 'SecurityError')
+                ? 'permission_denied'
+                : 'failed';
+            this.voice_error = e?.message || '';
+            this.cleanup_voice_capture();
+            this.render_voice_status();
+        }
     }
 
-    start_recognition_cycle() {
-        if (!this.voice_should_listen || this.voice_state !== 'recording') return;
+    get_recording_mime_type() {
+        return [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+            'audio/ogg;codecs=opus',
+        ].find((type) => MediaRecorder.isTypeSupported(type)) || '';
+    }
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        this.recognition = recognition;
-        recognition.lang = this.voice_lang;
-        recognition.interimResults = true;
-        recognition.continuous = true;
-
-        recognition.onresult = (event) => {
-            if (this.recognition !== recognition) return;
-            let finalTranscript = '';
-            let interim = '';
-            // Rebuild this recognition cycle from all of its results. Appending
-            // only from resultIndex can duplicate a final phrase when Chrome
-            // re-emits results around a mobile pause or language restart.
-            for (let i = 0; i < event.results.length; i++) {
-                const transcript = (event.results[i][0].transcript || '').trim();
-                if (event.results[i].isFinal) {
-                    finalTranscript += (finalTranscript ? ' ' : '') + transcript;
-                } else {
-                    interim += (interim ? ' ' : '') + transcript;
-                }
-            }
-            this.voice_session_final = finalTranscript;
-            this.voice_session_interim = interim;
-            this.update_voice_input();
-        };
-
-        recognition.onerror = (event) => {
-            if (this.recognition !== recognition) return;
-            if (event.error === 'no-speech') {
-                // Mobile Chrome commonly ends a recognition cycle after a
-                // pause. onend restarts it while the user is still recording.
-                return;
-            }
-            if (event.error === 'aborted') {
-                // Expected when the user stops or changes language.
-                return;
-            }
-
-            this.voice_should_listen = false;
-            if (
-                event.error === 'not-allowed'
-                || event.error === 'permission-denied'
-                || event.error === 'service-not-allowed'
-            ) {
-                this.voice_state = 'permission_denied';
-            } else if (event.error === 'network') {
-                this.voice_state = 'network_error';
-            } else {
-                this.voice_state = 'failed';
-            }
-            this.cleanup_voice_capture();
-            this.render_voice_status();
-        };
-
-        recognition.onend = () => {
-            if (this.recognition === recognition) {
-                this.recognition = null;
-            }
-            this.commit_voice_session(true);
-
-            if (this.voice_should_listen && this.voice_state === 'recording') {
-                // continuous=true is only advisory; Android/mobile Chrome
-                // still ends after silence. Restart without ending dictation.
-                clearTimeout(this.voice_restart_timer);
-                this.voice_restart_timer = setTimeout(() => {
-                    this.voice_restart_timer = null;
-                    this.start_recognition_cycle();
-                }, 250);
-                return;
-            }
-
-            this.cleanup_voice_capture();
-            this.render_voice_status();
-        };
+    async process_recorded_audio(blob, requestId) {
+        this.cleanup_voice_capture();
+        if (requestId !== this.voice_request_id) return;
 
         try {
-            recognition.start();
+            if (!blob?.size) throw new Error(__('No speech was recorded.'));
+            const audioBase64 = await this.convert_blob_to_wav_base64(blob);
+            if (requestId !== this.voice_request_id) return;
+            const response = await frappe.call({
+                method: 'aimatic.ai.api.transcribe_audio',
+                args: {
+                    audio_base64: audioBase64,
+                    audio_format: 'wav',
+                    language_hint: 'auto',
+                },
+            });
+            if (requestId !== this.voice_request_id) return;
+            const result = response.message || {};
+            if (!result.transcript) throw new Error(__('No transcript was returned.'));
+
+            this.voice_committed_transcript = result.transcript.trim();
+            this.voice_model = result.model || '';
+            this.update_voice_input();
+            this.voice_state = 'ready';
         } catch (e) {
-            if (this.recognition === recognition) {
-                this.recognition = null;
-            }
-            this.voice_should_listen = false;
+            if (requestId !== this.voice_request_id) return;
+            this.voice_error = e?.message || __('Free OpenRouter transcription failed.');
             this.voice_state = 'failed';
-            this.cleanup_voice_capture();
-            this.render_voice_status();
         }
+        this.render_voice_status();
     }
 
-    reset_voice_session() {
-        this.voice_session_final = '';
-        this.voice_session_interim = '';
-    }
-
-    merge_voice_transcript(existing, addition) {
-        const left = (existing || '').trim();
-        const right = (addition || '').trim();
-        if (!left) return right;
-        if (!right) return left;
-
-        const leftWords = left.split(/\s+/);
-        const rightWords = right.split(/\s+/);
-        const normalize = (word) => word
-            .toLocaleLowerCase()
-            .replace(/[^a-z0-9\u0600-\u06ff]+/gi, '');
-        const maxOverlap = Math.min(leftWords.length, rightWords.length, 12);
-        let overlap = 0;
-        for (let size = maxOverlap; size > 0; size--) {
-            const leftTail = leftWords.slice(-size).map(normalize);
-            const rightHead = rightWords.slice(0, size).map(normalize);
-            if (leftTail.every((word, index) => word && word === rightHead[index])) {
-                overlap = size;
-                break;
+    async convert_blob_to_wav_base64(blob) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        const context = new AudioContextClass();
+        try {
+            const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+            const targetRate = 16000;
+            const sampleCount = Math.max(1, Math.round(decoded.length * targetRate / decoded.sampleRate));
+            const samples = new Float32Array(sampleCount);
+            const ratio = decoded.sampleRate / targetRate;
+            for (let i = 0; i < sampleCount; i++) {
+                const start = Math.floor(i * ratio);
+                const end = Math.min(decoded.length, Math.max(start + 1, Math.floor((i + 1) * ratio)));
+                let sum = 0;
+                let count = 0;
+                for (let channel = 0; channel < decoded.numberOfChannels; channel++) {
+                    const channelData = decoded.getChannelData(channel);
+                    for (let sourceIndex = start; sourceIndex < end; sourceIndex++) {
+                        sum += channelData[sourceIndex];
+                        count++;
+                    }
+                }
+                samples[i] = count ? sum / count : 0;
             }
+            return this.encode_pcm16_wav_base64(samples, targetRate);
+        } finally {
+            context.close().catch(() => {});
         }
-        return leftWords.concat(rightWords.slice(overlap)).join(' ');
     }
 
-    commit_voice_session(includeInterim) {
-        const chunk = [
-            this.voice_session_final,
-            includeInterim ? this.voice_session_interim : '',
-        ].filter(Boolean).join(' ');
-        this.voice_committed_transcript = this.merge_voice_transcript(
-            this.voice_committed_transcript,
-            chunk
-        );
-        this.reset_voice_session();
-        this.update_voice_input();
+    encode_pcm16_wav_base64(samples, sampleRate) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        const writeText = (offset, text) => {
+            for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
+        };
+        writeText(0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeText(8, 'WAVE');
+        writeText(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeText(36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+        for (let i = 0; i < samples.length; i++) {
+            const value = Math.max(-1, Math.min(1, samples[i]));
+            view.setInt16(44 + i * 2, value < 0 ? value * 0x8000 : value * 0x7fff, true);
+        }
+
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+            binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        }
+        return btoa(binary);
     }
 
     update_voice_input() {
-        const liveTranscript = [
-            this.voice_committed_transcript,
-            this.voice_session_final,
-            this.voice_session_interim,
-        ].filter(Boolean).join(' ').trim();
-        const value = [this.voice_base_text, liveTranscript]
+        const value = [this.voice_base_text, this.voice_committed_transcript]
             .filter(Boolean)
             .join(' ');
         this.$input.val(value).trigger('input');
@@ -1313,79 +1318,37 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         }
     }
 
-    stop_recording(fromError = false) {
-        this.voice_should_listen = false;
-        clearTimeout(this.voice_restart_timer);
-        this.voice_restart_timer = null;
-        this.commit_voice_session(true);
-
-        if (this.recognition) {
-            try {
-                this.recognition.stop();
-            } catch (e) {
-                // already stopped
-            }
-        }
-        if (!fromError && this.voice_state === 'recording') {
-            this.voice_state = 'ready';
-        }
-        this.cleanup_voice_capture();
+    stop_recording() {
+        if (this.voice_state !== 'recording' || !this.media_recorder) return;
+        clearTimeout(this.voice_max_timer);
+        this.voice_max_timer = null;
+        this.stop_duration_timer();
+        this.voice_state = 'processing';
         this.render_voice_status();
+        try {
+            this.media_recorder.stop();
+        } catch (e) {
+            this.voice_error = e?.message || __('The browser could not stop recording.');
+            this.voice_state = 'failed';
+            this.cleanup_voice_capture();
+            this.render_voice_status();
+        }
     }
 
     cleanup_voice_capture() {
-        clearTimeout(this.voice_restart_timer);
-        this.voice_restart_timer = null;
+        clearTimeout(this.voice_max_timer);
+        this.voice_max_timer = null;
         this.stop_duration_timer();
         this.stop_level_meter();
     }
 
-    switch_voice_language(lang) {
-        if (this.voice_state !== 'recording' || lang === this.voice_lang) return;
-        this.voice_lang = lang;
-        this.commit_voice_session(true);
-        if (this.recognition) {
-            try {
-                this.recognition.stop();
-            } catch (e) {
-                // onend or the restart timer will open the new language cycle
-            }
-        } else {
-            clearTimeout(this.voice_restart_timer);
-            this.voice_restart_timer = setTimeout(() => {
-                this.voice_restart_timer = null;
-                this.start_recognition_cycle();
-            }, 50);
-        }
-        this.render_voice_status();
-    }
-
     finish_voice_for_send() {
-        if (this.voice_state === 'recording') {
-            this.stop_recording();
-        }
         const message = this.$input.val() || '';
-
-        // stop() may still emit a late final result. Once Send is explicitly
-        // tapped, freeze the reviewed text so a stale callback cannot refill
-        // the textarea after _send_message_now() clears it.
-        if (this.recognition) {
-            const recognition = this.recognition;
-            recognition.onresult = null;
-            recognition.onerror = null;
-            recognition.onend = null;
-            try {
-                recognition.abort();
-            } catch (e) {
-                // already stopped
-            }
-            this.recognition = null;
-        }
-        this.voice_should_listen = false;
         this.cleanup_voice_capture();
         this.voice_base_text = '';
         this.voice_committed_transcript = '';
-        this.reset_voice_session();
+        this.voice_model = '';
+        this.voice_error = '';
         this.voice_state = 'idle';
         this.render_voice_status();
         return message;
@@ -1412,23 +1375,17 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         }
     }
 
-    start_level_meter() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then((stream) => {
-                this.audio_stream = stream;
-                this.audio_context = new (window.AudioContext || window.webkitAudioContext)();
-                const source = this.audio_context.createMediaStreamSource(stream);
-                this.analyser = this.audio_context.createAnalyser();
-                this.analyser.fftSize = 32;
-                source.connect(this.analyser);
-                this.tick_level_meter();
-            })
-            .catch(() => {
-                // Level meter is cosmetic only - recognition itself already
-                // requested (and may have been denied) mic access separately,
-                // so a failure here doesn't change voice_state on its own.
-            });
+    start_level_meter(stream) {
+        try {
+            this.audio_context = new (window.AudioContext || window.webkitAudioContext)();
+            const source = this.audio_context.createMediaStreamSource(stream);
+            this.analyser = this.audio_context.createAnalyser();
+            this.analyser.fftSize = 32;
+            source.connect(this.analyser);
+            this.tick_level_meter();
+        } catch (e) {
+            // The level meter is cosmetic; recording can continue without it.
+        }
     }
 
     tick_level_meter() {
@@ -1460,47 +1417,57 @@ aimatic.AiAssistantPage = class AiAssistantPage {
     }
 
     render_voice_status() {
+        const isRecording = this.voice_state === 'recording';
+        const isProcessing = this.voice_state === 'processing';
         this.$mic_btn
-            .toggleClass('recording', this.voice_state === 'recording')
-            .html(this.voice_state === 'recording' ? frappe.utils.icon('circle-stop', 'sm') : frappe.utils.icon('mic', 'sm'));
+            .toggleClass('recording', isRecording)
+            .toggleClass('processing', isProcessing)
+            .prop('disabled', this.voice_state === 'unsupported' || isProcessing || this.sending)
+            .html(isRecording ? frappe.utils.icon('circle-stop', 'sm') : frappe.utils.icon('mic', 'sm'));
+        this.$send.prop('disabled', Boolean(this.sending || isRecording || isProcessing));
 
-        if (this.voice_state === 'recording') {
+        if (isRecording) {
             const secs = Math.floor((Date.now() - this.recording_start_ms) / 1000);
             const mm = String(Math.floor(secs / 60)).padStart(2, '0');
             const ss = String(secs % 60).padStart(2, '0');
-            const isUrdu = this.voice_lang === 'ur-PK';
-            const nextLang = isUrdu ? 'en-PK' : 'ur-PK';
-            const languageLabel = isUrdu ? __('Urdu') : __('English (Pakistan)');
-            const switchLabel = isUrdu ? __('Switch to English') : __('Switch to Urdu');
             this.$voice_status.html(`
                 <span class="ai-assistant-voice-rec-dot"></span>
                 <span class="ai-assistant-voice-duration">${mm}:${ss}</span>
                 <span class="ai-assistant-voice-bars">
                     ${[0, 1, 2, 3, 4].map(() => '<span class="ai-assistant-voice-bar"></span>').join('')}
                 </span>
-                <span class="small text-muted">${languageLabel}</span>
-                <button class="btn btn-xs ai-assistant-voice-lang" data-lang="${nextLang}">${switchLabel}</button>
-                <span class="small text-muted">${__('Recording - audio may be sent to your browser\'s speech service. Review the transcript before sending.')}</span>
+                <span class="small text-muted">${__('Recording — tap Stop to transcribe (maximum 45 seconds).')}</span>
             `);
-            this.$voice_status.find('.ai-assistant-voice-lang').on('click', (e) => {
-                const lang = $(e.currentTarget).attr('data-lang');
-                this.switch_voice_language(lang);
-            });
+        } else if (isProcessing) {
+            this.$voice_status.html(`
+                <span class="ai-assistant-voice-spinner" aria-hidden="true"></span>
+                <span class="small text-muted">${__('Transcribing with a free OpenRouter model…')}</span>
+            `);
         } else if (this.voice_state === 'ready') {
-            this.$voice_status.html(`<span class="small text-muted">${__('Transcript ready below - edit if needed, then Send.')}</span> <button class="btn btn-xs ai-assistant-voice-discard">${__('Discard')}</button>`);
+            const model = frappe.utils.escape_html(this.voice_model || '');
+            this.$voice_status.html(`
+                <span class="small text-muted">${__('Transcript ready — edit if needed, then Send.')}</span>
+                ${model ? `<span class="small ai-assistant-voice-model" title="${model}">${__('Free model')}</span>` : ''}
+                <span class="small text-muted">${__('Language is auto-detected; Urdu is best-effort on the current free model.')}</span>
+                <button class="btn btn-xs ai-assistant-voice-discard">${__('Discard')}</button>
+            `);
             this.$voice_status.find('.ai-assistant-voice-discard').on('click', () => {
                 this.$input.val(this.voice_base_text || '').trigger('input');
                 this.voice_committed_transcript = '';
-                this.reset_voice_session();
+                this.voice_model = '';
+                this.voice_error = '';
                 this.voice_state = 'idle';
                 this.render_voice_status();
             });
         } else if (this.voice_state === 'permission_denied') {
             this.$voice_status.html(`<span class="small ai-assistant-voice-error">${__('Microphone permission denied. Allow microphone access in your browser to use voice input.')}</span>`);
         } else if (this.voice_state === 'network_error') {
-            this.$voice_status.html(`<span class="small ai-assistant-voice-error">${__('Voice recognition needs a network connection. Try again or type your question.')}</span>`);
+            this.$voice_status.html(`<span class="small ai-assistant-voice-error">${__('Transcription needs a network connection. Try again or type your question.')}</span>`);
         } else if (this.voice_state === 'failed') {
-            this.$voice_status.html(`<span class="small ai-assistant-voice-error">${__('Voice recognition failed. Try again or type your question.')}</span>`);
+            const detail = frappe.utils.escape_html(this.voice_error || '');
+            this.$voice_status.html(`<span class="small ai-assistant-voice-error">${__('Free OpenRouter transcription failed. No paid fallback was used. Try again or type your question.')}${detail ? ` ${detail}` : ''}</span>`);
+        } else if (this.voice_state === 'unsupported') {
+            this.$voice_status.html(`<span class="small text-muted">${__('Audio recording is not supported in this browser.')}</span>`);
         } else {
             this.$voice_status.empty();
         }
@@ -1538,7 +1505,16 @@ aimatic.AiAssistantPage = class AiAssistantPage {
     }
 
     send_message(rawMessage) {
-        if (this.voice_state === 'recording' || this.voice_state === 'ready') {
+        if (this.voice_state === 'recording') {
+            this.stop_recording();
+            frappe.show_alert({ message: __('Wait for the transcript, review it, then tap Send.'), indicator: 'blue' });
+            return;
+        }
+        if (this.voice_state === 'processing') {
+            frappe.show_alert({ message: __('Transcription is still in progress.'), indicator: 'blue' });
+            return;
+        }
+        if (this.voice_state === 'ready') {
             rawMessage = this.finish_voice_for_send();
         }
         const message = (rawMessage || '').trim();
@@ -1604,7 +1580,10 @@ aimatic.AiAssistantPage = class AiAssistantPage {
 
     set_sending(sending) {
         this.sending = sending;
-        this.$send.prop('disabled', sending).text(sending ? __('Thinking…') : __('Send'));
+        this.$send
+            .prop('disabled', Boolean(sending || this.voice_state === 'recording' || this.voice_state === 'processing'))
+            .text(sending ? __('Thinking…') : __('Send'));
+        this.render_voice_status();
     }
 
     build_bubble(role, content, is_error) {

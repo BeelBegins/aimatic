@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import re
+from decimal import Decimal, InvalidOperation
 
 import frappe
 import requests
@@ -96,6 +99,13 @@ def ping():
 _OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 _MODELS_CACHE_KEY = "aimatic_ai_free_models"
 _MODELS_CACHE_SECONDS = 6 * 60 * 60
+_FREE_AUDIO_MODEL_CACHE_KEY = "aimatic_ai_free_audio_model"
+_PREFERRED_FREE_AUDIO_MODELS = (
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+)
+_ALLOWED_AUDIO_FORMATS = {"wav", "mp3", "aiff", "aac", "ogg", "flac", "m4a", "pcm16", "pcm24"}
+_MAX_AUDIO_BYTES = 2 * 1024 * 1024
+_MAX_AUDIO_BASE64_CHARS = 4 * ((_MAX_AUDIO_BYTES + 2) // 3)
 
 
 @frappe.whitelist()
@@ -169,6 +179,164 @@ def list_available_free_models(force_refresh=False):
 
     frappe.cache().set_value(_MODELS_CACHE_KEY, models, expires_in_sec=_MODELS_CACHE_SECONDS)
     return models
+
+
+def _is_zero_price(value) -> bool:
+    if value is None:
+        return False
+    try:
+        return Decimal(str(value)) == 0
+    except (InvalidOperation, ValueError):
+        return False
+
+
+def _get_free_audio_model(force_refresh=False) -> str:
+    """Select an audio-input model that OpenRouter currently advertises at
+    zero prompt and completion cost. There is deliberately no paid fallback:
+    if the free catalogue changes or its only audio model disappears, voice
+    transcription fails visibly instead of spending money unexpectedly."""
+    if not cint(force_refresh):
+        cached = frappe.cache().get_value(_FREE_AUDIO_MODEL_CACHE_KEY)
+        if cached:
+            return cached.decode() if isinstance(cached, bytes) else cached
+
+    try:
+        response = requests.get(_OPENROUTER_MODELS_URL, timeout=15)
+    except requests.RequestException as e:
+        raise NemotronError(f"Could not check OpenRouter's free audio models: {e}")
+
+    if response.status_code != 200:
+        raise NemotronError(
+            f"OpenRouter model catalogue returned {response.status_code}: {response.text}"
+        )
+
+    try:
+        models = response.json()["data"]
+    except (KeyError, TypeError, ValueError):
+        raise NemotronError("OpenRouter returned an unexpected model catalogue response.")
+
+    free_audio_models = []
+    for model in models:
+        model_id = model.get("id", "")
+        pricing = model.get("pricing") or {}
+        architecture = model.get("architecture") or {}
+        input_modalities = architecture.get("input_modalities") or []
+        output_modalities = architecture.get("output_modalities") or []
+        if (
+            model_id.endswith(":free")
+            and _is_zero_price(pricing.get("prompt"))
+            and _is_zero_price(pricing.get("completion"))
+            and "audio" in input_modalities
+            and "text" in output_modalities
+        ):
+            free_audio_models.append(model_id)
+
+    selected = next(
+        (model_id for model_id in _PREFERRED_FREE_AUDIO_MODELS if model_id in free_audio_models),
+        free_audio_models[0] if free_audio_models else None,
+    )
+    if not selected:
+        raise NemotronError(
+            "No zero-cost audio transcription model is currently available on OpenRouter. "
+            "No paid fallback was used."
+        )
+
+    frappe.cache().set_value(
+        _FREE_AUDIO_MODEL_CACHE_KEY,
+        selected,
+        expires_in_sec=_MODELS_CACHE_SECONDS,
+    )
+    return selected
+
+
+@frappe.whitelist()
+def transcribe_audio(audio_base64: str, audio_format: str = "wav", language_hint: str = "auto"):
+    """Transcribe a short recording through a *currently free* OpenRouter
+    audio model. Audio is held only in request memory; this endpoint does not
+    create a File or Conversation record. The result remains editable in the
+    browser and is not submitted as an assistant question automatically."""
+    _check_role()
+
+    audio_format = (audio_format or "").strip().lower()
+    if audio_format not in _ALLOWED_AUDIO_FORMATS:
+        frappe.throw(_("Unsupported audio format."))
+
+    if not isinstance(audio_base64, str) or not audio_base64:
+        frappe.throw(_("No audio recording was received."))
+    if len(audio_base64) > _MAX_AUDIO_BASE64_CHARS:
+        frappe.throw(_("Recording is too large. Record no more than 45 seconds."))
+
+    try:
+        audio_bytes = base64.b64decode(audio_base64, validate=True)
+    except (binascii.Error, ValueError):
+        frappe.throw(_("The audio recording is invalid."))
+    if len(audio_bytes) < 512:
+        frappe.throw(_("The recording is too short. Please speak and try again."))
+    if len(audio_bytes) > _MAX_AUDIO_BYTES:
+        frappe.throw(_("Recording is too large. Record no more than 45 seconds."))
+
+    hint = (language_hint or "auto").strip()[:32]
+    language_instruction = (
+        "Auto-detect the spoken language"
+        if hint.lower() == "auto"
+        else f"The expected spoken language is {hint}"
+    )
+    prompt = (
+        "Transcribe this audio exactly in its spoken language and original script. "
+        "Do not translate or answer it. Return only the transcript."
+    )
+    if hint.lower() != "auto":
+        prompt += f" {language_instruction}."
+
+    try:
+        model = _get_free_audio_model()
+        completion = get_chat_completion(
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "input_audio",
+                        "input_audio": {"data": audio_base64, "format": audio_format},
+                    },
+                ],
+            }],
+            # NVIDIA's model card explicitly recommends temperature=1.0 and
+            # non-thinking mode for ASR. OpenRouter exposes temperature and
+            # reasoning for this free model (but not NVIDIA's top_k knob).
+            temperature=1.0,
+            max_tokens=1024,
+            model=model,
+            reasoning={"enabled": False},
+            timeout=120,
+            return_metadata=True,
+        )
+    except NemotronError as e:
+        frappe.throw(str(e))
+
+    usage = completion.get("usage") or {}
+    prompt_details = usage.get("prompt_tokens_details") or {}
+    if cint(prompt_details.get("audio_tokens")) <= 0:
+        frappe.throw(_(
+            "OpenRouter's current free provider did not accept the audio recording. "
+            "No transcript was inserted and no paid fallback was used. Please try again later."
+        ))
+
+    message = completion["message"]
+    transcript = message.get("content")
+    if isinstance(transcript, list):
+        transcript = " ".join(
+            part.get("text", "")
+            for part in transcript
+            if isinstance(part, dict) and part.get("type") == "text"
+        )
+    if not isinstance(transcript, str) or not transcript.strip():
+        frappe.throw(_("The free transcription model returned no transcript. Please try again."))
+
+    transcript = transcript.strip()
+    transcript = re.sub(r"^```(?:text)?\s*|\s*```$", "", transcript, flags=re.IGNORECASE).strip()
+    transcript = re.sub(r"^transcript\s*:\s*", "", transcript, flags=re.IGNORECASE).strip()
+    return {"transcript": transcript, "model": model, "free": True}
 
 
 def _check_role():
