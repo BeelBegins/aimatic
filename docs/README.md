@@ -360,6 +360,8 @@ At a high level, bringing a new branch or site online involves:
 1. Creating the Branch record (its own warehouse and cost center are created alongside it).
 2. Assigning staff to that branch (via a default Branch permission) so their sales/purchases
    post to the right books automatically.
+   Administrator/System Manager transactions use the company's only Branch automatically; if the
+   company has multiple Branches, saving is blocked until the administrator explicitly selects one.
 3. Setting up POS Profile(s) and terminal(s) for that branch.
    Android terminals additionally require a supervisor-generated one-time enrollment QR; the
    public OAuth client is installed automatically by the Aimatic migration.

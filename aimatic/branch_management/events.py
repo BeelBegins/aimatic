@@ -125,16 +125,37 @@ def apply_branch_defaults(doc, method=None):
 		# Companies that have not adopted Ai Matic Branch management keep normal
 		# ERPNext Company/Warehouse behavior. Branch enforcement starts only after
 		# at least one Branch is configured for the document's Company.
-		if doc.company and not frappe.db.exists("Branch", {"company": doc.company}):
+		company_branches = (
+			frappe.get_all(
+				"Branch",
+				filters={"company": doc.company},
+				pluck="name",
+				order_by="name",
+				limit_page_length=2,
+			)
+			if doc.company
+			else []
+		)
+		if not company_branches:
 			return
 		if can_override:
-			return
-		frappe.throw(
-			_(
-				"No Branch is assigned to your user account, so this document cannot "
-				"be created. Ask your administrator to grant you access to a Branch."
+			if len(company_branches) == 1:
+				doc.branch = company_branches[0]
+			else:
+				frappe.throw(
+					_(
+						"Company {0} has multiple Branches. Select a Branch before saving "
+						"this {1}; Administrator and manager transactions are never assigned "
+						"to a Branch by guesswork."
+					).format(frappe.bold(doc.company), doc.doctype)
+				)
+		else:
+			frappe.throw(
+				_(
+					"No Branch is assigned to your user account, so this document cannot "
+					"be created. Ask your administrator to grant you access to a Branch."
+				)
 			)
-		)
 
 	branch_defaults = get_branch_defaults(doc.branch)
 	has_set_warehouse = doc.meta.has_field("set_warehouse")

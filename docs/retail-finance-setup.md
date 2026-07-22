@@ -31,6 +31,8 @@ The future operator should be guided through this order, with a visible owner an
 2. One Branch per store, one enabled leaf cost center per store, finished/rejected leaf warehouses,
    the Branch Accounting Dimension, and one enabled selling-only `<Branch> Selling Price List`.
 3. POS Profiles and terminals mapped to the exact Branch, warehouse, and cost center; Modes of Payment mapped to company cash/bank accounts.
+   Administrator/manager transactions may auto-resolve only when the Company has exactly one
+   Branch; with multiple Branches the user must select one before saving and the server never guesses.
 4. Stock valuation policy, items, opening quantities and values, supplier/customer opening balances, and a balanced opening trial balance.
 5. Tax applicability, FBR settings, tax accounts, invoice sequence, and filing ownership.
 6. Cashier opening/closing, deposit ownership, bank statement import, petty cash, approval limits, and period-close cadence.
