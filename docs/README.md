@@ -117,6 +117,10 @@ Branch defaults are used as a fallback. The app shows customer balance/credit, c
 and warehouse stock and creates normal draft Sales Orders. Offline drafts retain one stable request ID; the server
 maps that ID to a single Sales Order so retries cannot create duplicates. Prices, taxes, stock
 policy, credit validation, permissions, company, and warehouse remain controlled by ERPNext.
+
+Items can be found by code, name, category, or brand. When an Item has alternate units with valid
+conversion factors, the salesperson can choose the unit before adding it and sees the package
+conversion, matching price, and available stock. Unconfigured or invalid alternate units stay hidden.
 If several warehouses are permitted and no ERPNext default is configured, login returns the
 available list and the salesperson must choose one before selecting a customer; the server does
 not guess which warehouse should supply the order.

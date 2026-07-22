@@ -196,7 +196,12 @@ def _item_stock_and_rates(item_codes, warehouse, price_list):
 
 	factors_by_item = {}
 	for row in conversions:
-		factors_by_item.setdefault(row.parent, {})[row.uom] = flt(row.conversion_factor) or 1.0
+		factor = flt(row.conversion_factor)
+		# Only expose alternate UOMs that are actually assigned to the Item and
+		# have a usable conversion. Treating a blank/zero factor as 1 would make
+		# an invalid packaging unit look orderable and price it like stock UOM.
+		if row.uom and factor > 0:
+			factors_by_item.setdefault(row.parent, {})[row.uom] = factor
 
 	rate_by_item = {}
 	uom_by_item = {}
@@ -211,7 +216,7 @@ def _item_stock_and_rates(item_codes, warehouse, price_list):
 		factors = dict(factors_by_item.get(item.name, {}))
 		factors.setdefault(item.stock_uom, 1.0)
 		uom_by_item[item.name] = {
-			"default_uom": item.sales_uom or item.stock_uom,
+			"default_uom": item.sales_uom if item.sales_uom in factors else item.stock_uom,
 			"uoms": [
 				{
 					"uom": uom,
@@ -389,7 +394,16 @@ def search_items(branch=None, warehouse=None, customer=None, search=None, barcod
 		filters = {"name": ["in", codes or [""]], "disabled": 0, "is_sales_item": 1}
 	else:
 		filters = {"disabled": 0, "is_sales_item": 1}
-	rows = frappe.get_list("Item", filters=filters, or_filters={"name": ["like", f"%{search}%"], "item_name": ["like", f"%{search}%"]} if search else None, fields=["name", "item_name", "item_group", "brand", "stock_uom", "image"], start=cint(offset), page_length=_page_length(limit), order_by="item_name")
+	or_filters = None
+	if search:
+		like = f"%{search}%"
+		or_filters = {
+			"name": ["like", like],
+			"item_name": ["like", like],
+			"item_group": ["like", like],
+			"brand": ["like", like],
+		}
+	rows = frappe.get_list("Item", filters=filters, or_filters=or_filters, fields=["name", "item_name", "item_group", "brand", "stock_uom", "image"], start=cint(offset), page_length=_page_length(limit), order_by="item_name")
 	stock_by_item, rate_by_item, uom_by_item = _item_stock_and_rates([row.name for row in rows], context.warehouse, price_list)
 	for row in rows:
 		stock = stock_by_item.get(row.name) or {}
