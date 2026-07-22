@@ -319,11 +319,43 @@ def create_suppliers(groups, company, wht_account):
     return code_to_supplier, stats, conflicts, failures
 
 
+def resolve_company_branch(company):
+    """Journal Entry has no doc_events hook for aimatic.branch_management (unlike
+    Sales/Purchase/Stock Entry, which get branch/cost_center forced onto them by
+    apply_branch_defaults) -- so unlike the item import's Stock Entries, nothing
+    populates Journal Entry Account.branch here unless this script sets it
+    itself. Confirmed live on siezal before this fix: cost_center on the 1,124
+    legacy opening-balance JE lines came out correct only by coincidence (the
+    Company's own default cost center happened to already point at the site's
+    one Branch), while branch was blank on 100% of them -- the same
+    unrecoverable gap documented in the root CLAUDE.md's GL Entry branch-backfill
+    note. Mirrors apply_branch_defaults's own rule: exactly one Company Branch
+    is used automatically, more than one requires an explicit decision here
+    rather than a guess (legacy vendor-ledger rows carry no branch/location
+    column at all, so there is no per-row signal to split on)."""
+    branches = frappe.get_all("Branch", filters={"company": company}, pluck="name", order_by="name")
+    if not branches:
+        frappe.throw(f"No Branch configured for {company}; set one up before importing opening balances.")
+    if len(branches) > 1:
+        frappe.throw(
+            f"{company} has multiple Branches ({', '.join(branches)}). Legacy vendor ledger rows "
+            "carry no branch/location column, so this script cannot guess which one opening "
+            "balances belong to -- pick one explicitly (e.g. add a BRANCH override constant) "
+            "before running this import."
+        )
+    branch = branches[0]
+    cost_center = frappe.get_cached_value("Branch", branch, "cost_center")
+    if not cost_center:
+        frappe.throw(f"Branch {branch} has no Cost Center configured.")
+    return branch, cost_center
+
+
 def create_opening_entries(rows, code_to_supplier, company, posting_date):
     """Phase 2: one Journal Entry per legacy row with a nonzero closing balance,
     each carrying its own original vendor name/code in the remark so the merged
     Supplier's ledger still shows exactly where every rupee came from. Negative
     balances (advance/overpayment) are allowed and expected."""
+    branch, cost_center = resolve_company_branch(company)
     payable_account = frappe.get_cached_value("Company", company, "default_payable_account")
     # Don't assume "Temporary Opening - <abbr>" is the account's full name --
     # siezal's chart of accounts has it as "1910 - Temporary Opening - SSM"
@@ -383,9 +415,19 @@ def create_opening_entries(rows, code_to_supplier, company, posting_date):
                         "party": supplier,
                         "credit_in_account_currency": amount,
                         "user_remark": remark,
+                        "branch": branch,
+                        "cost_center": cost_center,
                     },
                 )
-                je.append("accounts", {"account": temp_opening_account, "debit_in_account_currency": amount})
+                je.append(
+                    "accounts",
+                    {
+                        "account": temp_opening_account,
+                        "debit_in_account_currency": amount,
+                        "branch": branch,
+                        "cost_center": cost_center,
+                    },
+                )
             else:
                 # net debit -> advance / overpayment to the supplier
                 je.append(
@@ -396,9 +438,19 @@ def create_opening_entries(rows, code_to_supplier, company, posting_date):
                         "party": supplier,
                         "debit_in_account_currency": amount,
                         "user_remark": remark,
+                        "branch": branch,
+                        "cost_center": cost_center,
                     },
                 )
-                je.append("accounts", {"account": temp_opening_account, "credit_in_account_currency": amount})
+                je.append(
+                    "accounts",
+                    {
+                        "account": temp_opening_account,
+                        "credit_in_account_currency": amount,
+                        "branch": branch,
+                        "cost_center": cost_center,
+                    },
+                )
 
             je.insert(ignore_permissions=True)
             je.submit()

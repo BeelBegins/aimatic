@@ -78,7 +78,7 @@
   "name": "GST Exempted"
  },
  {
-  "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
+  "advance_tax_account": null,
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -91,7 +91,7 @@
   "name": "Adv Std (Excl Scheme)"
  },
  {
-  "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
+  "advance_tax_account": null,
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -104,7 +104,7 @@
   "name": "Adv Std (Incl Scheme)"
  },
  {
-  "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
+  "advance_tax_account": null,
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -117,7 +117,7 @@
   "name": "Adv On TP"
  },
  {
-  "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
+  "advance_tax_account": null,
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -130,7 +130,7 @@
   "name": "Adv TP + GST - TO"
  },
  {
-  "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
+  "advance_tax_account": null,
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -143,7 +143,7 @@
   "name": "Adv TP + GST - Disc - TO"
  },
  {
-  "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
+  "advance_tax_account": null,
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -156,7 +156,7 @@
   "name": "Adv TP + GST + FED - Disc - TO"
  },
  {
-  "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
+  "advance_tax_account": null,
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -195,7 +195,7 @@
   "name": "FED Per from Amount"
  },
  {
-  "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
+  "advance_tax_account": null,
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -221,7 +221,7 @@
   "name": "GST Std (Incl Scheme)"
  },
  {
-  "advance_tax_account": "Advance Tax Deducted by Suppliers - ST",
+  "advance_tax_account": null,
   "description": null,
   "discount_account": null,
   "docstatus": 0,

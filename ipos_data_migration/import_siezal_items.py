@@ -326,7 +326,48 @@ def create_selling_price(item_code, selling_rate):
     return True
 
 
+def get_branch_and_cost_center():
+    """Resolved explicitly (not left to aimatic.branch_management's
+    apply_branch_defaults before_validate hook to fill in silently) so this
+    reference script stays self-contained for whoever copies it for a new
+    site -- and so a Warehouse that hasn't been branch-mapped yet
+    (Warehouse.custom_branch blank) fails loudly here rather than falling
+    through the hook's own Administrator/override fallback chain, which could
+    resolve to a different Branch than intended on a multi-branch company.
+    The hook still runs on insert and will leave these values alone once set
+    (can_override users only get blanks filled), so this isn't fighting it --
+    it's just not depending on it."""
+    branch = frappe.get_cached_value("Warehouse", WAREHOUSE, "custom_branch")
+    if not branch:
+        frappe.throw(f"Warehouse {WAREHOUSE} has no Branch mapped (custom_branch is blank).")
+    cost_center = frappe.get_cached_value("Branch", branch, "cost_center")
+    if not cost_center:
+        frappe.throw(f"Branch {branch} has no Cost Center configured.")
+    return branch, cost_center
+
+
+def get_temp_opening_account():
+    """The offsetting account for one-time opening-balance stock entries must
+    NOT be the default Stock Adjustment account -- that account is Expense /
+    Profit and Loss, so crediting it for opening stock reads as phantom P&L
+    income for whatever period the migration runs in. Temporary Opening
+    (Asset / Balance Sheet, account_type "Temporary") is the correct wash
+    account -- the same one supplier opening balances already use in
+    import_siezal_suppliers.py -- so the two migration halves net through one
+    suspense account instead of one leaking into reported profit. See
+    apps/aimatic/ipos_data_migration/import.md, "Opening-stock GL posting."""
+    company = frappe.db.get_value("Warehouse", WAREHOUSE, "company")
+    account = frappe.db.get_value(
+        "Account", {"company": company, "account_name": "Temporary Opening", "is_group": 0}
+    )
+    if not account:
+        frappe.throw(f"No 'Temporary Opening' account found under {company}.")
+    return account
+
+
 def create_stock_entries(stock_rows):
+    temp_opening_account = get_temp_opening_account()
+    branch, cost_center = get_branch_and_cost_center()
     created = 0
     zero_rate_rows = 0
     for start in range(0, len(stock_rows), STOCK_ENTRY_CHUNK_SIZE):
@@ -338,6 +379,7 @@ def create_stock_entries(stock_rows):
         entry.stock_entry_type = "Material Receipt"
         entry.to_warehouse = WAREHOUSE
         entry.set_posting_time = 1
+        entry.branch = branch
 
         for stock_row in chunk:
             # allow_zero_valuation_rate must be conditional, not blanket-on for
@@ -351,6 +393,9 @@ def create_stock_entries(stock_rows):
                     "basic_rate": stock_row["rate"],
                     "valuation_rate": stock_row["rate"],
                     "allow_zero_valuation_rate": 1 if stock_row["rate"] <= 0 else 0,
+                    "expense_account": temp_opening_account,
+                    "cost_center": cost_center,
+                    "branch": branch,
                 },
             )
             if stock_row["rate"] <= 0:
@@ -375,6 +420,8 @@ def create_negative_stock_entries(stock_rows):
             frappe.db.set_value("Item", stock_row["item_code"], "valuation_rate", stock_row["rate"])
     frappe.db.commit()
 
+    temp_opening_account = get_temp_opening_account()
+    branch, cost_center = get_branch_and_cost_center()
     created = 0
     zero_rate_rows = 0
     for start in range(0, len(stock_rows), STOCK_ENTRY_CHUNK_SIZE):
@@ -386,6 +433,7 @@ def create_negative_stock_entries(stock_rows):
         entry.stock_entry_type = "Material Issue"
         entry.from_warehouse = WAREHOUSE
         entry.set_posting_time = 1
+        entry.branch = branch
 
         for stock_row in chunk:
             entry.append(
@@ -396,6 +444,9 @@ def create_negative_stock_entries(stock_rows):
                     "s_warehouse": WAREHOUSE,
                     "basic_rate": stock_row["rate"],
                     "allow_zero_valuation_rate": 1 if stock_row["rate"] <= 0 else 0,
+                    "expense_account": temp_opening_account,
+                    "cost_center": cost_center,
+                    "branch": branch,
                 },
             )
             if stock_row["rate"] <= 0:

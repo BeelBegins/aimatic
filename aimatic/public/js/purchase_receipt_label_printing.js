@@ -3,6 +3,19 @@ frappe.ui.form.on("Purchase Receipt", {
 		if (frm.doc.docstatus !== 1) {
 			return;
 		}
+
+		frm.add_custom_button(__("Stock Acknowledgement"), () => {
+			const url =
+				"/printview?doctype=" +
+				encodeURIComponent(frm.doc.doctype) +
+				"&name=" +
+				encodeURIComponent(frm.doc.name) +
+				"&format=" +
+				encodeURIComponent("Stock Acknowledgement") +
+				"&no_letterhead=1&trigger_print=0";
+			window.open(url, "_blank");
+		}, __("Print"));
+
 		if (!frappe.model.can_create("AIM Label Print Job")) {
 			return;
 		}

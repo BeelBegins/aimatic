@@ -90,6 +90,48 @@ Current scope: item, barcode, price, FBR category, and stock import only. Suppli
   something to draw its rate from — verified working end-to-end on `hsm` before being written into
   the reference script.
 
+#### Opening-stock GL posting (fixed 2026-07-23)
+
+Every `Stock Entry Detail` row this import creates must set `expense_account` explicitly to the
+site's **`Temporary Opening`** account (Asset / Balance Sheet, `account_type: "Temporary"` — the
+exact account already used by `import_<site>_suppliers.py`'s opening-balance Journal Entries), never
+left to default. Left unset, ERPNext falls back to `Company.stock_adjustment_account` — a plain
+**Expense / Profit and Loss** account meant for routine stock-count corrections. Crediting that
+account with the entire opening-stock value in one lump sum (confirmed live on `siezal`: Rs
+47,145,912.77 across 70 `Material Receipt` entries hit `5119 - Stock Adjustment - SSM`) reads as
+phantom P&L income for whatever posting period the migration ran in, distorting reported profit for
+that period — this was never supposed to be a routine stock adjustment, it's a one-time
+opening-balance entry that must bypass P&L entirely, the same way opening vendor balances already do.
+
+Routing both halves of a migration's opening entries through the same `Temporary Opening` suspense
+account (rather than one leaking into P&L on its own) means that once **all** opening entries for a
+site are posted — items, suppliers, and any others (customer opening balances, cash/bank, etc.) —
+`Temporary Opening`'s net balance is exactly the site's opening equity contribution (or drawdown),
+by construction. That residual must be closed out via one final Journal Entry to
+**`Opening Balance Equity`** (Equity / Balance Sheet, already present in the standard CoA) —
+`close_migration_opening_balance.py` (see Reference Scripts below) does this. Run it once, by hand,
+after both the item and supplier imports for a new site are fully done — it is idempotent (a no-op
+if `Temporary Opening` already nets to zero).
+
+**This was not applied retroactively to `szl`/`siezal`/`hsm`'s already-completed migrations** — their
+existing opening-stock entries still credit `Stock Adjustment`, a historical data-quality gap, not
+something this fix rewrites. It only changes how the *next* site's import script (copied from
+`import_siezal_items.py`) behaves.
+
+#### Branch / Cost Center / Accounting Dimension (fixed 2026-07-23)
+
+Every Stock Entry this script creates must carry the correct `branch` (header + every row) and
+`cost_center` (every row) explicitly, resolved once via `get_branch_and_cost_center()` (reverse
+lookup through `Warehouse.custom_branch` → `Branch.cost_center`, throwing loudly if either is
+unmapped) rather than left for `aimatic.branch_management`'s `apply_branch_defaults` `before_validate`
+hook to fill in silently. That hook *does* still fire for these script-inserted Stock Entries and
+was confirmed (live, on `siezal`) to already fill in the correct values for every one of the 13,978
+Material Receipt rows — but a migration script meant to be copied for a new site should not have an
+invisible dependency on that hook's own Administrator/override fallback chain, which can resolve to
+the wrong Branch on a company with more than one. Setting these fields explicitly doesn't fight the
+hook (`can_override` users only get blanks filled in, never an already-set value overwritten) — it
+just makes the script self-contained and fail-fast instead of silently correct-by-luck.
+
 ### Tax-exclusive valuation rate (fixed 2026-07-16)
 
 Both reference scripts now reverse-calculate `CurCost` before using it as a Stock Entry rate,
@@ -241,7 +283,12 @@ For this import format:
      rate (`sales_tax = CurCost * tax_rate / (100 + tax_rate)`, `rate = CurCost - sales_tax`) —
      never `CurCost` raw
    - allow zero valuation when the resulting rate is `0`
+   - `expense_account` set to the site's `Temporary Opening` account on every row — see
+     "Opening-stock GL posting" above; never left to default
 6. Validate imported rows against `MRP` and optional `rp` logic where needed.
+7. After both the item and supplier imports are complete for the site, run
+   `close_migration_opening_balance.py` once to close `Temporary Opening`'s residual to
+   `Opening Balance Equity`.
 
 ## Confirmed Non-Mappings
 
@@ -288,6 +335,39 @@ actually uploaded on that site; only the script itself is centralized.
   `"NULL"`/junk-row handling, spreadsheet footer-row filtering) and the `MRP` fallback chain
   documented above, all first introduced for `siezal`. Prefer this one as the starting point for a
   new site's script.
+- `close_migration_opening_balance.py` (2026-07-23) — the cross-cutting final step, shared across
+  sites, not item- or supplier-specific: closes the `Temporary Opening` suspense account's residual
+  balance to `Opening Balance Equity` once both imports for a site are complete. See "Opening-stock
+  GL posting" above for why this exists.
+- `update_hsm_item_brands.py` (2026-07-22) — a narrower, standalone follow-up pass, not a full item
+  import: sets `Item.brand` on already-imported `hsm` items from a separate AI-generated catalogue
+  workbook, `itemmastersto.xlsx` (`Query1` sheet, columns `ItemCode`/`AiBrand`/`AiCompany`/
+  `AiDepartment`/`AiCategory`/`AiSubCategory`/`AiCoreCategory`/`AiDescription`/
+  `AiShortDescription` — only `ItemCode` and `AiBrand` are consumed by this script; the rest is
+  unused category-classification data, out of scope here since it needs a separate Item Group
+  decision, see the "Arfa Food" gotcha below). Despite the column name, `ItemCode` in this sheet is
+  actually a **barcode**, not an ERPNext `item_code` — matched against `Item Barcode.barcode`
+  (`get_barcode_to_items`), not `Item.item_code` directly. Rows are skipped when: `AiBrand` is blank
+  or literally `"Generic"` (case-insensitive; the sheet uses `"Generic"` as its placeholder for
+  "brand unknown", present on roughly a third of the ~231k rows); `ItemCode` is shorter than 8
+  characters (guards against non-barcode junk values in that column); or the barcode has no match in
+  `hsm`'s `Item Barcode` table (expected for most rows — this workbook spans a much larger item
+  universe than any one site actually stocks). When a barcode matches more than one Item, every
+  matched Item is updated, not just one. Missing `Brand` records are created on demand
+  (`ensure_brand`); MariaDB's default case-insensitive collation on `Brand.name` means a brand
+  string that differs only in case from an already-created Brand reuses that record rather than
+  creating a near-duplicate. Live run on `hsm` (2026-07-22): 7,509 write operations across 7,163
+  distinct Items (the gap is items matched under more than one barcode in the sheet), 997 new Brand
+  records, 156,824 rows skipped for no barcode match, 67,086 skipped as generic/blank brand. A
+  `DRY_RUN` flag at the top of the script gates all writes behind a read-only counts-only pass —
+  always run with `DRY_RUN = True` first and sanity-check the summary before flipping it off.
+  **Known data-quality issue surfaced by this sheet, not yet acted on**: `AiCategory` uses `"Arfa
+  Food"` as a value across several unrelated food subcategories (dry fruits, pulses, chickpeas) —
+  looks like a supplier/brand name that leaked into what should be a generic category label. Nothing
+  in ERPNext (no Item Group) is named this today; it only exists as row data in this workbook. If a
+  future pass builds Item Groups from `AiCategory`/`AiSubCategory`/`AiCoreCategory`, `"Arfa Food"`
+  needs renaming to a real generic category name first — deliberately deferred, not part of this
+  brand-only script.
 - `update_siezal_item_brands.py` (2026-07-23) — the SIEZAL-safe version of the separate catalogue
   brand pass. It reads `itemmastersto.xlsx` / `Query1` and joins the sheet's `ItemCode` to
   `Item Barcode.barcode` (the source value is a barcode, not ERPNext `Item.item_code`), then assigns
@@ -304,6 +384,29 @@ actually uploaded on that site; only the script itself is centralized.
   pending updates. The 40 ties were intentionally not guessed. Backup taken immediately before the
   write: `sites/siezal/private/backups/20260723_013705-siezal-database.sql.gz` plus its matching
   `20260723_013705-siezal-site_config_backup.json`.
+- `assign_hsm_item_groups.py` (2026-07-22) — the deferred Item Group follow-up to the above: builds
+  a 2-level Item Group tree (`Department` > `Category`, from `itemmastersto.xlsx`'s `AiDepartment`/
+  `AiCategory` columns only — `AiSubCategory`/`AiCoreCategory` are too granular and were deliberately
+  not used, a product decision made explicit at the time rather than assumed) and assigns every
+  matched `hsm` Item to its resolved leaf Category group. Same barcode-matching approach as the brand
+  script (`ItemCode` -> `Item Barcode.barcode`, `>= 8` char guard); the `"Arfa Food"` mislabeling
+  (see above) is renamed to `"Dry Foods"` before the tree is built (`CATEGORY_RENAMES`). When an
+  item's several matched sheet rows disagree on department/category (50 of 7,258 items, 0.7%), the
+  most-frequent `(dept, cat)` pairing wins, ties broken by whichever row appears later in the sheet.
+  Live run on `hsm`: 11 departments, 39 categories, 7,258 items assigned (the remaining 4,121 of
+  hsm's 11,379 items — not covered by this sheet at all — stay on the pre-existing default `Products`
+  group untouched).
+  - **Self-named department/category collision gotcha**: two of the 39 pairs have an identical
+    department and category string (`'Electronics' > 'Electronics'`, `'Textile' > 'Textile'`).
+    `Item Group.name` is globally unique, so once the department node (`is_group=1`) was created, the
+    later attempt to create the same-named leaf category silently no-opped (`frappe.db.exists` found
+    the department node itself) and those 66 items (44 + 22) ended up with `item_group` pointing at
+    the **group** node instead of a leaf, inconsistent with every other item in the tree. Fixed
+    post-run by flipping just those two `Item Group` rows from `is_group=1` to `is_group=0` (verified
+    first that neither had any child groups) rather than reworking the assignment script — a
+    department that only ever contains one same-named category is really just a single leaf, not a
+    group with one child. Worth building this self-name check into the script itself if this sheet
+    (or one shaped like it) is ever re-run for another site.
 
 **When starting a new site's import, copy the most complete existing script into a new
 `import_<site>_items.py` in this same directory** rather than writing from scratch or leaving a

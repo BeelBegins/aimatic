@@ -1,31 +1,53 @@
 {% set title = 'STOCK ACKNOWLEDGEMENT' %}
 <style>
-@page { size: 297mm 210mm; margin: 5mm; }
-html, body { width: 297mm; margin: 0; padding: 0; }
-.print-format { width: 287mm !important; max-width: 287mm !important; min-height: 0 !important; margin: 0 auto !important; padding: 0 !important; font-family: Arial, Helvetica, sans-serif; font-size: 6.5pt; color: #000; }
+@page { size: 210mm 297mm; margin: 5mm; }
+html, body { width: 200mm; margin: 0; padding: 0; }
+.print-format { width: 200mm !important; max-width: 200mm !important; min-height: 0 !important; margin: 0 auto !important; padding: 0 !important; font-family: Arial, Helvetica, sans-serif; font-size: 6.3pt; color: #000; }
 .aim-title { text-align: center; font-size: 10pt; font-weight: 700; margin: 0 0 1mm; }
 .aim-head { width: 100%; border-collapse: collapse; margin: 0 0 1mm; }
 .aim-head td { border: 0; padding: .35mm 1mm; vertical-align: top; }
 .aim-label { font-weight: 700; white-space: nowrap; }
 .aim-company { text-align: center; font-size: 8pt; font-weight: 700; }
-.aim-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.aim-grid th { border-top: .25mm solid #000; border-bottom: .25mm solid #000; padding: .65mm .35mm; font-size: 5.2pt; line-height: 1.05; text-align: center; vertical-align: bottom; }
-.aim-grid td { padding: .75mm .3mm; border-bottom: .1mm solid #bbb; vertical-align: middle; overflow: hidden; overflow-wrap: normal; word-break: normal; }
-.aim-grid .num { text-align: right; white-space: nowrap; font-size: 5.4pt; }
-.aim-grid .center { text-align: center; }
-.aim-grid .desc { text-align: left; overflow-wrap: anywhere; }
-.aim-grid .barcode { white-space: nowrap; font-size: 5pt; font-weight: 700; }
-.aim-sign-block { width: 100%; margin-top: 6mm; border-collapse: collapse; page-break-inside: avoid; }
+.aim-head-row { display: grid; grid-template-columns: 1fr 4mm 1fr; margin: 0 0 .3mm; }
+.aim-head-col { display: grid; grid-template-columns: 6% 16% 40% 12% 12% 14%; border-top: .25mm solid #000; border-bottom: .25mm solid #000; }
+.aim-head-col span { padding: .7mm .35mm; font-size: 5.6pt; font-weight: 700; line-height: 1.1; text-align: center; }
+.aim-head-col span.h-desc { text-align: left; }
+.aim-items { column-count: 2; column-gap: 4mm; column-rule: .2mm solid #ccc; margin: 0 0 1mm; }
+.aim-item-row { display: grid; grid-template-columns: 6% 16% 40% 12% 12% 14%; break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid; border-bottom: .1mm solid #bbb; }
+.aim-item-row > div { padding: .8mm .3mm; vertical-align: middle; overflow: hidden; overflow-wrap: normal; word-break: normal; }
+.aim-item-row .num { text-align: right; white-space: nowrap; font-size: 5.8pt; }
+.aim-item-row .line-total { font-weight: 700; }
+.aim-item-row .center { text-align: center; }
+.aim-item-row .desc { text-align: left; overflow-wrap: anywhere; font-size: 5.8pt; }
+.aim-item-row .barcode { white-space: nowrap; font-size: 5.2pt; font-weight: 700; }
+.aim-bottom { width: 100%; margin-top: 1.5mm; border-collapse: collapse; page-break-inside: avoid; }
+.aim-bottom > tbody > tr > td { border: 0; padding: .4mm .6mm; vertical-align: top; }
+.aim-summary { width: 100%; margin-left: auto; border-collapse: collapse; table-layout: fixed; }
+.aim-summary td { border: 0; padding: .3mm .5mm; white-space: nowrap; font-size: 6.5pt; }
+.aim-summary .summary-label { width: 62%; text-align: right; font-weight: 700; }
+.aim-summary .summary-value { width: 38%; text-align: right; }
+.aim-summary .grand-total td { padding-top: .7mm; border-top: .25mm solid #000; font-weight: 700; font-size: 7.2pt; }
+.aim-note { min-height: 8mm; font-size: 6.5pt; }
+.aim-sign-block { width: 100%; margin-top: 5mm; border-collapse: collapse; page-break-inside: avoid; }
 .aim-sign-block td { border: 0; padding: 0 3mm; text-align: center; vertical-align: bottom; }
-.aim-sign-line { min-height: 10mm; border-top: .25mm solid #000; margin: 0 2mm 1mm; }
-.aim-sign-caption { font-weight: 700; }
+.aim-sign-line { min-height: 9mm; border-top: .25mm solid #000; margin: 0 2mm 1mm; }
+.aim-sign-caption { font-weight: 700; font-size: 6.5pt; }
 @media print {
- html, body { width: 297mm !important; }
- .print-format { width: 287mm !important; max-width: 287mm !important; }
+ html, body { width: 210mm !important; }
+ .print-format { width: 200mm !important; max-width: 200mm !important; }
 }
 </style>
 {% set item_context = get_purchase_print_item_context(doc) %}
-<div class="aim-title">{{ title }}</div>
+{% set branch_title = doc.branch and (' (' ~ doc.branch|upper ~ ')') or '' %}
+{% set gross = doc.custom_total_gross or doc.total or 0 %}
+{% set discount = doc.custom_total_discount or doc.discount_amount or 0 %}
+{% set gst_total = doc.custom_total_gst or 0 %}
+{% set fed_total = doc.custom_total_fed or 0 %}
+{% set advance_tax_total = doc.custom_total_advance_tax or 0 %}
+{% set trade_offer = doc.custom_total_trade_offer or 0 %}
+{% set grand_line_total = doc.custom_grand_line_total or doc.grand_total or 0 %}
+{% set all_items = doc.items or [] %}
+<div class="aim-title">{{ title }}{{ branch_title }}</div>
 <table class="aim-head">
  <tr>
   <td style="width:9%" class="aim-label">PR No.</td><td style="width:23%">{{ doc.name }}</td>
@@ -37,33 +59,48 @@ html, body { width: 297mm; margin: 0; padding: 0; }
   <td class="aim-label">Branch</td><td>{{ doc.branch or '' }}</td>
  </tr>
 </table>
-<table class="aim-grid">
- <thead><tr>
-  <th style="width:3%">S#</th>
-  <th style="width:10%">Barcode</th>
-  <th style="width:29%">Item Description</th>
-  <th style="width:5%">UOM</th>
-  <th style="width:9%">Ordered<br>Qty</th>
-  <th style="width:9%">Received<br>Qty</th>
-  <th style="width:9%">Rejected<br>Qty</th>
-  <th style="width:26%">Remarks</th>
- </tr></thead>
- <tbody>
- {% for row in doc.items %}
-  {% set row_ctx = item_context.get(row.name, {}) %}
-  {% set barcode = row.barcode or row_ctx.barcode or row.item_code or '' %}
-  <tr>
-   <td class="center">{{ loop.index }}</td>
-   <td class="barcode">{{ barcode }}</td>
-   <td class="desc">{{ row.item_name or row.description }}</td>
-   <td class="center">{{ row.uom or '' }}</td>
-   <td class="num">{{ frappe.utils.flt(row.qty, 2) }}</td>
-   <td class="num">{{ frappe.utils.flt(row.received_qty, 2) }}</td>
-   <td class="num">{{ frappe.utils.flt(row.rejected_qty, 2) }}</td>
-   <td></td>
-  </tr>
- {% endfor %}
- </tbody>
+<div class="aim-head-row">
+ <div class="aim-head-col">
+  <span>S#</span><span>Barcode</span><span class="h-desc">Item Name</span><span>Qty</span><span>Rej. Qty</span><span>Line Total</span>
+ </div>
+ <div></div>
+ <div class="aim-head-col">
+  <span>S#</span><span>Barcode</span><span class="h-desc">Item Name</span><span>Qty</span><span>Rej. Qty</span><span>Line Total</span>
+ </div>
+</div>
+<div class="aim-items">
+{% for row in all_items %}
+ {% set row_ctx = item_context.get(row.name, {}) %}
+ {% set barcode_value = row.barcode or row_ctx.barcode or row.item_code or '' %}
+ {% set qty = row.received_qty or row.qty or 0 %}
+ {% set rejected_qty = row.rejected_qty or 0 %}
+ {% set line_total = row.custom_line_total or row.amount or 0 %}
+ <div class="aim-item-row">
+  <div class="center">{{ loop.index }}</div>
+  <div class="barcode">{{ barcode_value }}</div>
+  <div class="desc">{{ row.item_name or row.description }}</div>
+  <div class="num">{{ frappe.utils.flt(qty, 2) }}</div>
+  <div class="num">{{ frappe.utils.flt(rejected_qty, 2) }}</div>
+  <div class="num line-total">{{ frappe.utils.fmt_money(line_total, currency=doc.currency) }}</div>
+ </div>
+{% endfor %}
+</div>
+<table class="aim-bottom">
+ <tr>
+  <td style="width:55%"><span class="aim-label">Note:</span> {{ doc.remarks or doc.instructions or '' }}</td>
+  <td style="width:45%">
+   <table class="aim-summary">
+    <tr><td class="summary-label">Gross Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(gross, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">Total Discount</td><td class="summary-value">{{ frappe.utils.fmt_money(discount, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">GST Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(gst_total, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">FED Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(fed_total, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">WHT (Advance Tax) Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(advance_tax_total, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">Trade Offer</td><td class="summary-value">{{ frappe.utils.fmt_money(trade_offer, currency=doc.currency) }}</td></tr>
+    <tr class="grand-total"><td class="summary-label">Grand Total</td><td class="summary-value">{{ frappe.utils.fmt_money(grand_line_total, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">Total After WHT</td><td class="summary-value">{{ frappe.utils.fmt_money(grand_line_total - advance_tax_total, currency=doc.currency) }}</td></tr>
+   </table>
+  </td>
+ </tr>
 </table>
 <table class="aim-sign-block">
  <tr>

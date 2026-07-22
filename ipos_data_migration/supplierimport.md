@@ -96,6 +96,20 @@ party); splitting one real vendor across several "different" Suppliers makes tha
   float dust remainder (e.g. `1e-9`) that's truthy in Python but rounds to `0.00` at ERPNext's
   currency precision, which then fails the Journal Entry with "Both Debit and Credit values cannot
   be zero" (hit 2 rows on the `hsm` first pass before this fix).
+- `Temporary Opening` is shared with the item import's opening-stock entries (see `import.md`'s
+  "Opening-stock GL posting" note, fixed 2026-07-23) — both migration halves must wash through this
+  one suspense account, closed once via `close_migration_opening_balance.py` after both imports are
+  done, rather than opening stock leaking into a P&L account on its own.
+- **Branch/Cost Center dimension (fixed 2026-07-23)**: unlike Sales/Purchase/Stock Entry, `Journal
+  Entry` has no `aimatic.branch_management` doc_events hook at all — nothing populates
+  `Journal Entry Account.branch`/`cost_center` unless this script sets them itself.
+  `resolve_company_branch(company)` requires the company to have exactly one Branch (throws
+  otherwise, since legacy vendor-ledger rows carry no branch/location column to split on) and stamps
+  `branch`+`cost_center` onto every account line of every opening-balance Journal Entry. Confirmed
+  live on `siezal` before this fix: `cost_center` on the 1,124 legacy JE lines came out correct only
+  by coincidence (Company's own default cost center happened to already equal the site's one
+  Branch's cost center), while `branch` was blank on all of them — the same unrecoverable gap the
+  root CLAUDE.md's GL Entry branch-backfill note documents for these exact rows.
 - `ContactPerson` (only ~2.5% populated in the `hsm` sample) and `LedgerCode` are not persisted as
   their own Supplier fields — `LedgerCode` only appears in the opening-entry remark text for
   traceability; `ContactPerson` was dropped on `hsm` for being too sparse to be worth a dedicated
