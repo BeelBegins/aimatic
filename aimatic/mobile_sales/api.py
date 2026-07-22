@@ -267,14 +267,18 @@ def _credit_context(customer, company):
 
 def _discount_authority(user=None):
 	user = user or frappe.session.user
-	roles = set(frappe.get_roles(user))
-	if {"Sales Manager", "System Manager"}.intersection(roles):
-		return 100.0
-	return flt(frappe.db.get_value(
+	configured = frappe.db.get_value(
 		"Mobile Sales Discount Authority",
 		{"user": user, "enabled": 1},
 		"maximum_discount_percent",
-	) or 0, 3)
+	)
+	# An explicit authority is a deliberate business limit and must win even
+	# when the user also manages approvals. Managers without one keep the
+	# unrestricted default; ordinary Sales Users default to zero.
+	if configured is not None:
+		return flt(configured, 3)
+	roles = set(frappe.get_roles(user))
+	return 100.0 if {"Sales Manager", "System Manager"}.intersection(roles) else 0.0
 
 
 def _discount_context(discount_percent=None, user=None):
@@ -350,7 +354,7 @@ def _make_order(
 		"selling_price_list": price_list,
 		"delivery_date": delivery_date,
 		"po_no": po_no,
-		"remarks": remarks,
+		"custom_mobile_sales_notes": remarks,
 		"order_type": "Sales",
 	}
 	if delivery_rule:
@@ -384,6 +388,32 @@ def _approval_for_order(order):
 	)
 
 
+def _mobile_order_status(doc):
+	"""Stable app-facing status independent of ERPNext's detailed workflow labels."""
+	if cint(doc.docstatus) == 0:
+		return "Draft"
+	if cint(doc.docstatus) == 2:
+		return "Cancelled"
+	if flt(doc.get("per_delivered")) >= 99.999 or doc.status in {"Completed", "Closed"}:
+		return "Completed"
+	if flt(doc.get("per_delivered")) > 0:
+		return "Partially Delivered"
+	return "Submitted"
+
+
+def _order_action_permissions(doc):
+	if doc.is_new():
+		return {"can_edit": False, "can_cancel": False}
+	return {
+		"can_edit": bool(doc.docstatus == 0 and doc.has_permission("write")),
+		"can_cancel": bool(
+			doc.docstatus == 1
+			and {"Sales Manager", "System Manager"}.intersection(frappe.get_roles(frappe.session.user))
+			and doc.has_permission("cancel")
+		),
+	}
+
+
 def _order_response(doc, credit=None, duplicate=False, delivery_rule=None, discount=None):
 	credit = credit or _credit_context(doc.customer, doc.company)
 	approval = None if doc.is_new() else _approval_for_order(doc.name)
@@ -408,12 +438,17 @@ def _order_response(doc, credit=None, duplicate=False, delivery_rule=None, disco
 	return {
 		"sales_order": doc.name,
 		"status": doc.status,
+		"mobile_status": _mobile_order_status(doc),
 		"docstatus": doc.docstatus,
 		"customer": doc.customer,
+		"customer_name": doc.customer_name,
+		"transaction_date": str(doc.transaction_date),
 		"branch": doc.get("branch"),
 		"warehouse": doc.set_warehouse,
 		"price_list": doc.selling_price_list,
 		"currency": doc.currency,
+		"po_no": doc.get("po_no"),
+		"remarks": doc.get("custom_mobile_sales_notes"),
 		"net_total": flt(doc.net_total, 2),
 		"grand_total": flt(doc.grand_total, 2),
 		"delivery_date": str(doc.delivery_date),
@@ -433,6 +468,7 @@ def _order_response(doc, credit=None, duplicate=False, delivery_rule=None, disco
 		"credit_limit": credit["credit_limit"],
 		"credit_warning": bool(credit["credit_limit"] and credit["outstanding_balance"] + flt(doc.grand_total) > credit["credit_limit"]),
 		"duplicate": duplicate,
+		**_order_action_permissions(doc),
 		"items": [{
 			"item_code": row.item_code,
 			"item_name": row.item_name,
@@ -1464,7 +1500,7 @@ def update_order(order, items, delivery_date=None, po_no=None, remarks=None, del
 	if po_no is not None:
 		doc.po_no = po_no
 	if remarks is not None:
-		doc.remarks = remarks
+		doc.custom_mobile_sales_notes = remarks
 	doc.run_method("set_missing_values")
 	doc.run_method("calculate_taxes_and_totals")
 	discount["original_grand_total"] = flt(doc.grand_total + doc.discount_amount, 2)
@@ -1627,13 +1663,28 @@ def approve_discount(order_name, approved, comment=None):
 
 
 @frappe.whitelist()
+def cancel_order(order):
+	"""Cancel one submitted Sales Order through normal ERPNext validation and permissions."""
+	_require_sales_manager()
+	doc = frappe.get_doc("Sales Order", order)
+	doc.check_permission("read")
+	if doc.docstatus == 2:
+		return {"order": _order_response(doc), "duplicate": True}
+	if doc.docstatus != 1:
+		frappe.throw(_("Only a submitted Sales Order can be cancelled. Draft orders remain editable."))
+	doc.check_permission("cancel")
+	doc.cancel()
+	return {"order": _order_response(doc), "duplicate": False}
+
+
+@frappe.whitelist()
 def get_orders(customer=None, offset=0, limit=20):
 	_require_sales_user()
 	filters = {"customer": customer} if customer else {}
 	orders = frappe.get_list(
 		"Sales Order",
 		filters=filters,
-		fields=["name", "customer", "customer_name", "transaction_date", "delivery_date", "status", "currency", "grand_total", "additional_discount_percentage", "branch", "set_warehouse", "modified"],
+		fields=["name", "customer", "customer_name", "transaction_date", "delivery_date", "status", "docstatus", "per_delivered", "currency", "grand_total", "additional_discount_percentage", "branch", "set_warehouse", "modified"],
 		start=cint(offset),
 		page_length=_page_length(limit),
 		order_by="modified desc",
@@ -1651,6 +1702,7 @@ def get_orders(customer=None, offset=0, limit=20):
 		for order in orders:
 			approval = approvals.get(order.name)
 			order.update({
+				"mobile_status": _mobile_order_status(order),
 				"approval_status": approval.status if approval else None,
 				"approval_reason": approval.reason if approval else None,
 				"approval_comment": approval.decision_comment if approval else None,

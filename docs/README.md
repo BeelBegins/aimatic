@@ -153,6 +153,10 @@ feed for Order Again. It returns item codes, quantities, and UOMs only as draft 
 re-runs customer context, catalogue/UOM, pricing, stock, tax, and credit validation before creation.
 A cached order can prepare an offline draft but cannot become authoritative without ERPNext.
 
+My Orders keeps server actions unambiguous. View fetches and displays the current ERPNext order without editing it. Edit is offered only for Draft Sales Orders; leaving edit mode restores any separate local order instead of overwriting it. Cancel Order is a different, explicitly confirmed action available only on submitted orders when the employee is a Sales Manager and ERPNext grants cancel permission. It uses normal ERPNext cancellation and never treats leaving the editor as a cancellation. Mobile PO references and notes persist in `po_no` and `custom_mobile_sales_notes`, and raw ERPNext statuses are normalized for the mobile filters.
+
+For deliberate sandbox or pilot testing, a System Manager may run `bench --site <site> execute aimatic.mobile_sales.demo_data.execute`. The idempotent command creates only clearly labeled `AIMATIC Demo` customers, brands, items, UOM conversions, stock, orders, discount approval, promotion, delivery rules, assortments, and visits. It is never invoked by install or migrate and must not be run indiscriminately on production sites.
+
 Active ERPNext Pricing Rules and Promotional Schemes appear in the Sales app as offer cards and item
 badges after server-side customer, company, warehouse, date, Item/Item Group, and Brand filtering.
 They are guidance only: ERPNext still applies the actual rule, free item, discount, tax, and final total

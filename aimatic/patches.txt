@@ -31,3 +31,4 @@ aimatic.patches.create_sales_oauth_client
 aimatic.patches.create_shopping_oauth_client
 aimatic.patches.create_restaurant_oauth_client
 aimatic.patches.ensure_ai_integration_settings_enabled
+aimatic.patches.create_mobile_sales_order_notes_field

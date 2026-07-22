@@ -221,6 +221,33 @@ class TestMobileSalesDiscountApprovals(FrappeTestCase):
 		events.before_submit_sales_order(frappe._dict(name="SO-1", additional_discount_percentage=10))
 
 
+class TestMobileSalesOrderActions(FrappeTestCase):
+	def test_mobile_status_is_stable_across_erpnext_workflow_labels(self):
+		self.assertEqual(api._mobile_order_status(frappe._dict(docstatus=0, status="Draft", per_delivered=0)), "Draft")
+		self.assertEqual(api._mobile_order_status(frappe._dict(docstatus=1, status="To Deliver and Bill", per_delivered=0)), "Submitted")
+		self.assertEqual(api._mobile_order_status(frappe._dict(docstatus=1, status="To Deliver and Bill", per_delivered=25)), "Partially Delivered")
+		self.assertEqual(api._mobile_order_status(frappe._dict(docstatus=2, status="Cancelled", per_delivered=0)), "Cancelled")
+
+	@patch("aimatic.mobile_sales.api.frappe.get_roles", return_value=["Sales Manager"])
+	@patch("aimatic.mobile_sales.api.frappe.db.get_value", return_value=5)
+	def test_explicit_discount_authority_overrides_manager_default(self, _get_value, get_roles):
+		self.assertEqual(api._discount_authority("manager@example.com"), 5)
+		get_roles.assert_not_called()
+
+	@patch("aimatic.mobile_sales.api._order_response", return_value={"mobile_status": "Cancelled"})
+	@patch("aimatic.mobile_sales.api.frappe.get_doc")
+	@patch("aimatic.mobile_sales.api._require_sales_manager")
+	def test_cancel_order_uses_erpnext_cancel_permission_and_lifecycle(self, _require, get_doc, _response):
+		doc = get_doc.return_value
+		doc.docstatus = 1
+		result = api.cancel_order("SO-1")
+		get_doc.assert_called_once_with("Sales Order", "SO-1")
+		doc.check_permission.assert_any_call("read")
+		doc.check_permission.assert_any_call("cancel")
+		doc.cancel.assert_called_once_with()
+		self.assertEqual(result["order"]["mobile_status"], "Cancelled")
+
+
 class TestMobileSalesPhaseThree(FrappeTestCase):
 	def test_order_proof_accepts_png_and_rejects_disguised_content(self):
 		valid = "data:image/png;base64,iVBORw0KGgo="
