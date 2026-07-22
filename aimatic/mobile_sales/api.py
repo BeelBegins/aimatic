@@ -491,6 +491,69 @@ def update_order(order, items, delivery_date=None, po_no=None, remarks=None):
 	return _order_response(doc)
 
 
+def _reorder_summary(doc):
+	"""Return only the prior-order fields needed to seed a new local draft."""
+	return {
+		"order_name": doc.name,
+		"customer": doc.customer,
+		"customer_name": doc.customer_name,
+		"transaction_date": str(doc.transaction_date),
+		"currency": doc.currency,
+		"grand_total": flt(doc.grand_total, 2),
+		"item_count": len(doc.items),
+		"items": [
+			{"item_code": row.item_code, "item_name": row.item_name, "uom": row.uom, "qty": flt(row.qty)}
+			for row in doc.items
+		],
+	}
+
+
+def _submitted_order_rows(customer=None, limit=3):
+	filters = {"docstatus": 1, "status": ["not in", ["Cancelled", "Closed"]]}
+	if customer:
+		filters["customer"] = customer
+	return frappe.get_list(
+		"Sales Order",
+		filters=filters,
+		fields=["name", "customer"],
+		order_by="transaction_date desc, modified desc",
+		page_length=min(max(cint(limit) or 3, 1), 30),
+	)
+
+
+@frappe.whitelist()
+def get_recent_reorder_candidates(limit=3):
+	"""Recent submitted orders for distinct permitted customers (maximum ten)."""
+	_require_sales_user()
+	limit = min(max(cint(limit) or 3, 1), 10)
+	orders = []
+	seen_customers = set()
+	# Read a bounded window because several recent orders may belong to one customer.
+	for row in _submitted_order_rows(limit=limit * 3):
+		if row.customer in seen_customers:
+			continue
+		doc = frappe.get_doc("Sales Order", row.name)
+		doc.check_permission("read")
+		orders.append(_reorder_summary(doc))
+		seen_customers.add(row.customer)
+		if len(orders) >= limit:
+			break
+	return {"orders": orders}
+
+
+@frappe.whitelist()
+def get_customer_last_order(customer):
+	"""Last submitted order for one permitted customer, or null when none exists."""
+	_require_sales_user()
+	customer = _customer_doc(customer).name
+	rows = _submitted_order_rows(customer=customer, limit=1)
+	if not rows:
+		return {"order": None}
+	doc = frappe.get_doc("Sales Order", rows[0].name)
+	doc.check_permission("read")
+	return {"order": _reorder_summary(doc)}
+
+
 @frappe.whitelist()
 def get_orders(customer=None, offset=0, limit=20):
 	_require_sales_user()

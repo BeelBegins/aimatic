@@ -118,6 +118,11 @@ and warehouse stock and creates normal draft Sales Orders. Offline drafts retain
 maps that ID to a single Sales Order so retries cannot create duplicates. Prices, taxes, stock
 policy, credit validation, permissions, company, and warehouse remain controlled by ERPNext.
 
+The restricted mobile Sales API also exposes a bounded, permission-filtered recent submitted-order
+feed for Order Again. It returns item codes, quantities, and UOMs only as draft seeds; the client then
+re-runs customer context, catalogue/UOM, pricing, stock, tax, and credit validation before creation.
+A cached order can prepare an offline draft but cannot become authoritative without ERPNext.
+
 Items can be found by code, name, category, or brand. When an Item has alternate units with valid
 conversion factors, the salesperson can choose the unit before adding it and sees the package
 conversion, matching price, and available stock. Unconfigured or invalid alternate units stay hidden.
