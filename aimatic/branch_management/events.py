@@ -230,14 +230,19 @@ def validate_branch_company_consistency(doc, method=None):
 
 
 def initialize_branch_selling_price_list(doc, method=None):
-	"""Create and link the branch's selling-only Price List at Branch creation.
+	"""Create and link the branch's selling-only and Foodpanda-only Price
+	Lists at Branch creation.
 
-	The shelf-pricing helper remains idempotent and is also the fallback for
+	The shelf-pricing helpers remain idempotent and are also the fallback for
 	legacy branches that predate this hook.
 	"""
-	from aimatic.shelf_pricing.utils import get_or_create_branch_price_list
+	from aimatic.shelf_pricing.utils import (
+		get_or_create_branch_foodpanda_price_list,
+		get_or_create_branch_price_list,
+	)
 
 	doc.default_selling_price_list = get_or_create_branch_price_list(doc.name)
+	doc.default_foodpanda_price_list = get_or_create_branch_foodpanda_price_list(doc.name)
 
 
 def validate_pos_profile_cost_center(doc, method=None):
@@ -270,13 +275,23 @@ def validate_pos_profile_cost_center(doc, method=None):
 
 
 def apply_pos_profile_branch_price_list(doc, method=None):
-	"""Keep every branch POS Profile on that branch's selling-only list."""
+	"""Keep every branch POS Profile on the right branch-specific list: the
+	branch's Foodpanda list for its Food Panda profile
+	(custom_is_foodpanda_profile), the branch's normal selling list for
+	every other POS Profile.
+	"""
 	if not doc.branch:
 		return
 
-	from aimatic.shelf_pricing.utils import get_or_create_branch_price_list
+	from aimatic.shelf_pricing.utils import (
+		get_or_create_branch_foodpanda_price_list,
+		get_or_create_branch_price_list,
+	)
 
-	doc.selling_price_list = get_or_create_branch_price_list(doc.branch)
+	if getattr(doc, "custom_is_foodpanda_profile", 0):
+		doc.selling_price_list = get_or_create_branch_foodpanda_price_list(doc.branch)
+	else:
+		doc.selling_price_list = get_or_create_branch_price_list(doc.branch)
 
 
 def sync_branch_to_user(doc, method=None):

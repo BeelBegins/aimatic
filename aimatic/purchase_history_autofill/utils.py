@@ -97,8 +97,19 @@ _QTY_LINKED_CUSTOM_DENY = frozenset({"custom_inventory_qty", "custom_scheme_qty"
 # Get-Items-From-PO flow (matching fieldnames copy automatically).
 _RATE_LINKED_CUSTOM_DENY = frozenset({"custom_vendor_rate"})
 
+# custom_fp_price has its own dedicated prefill mechanism (a live client
+# script that pulls the branch's *current* Foodpanda Price List rate - see
+# public/js/foodpanda_price_prefill.js) which is a fundamentally different
+# source than this module's "carry forward the last submitted document's
+# value" - mixing both onto the same field would fight over which one wins.
+_CURRENT_PRICE_LIST_DENY = frozenset({"custom_fp_price"})
+
 _ALWAYS_EXCLUDE = (
-    _DOC_SPECIFIC_DENY | _COMPUTED_OUTPUT_DENY | _QTY_LINKED_CUSTOM_DENY | _RATE_LINKED_CUSTOM_DENY
+    _DOC_SPECIFIC_DENY
+    | _COMPUTED_OUTPUT_DENY
+    | _QTY_LINKED_CUSTOM_DENY
+    | _RATE_LINKED_CUSTOM_DENY
+    | _CURRENT_PRICE_LIST_DENY
 )
 
 # Doctypes searched for history, in the order rule 3 lists them. Both are

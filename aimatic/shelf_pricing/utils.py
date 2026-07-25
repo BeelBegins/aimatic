@@ -1,12 +1,14 @@
 import frappe
 from frappe.utils import flt, now_datetime
 
-# Single global Foodpanda Item Price list. Not a per-branch concept, so it's
-# a hardcoded constant rather than a new settings doctype - matches the
-# SELLING_PRICE_LIST-constant style already used in ipos_data_migration
-# scripts for a similarly single, fixed price list.
+# Legacy single global Foodpanda Item Price list name. No longer created by
+# app code - Foodpanda pricing is per-branch now (see
+# get_or_create_branch_foodpanda_price_list). Kept only so
+# patches.create_branch_foodpanda_price_list can find and repoint whichever
+# existing site already had one live, instead of creating a duplicate.
 FOODPANDA_PRICE_LIST = "Foodpanda"
 BRANCH_PRICE_LIST_SUFFIX = " Selling Price List"
+BRANCH_FOODPANDA_PRICE_LIST_SUFFIX = " Foodpanda Price List"
 BRANCH_BASELINE_FIELDS = (
     "item_code",
     "uom",
@@ -34,6 +36,10 @@ def _default_currency():
 
 def get_branch_price_list_name(branch):
     return f"{branch}{BRANCH_PRICE_LIST_SUFFIX}"
+
+
+def get_branch_foodpanda_price_list_name(branch):
+    return f"{branch}{BRANCH_FOODPANDA_PRICE_LIST_SUFFIX}"
 
 
 def _copy_branch_price_baseline(source_price_list, target_price_list):
@@ -119,7 +125,13 @@ def get_or_create_branch_price_list(branch):
 
     frappe.db.set_value("Branch", branch, "default_selling_price_list", price_list_name)
 
-    for pos_profile in frappe.get_all("POS Profile", filters={"branch": branch}, pluck="name"):
+    # Food Panda profiles are excluded here - they belong on the branch's
+    # Foodpanda list instead, via get_or_create_branch_foodpanda_price_list.
+    for pos_profile in frappe.get_all(
+        "POS Profile",
+        filters={"branch": branch, "custom_is_foodpanda_profile": 0},
+        pluck="name",
+    ):
         frappe.db.set_value("POS Profile", pos_profile, "selling_price_list", price_list_name)
 
     return price_list_name
@@ -137,18 +149,43 @@ def _validate_selling_only_price_list(price_list):
         )
 
 
-def get_or_create_foodpanda_price_list():
-    if not frappe.db.exists("Price List", FOODPANDA_PRICE_LIST):
+def get_or_create_branch_foodpanda_price_list(branch):
+    """Return the Branch's Foodpanda-only Price List, creating and linking
+    one the first time it's needed. Mirrors get_or_create_branch_price_list,
+    but no baseline copy on creation - Foodpanda pricing (MRP-as-rate) is
+    seeded item-by-item from Purchase Receipts via apply_foodpanda_price_update,
+    not from the branch's normal selling baseline.
+    """
+    existing = frappe.db.get_value("Branch", branch, "default_foodpanda_price_list")
+    if existing:
+        _validate_selling_only_price_list(existing)
+        return existing
+
+    price_list_name = get_branch_foodpanda_price_list_name(branch)
+    if not frappe.db.exists("Price List", price_list_name):
         frappe.get_doc(
             {
                 "doctype": "Price List",
-                "price_list_name": FOODPANDA_PRICE_LIST,
+                "price_list_name": price_list_name,
                 "selling": 1,
+                "buying": 0,
                 "currency": _default_currency(),
                 "enabled": 1,
             }
         ).insert(ignore_permissions=True)
-    return FOODPANDA_PRICE_LIST
+    else:
+        _validate_selling_only_price_list(price_list_name)
+
+    frappe.db.set_value("Branch", branch, "default_foodpanda_price_list", price_list_name)
+
+    for pos_profile in frappe.get_all(
+        "POS Profile",
+        filters={"branch": branch, "custom_is_foodpanda_profile": 1},
+        pluck="name",
+    ):
+        frappe.db.set_value("POS Profile", pos_profile, "selling_price_list", price_list_name)
+
+    return price_list_name
 
 
 def log_price_update(purchase_receipt, item_code, price_list, branch, field_updated, old_value, new_value):

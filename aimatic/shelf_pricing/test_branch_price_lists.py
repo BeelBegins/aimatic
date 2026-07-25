@@ -57,6 +57,42 @@ class TestBranchPriceListInitialization(unittest.TestCase):
 		self.assertIn(call("POS Profile", "POS-1", "selling_price_list", "Branch One Selling Price List"), frappe.db.set_value.call_args_list)
 
 	@patch("aimatic.shelf_pricing.utils.frappe")
+	def test_creates_branch_foodpanda_price_list_without_baseline_copy(self, frappe):
+		from aimatic.shelf_pricing.utils import get_or_create_branch_foodpanda_price_list
+
+		frappe.db.get_value.return_value = None
+		frappe.db.exists.return_value = False
+		frappe.db.get_single_value.return_value = "PKR"
+		frappe.get_all.return_value = ["POS-1"]
+		inserted = []
+
+		def get_doc(values):
+			inserted.append(values)
+			return Mock()
+
+		frappe.get_doc.side_effect = get_doc
+		result = get_or_create_branch_foodpanda_price_list("Branch One")
+
+		self.assertEqual(result, "Branch One Foodpanda Price List")
+		self.assertEqual(inserted[0]["doctype"], "Price List")
+		self.assertEqual(inserted[0]["selling"], 1)
+		self.assertEqual(inserted[0]["buying"], 0)
+		frappe.db.bulk_insert.assert_not_called()
+		self.assertIn(
+			call(
+				"Branch",
+				"Branch One",
+				"default_foodpanda_price_list",
+				"Branch One Foodpanda Price List",
+			),
+			frappe.db.set_value.call_args_list,
+		)
+		self.assertIn(
+			call("POS Profile", "POS-1", "selling_price_list", "Branch One Foodpanda Price List"),
+			frappe.db.set_value.call_args_list,
+		)
+
+	@patch("aimatic.shelf_pricing.utils.frappe")
 	def test_existing_branch_list_must_be_enabled_and_selling_only(self, frappe):
 		from aimatic.shelf_pricing.utils import get_or_create_branch_price_list
 
@@ -69,14 +105,22 @@ class TestBranchPriceListInitialization(unittest.TestCase):
 		with self.assertRaises(ValueError):
 			get_or_create_branch_price_list("Branch One")
 
+	@patch(
+		"aimatic.shelf_pricing.utils.get_or_create_branch_foodpanda_price_list",
+		return_value="Branch One Foodpanda Price List",
+	)
 	@patch("aimatic.shelf_pricing.utils.get_or_create_branch_price_list", return_value="Branch One Selling Price List")
-	def test_new_branch_event_initializes_price_list(self, initialize):
+	def test_new_branch_event_initializes_price_list(self, initialize, initialize_foodpanda):
 		from aimatic.branch_management.events import initialize_branch_selling_price_list
 
-		doc = SimpleNamespace(name="Branch One", default_selling_price_list=None)
+		doc = SimpleNamespace(
+			name="Branch One", default_selling_price_list=None, default_foodpanda_price_list=None
+		)
 		initialize_branch_selling_price_list(doc)
 		initialize.assert_called_once_with("Branch One")
+		initialize_foodpanda.assert_called_once_with("Branch One")
 		self.assertEqual(doc.default_selling_price_list, "Branch One Selling Price List")
+		self.assertEqual(doc.default_foodpanda_price_list, "Branch One Foodpanda Price List")
 
 	@patch("aimatic.shelf_pricing.utils.get_or_create_branch_price_list", return_value="Branch One Selling Price List")
 	def test_pos_profile_always_uses_its_branch_price_list(self, initialize):
@@ -86,6 +130,20 @@ class TestBranchPriceListInitialization(unittest.TestCase):
 		apply_pos_profile_branch_price_list(doc)
 		initialize.assert_called_once_with("Branch One")
 		self.assertEqual(doc.selling_price_list, "Branch One Selling Price List")
+
+	@patch(
+		"aimatic.shelf_pricing.utils.get_or_create_branch_foodpanda_price_list",
+		return_value="Branch One Foodpanda Price List",
+	)
+	def test_pos_profile_uses_foodpanda_price_list_when_flagged(self, initialize_foodpanda):
+		from aimatic.branch_management.events import apply_pos_profile_branch_price_list
+
+		doc = SimpleNamespace(
+			branch="Branch One", selling_price_list="Standard Selling", custom_is_foodpanda_profile=1
+		)
+		apply_pos_profile_branch_price_list(doc)
+		initialize_foodpanda.assert_called_once_with("Branch One")
+		self.assertEqual(doc.selling_price_list, "Branch One Foodpanda Price List")
 
 	@patch("aimatic.shelf_pricing.utils.get_or_create_branch_price_list")
 	@patch("aimatic.retail_finance_setup.api._resolve_company", return_value="Test Company")

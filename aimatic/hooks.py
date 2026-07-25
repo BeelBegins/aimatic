@@ -133,10 +133,15 @@ doctype_js = {
         # the actual server-side guarantee this mirrors. Shared with
         # Purchase Order below.
         "public/js/purchase_history_autofill.js",
+        # Live preview only - prefills custom_fp_price from the branch's
+        # current Foodpanda Price List. Shared with Purchase Order/Invoice.
+        "public/js/foodpanda_price_prefill.js",
     ],
     "Purchase Order": [
         "public/js/purchase_history_autofill.js",
+        "public/js/foodpanda_price_prefill.js",
     ],
+    "Purchase Invoice": "public/js/foodpanda_price_prefill.js",
     "Delivery Note": "public/js/label_printing_source_buttons.js",
     "Stock Entry": "public/js/label_printing_source_buttons.js",
     "Sales Invoice": "public/js/label_printing_source_buttons.js",
