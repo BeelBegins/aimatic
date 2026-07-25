@@ -84,6 +84,34 @@ def submit_payload_to_fbr(payload, settings):
     return normalize_fbr_response(response, payload)
 
 
+def log_fbr_submission_failure(doc, payload, response_data):
+    """
+    block_submit_on_failure rolls back the whole insert+submit transaction
+    (submit_online_sale runs it inside a named savepoint specifically so a
+    failure here can roll back cleanly), so
+    doc.custom_fbr_request_payload/custom_fbr_response_payload never reach
+    the database. defer_insert=True writes to redis instead of the current
+    SQL transaction, so the log survives that rollback - a plain
+    frappe.db.commit() here would instead consume the caller's savepoint out
+    from under it and permanently leave the just-inserted draft invoice
+    behind, so don't "simplify" this back to a commit.
+    """
+
+    request_json = json.dumps(payload, indent=2, ensure_ascii=False, default=str)
+    response_json = json.dumps(response_data, indent=2, ensure_ascii=False, default=str)
+
+    frappe.log_error(
+        title=f"FBR POS submission failed: {doc.name}",
+        message=(
+            f"Company: {doc.company}\n"
+            f"POS Invoice: {doc.name}\n\n"
+            f"Request payload:\n{request_json}\n\n"
+            f"Response:\n{response_json}"
+        ),
+        defer_insert=True,
+    )
+
+
 def apply_fbr_result_to_doc(
     doc,
     payload,
@@ -200,6 +228,8 @@ def submit_pos_invoice_to_fbr(doc):
         )
 
         if not success and settings.get("block_submit_on_failure"):
+            log_fbr_submission_failure(doc, payload, response_data)
+
             frappe.throw(
                 _(
                     "FBR submission failed. Invoice was not submitted. "
@@ -233,6 +263,8 @@ def submit_pos_invoice_to_fbr(doc):
         )
 
         if settings.get("block_submit_on_failure"):
+            log_fbr_submission_failure(doc, payload, error_data)
+
             frappe.throw(
                 _("FBR submission error: {0}").format(str(e))
             )
