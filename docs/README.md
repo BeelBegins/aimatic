@@ -250,6 +250,16 @@ required by law, with the correct tax category and rate calculated per item. Ref
 reported to FBR independently of the original sale, so a return is never mistaken for a
 duplicate of the original transaction.
 
+By default, a till (POS Profile) whose branch has no FBR e-invoicing set up yet simply cannot
+ring up sales at all — this is deliberate, since normally every sale must be tax-reported. For
+a branch that genuinely isn't FBR-registered yet (for example, a brand-new store still being
+set up, or below the registration threshold), an implementer can check "Allow Sale Without FBR"
+on that till's POS Profile. With that switch on, sales at that till complete normally with no
+change to the customer's price, just without any GST line or FBR e-invoice — the receipt looks
+like any other receipt, with no FBR section shown at all, rather than showing a confusing
+"rejected" message. Leave the switch off for every till that should keep FBR mandatory, which is
+every till in normal day-to-day operation once a branch's FBR settings are properly configured.
+
 ### Barcode and shelf-label printing
 
 Staff can print barcode labels or A4 shelf-price labels directly from a submitted Purchase
