@@ -1,5 +1,53 @@
 import frappe
 from frappe import _
+from frappe.utils import cint
+
+
+def is_fbr_optional_for_pos_profile(pos_profile):
+    if not pos_profile:
+        return False
+
+    return cint(
+        frappe.db.get_value("POS Profile", pos_profile, "custom_fbr_optional")
+    )
+
+
+def resolve_fbr_settings(doc, company, branch):
+    """
+    Returns the enabled FBR Integration Settings dict for (company, branch).
+
+    If none exists and doc.pos_profile has opted in via custom_fbr_optional,
+    returns None instead of throwing - callers must treat None as "skip FBR
+    entirely for this document." Otherwise throws exactly as get_fbr_settings
+    always has (FBR remains mandatory for this profile).
+    """
+
+    settings_name = frappe.db.get_value(
+        "FBR Integration Settings",
+        {
+            "company": company,
+            "branch": branch,
+            "enabled": 1,
+            "enable_fbr_for_pos": 1,
+        },
+        "name",
+    )
+
+    if not settings_name:
+        if is_fbr_optional_for_pos_profile(getattr(doc, "pos_profile", None)):
+            return None
+
+        frappe.throw(
+            _(
+                "Enabled FBR Integration Settings not found for "
+                "Company {0} and Branch {1}"
+            ).format(
+                frappe.bold(company),
+                frappe.bold(branch),
+            )
+        )
+
+    return get_fbr_settings(company, branch)
 
 
 def get_fbr_settings(company, branch):

@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, get_datetime
 
-from aimatic.fbr_pos.settings import get_fbr_settings
+from aimatic.fbr_pos.settings import resolve_fbr_settings
 from aimatic.fbr_pos.tax_calculator import (
     calculate_fbr_item,
     get_item_fbr_configuration,
@@ -40,7 +40,8 @@ def get_invoice_branch(doc):
 def get_settings_for_invoice(doc):
     branch = get_invoice_branch(doc)
 
-    return get_fbr_settings(
+    return resolve_fbr_settings(
+        doc,
         doc.company,
         branch,
     )
@@ -359,6 +360,10 @@ def get_usin(doc):
 
 def build_pos_payload(doc):
     settings = get_settings_for_invoice(doc)
+
+    if settings is None:
+        return None
+
     customer = get_customer_snapshot(doc)
 
     is_return = cint(getattr(doc, "is_return", 0))

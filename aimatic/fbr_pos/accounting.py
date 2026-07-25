@@ -2,13 +2,13 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt
 
-from aimatic.fbr_pos.settings import get_fbr_settings
+from aimatic.fbr_pos.settings import resolve_fbr_settings
 from aimatic.fbr_pos.payload_builder import get_invoice_branch
 
 
 def get_fbr_settings_from_doc(doc):
     branch = get_invoice_branch(doc)
-    return get_fbr_settings(doc.company, branch)
+    return resolve_fbr_settings(doc, doc.company, branch)
 
 
 def get_total_fbr_tax(doc):
@@ -155,8 +155,9 @@ def apply_fbr_accounting_rows(doc):
 
     clear_fbr_tax_rows(doc)
 
-    add_fbr_sales_tax_row(doc, settings)
-    add_fbr_pos_fee_row(doc, settings)
+    if settings is not None:
+        add_fbr_sales_tax_row(doc, settings)
+        add_fbr_pos_fee_row(doc, settings)
 
     doc.run_method("calculate_taxes_and_totals")
 

@@ -7,13 +7,13 @@ from frappe import _
 from frappe.utils import now
 
 from aimatic.fbr_pos.payload_builder import build_pos_payload
-from aimatic.fbr_pos.settings import get_fbr_settings
+from aimatic.fbr_pos.settings import resolve_fbr_settings
 from aimatic.fbr_pos.payload_builder import get_invoice_branch
 
 
 def get_settings_from_doc(doc):
     branch = get_invoice_branch(doc)
-    return get_fbr_settings(doc.company, branch)
+    return resolve_fbr_settings(doc, doc.company, branch)
 
 
 def normalize_fbr_response(response, payload):
@@ -145,6 +145,14 @@ def apply_fbr_result_to_doc(
 
 def submit_pos_invoice_to_fbr(doc):
     settings = get_settings_from_doc(doc)
+
+    if settings is None:
+        return {
+            "success": False,
+            "skipped": True,
+            "payload": None,
+            "response": None,
+        }
 
     payload = build_pos_payload(doc)
 
