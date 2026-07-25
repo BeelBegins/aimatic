@@ -33,4 +33,6 @@ aimatic.patches.create_restaurant_oauth_client
 aimatic.patches.ensure_ai_integration_settings_enabled
 aimatic.patches.create_mobile_sales_order_notes_field
 aimatic.patches.create_branch_accounting_dimension
+aimatic.patches.remove_item_field_order_override
 aimatic.patches.create_pos_profile_fbr_optional_field
+aimatic.patches.repair_item_custom_docperms

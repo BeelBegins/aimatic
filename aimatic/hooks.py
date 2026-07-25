@@ -240,12 +240,23 @@ fixtures = [
             ["parent", "in", [
                 "POS Opening Entry", "POS Closing Entry", "POS Profile", "Company",
                 "Sales Taxes and Charges Template", "Mode of Payment", "Coupon Code",
-                "Customer", "Customer Group", "Territory", "Item", "Item Price", "Bin",
+                "Customer", "Customer Group", "Territory", "Item Price", "Bin",
                 "Branch", "Print Format",
             ]],
             ["role", "in", ["POS User", "POS Supervisor"]],
         ],
     },
+    # Item is deliberately NOT fixture-tracked here, unlike the other doctypes above -
+    # Custom DocPerm's own autoname is "hash", and fixture-sync's import_doc() does not
+    # reliably converge to a stable set of names for it across repeated bench migrate
+    # runs in practice (confirmed: an earlier fixture-based attempt at this exact fix
+    # kept re-creating a fresh duplicate 11-row batch on every migrate, unbounded).
+    # aimatic.patches.repair_item_custom_docperms is the sole mechanism instead - a
+    # one-time, content-based (not name-based) reconciliation that rebuilds Item's
+    # complete Custom DocPerm set (standard DocPerm rows, since any Custom DocPerm on a
+    # doctype replaces ALL of its standard DocPerm rows, plus the two POS read+export
+    # grants) directly against what's actually in the database. Patches only run once
+    # per site (Patch Log), so this sidesteps the fixture-sync instability entirely.
     # POS Invoice itself (2026-07-20): the same class of gap as above, but discovered
     # one step further down the same flow - a cashier with POS User could log in, open
     # a shift, and preview a cart, but submit_online_sale's own

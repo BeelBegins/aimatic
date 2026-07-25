@@ -220,6 +220,11 @@ via a Purchase Invoice). The system captures the cost, applicable taxes, and —
 release — the intended shelf/selling price and MRP right there on the receipt, so pricing
 decisions happen at the point of receiving stock rather than as a separate step later.
 
+The New Item screen keeps the standard ERPNext Details layout, including Item Code, Item Name,
+Item Group, and Default Unit of Measure, at every Desk width and with the navigation sidebar
+open or collapsed. Aimatic extra Item fields are inserted beside the appropriate standard
+fields; they do not replace or reorder the complete Item form.
+
 ### Selling prices: branch pricing, MRP, and Foodpanda
 
 Every branch can now have its own selling price for the same item — useful when one branch's
