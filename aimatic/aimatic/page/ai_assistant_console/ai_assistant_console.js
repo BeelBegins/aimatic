@@ -1609,8 +1609,14 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         // specific turn's save behavior.
         const $turn = $(`<div class="ai-assistant-rich-turn"></div>`).attr('data-question', frappe.utils.escape_html(question || ''));
 
-        if (response.answer && response.answer.summary) {
-            $turn.append(this.render_summary(response.answer.summary));
+        if (response.answer && response.answer.direct_answer) {
+            const $direct = $("<div class=\"ai-assistant-direct-answer\"></div>");
+            $direct.text(response.answer.direct_answer);
+            $turn.append($direct);
+        }
+
+        if (response.answer && (response.answer.executive_summary || response.answer.summary)) {
+            $turn.append(this.render_summary(response.answer.executive_summary || response.answer.summary));
         }
 
         if (response.kpis && response.kpis.length) {
@@ -1638,8 +1644,20 @@ aimatic.AiAssistantPage = class AiAssistantPage {
             });
         }
 
+        if (response.key_drivers && response.key_drivers.length) {
+            $turn.append(this.render_key_drivers(response.key_drivers));
+        }
+
         if (response.insights && response.insights.length) {
             $turn.append(this.render_insights(response.insights));
+        }
+
+        if (response.recommendations && response.recommendations.length) {
+            $turn.append(this.render_recommendations(response.recommendations));
+        }
+
+        if (response.data_quality_detail) {
+            $turn.append(this.render_data_quality(response.data_quality_detail));
         }
 
         if (response.warnings && response.warnings.length) {
@@ -1648,6 +1666,10 @@ aimatic.AiAssistantPage = class AiAssistantPage {
 
         if (response.follow_up_questions && response.follow_up_questions.length) {
             $turn.append(this.render_follow_ups(response.follow_up_questions));
+        }
+
+        if (response.explainability && Object.keys(response.explainability).length) {
+            $turn.append(this.render_explainability(response.explainability));
         }
 
         // Phase 3: Save this answer as an AI Saved Report (question + full
@@ -1670,6 +1692,84 @@ aimatic.AiAssistantPage = class AiAssistantPage {
         $turn[0].scrollIntoView({ block: 'start', behavior: 'smooth' });
 
         pendingCharts.forEach(({ chart, $mount }) => this.init_chart(chart, $mount));
+    }
+
+    render_key_drivers(drivers) {
+        const wrap = jQuery("<div class=\"ai-assistant-quality-section\"></div>");
+        wrap.append(jQuery("<div class=\"ai-assistant-section-title\"></div>").text(__("Key Drivers")));
+        const list = jQuery("<div class=\"ai-assistant-driver-list\"></div>");
+        drivers.forEach((driver) => {
+            const item = jQuery("<div class=\"ai-assistant-driver-item\"></div>");
+            item.append(jQuery("<span class=\"ai-assistant-driver-label\"></span>").text(driver.label || ""));
+            item.append(jQuery("<span class=\"ai-assistant-driver-value\"></span>").text(
+                format_number(driver.value || 0, null, 2) +
+                (driver.contribution_pct != null ? " (" + format_number(driver.contribution_pct, null, 2) + "%)" : "")
+            ));
+            list.append(item);
+        });
+        wrap.append(list);
+        return wrap;
+    }
+
+    render_recommendations(recommendations) {
+        const wrap = jQuery("<div class=\"ai-assistant-quality-section\"></div>");
+        wrap.append(jQuery("<div class=\"ai-assistant-section-title\"></div>").text(__("Recommendations")));
+        recommendations.forEach((recommendation) => {
+            const card = jQuery("<div class=\"ai-assistant-recommendation\"></div>");
+            card.append(jQuery("<strong></strong>").text(recommendation.title || ""));
+            if (recommendation.reason) card.append(jQuery("<div></div>").text(recommendation.reason));
+            if (recommendation.action === "review_price_recommendation") {
+                card.append(jQuery("<div class=\"text-muted small\"></div>").text(
+                    __("Decision-support recommendation — not an automatic price update.")
+                ));
+            }
+            wrap.append(card);
+        });
+        return wrap;
+    }
+
+    render_data_quality(quality) {
+        const wrap = jQuery("<div class=\"ai-assistant-data-quality\"></div>");
+        const score = quality.score == null ? 0 : quality.score;
+        wrap.append(jQuery("<strong></strong>").text(__("Data quality: {0} — {1}%", [quality.grade || "unknown", score])));
+        if (quality.rows_analyzed != null) {
+            wrap.append(jQuery("<span class=\"text-muted\"></span>").text(
+                __("{0} rows analyzed", [quality.rows_analyzed])
+            ));
+        }
+        return wrap;
+    }
+
+    render_explainability(explainability) {
+        const details = jQuery("<details class=\"ai-assistant-explainability\"></details>");
+        details.append(jQuery("<summary></summary>").text(__("How this was calculated")));
+        const body = jQuery("<div class=\"ai-assistant-explainability-body\"></div>");
+        const included = explainability.data_included || [];
+        if (included.length) {
+            body.append(jQuery("<strong></strong>").text(__("Data included")));
+            const list = jQuery("<ul></ul>");
+            included.forEach((source) => {
+                const rows = source.rows_analyzed == null ? "" : " — " + source.rows_analyzed + " " + __("rows");
+                list.append(jQuery("<li></li>").text((source.tool_name || "") + rows));
+            });
+            body.append(list);
+        }
+        const assumptions = explainability.assumptions || [];
+        if (assumptions.length) {
+            body.append(jQuery("<strong></strong>").text(__("Assumptions")));
+            const list = jQuery("<ul></ul>");
+            assumptions.forEach((value) => list.append(jQuery("<li></li>").text(value)));
+            body.append(list);
+        }
+        const limitations = explainability.limitations || [];
+        if (limitations.length) {
+            body.append(jQuery("<strong></strong>").text(__("Limitations")));
+            const list = jQuery("<ul></ul>");
+            limitations.forEach((value) => list.append(jQuery("<li></li>").text(value)));
+            body.append(list);
+        }
+        details.append(body);
+        return details;
     }
 
     render_summary(summary) {

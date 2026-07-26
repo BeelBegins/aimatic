@@ -74,6 +74,9 @@ class Answer:
     data_quality: Literal["excellent", "good", "fair", "poor"]
     intent: str
     entities: dict[str, Any]
+    direct_answer: Optional[str] = None
+    executive_summary: Optional[str] = None
+    confidence_details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -316,6 +319,8 @@ class Warning:
     code: str
     message: str
     affected_metrics: list[str]
+    severity: Optional[Literal["info", "watch", "warning", "critical"]] = None
+    details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -328,6 +333,7 @@ class Source:
     description: Optional[str] = None
     doctype: Optional[str] = None
     filters: Optional[dict[str, Any]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         d = {"type": self.type, "name": self.name}
@@ -337,6 +343,8 @@ class Source:
             d["doctype"] = self.doctype
         if self.filters is not None:
             d["filters"] = self.filters
+        if self.metadata:
+            d["metadata"] = self.metadata
         return d
 
 
@@ -356,6 +364,10 @@ class StructuredResponse:
     context: Context
     analysis_plan: dict[str, Any] = field(default_factory=dict)
     tool_invocations: list[ToolInvocation] = field(default_factory=list)
+    key_drivers: list[dict[str, Any]] = field(default_factory=list)
+    recommendations: list[dict[str, Any]] = field(default_factory=list)
+    explainability: dict[str, Any] = field(default_factory=dict)
+    data_quality_detail: dict[str, Any] = field(default_factory=dict)
     kpis: list[KPI] = field(default_factory=list)
     charts: list[Chart] = field(default_factory=list)
     tables: list[Table] = field(default_factory=list)
@@ -371,6 +383,10 @@ class StructuredResponse:
             "context": self.context.to_dict(),
             "analysis_plan": self.analysis_plan,
             "tool_invocations": [invocation.to_dict() for invocation in self.tool_invocations],
+            "key_drivers": self.key_drivers,
+            "recommendations": self.recommendations,
+            "explainability": self.explainability,
+            "data_quality_detail": self.data_quality_detail,
             "kpis": [k.to_dict() for k in self.kpis],
             "charts": [c.to_dict() for c in self.charts],
             "tables": [t.to_dict() for t in self.tables],

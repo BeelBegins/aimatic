@@ -19,6 +19,14 @@ from aimatic.ai.answer_builder import (
 )
 from aimatic.ai.chart_recommender import recommend_chart
 from aimatic.ai.report_registry import get_registry
+from aimatic.ai.response_quality import (
+	calculate_drivers,
+	calculate_quality,
+	deterministic_recommendations,
+	direct_answer,
+	explainability,
+	result_follow_ups,
+)
 from aimatic.ai.response_schema import (
 	ComparisonPeriod,
 	DateRange,
@@ -27,6 +35,7 @@ from aimatic.ai.response_schema import (
 	StructuredResponse,
 	Table,
 	ToolInvocation,
+	Warning,
 )
 from aimatic.ai.routing_engine import AnalysisPlan, route_for_tool
 
@@ -293,13 +302,73 @@ def build_invocation_response(
 			},
 		)
 
+	kpis = _merge_kpis(invocations)
+	charts = _merge_charts(invocations)
+	tables = _merge_tables(invocations)
+	quality = calculate_quality(invocations)
+	drivers = calculate_drivers(invocations)
+	recommendations = deterministic_recommendations(invocations)
+	explanation = explainability(invocations)
+
+	warnings = list(response.warnings)
+	for invocation in invocations:
+		if invocation.status == "error":
+			warnings.append(Warning(
+				code="TOOL_EXECUTION_FAILED",
+				message=f"{invocation.tool_name} could not be used: {invocation.result.get('error')}",
+				affected_metrics=[],
+				severity="warning",
+				details={"invocation_id": invocation.call_id},
+			))
+		if invocation.result.get("total_row_count", 0) > invocation.result.get("row_count", 0):
+			warnings.append(Warning(
+				code="PARTIAL_RESULT",
+				message="The displayed result is capped; totals may cover more rows than the table shows.",
+				affected_metrics=[],
+				severity="info",
+				details={"invocation_id": invocation.call_id},
+			))
+	if quality["grade"] in {"fair", "poor"}:
+		warnings.append(Warning(
+			code="LOW_DATA_QUALITY",
+			message="Use this result with caution; coverage or data quality is limited.",
+			affected_metrics=[kpi.key for kpi in kpis],
+			severity="warning",
+			details=quality,
+		))
+
+	answer = replace(
+		response.answer,
+		confidence=round(quality["score"] / 100, 3),
+		data_quality=quality["grade"],
+		intent=plan.get("intent") or response.answer.intent,
+		entities={key: plan.get(key) for key in ("branch", "item", "supplier", "customer", "warehouse") if plan.get(key)},
+		direct_answer=direct_answer(kpis),
+		executive_summary=reply_text,
+		confidence_details=quality,
+	)
+	context = replace(
+		context,
+		permissions=replace(
+			context.permissions,
+			can_export=bool(tables),
+			can_schedule=True,
+		),
+	)
 	return replace(
 		response,
+		answer=answer,
 		context=context,
 		analysis_plan=plan,
 		tool_invocations=invocations,
-		kpis=_merge_kpis(invocations),
-		charts=_merge_charts(invocations),
-		tables=_merge_tables(invocations),
+		key_drivers=drivers,
+		recommendations=recommendations,
+		explainability=explanation,
+		data_quality_detail=quality,
+		kpis=kpis,
+		charts=charts,
+		tables=tables,
+		warnings=warnings,
+		follow_up_questions=result_follow_ups(invocations, drivers, recommendations),
 		sources=_sources(invocations),
 	)

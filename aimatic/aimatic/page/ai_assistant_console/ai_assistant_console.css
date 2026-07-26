@@ -1635,3 +1635,74 @@
         display: flex !important;
     }
 }
+
+.ai-assistant-direct-answer {
+    margin: 0 0 10px;
+    padding: 12px 14px;
+    border-left: 4px solid var(--primary);
+    border-radius: 6px;
+    background: var(--control-bg);
+    color: var(--text-color);
+    font-size: 1.05rem;
+    font-weight: 650;
+}
+
+.ai-assistant-quality-section,
+.ai-assistant-explainability,
+.ai-assistant-data-quality {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg);
+}
+
+.ai-assistant-section-title {
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.ai-assistant-driver-list {
+    display: grid;
+    gap: 6px;
+}
+
+.ai-assistant-driver-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ai-assistant-driver-value {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.ai-assistant-recommendation {
+    padding: 8px 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.ai-assistant-recommendation:first-of-type {
+    border-top: 0;
+}
+
+.ai-assistant-data-quality {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ai-assistant-explainability summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.ai-assistant-explainability-body {
+    margin-top: 10px;
+}
+
+.ai-assistant-explainability-body ul {
+    margin: 5px 0 10px 18px;
+}
