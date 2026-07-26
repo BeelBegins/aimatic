@@ -203,3 +203,11 @@ def cint_value(value) -> int:
 KPI_DISPATCH = {"get_abc_xyz_analysis": _kpis_abc_xyz}
 TABLE_DISPATCH = {"get_abc_xyz_analysis": _table_abc_xyz}
 CHARTS_DISPATCH = {"get_abc_xyz_analysis": _charts_abc_xyz}
+
+from aimatic.ai.demand_forecasting_response import CHARTS_DISPATCH as _FORECAST_CHARTS
+from aimatic.ai.demand_forecasting_response import KPI_DISPATCH as _FORECAST_KPIS
+from aimatic.ai.demand_forecasting_response import TABLE_DISPATCH as _FORECAST_TABLES
+
+KPI_DISPATCH.update(_FORECAST_KPIS)
+TABLE_DISPATCH.update(_FORECAST_TABLES)
+CHARTS_DISPATCH.update(_FORECAST_CHARTS)

@@ -106,3 +106,42 @@ class TestResponseQuality(TestCase):
 			]
 		)
 		self.assertFalse(recommendations[0]["automatic_update"])
+
+	def test_unbacktested_forecast_does_not_receive_perfect_accuracy(self):
+		forecast = ToolInvocation(
+			call_id="forecast-1",
+			tool_name="get_demand_forecast",
+			arguments={},
+			result={
+				"row_count": 1,
+				"forecasts": [{"forecast_confidence": 20, "wape": None}],
+			},
+			sequence=1,
+			status="success",
+			route="certified_tool",
+		)
+		quality = calculate_quality([forecast])
+		self.assertEqual(quality["factors"]["forecast_accuracy"], 0.25)
+		self.assertLess(quality["score"], 75)
+
+	def test_forecast_stock_plan_creates_review_only_reorder(self):
+		forecast = ToolInvocation(
+			call_id="forecast-1",
+			tool_name="get_demand_forecast",
+			arguments={},
+			result={
+				"forecasts": [{
+					"item_code": "ITEM-1",
+					"stock_plan": {
+						"suggested_reorder_quantity": 12,
+						"expected_demand_during_lead_time": 20,
+					},
+				}],
+			},
+			sequence=1,
+			status="success",
+			route="certified_tool",
+		)
+		recommendations = deterministic_recommendations([forecast])
+		self.assertEqual(recommendations[0]["quantity"], 12)
+		self.assertEqual(recommendations[0]["action"], "review_reorder")

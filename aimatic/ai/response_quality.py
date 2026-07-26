@@ -116,17 +116,22 @@ def calculate_quality(invocations: list[ToolInvocation]) -> dict[str, Any]:
 	outlier_rates = []
 	for invocation in successful:
 		result = invocation.result
-		for key in ("data_coverage", "coverage", "coverage_pct"):
-			if result.get(key) is not None:
-				value = flt(result.get(key))
-				coverage_values.append(value / 100 if value > 1 else value)
+		quality_rows = [result, *_rows(result)]
+		for quality_row in quality_rows:
+			for key in ("data_coverage", "coverage", "coverage_pct", "forecast_confidence"):
+				if quality_row.get(key) is not None:
+					value = flt(quality_row.get(key))
+					coverage_values.append(value / 100 if value > 1 else value)
+			if quality_row.get("wape") is not None:
+				forecast_values.append(max(0.0, 1.0 - flt(quality_row.get("wape")) / 100))
+			if quality_row.get("outlier_percentage") is not None:
+				outlier_rates.append(min(1.0, flt(quality_row.get("outlier_percentage")) / 100))
 		reconciliation = result.get("reconciliation")
 		if isinstance(reconciliation, dict):
 			reconciliation_values.append(1.0 if reconciliation.get("passed") else 0.0)
-		if result.get("wape") is not None:
-			forecast_values.append(max(0.0, 1.0 - flt(result.get("wape")) / 100))
-		if result.get("outlier_percentage") is not None:
-			outlier_rates.append(min(1.0, flt(result.get("outlier_percentage")) / 100))
+
+	if any(invocation.tool_name == "get_demand_forecast" for invocation in successful) and not forecast_values:
+		forecast_values.append(0.25)
 
 	scalars = []
 	for invocation in successful:
@@ -234,13 +239,19 @@ def deterministic_recommendations(invocations: list[ToolInvocation], limit: int 
 	for invocation in _successful(invocations):
 		result = invocation.result
 		for row in _rows(result):
-			if flt(row.get("suggested_order_qty")) > 0:
+			stock_plan = row.get("stock_plan") or {}
+			reorder_quantity = flt(row.get("suggested_order_qty") or stock_plan.get("suggested_reorder_quantity"))
+			if reorder_quantity > 0:
 				recommendations.append(
 					{
 						"title": f"Reorder {row.get('item_name') or row.get('item_code')}",
 						"action": "review_reorder",
-						"quantity": flt(row.get("suggested_order_qty")),
-						"reason": f"Current cover is {flt(row.get('days_of_stock')):.1f} days.",
+						"quantity": reorder_quantity,
+						"reason": (
+							f"Forecast demand during lead time is {flt(stock_plan.get('expected_demand_during_lead_time')):.2f}."
+							if stock_plan
+							else f"Current cover is {flt(row.get('days_of_stock')):.1f} days."
+						),
 						"invocation_id": invocation.call_id,
 					}
 				)

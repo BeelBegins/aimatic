@@ -45,3 +45,7 @@ BUSINESS_DATA_SOURCES = {
 		refresh_behavior="cached",
 	),
 }
+
+from aimatic.ai.demand_forecasting_registry import FORECAST_DATA_SOURCES
+
+BUSINESS_DATA_SOURCES.update(FORECAST_DATA_SOURCES)

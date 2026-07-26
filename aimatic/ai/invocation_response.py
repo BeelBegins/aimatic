@@ -321,6 +321,17 @@ def build_invocation_response(
 				severity="warning",
 				details={"invocation_id": invocation.call_id},
 			))
+		quality_messages = list(invocation.result.get("data_quality_warnings") or [])
+		for result_row in invocation.result.get("forecasts") or []:
+			quality_messages.extend(result_row.get("data_quality_warnings") or [])
+		for warning_index, message in enumerate(dict.fromkeys(str(value) for value in quality_messages)):
+			warnings.append(Warning(
+				code=f"DATA_QUALITY_{invocation.sequence}_{warning_index + 1}",
+				message=message,
+				affected_metrics=[],
+				severity="warning",
+				details={"invocation_id": invocation.call_id},
+			))
 		if invocation.result.get("total_row_count", 0) > invocation.result.get("row_count", 0):
 			warnings.append(Warning(
 				code="PARTIAL_RESULT",
