@@ -603,11 +603,14 @@ def discover_frappe_reports() -> dict[str, DataSource]:
 
 
 def get_registry() -> dict[str, DataSource]:
-    """Merge TOOL_REGISTRY (bare tool names) with discovered reports (report:<name>). Tools win on collision."""
+    """Merge certified tools, advanced engines, and discovered reports."""
+    from aimatic.ai.business_intelligence_registry import BUSINESS_DATA_SOURCES
+
     registry: dict[str, DataSource] = {}
     registry.update(discover_frappe_reports())
     for tool_name, ds in TOOL_REGISTRY.items():
         registry[tool_name] = ds
+    registry.update(BUSINESS_DATA_SOURCES)
     return registry
 
 

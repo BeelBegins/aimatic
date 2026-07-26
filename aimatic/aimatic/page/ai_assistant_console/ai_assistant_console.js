@@ -1844,7 +1844,17 @@ aimatic.AiAssistantPage = class AiAssistantPage {
 
     init_chart(chart, $mount) {
         let chartType = chart.type;
-        if (chartType === 'donut') {
+        if (chartType === 'scatter') {
+            this.init_scatter_chart(chart, $mount);
+            return;
+        }
+        if (chartType === 'heatmap') {
+            this.init_matrix_chart(chart, $mount);
+            return;
+        }
+        if (chartType === 'pareto') {
+            chartType = 'axis-mixed';
+        } else if (chartType === 'donut') {
             chartType = 'pie';
         } else if (!['line', 'bar', 'pie'].includes(chartType)) {
             chartType = 'bar';
@@ -1855,9 +1865,10 @@ aimatic.AiAssistantPage = class AiAssistantPage {
 
         const chartData = {
             labels: labels,
-            datasets: datasets.map((ds) => ({
+            datasets: datasets.map((ds, index) => ({
                 name: ds.label,
                 values: ds.data,
+                ...(chart.type === 'pareto' ? { chartType: index === 0 ? 'bar' : 'line' } : {}),
             })),
         };
 
@@ -1890,6 +1901,67 @@ aimatic.AiAssistantPage = class AiAssistantPage {
             console.error('Chart render error:', e);
             $mount.after(`<div class="text-muted small">${__('Chart could not be rendered')}</div>`);
         }
+    }
+
+    init_matrix_chart(chart, mountElement) {
+        const labels = (chart.data && chart.data.labels) || [];
+        const values = ((chart.data && chart.data.datasets && chart.data.datasets[0]) || {}).data || [];
+        const maximum = Math.max(...values.map((value) => Number(value) || 0), 1);
+        const grid = document.createElement("div");
+        grid.className = "ai-assistant-matrix-chart";
+        labels.forEach((label, index) => {
+            const cell = document.createElement("div");
+            cell.className = "ai-assistant-matrix-cell";
+            const value = Number(values[index]) || 0;
+            cell.style.backgroundColor = "rgba(116, 62, 226, " + (0.12 + 0.78 * value / maximum) + ")";
+            const name = document.createElement("strong");
+            name.textContent = label;
+            const count = document.createElement("span");
+            count.textContent = format_number(value, null, 0);
+            cell.append(name, count);
+            grid.appendChild(cell);
+        });
+        mountElement.empty().append(grid);
+    }
+
+    init_scatter_chart(chart, mountElement) {
+        const labels = (chart.data && chart.data.labels) || [];
+        const datasets = (chart.data && chart.data.datasets) || [];
+        const xValues = (datasets[0] && datasets[0].data) || [];
+        const yValues = (datasets[1] && datasets[1].data) || [];
+        const width = 760;
+        const height = 320;
+        const padding = 42;
+        const xMax = Math.max(...xValues.map((value) => Number(value) || 0), 1);
+        const yMax = Math.max(...yValues.map((value) => Number(value) || 0), 1);
+        const namespace = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(namespace, "svg");
+        svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+        svg.setAttribute("role", "img");
+        svg.setAttribute("aria-label", chart.title || "Scatter chart");
+        [[padding, height - padding, width - padding, height - padding], [padding, padding, padding, height - padding]].forEach((line) => {
+            const axis = document.createElementNS(namespace, "line");
+            axis.setAttribute("x1", line[0]);
+            axis.setAttribute("y1", line[1]);
+            axis.setAttribute("x2", line[2]);
+            axis.setAttribute("y2", line[3]);
+            axis.setAttribute("class", "ai-assistant-scatter-axis");
+            svg.appendChild(axis);
+        });
+        labels.forEach((label, index) => {
+            const xValue = Number(xValues[index]) || 0;
+            const yValue = Number(yValues[index]) || 0;
+            const circle = document.createElementNS(namespace, "circle");
+            circle.setAttribute("cx", padding + (width - padding * 2) * xValue / xMax);
+            circle.setAttribute("cy", height - padding - (height - padding * 2) * yValue / yMax);
+            circle.setAttribute("r", 6);
+            circle.setAttribute("class", "ai-assistant-scatter-point");
+            const title = document.createElementNS(namespace, "title");
+            title.textContent = label + ": " + format_number(xValue, null, 2) + ", " + format_number(yValue, null, 2) + "%";
+            circle.appendChild(title);
+            svg.appendChild(circle);
+        });
+        mountElement.empty().append(svg);
     }
 
     format_chart_value(value, format) {

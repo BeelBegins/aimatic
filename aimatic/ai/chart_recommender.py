@@ -685,6 +685,16 @@ _CHART_DISPATCH: dict[str, callable] = {
 }
 
 
+def recommend_charts(tool_name: str, result: dict) -> list[Chart]:
+    """Return every deterministic chart for advanced engines, or the legacy single chart."""
+    from aimatic.ai.business_intelligence_response import CHARTS_DISPATCH
+
+    if tool_name in CHARTS_DISPATCH:
+        return CHARTS_DISPATCH[tool_name](result)
+    chart = recommend_chart(tool_name, result)
+    return [chart] if chart else []
+
+
 def recommend_chart(tool_name: str, result: dict) -> Chart | None:
     """Public dispatcher: returns a Chart for the given tool+result, or None."""
     fn = _CHART_DISPATCH.get(tool_name)

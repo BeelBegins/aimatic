@@ -17,7 +17,7 @@ from aimatic.ai.answer_builder import (
 	_TABLE_DISPATCH,
 	build_response as build_legacy_response,
 )
-from aimatic.ai.chart_recommender import recommend_chart
+from aimatic.ai.chart_recommender import recommend_charts
 from aimatic.ai.report_registry import get_registry
 from aimatic.ai.response_quality import (
 	calculate_drivers,
@@ -184,20 +184,21 @@ def _merge_charts(invocations: list[ToolInvocation]):
 	for invocation in invocations:
 		if invocation.status != "success":
 			continue
-		chart = recommend_chart(invocation.tool_name, invocation.result)
-		if not chart:
+		invocation_charts = recommend_charts(invocation.tool_name, invocation.result)
+		if not invocation_charts:
 			continue
 		label = invocation.period_role.title() if invocation.period_role else ""
-		charts.append(
-			replace(
-				chart,
-				id=f"{chart.id}__{invocation.sequence}",
-				title=f"{chart.title} — {label}" if label in {"Current", "Previous"} else chart.title,
-				invocation_id=invocation.call_id,
-				period_role=invocation.period_role,
-				scenario=invocation.scenario,
+		for chart in invocation_charts:
+			charts.append(
+				replace(
+					chart,
+					id=f"{chart.id}__{invocation.sequence}",
+					title=f"{chart.title} — {label}" if label in {"Current", "Previous"} else chart.title,
+					invocation_id=invocation.call_id,
+					period_role=invocation.period_role,
+					scenario=invocation.scenario,
+				)
 			)
-		)
 	return charts
 
 

@@ -1590,6 +1590,13 @@ _TABLE_DISPATCH: dict[str, callable] = {
 }
 
 
+from aimatic.ai.business_intelligence_response import KPI_DISPATCH as _BUSINESS_KPI_DISPATCH
+from aimatic.ai.business_intelligence_response import TABLE_DISPATCH as _BUSINESS_TABLE_DISPATCH
+
+_KPI_DISPATCH.update(_BUSINESS_KPI_DISPATCH)
+_TABLE_DISPATCH.update(_BUSINESS_TABLE_DISPATCH)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Part 3 — Orchestrator
 # ═══════════════════════════════════════════════════════════════════════════
