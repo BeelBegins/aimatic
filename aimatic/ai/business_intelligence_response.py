@@ -219,3 +219,11 @@ from aimatic.ai.price_recommendation_response import TABLE_DISPATCH as _PRICE_TA
 KPI_DISPATCH.update(_PRICE_KPIS)
 TABLE_DISPATCH.update(_PRICE_TABLES)
 CHARTS_DISPATCH.update(_PRICE_CHARTS)
+
+from aimatic.ai.advanced_intelligence_response import CHARTS_DISPATCH as _ADVANCED_CHARTS
+from aimatic.ai.advanced_intelligence_response import KPI_DISPATCH as _ADVANCED_KPIS
+from aimatic.ai.advanced_intelligence_response import TABLE_DISPATCH as _ADVANCED_TABLES
+
+KPI_DISPATCH.update(_ADVANCED_KPIS)
+TABLE_DISPATCH.update(_ADVANCED_TABLES)
+CHARTS_DISPATCH.update(_ADVANCED_CHARTS)

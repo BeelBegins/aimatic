@@ -53,3 +53,7 @@ BUSINESS_DATA_SOURCES.update(FORECAST_DATA_SOURCES)
 from aimatic.ai.price_recommendation_registry import PRICE_DATA_SOURCES
 
 BUSINESS_DATA_SOURCES.update(PRICE_DATA_SOURCES)
+
+from aimatic.ai.advanced_intelligence_registry import ADVANCED_DATA_SOURCES
+
+BUSINESS_DATA_SOURCES.update(ADVANCED_DATA_SOURCES)
