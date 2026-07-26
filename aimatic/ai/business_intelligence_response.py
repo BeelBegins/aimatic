@@ -211,3 +211,11 @@ from aimatic.ai.demand_forecasting_response import TABLE_DISPATCH as _FORECAST_T
 KPI_DISPATCH.update(_FORECAST_KPIS)
 TABLE_DISPATCH.update(_FORECAST_TABLES)
 CHARTS_DISPATCH.update(_FORECAST_CHARTS)
+
+from aimatic.ai.price_recommendation_response import CHARTS_DISPATCH as _PRICE_CHARTS
+from aimatic.ai.price_recommendation_response import KPI_DISPATCH as _PRICE_KPIS
+from aimatic.ai.price_recommendation_response import TABLE_DISPATCH as _PRICE_TABLES
+
+KPI_DISPATCH.update(_PRICE_KPIS)
+TABLE_DISPATCH.update(_PRICE_TABLES)
+CHARTS_DISPATCH.update(_PRICE_CHARTS)

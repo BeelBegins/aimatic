@@ -49,3 +49,7 @@ BUSINESS_DATA_SOURCES = {
 from aimatic.ai.demand_forecasting_registry import FORECAST_DATA_SOURCES
 
 BUSINESS_DATA_SOURCES.update(FORECAST_DATA_SOURCES)
+
+from aimatic.ai.price_recommendation_registry import PRICE_DATA_SOURCES
+
+BUSINESS_DATA_SOURCES.update(PRICE_DATA_SOURCES)
