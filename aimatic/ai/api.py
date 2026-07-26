@@ -22,7 +22,14 @@ from aimatic.ai.tools_expanded import TOOL_DISPATCH as _EXPANDED_DISPATCH, TOOL_
 from aimatic.ai.report_runner import TOOL_DISPATCH as _REPORT_RUNNER_DISPATCH, TOOL_SPECS as _REPORT_RUNNER_SPECS
 from aimatic.ai.analytics_engine import TOOL_DISPATCH as _ANALYTICS_DISPATCH, TOOL_SPECS as _ANALYTICS_SPECS
 from aimatic.ai.dynamic_report import DYNAMIC_REPORT_DISPATCH, TOOL_SPECS as _DYNAMIC_REPORT_SPECS
-from aimatic.ai.answer_builder import build_response
+from aimatic.ai.invocation_response import build_invocation_response as build_response
+from aimatic.ai.routing_engine import (
+    ANALYSIS_PLAN_TOOL_SPEC,
+    fallback_plan,
+    parse_plan_message,
+    route_for_tool,
+    select_tool_specs,
+)
 
 TOOL_SPECS = _CORE_SPECS + _EXTENDED_SPECS + _ACCOUNTS_SPECS + _EXPANDED_SPECS + _REPORT_RUNNER_SPECS + _ANALYTICS_SPECS + _DYNAMIC_REPORT_SPECS
 TOOL_DISPATCH = {**_CORE_DISPATCH, **_EXTENDED_DISPATCH, **_ACCOUNTS_DISPATCH, **_EXPANDED_DISPATCH, **_REPORT_RUNNER_DISPATCH, **_ANALYTICS_DISPATCH, **DYNAMIC_REPORT_DISPATCH}
@@ -370,7 +377,7 @@ def _build_system_prompt() -> str:
     covers whichever handful of tools happen to be spelled out."""
     company = frappe.defaults.get_user_default("Company") or frappe.defaults.get_default("company") or "the company"
     return (
-        f"You are an analytics assistant for {company}, a retail business running on ERPNext. "
+        f"You are an analytics assistant for {company}, a retail business running on ERP. "
         f"Today's date is {today()}. "
         "Answer questions using ONLY the provided tools - never guess or estimate numbers "
         "yourself. All monetary figures returned by tools are in the company's default currency. "
@@ -402,7 +409,7 @@ def _build_system_prompt() -> str:
         "'net sales by customer group this month vs last month'; pair it with "
         "drill_down_transactions when the question asks to see the underlying documents/"
         "invoices behind a figure. (2) list_frappe_reports then run_frappe_report - existing "
-        "standard ERPNext reports (Stock Balance, Accounts Receivable, Sales Register, etc.) for "
+        "standard ERP reports (Stock Balance, Accounts Receivable, Sales Register, etc.) for "
         "questions that map to a well-known report by name. (3) run_dynamic_report - last resort "
         "only, a narrow whitelisted query over POS Invoice/Purchase Invoice/Purchase Receipt/Item/"
         "Customer/Supplier.\n\n"
@@ -507,6 +514,49 @@ def _parse_history(history: str | None) -> list[dict]:
     return turns
 
 
+def _derive_analysis_plan(message: str, history: str | None = None):
+    """Ask the model only for business metadata, then validate it server-side.
+
+    Planning failure is non-fatal: deterministic parsing still narrows the tool
+    catalogue, so the reporting path remains available during provider flakiness.
+    """
+    company = _resolve_company()
+    context_turns = _parse_history(history)[-4:]
+    context_text = "\n".join(f"{turn['role']}: {turn['content']}" for turn in context_turns)
+    planning_messages = [
+        {
+            "role": "system",
+            "content": (
+                "Understand the retail business question and submit the required "
+                "analysis plan. Resolve relative dates using today=" + str(today()) + ". "
+                "Use business concepts only; never include SQL, table names, field "
+                "names, formulas, or calculated figures."
+            ),
+        },
+        {"role": "user", "content": (context_text + "\nCurrent question: " + message).strip()},
+    ]
+    try:
+        planned = get_chat_completion(
+            planning_messages,
+            tools=[ANALYSIS_PLAN_TOOL_SPEC],
+            tool_choice={"type": "function", "function": {"name": "submit_analysis_plan"}},
+            max_tokens=512,
+        )
+        return parse_plan_message(planned, message, company)
+    except (NemotronError, TypeError, ValueError):
+        return fallback_plan(message, company)
+
+
+def _tool_call_arguments(call: dict) -> dict:
+    function = call.get("function") or {}
+    raw_args = function.get("arguments") or {}
+    try:
+        parsed = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+    except (TypeError, ValueError):
+        return {}
+    return dict(parsed) if isinstance(parsed, dict) else {}
+
+
 @frappe.whitelist()
 def ask(message: str, history: str | None = None, conversation: str | None = None):
     """Role-gated conversational entrypoint over the read-only tools in tools.py.
@@ -533,11 +583,27 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
     messages.extend(_parse_history(history))
     messages.append({"role": "user", "content": message})
 
-    tool_results = {}
+    analysis_plan = _derive_analysis_plan(message, history)
+    tool_invocations = []
+    failed_tools = set()
+    successful_routes = set()
 
     for _iteration in range(_MAX_TOOL_ITERATIONS):
+        candidate_specs = select_tool_specs(
+            message,
+            analysis_plan,
+            TOOL_SPECS,
+            failed_tools=failed_tools,
+            successful_routes=successful_routes,
+        )
+        if not candidate_specs and not successful_routes:
+            frappe.throw(_("This question is outside the currently certified analytical tools."))
         try:
-            assistant_message = get_chat_completion(messages, tools=TOOL_SPECS, tool_choice="auto")
+            assistant_message = get_chat_completion(
+                messages,
+                tools=candidate_specs or None,
+                tool_choice="auto" if candidate_specs else None,
+            )
         except NemotronError as e:
             frappe.throw(str(e))
 
@@ -561,7 +627,9 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
                     ),
                 })
                 continue
-            if _looks_like_tool_hallucination(reply, tool_results):
+            if _looks_like_tool_hallucination(
+                reply, [i for i in tool_invocations if i["status"] == "success"]
+            ):
                 frappe.log_error(
                     title="AI Assistant: tool hallucination corrected",
                     message=f"question={message!r} raw_content={reply!r}",
@@ -606,7 +674,7 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
                 # anything.
                 frappe.log_error(
                     title="AI Assistant: empty non-answer corrected",
-                    message=f"question={message!r} tool_results_so_far={sorted(tool_results.keys())!r}",
+                    message=f"question={message!r} tool_invocations_so_far={[(i['tool_name'], i['status']) for i in tool_invocations]!r}",
                 )
                 messages.append({
                     "role": "user",
@@ -615,6 +683,16 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
                         "tool that best matches the question now, or if you already have "
                         "enough information from earlier tool results, answer in plain "
                         "language - do not reply with nothing."
+                    ),
+                })
+                continue
+            if not any(i["status"] == "success" for i in tool_invocations):
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "A factual business answer requires a successful certified tool call. "
+                        "Call one of the provided tools now. If none can answer, state only that "
+                        "the current certified analytics cannot answer the question; do not provide figures."
                     ),
                 })
                 continue
@@ -636,25 +714,40 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
 
             user_role = next((r for r in frappe.get_roles() if r in _ALLOWED_ROLES), "User")
 
-            structured = build_response(message, reply, tool_results, company, branch_names, user_role)
+            structured = build_response(
+                message,
+                reply,
+                tool_invocations,
+                company,
+                branch_names,
+                user_role,
+                analysis_plan,
+            )
             return structured.to_dict()
 
         for call in tool_calls:
             function = call.get("function") or {}
-            name = function.get("name")
+            name = function.get("name") or "unknown"
+            arguments = _tool_call_arguments(call)
             result = _dispatch_tool_call(call)
-            if name in TOOL_DISPATCH and "error" not in result and name not in tool_results:
-                # Keep the FIRST call's result per tool name. A comparison-style
-                # question ("this month vs last month") makes the model call the
-                # same tool twice with different date ranges; the first call is
-                # the period the question actually asked about, later calls are
-                # supplementary context for the model's own prose. Overwriting
-                # here (last-call-wins) let a zero-result comparison call clobber
-                # the real KPI/table/chart data built from the first call.
-                tool_results[name] = result
+            status = "error" if "error" in result else "success"
+            route = route_for_tool(name)
+            tool_invocations.append({
+                "call_id": str(call.get("id") or f"call-{len(tool_invocations) + 1}"),
+                "tool_name": name,
+                "arguments": arguments,
+                "result": result,
+                "sequence": len(tool_invocations) + 1,
+                "status": status,
+                "route": route,
+            })
+            if status == "error":
+                failed_tools.add(name)
+            else:
+                successful_routes.add(route)
             messages.append({"role": "tool", "tool_call_id": call.get("id"), "content": json.dumps(result, default=str)})
 
-    frappe.throw(_("Could not produce an answer after several tool calls. Try rephrasing your question."))
+    frappe.throw(_("The current certified analytics could not answer this question reliably. No business figures were produced."))
 
 
 def _log_turn(role: str, content: str, conversation: str | None = None):
@@ -877,6 +970,14 @@ def save_report(question: str, context_json: str, response_json: str, title: str
     if not context_json or not response_json:
         frappe.throw(_("Context and response snapshots are required."))
 
+    try:
+        response_snapshot = json.loads(response_json)
+    except (TypeError, ValueError):
+        frappe.throw(_("Response snapshot must be valid JSON."))
+    if not isinstance(response_snapshot, dict):
+        frappe.throw(_("Response snapshot must be a JSON object."))
+    invocation_snapshot = response_snapshot.get("tool_invocations") or []
+
     doc = frappe.get_doc({
         "doctype": "AI Saved Report",
         "user": frappe.session.user,
@@ -884,7 +985,7 @@ def save_report(question: str, context_json: str, response_json: str, title: str
         "question": question.strip(),
         "context_snapshot": context_json,
         "response_snapshot": response_json,
-        "tool_results_snapshot": "{}",
+        "tool_results_snapshot": json.dumps(invocation_snapshot, default=str),
         "pinned": 0,
     }).insert(ignore_permissions=True)
     return {"name": doc.name}
@@ -929,7 +1030,8 @@ def get_saved_report(name: str):
         "question": doc.question,
         "context": json.loads(doc.context_snapshot or "{}"),
         "response": json.loads(doc.response_snapshot or "{}"),
-        "tool_results": json.loads(doc.tool_results_snapshot or "{}"),
+        "tool_results": json.loads(doc.tool_results_snapshot or "[]"),
+        "tool_invocations": json.loads(doc.tool_results_snapshot or "[]"),
         "pinned": cint(doc.pinned),
         "last_refreshed": str(doc.last_refreshed) if doc.last_refreshed else None,
     }
@@ -991,6 +1093,7 @@ def refresh_saved_report(name: str):
 
     # Update snapshots
     doc.response_snapshot = json.dumps(fresh, default=str)
+    doc.tool_results_snapshot = json.dumps(fresh.get("tool_invocations") or [], default=str)
     doc.last_refreshed = now_datetime()
     doc.save(ignore_permissions=True)
 
@@ -1181,10 +1284,20 @@ def export_table(table_json: str, filename: str, format: str = "csv"):
     for row in rows:
         data.append([row.get(col.get("key", ""), "") for col in columns])
 
+    # build_csv_response/build_xlsx_response (via provide_binary_file) always
+    # append their own ".csv"/".xlsx" suffix - every other core caller passes a
+    # bare name. The client sends a name that already ends in the target
+    # extension, so strip it here or the download lands as "name.xlsx.xlsx".
+    base_filename = filename
+    for ext in (".csv", ".xlsx"):
+        if base_filename.lower().endswith(ext):
+            base_filename = base_filename[: -len(ext)]
+            break
+
     if format == "xlsx":
-        build_xlsx_response(data, filename)
+        build_xlsx_response(data, base_filename)
     else:
-        build_csv_response(data, filename)
+        build_csv_response(data, base_filename)
     # No return value - response helpers set frappe.response directly
 # NOTE: appended into the existing ai/api.py, which already imports
 # frappe/json/frappe._ at module scope - not repeated here.

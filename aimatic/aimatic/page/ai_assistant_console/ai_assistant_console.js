@@ -1946,7 +1946,7 @@ aimatic.AiAssistantPage = class AiAssistantPage {
                 <div class="ai-assistant-warning">
                     <span class="ai-assistant-warning-code">${frappe.utils.escape_html(w.code)}</span>
                     <span class="ai-assistant-warning-msg">${frappe.utils.escape_html(w.message)}</span>
-                    ${w.affected_metrics ? `<span class="ai-assistant-warning-metrics small text-muted">(${frappe.utils.escape_html(w.affected_metrics.join(', '))})</span>` : ''}
+                    ${w.affected_metrics && w.affected_metrics.length ? `<span class="ai-assistant-warning-metrics small text-muted">(${frappe.utils.escape_html(w.affected_metrics.join(', '))})</span>` : ''}
                 </div>
             `);
             $wrap.append($item);

@@ -1676,17 +1676,23 @@ def build_response(
     if tool_names & margin_tools:
         follow_ups.append("Break down margin by category")
 
-    # Always include export affordance (forward-looking; not implemented yet -
-    # no export backend exists in Phase 1, this is just a suggested question the
-    # user can type, not a working action - see actions=[] below)
-    follow_ups.append("Export this to Excel")
+    # NOTE: a "Export this to Excel" follow-up chip used to be appended
+    # unconditionally here. It predates Phase 3's real export mechanism (the
+    # per-table CSV/XLSX buttons in render_table + api.py:export_table) and
+    # was never removed once that shipped - clicking a follow-up chip just
+    # calls send_message(chip_text), so it silently sent "Export this to
+    # Excel" as a normal chat question with no tool behind it, producing a
+    # NO_TOOL_DATA non-answer instead of exporting anything. Removed
+    # 2026-07-26 (real user-reported bug: "clicking export to excel just adds
+    # a chat message"). The real export affordance is the CSV/XLSX buttons on
+    # each table.
 
     # ─── Warnings ───
     warnings: list[Warning] = []
     if not tool_results:
         warnings.append(Warning(
             code="NO_TOOL_DATA",
-            message="This answer is based on general knowledge, not live ERPNext data.",
+            message="This answer is based on general knowledge, not live ERP data.",
             affected_metrics=[],
         ))
 

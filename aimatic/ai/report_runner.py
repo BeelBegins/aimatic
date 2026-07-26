@@ -1,4 +1,4 @@
-"""Phase 4b: execute a cataloged ERPNext Query/Script Report - the missing half of
+"""Phase 4b: execute a cataloged ERP Query/Script Report - the missing half of
 report_registry.discover_frappe_reports(), which only ever catalogued reports, never
 ran them. Two tools:
   - list_frappe_reports: keyword search over the same discovered-reports catalogue
@@ -11,7 +11,7 @@ ran them. Two tools:
     (Query/Script Report, not disabled, module in Accounts/Buying/Selling/Stock/
     Aimatic) - an arbitrary report name is rejected before any execution is attempted.
 Company scoping is force-applied the same way dynamic_report.py forces it: if the
-caller's filters dict has a "company" key (most ERPNext reports accept one), it is
+caller's filters dict has a "company" key (most ERP reports accept one), it is
 always overwritten with the user's own resolved default company, never left to
 whatever the model supplied.
 """
@@ -75,7 +75,7 @@ def run_frappe_report(report_name: str, filters: dict | str | None = None, limit
     Branch scoping: unlike every purpose-built tool in this module, an arbitrary
     cataloged report's own SQL/script is not guaranteed to filter rows by the
     caller's Branch User Permission the way frappe.db.get_list does - many core
-    ERPNext Query/Script Reports run raw SQL with no per-row permission check at
+    ERP Query/Script Reports run raw SQL with no per-row permission check at
     all. So this refuses to run any report at all for a branch-restricted caller
     (one whose _resolve_branch_filter is not None, i.e. they see a strict subset
     of the company's branches) rather than risk leaking another branch's data
@@ -147,7 +147,7 @@ TOOL_SPECS = [
         "function": {
             "name": "list_frappe_reports",
             "description": (
-                "Search the catalogue of existing ERPNext reports (Query/Script Reports from "
+                "Search the catalogue of existing ERP reports (Query/Script Reports from "
                 "Accounts/Buying/Selling/Stock modules, plus this app's own custom reports) by "
                 "keyword. Call this BEFORE run_frappe_report to find a valid report_name - there "
                 "is no other way to know one. Only use this when no purpose-built tool answers "
@@ -167,9 +167,9 @@ TOOL_SPECS = [
         "function": {
             "name": "run_frappe_report",
             "description": (
-                "Execute one existing ERPNext report by exact name (found via list_frappe_reports "
+                "Execute one existing ERP report by exact name (found via list_frappe_reports "
                 "first) and return its rows. Company scoping is applied automatically. Use this "
-                "for questions best answered by an existing standard ERPNext report (e.g. Accounts "
+                "for questions best answered by an existing standard ERP report (e.g. Accounts "
                 "Receivable, Stock Balance, Sales Analytics) rather than a purpose-built tool or "
                 "run_dynamic_report."
             ),

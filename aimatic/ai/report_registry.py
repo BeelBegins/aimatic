@@ -537,7 +537,7 @@ TOOL_REGISTRY: dict[str, DataSource] = {
     "list_frappe_reports": DataSource(
         key="tool:list_frappe_reports",
         name="Report Catalogue Search",
-        description="Search the allowlisted catalogue of runnable ERPNext Query and Script Reports by keyword.",
+        description="Search the allowlisted catalogue of runnable ERP Query and Script Reports by keyword.",
         source_type="tool",
         supported_filters=["keyword", "limit"],
         returned_fields=["reports", "total_available"],
@@ -548,8 +548,8 @@ TOOL_REGISTRY: dict[str, DataSource] = {
     ),
     "run_frappe_report": DataSource(
         key="tool:run_frappe_report",
-        name="ERPNext Report Runner",
-        description="Execute one allowlisted ERPNext Query or Script Report with the report's own permission checks and forced company scope.",
+        name="ERP Report Runner",
+        description="Execute one allowlisted ERP Query or Script Report with the report's own permission checks and forced company scope.",
         source_type="tool",
         supported_filters=["report_name", "filters", "limit"],
         returned_fields=["report_name", "columns", "rows", "row_count", "total_row_count", "filters_applied"],

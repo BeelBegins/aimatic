@@ -80,6 +80,27 @@ class Answer:
 
 
 @dataclass(frozen=True)
+class ToolInvocation:
+	call_id: str
+	tool_name: str
+	arguments: dict[str, Any]
+	result: dict[str, Any]
+	sequence: int
+	status: Literal["success", "error"]
+	route: Literal["certified_tool", "analytics", "erp_report", "dynamic_report"]
+	period_role: Optional[Literal["current", "previous", "scenario", "supporting"]] = None
+	scenario: Optional[str] = None
+
+	def to_dict(self) -> dict[str, Any]:
+		d = asdict(self)
+		if self.period_role is None:
+			d.pop("period_role")
+		if self.scenario is None:
+			d.pop("scenario")
+		return d
+
+
+@dataclass(frozen=True)
 class KPI:
     key: str
     label: str
@@ -87,10 +108,18 @@ class KPI:
     format: Literal["currency", "percent", "number", "qty"]
     currency: Optional[str] = None
     comparison: Optional[float] = None
+    variance_amount: Optional[float] = None
     variance_pct: Optional[float] = None
     trend: Optional[Literal["up", "down", "flat"]] = None
     tooltip: Optional[str] = None
     severity: Optional[Literal["info", "watch", "warning", "critical"]] = None
+    target: Optional[float] = None
+    status: Optional[str] = None
+    unit: Optional[str] = None
+    invocation_ids: list[str] = field(default_factory=list)
+    period: Optional[dict[str, Any]] = None
+    comparison_period: Optional[dict[str, Any]] = None
+    scenario: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         d = {
@@ -103,6 +132,9 @@ class KPI:
             d["currency"] = self.currency
         if self.comparison is not None:
             d["comparison"] = self.comparison
+            d["previous_value"] = self.comparison
+        if self.variance_amount is not None:
+            d["variance_amount"] = self.variance_amount
         if self.variance_pct is not None:
             d["variance_pct"] = self.variance_pct
         if self.trend is not None:
@@ -111,6 +143,20 @@ class KPI:
             d["tooltip"] = self.tooltip
         if self.severity is not None:
             d["severity"] = self.severity
+        if self.target is not None:
+            d["target"] = self.target
+        if self.status is not None:
+            d["status"] = self.status
+        if self.unit is not None:
+            d["unit"] = self.unit
+        if self.invocation_ids:
+            d["invocation_ids"] = self.invocation_ids
+        if self.period is not None:
+            d["period"] = self.period
+        if self.comparison_period is not None:
+            d["comparison_period"] = self.comparison_period
+        if self.scenario is not None:
+            d["scenario"] = self.scenario
         return d
 
 
@@ -149,9 +195,12 @@ class Chart:
     options: ChartOptions
     auto_selected: bool
     manual_override_allowed: bool = True
+    invocation_id: Optional[str] = None
+    period_role: Optional[str] = None
+    scenario: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d = {
             "id": self.id,
             "title": self.title,
             "type": self.type,
@@ -160,6 +209,13 @@ class Chart:
             "auto_selected": self.auto_selected,
             "manual_override_allowed": self.manual_override_allowed,
         }
+        if self.invocation_id is not None:
+            d["invocation_id"] = self.invocation_id
+        if self.period_role is not None:
+            d["period_role"] = self.period_role
+        if self.scenario is not None:
+            d["scenario"] = self.scenario
+        return d
 
 
 @dataclass(frozen=True)
@@ -212,6 +268,10 @@ class Table:
     pagination: Optional[Pagination] = None
     exportable: bool = True
     drill_down: Optional[DrillDown] = None
+    invocation_id: Optional[str] = None
+    period_role: Optional[str] = None
+    scenario: Optional[str] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         d = {
@@ -227,6 +287,14 @@ class Table:
             d["pagination"] = self.pagination.to_dict()
         if self.drill_down is not None:
             d["drill_down"] = self.drill_down.to_dict()
+        if self.invocation_id is not None:
+            d["invocation_id"] = self.invocation_id
+        if self.period_role is not None:
+            d["period_role"] = self.period_role
+        if self.scenario is not None:
+            d["scenario"] = self.scenario
+        if self.metadata:
+            d["metadata"] = self.metadata
         return d
 
 
@@ -286,6 +354,8 @@ class Action:
 class StructuredResponse:
     answer: Answer
     context: Context
+    analysis_plan: dict[str, Any] = field(default_factory=dict)
+    tool_invocations: list[ToolInvocation] = field(default_factory=list)
     kpis: list[KPI] = field(default_factory=list)
     charts: list[Chart] = field(default_factory=list)
     tables: list[Table] = field(default_factory=list)
@@ -299,6 +369,8 @@ class StructuredResponse:
         return {
             "answer": self.answer.to_dict(),
             "context": self.context.to_dict(),
+            "analysis_plan": self.analysis_plan,
+            "tool_invocations": [invocation.to_dict() for invocation in self.tool_invocations],
             "kpis": [k.to_dict() for k in self.kpis],
             "charts": [c.to_dict() for c in self.charts],
             "tables": [t.to_dict() for t in self.tables],
