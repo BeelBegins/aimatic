@@ -13,6 +13,10 @@ all get oriented without reading source code. For the technical "how it's wired"
 (hooks, doctypes, gotchas learned the hard way), see `CLAUDE.md` at the root of this bench —
 this guide and that file are meant to be read together, not as duplicates of each other.
 
+The governed AI Assistant architecture, certified formulas, confidence rules, limitations,
+example questions, and evaluation corpus are documented in
+[`ai-business-intelligence.md`](ai-business-intelligence.md).
+
 The customer storefront for the `siezal` site is served at `https://shop.aimatic.tech/`. System Managers can use `https://shop.aimatic.tech/uploadimageproduct` to upload a Shopping Product photo, run local background removal, compare the original and transparent result, and approve the public image. Processing uses an isolated `rembg`/U²-Netp Python 3.12 environment under `/home/nabeel/.local/share/aimatic-bgremove`; it has no external paid API and must not be installed into the Frappe environment.
 
 ## The product portfolio

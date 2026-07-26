@@ -6,7 +6,14 @@ from unittest.mock import Mock, patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from aimatic.ai.api import _get_free_audio_model, _is_zero_price, transcribe_audio
+from aimatic.ai.api import (
+	_get_free_audio_model,
+	_is_zero_price,
+	export_table,
+	refresh_saved_report,
+	save_report,
+	transcribe_audio,
+)
 from aimatic.ai.nemotron_client import NemotronError, get_chat_completion
 
 
@@ -122,3 +129,58 @@ class TestFreeAudioTranscription(FrappeTestCase):
 		payload = json.loads(post.call_args.kwargs["data"])
 		self.assertEqual(payload["reasoning"], {"enabled": False})
 		self.assertEqual(post.call_args.kwargs["timeout"], 120)
+
+	("aimatic.ai.api._check_role")
+	("aimatic.ai.api.frappe.get_doc")
+	def test_saved_report_snapshot_preserves_repeated_invocations(self, get_doc, _role):
+		get_doc.return_value.insert.return_value = SimpleNamespace(name="AI-SAVED-1")
+		invocations = [
+			{"call_id": "current", "tool_name": "get_sales_overview", "sequence": 1},
+			{"call_id": "previous", "tool_name": "get_sales_overview", "sequence": 2},
+		]
+		result = save_report(
+			"Compare sales",
+			"{}",
+			json.dumps({"tool_invocations": invocations}),
+		)
+		self.assertEqual(result["name"], "AI-SAVED-1")
+		payload = get_doc.call_args.args[0]
+		self.assertEqual(json.loads(payload["tool_results_snapshot"]), invocations)
+
+	("aimatic.ai.api._check_role")
+	("aimatic.ai.api._check_saved_report_ownership")
+	("aimatic.ai.api.ask")
+	("aimatic.ai.api.frappe.get_doc")
+	def test_saved_report_refresh_replaces_invocation_snapshot(self, get_doc, ask, _ownership, _role):
+		doc = SimpleNamespace(
+			question="Compare sales",
+			response_snapshot=json.dumps({"kpis": [{"value": 1}]}),
+			tool_results_snapshot="[]",
+			last_refreshed=None,
+			save=Mock(),
+		)
+		get_doc.return_value = doc
+		invocations = [{"call_id": "new", "tool_name": "get_sales_overview", "sequence": 1}]
+		ask.return_value = {"kpis": [{"value": 2}], "charts": [], "tables": [], "tool_invocations": invocations}
+		refresh_saved_report("AI-SAVED-1")
+		self.assertEqual(json.loads(doc.tool_results_snapshot), invocations)
+		doc.save.assert_called_once_with(ignore_permissions=True)
+
+	("aimatic.ai.api._check_role")
+	("aimatic.ai.api.build_csv_response")
+	def test_export_uses_exact_structured_table_values(self, build_csv, _role):
+		table = {
+			"columns": [
+				{"key": "scenario", "label": "Scenario"},
+				{"key": "value", "label": "Value"},
+			],
+			"rows": [
+				{"scenario": "Current", "value": 120},
+				{"scenario": "Previous", "value": 100},
+			],
+		}
+		export_table(json.dumps(table), "comparison.csv", "csv")
+		build_csv.assert_called_once_with(
+			[["Scenario", "Value"], ["Current", 120], ["Previous", 100]],
+			"comparison",
+		)
