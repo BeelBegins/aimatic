@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.exceptions import PermissionError as FrappePermissionError
+from frappe.tests import IntegrationTestCase
 
 # ---------------------------------------------------------------------------
 # Site-specific fixtures (resolved once at module import against the live DB)
@@ -76,16 +77,20 @@ def _require_fixtures(test):
 # Test base
 # ---------------------------------------------------------------------------
 
-class _AimTestCase(unittest.TestCase):
+class _AimTestCase(IntegrationTestCase):
     """Saves/restores the Frappe session user and rolls back the DB after each test."""
 
     def setUp(self):
+        super().setUp()
         self._original_user = frappe.session.user
         frappe.set_user("Administrator")
 
     def tearDown(self):
-        frappe.set_user(self._original_user)
-        frappe.db.rollback()
+        try:
+            frappe.set_user(self._original_user)
+            frappe.db.rollback()
+        finally:
+            super().tearDown()
 
 
 class TestAndroidBearerSecurity(_AimTestCase):
