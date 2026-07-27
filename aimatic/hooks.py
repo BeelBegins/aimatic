@@ -25,6 +25,13 @@ doc_events = {
     "Customer": {
         "validate": "aimatic.offline_pos.customer_validation.validate_customer",
     },
+    # Auto-assigns a new Account's account_number (when left blank) to the
+    # next free number in the numeric block implied by its parent account -
+    # removes the error-prone manual "what's the next number in this series"
+    # judgment call from whoever is adding a new ledger account.
+    "Account": {
+        "validate": "aimatic.coa_numbering.events.auto_assign_account_number",
+    },
     # Branch Management: derives cost_center / set_warehouse / rejected_warehouse
     # from the document's Branch so normal Sales/Purchase users never pick these
     # (and can't pick them wrong). POS Invoice is deliberately excluded - see
