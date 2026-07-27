@@ -36,5 +36,7 @@ aimatic.patches.create_branch_accounting_dimension
 aimatic.patches.remove_item_field_order_override
 aimatic.patches.create_pos_profile_fbr_optional_field
 aimatic.patches.repair_item_custom_docperms
+aimatic.patches.repair_item_price_custom_docperms
+aimatic.patches.repair_pos_role_custom_docperms
 aimatic.patches.create_branch_foodpanda_price_list
 aimatic.patches.create_purchase_fp_price_field
