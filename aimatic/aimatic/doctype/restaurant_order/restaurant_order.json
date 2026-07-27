@@ -12,7 +12,7 @@
   {"fieldname":"waiter","fieldtype":"Link","label":"Waiter","options":"User","reqd":1,"in_list_view":1},
   {"default":"1","fieldname":"guest_count","fieldtype":"Int","label":"Guest Count","reqd":1},
   {"fieldname":"opened_at","fieldtype":"Datetime","label":"Opened At","read_only":1},
-  {"fieldname":"section_sales","fieldtype":"Section Break","label":"ERPNext Context"},
+  {"fieldname":"section_sales","fieldtype":"Section Break","label":"ERP Context"},
   {"fieldname":"pos_profile","fieldtype":"Link","label":"POS Profile","options":"POS Profile","reqd":1,"read_only":1},
   {"fieldname":"customer","fieldtype":"Link","label":"Customer","options":"Customer","read_only":1},
   {"fieldname":"warehouse","fieldtype":"Link","label":"Warehouse","options":"Warehouse","reqd":1,"read_only":1},

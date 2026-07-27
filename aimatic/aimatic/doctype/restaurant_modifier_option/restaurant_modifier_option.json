@@ -5,7 +5,7 @@
   {"fieldname":"option_code","fieldtype":"Data","label":"Option Code","reqd":1,"in_list_view":1},
   {"fieldname":"label","fieldtype":"Data","label":"Label","reqd":1,"in_list_view":1},
   {"default":"0","fieldname":"price_adjustment","fieldtype":"Currency","label":"Price Adjustment","in_list_view":1},
-  {"fieldname":"linked_item","fieldtype":"Link","label":"Linked ERPNext Item","options":"Item"},
+  {"fieldname":"linked_item","fieldtype":"Link","label":"Linked ERP Item","options":"Item"},
   {"default":"0","fieldname":"disabled","fieldtype":"Check","label":"Disabled","in_list_view":1}
  ], "permissions":[], "states":[]
 }

@@ -38,7 +38,7 @@
   {"fieldname": "saturday", "fieldtype": "Check", "label": "Saturday"},
   {"fieldname": "sunday", "fieldtype": "Check", "label": "Sunday"},
   {"fieldname": "rules_section", "fieldtype": "Section Break", "label": "Delivery Rules"},
-  {"default": "0", "description": "Shown as a warning in Sales; normal ERPNext validation still remains authoritative.", "fieldname": "minimum_order_value", "fieldtype": "Currency", "label": "Minimum Order Value", "non_negative": 1},
+  {"default": "0", "description": "Shown as a warning in Sales; normal ERP validation still remains authoritative.", "fieldname": "minimum_order_value", "fieldtype": "Currency", "label": "Minimum Order Value", "non_negative": 1},
   {"description": "Instructions shown to the sales rep for this location.", "fieldname": "instructions", "fieldtype": "Small Text", "label": "Delivery Instructions"}
  ],
  "index_web_pages_for_search": 0,

@@ -77,14 +77,14 @@ def _default_company(branch_doc=None, warehouse_doc=None, fallback_branch_doc=No
 	companies = frappe.get_list("Company", pluck="name", limit_page_length=2)
 	if len(companies) == 1:
 		return companies[0]
-	frappe.throw(_("Select a default Company or Warehouse in ERPNext"))
+	frappe.throw(_("Select a default Company or Warehouse in ERP"))
 
 
 def _default_warehouse(company, branch=None, requested=None, required=True):
 	if requested:
 		return _warehouse_doc(requested, company, required=True).name
 
-	# Preserve ERPNext's standard user/global defaults before consulting Ai Matic Branch settings.
+	# Preserve ERP's standard user/global defaults before consulting Ai Matic Branch settings.
 	for candidate in (
 		frappe.defaults.get_user_default("Warehouse"),
 		frappe.db.get_single_value("Stock Settings", "default_warehouse"),
@@ -126,7 +126,7 @@ def _sales_context(branch=None, warehouse=None, require_warehouse=True):
 		branch_doc.get("default_selling_price_list") if branch_doc else None
 	)
 	if not price_list:
-		frappe.throw(_("Configure the Selling Price List in ERPNext Selling Settings"))
+		frappe.throw(_("Configure the Selling Price List in ERP Selling Settings"))
 	return frappe._dict(
 		branch=branch,
 		company=company,
@@ -163,7 +163,7 @@ def _item_stock_and_rates(item_codes, warehouse, price_list):
 	  missing UOM selector itself; fixed here as part of making per-UOM pricing correct).
 	- uom_by_item: {item_code: {"default_uom": str, "uoms": [{uom, conversion_factor, rate}]}}.
 	  A uom's rate prefers a dedicated Item Price row for that (item_code, uom, price_list);
-	  falling back to stock_uom_rate * conversion_factor, mirroring ERPNext's own
+	  falling back to stock_uom_rate * conversion_factor, mirroring ERP's own
 	  get_price_list_rate fallback (erpnext/stock/get_item_details.py:1291) so client-shown
 	  estimates agree with what set_missing_values/calculate_taxes_and_totals compute
 	  server-side at submit time.
@@ -389,7 +389,7 @@ def _approval_for_order(order):
 
 
 def _mobile_order_status(doc):
-	"""Stable app-facing status independent of ERPNext's detailed workflow labels."""
+	"""Stable app-facing status independent of ERP's detailed workflow labels."""
 	if cint(doc.docstatus) == 0:
 		return "Draft"
 	if cint(doc.docstatus) == 2:
@@ -492,7 +492,7 @@ def get_public_config():
 @frappe.whitelist()
 def get_context(branch=None, warehouse=None):
 	user = _require_sales_user()
-	# Initial login must return the available choices even when ERPNext has
+	# Initial login must return the available choices even when ERP has
 	# several warehouses and no default. Transaction endpoints stay strict.
 	context = _sales_context(branch, warehouse, require_warehouse=False)
 	default_branch = get_user_default_branch()
@@ -681,7 +681,7 @@ def _promotion_offer(rule):
 
 @frappe.whitelist()
 def get_active_promotions(customer, date=None, branch=None, warehouse=None):
-	"""Curated active Selling Pricing Rules; ERPNext still applies every offer."""
+	"""Curated active Selling Pricing Rules; ERP still applies every offer."""
 	_require_sales_user()
 	context = _sales_context(branch, warehouse)
 	customer_doc = _customer_doc(customer)
@@ -1456,7 +1456,7 @@ def create_order(request_id, customer, items, branch=None, warehouse=None, deliv
 @frappe.whitelist()
 def update_order(order, items, delivery_date=None, po_no=None, remarks=None, delivery_location=None, discount_percent=None, discount_reason=None):
 	"""Edits an existing Sales Order still sitting as a Draft (docstatus=0).
-	Only reachable for Draft orders - once submitted/cancelled, ERPNext's own
+	Only reachable for Draft orders - once submitted/cancelled, ERP's own
 	docstatus immutability is the guard, not anything here. Recomputes items/
 	pricing/tax the same way _make_order does for a new order (never trusts
 	a client-supplied rate/amount), using the order's own existing branch/
@@ -1664,7 +1664,7 @@ def approve_discount(order_name, approved, comment=None):
 
 @frappe.whitelist()
 def cancel_order(order):
-	"""Cancel one submitted Sales Order through normal ERPNext validation and permissions."""
+	"""Cancel one submitted Sales Order through normal ERP validation and permissions."""
 	_require_sales_manager()
 	doc = frappe.get_doc("Sales Order", order)
 	doc.check_permission("read")
@@ -1775,7 +1775,7 @@ def _manager_team_metrics(company, start_date, end_date, warehouse=None):
 
 @frappe.whitelist()
 def get_manager_dashboard(period="month", branch=None, warehouse=None):
-	"""Compact manager view; every amount is aggregated from submitted ERPNext Sales Orders."""
+	"""Compact manager view; every amount is aggregated from submitted ERP Sales Orders."""
 	_require_sales_manager()
 	context = _sales_context(branch, warehouse, require_warehouse=False)
 	today = getdate(nowdate())
