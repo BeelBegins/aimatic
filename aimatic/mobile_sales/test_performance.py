@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
@@ -45,8 +46,8 @@ class TestMobileSalesReorderFeed(FrappeTestCase):
 			frappe._dict(name="SO-3", customer="CUST-2"),
 		]
 		docs = {
-			"SO-1": frappe._dict(name="SO-1", customer="CUST-1", customer_name="One", transaction_date="2026-07-20", currency="PKR", grand_total=1200, items=[frappe._dict(item_code="ITEM-1", item_name="Item One", uom="Box", qty=2)]),
-			"SO-3": frappe._dict(name="SO-3", customer="CUST-2", customer_name="Two", transaction_date="2026-07-19", currency="PKR", grand_total=900, items=[frappe._dict(item_code="ITEM-2", item_name="Item Two", uom="Nos", qty=3)]),
+			"SO-1": SimpleNamespace(name="SO-1", customer="CUST-1", customer_name="One", transaction_date="2026-07-20", currency="PKR", grand_total=1200, items=[frappe._dict(item_code="ITEM-1", item_name="Item One", uom="Box", qty=2)]),
+			"SO-3": SimpleNamespace(name="SO-3", customer="CUST-2", customer_name="Two", transaction_date="2026-07-19", currency="PKR", grand_total=900, items=[frappe._dict(item_code="ITEM-2", item_name="Item Two", uom="Nos", qty=3)]),
 		}
 		for doc in docs.values():
 			doc.check_permission = lambda permission: self.assertEqual(permission, "read")

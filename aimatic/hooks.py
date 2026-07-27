@@ -168,13 +168,13 @@ jinja = {
     ],
 }
 
-# Creates the Label Printing roles and default templates on a fresh
-# `bench install-app aimatic`. The equivalent patches (create_label_printing_roles,
-# create_label_printing_default_templates) handle sites that already had the
-# app installed before this module existed. Print Format/Report packaging
-# does NOT need an after_install entry - see the printingformats note in
-# CLAUDE.md for how those ship via Frappe's own native module-doc sync
-# instead.
+# Creates Label Printing defaults, Restaurant roles, and the POS roles plus
+# Item master-data grants on a fresh `bench install-app aimatic`. Frappe marks
+# patches completed instead of executing them during first installation, so
+# the equivalent patches handle upgrades while this hook handles new sites.
+# Print Format/Report packaging does NOT need an after_install entry - see the
+# print-format-packaging skill for how those ship via Frappe's native
+# module-doc sync instead.
 after_install = "aimatic.setup.after_install"
 after_migrate = "aimatic.tax_formula_setup.after_migrate"
 
@@ -263,12 +263,13 @@ fixtures = [
     # reliably converge to a stable set of names for it across repeated bench migrate
     # runs in practice (confirmed: an earlier fixture-based attempt at this exact fix
     # kept re-creating a fresh duplicate 11-row batch on every migrate, unbounded).
-    # aimatic.patches.repair_item_custom_docperms is the sole mechanism instead - a
-    # one-time, content-based (not name-based) reconciliation that rebuilds Item's
-    # complete Custom DocPerm set (standard DocPerm rows, since any Custom DocPerm on a
-    # doctype replaces ALL of its standard DocPerm rows, plus the two POS read+export
-    # grants) directly against what's actually in the database. Patches only run once
-    # per site (Patch Log), so this sidesteps the fixture-sync instability entirely.
+    # aimatic.patches.repair_item_custom_docperms is used instead - a content-based
+    # (not name-based) reconciliation that rebuilds Item's complete Custom DocPerm set
+    # (standard DocPerm rows, since any Custom DocPerm on a doctype replaces ALL of
+    # its standard DocPerm rows, plus the two POS read+export grants) directly against
+    # what's actually in the database. It runs through a patch for upgrades and the
+    # app's after_install/test bootstrap for new sites and CI, sidestepping fixture
+    # hash-name instability in every path.
     # POS Invoice itself (2026-07-20): the same class of gap as above, but discovered
     # one step further down the same flow - a cashier with POS User could log in, open
     # a shift, and preview a cart, but submit_online_sale's own

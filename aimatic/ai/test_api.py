@@ -130,8 +130,8 @@ class TestFreeAudioTranscription(FrappeTestCase):
 		self.assertEqual(payload["reasoning"], {"enabled": False})
 		self.assertEqual(post.call_args.kwargs["timeout"], 120)
 
-	("aimatic.ai.api._check_role")
-	("aimatic.ai.api.frappe.get_doc")
+	@patch("aimatic.ai.api._check_role")
+	@patch("aimatic.ai.api.frappe.get_doc")
 	def test_saved_report_snapshot_preserves_repeated_invocations(self, get_doc, _role):
 		get_doc.return_value.insert.return_value = SimpleNamespace(name="AI-SAVED-1")
 		invocations = [
@@ -147,10 +147,10 @@ class TestFreeAudioTranscription(FrappeTestCase):
 		payload = get_doc.call_args.args[0]
 		self.assertEqual(json.loads(payload["tool_results_snapshot"]), invocations)
 
-	("aimatic.ai.api._check_role")
-	("aimatic.ai.api._check_saved_report_ownership")
-	("aimatic.ai.api.ask")
-	("aimatic.ai.api.frappe.get_doc")
+	@patch("aimatic.ai.api._check_role")
+	@patch("aimatic.ai.api._check_saved_report_ownership")
+	@patch("aimatic.ai.api.ask")
+	@patch("aimatic.ai.api.frappe.get_doc")
 	def test_saved_report_refresh_replaces_invocation_snapshot(self, get_doc, ask, _ownership, _role):
 		doc = SimpleNamespace(
 			question="Compare sales",
@@ -166,8 +166,8 @@ class TestFreeAudioTranscription(FrappeTestCase):
 		self.assertEqual(json.loads(doc.tool_results_snapshot), invocations)
 		doc.save.assert_called_once_with(ignore_permissions=True)
 
-	("aimatic.ai.api._check_role")
-	("aimatic.ai.api.build_csv_response")
+	@patch("aimatic.ai.api._check_role")
+	@patch("aimatic.ai.api.build_csv_response")
 	def test_export_uses_exact_structured_table_values(self, build_csv, _role):
 		table = {
 			"columns": [

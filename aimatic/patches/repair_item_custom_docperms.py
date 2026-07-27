@@ -62,8 +62,9 @@ def execute():
     permission flag directly against what already exists sidesteps that
     entirely: matching rows are left alone or corrected in place, stray/
     duplicate rows are removed, and only genuinely missing rows are inserted.
-    Patches only ever execute once per site (Patch Log), but this is written
-    to converge safely if it were ever run again.
+    Migration patches execute once per site, but this repair is also called by
+    the fresh-install and test bootstrap paths, so every invocation must
+    converge safely.
     """
     target_by_key = {_row_key(row): row for row in _target_rows()}
 
