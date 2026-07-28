@@ -208,7 +208,9 @@ fixtures = [
     # links on unambiguous single-company sites by selecting that company's
     # enabled ``GST - <abbr>`` tax ledger. Existing valid mappings and all
     # multi-company sites are left untouched; other account types are never
-    # guessed.
+    # guessed. A standalone `sync_fixtures` call (bypassing `bench migrate`)
+    # reintroduces the dangling placeholder without running this repair -
+    # the daily scheduler entry below is the safety net for that case.
     {"doctype": "Tax Formula"},
     # Reference GST categories for FBR e-invoicing - configuration, no secrets.
     {"doctype": "FBR Tax Category"},
@@ -449,6 +451,10 @@ scheduler_events = {
 		"aimatic.ai.tasks.purge_old_ai_messages",
 		"aimatic.ai.tasks.run_scheduled_questions",
 		"aimatic.ai.tasks.check_alert_rules",
+		# Safety net: a standalone fixture sync (bypassing `bench migrate`)
+		# resets Tax Formula.gst_account to the shared fixture's placeholder
+		# and skips the after_migrate repair below. This self-heals daily.
+		"aimatic.tax_formula_setup.repair_dangling_gst_accounts",
 	],
 }
 
