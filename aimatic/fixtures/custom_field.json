@@ -4346,7 +4346,7 @@
   "module": null,
   "name": "Purchase Invoice Item-custom_discount_amnt",
   "no_copy": 0,
-  "non_negative": 1,
+  "non_negative": 0,
   "options": null,
   "permlevel": 0,
   "placeholder": null,
