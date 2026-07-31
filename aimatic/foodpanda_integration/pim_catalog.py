@@ -10,6 +10,9 @@ from frappe import _
 from aimatic.shelf_pricing.utils import get_or_create_branch_foodpanda_price_list
 
 
+_COMMIT_BATCH_SIZE = 100
+
+
 def _barcode(value):
 	value = str(value or "").strip()
 	if value.endswith(".0") and value[:-2].isdigit():
@@ -71,7 +74,7 @@ def _copy_missing_prices(source_price_list, target_price_list):
 	existing_items = set(
 		frappe.get_all("Item Price", filters={"price_list": target_price_list}, pluck="item_code")
 	)
-	copied = skipped_ambiguous = 0
+	copied = skipped_ambiguous = skipped_locked = pending_copies = 0
 	for item_code, rows in by_item.items():
 		if item_code in existing_items:
 			continue
@@ -79,22 +82,33 @@ def _copy_missing_prices(source_price_list, target_price_list):
 			skipped_ambiguous += 1
 			continue
 		row = rows[0]
-		frappe.get_doc(
-			{
-				"doctype": "Item Price",
-				"item_code": item_code,
-				"price_list": target_price_list,
-				"price_list_rate": row.price_list_rate,
-				"currency": row.currency,
-				"uom": row.uom,
-				"valid_from": row.valid_from,
-				"valid_upto": row.valid_upto,
-				"selling": 1,
-				"buying": 0,
-			}
-		).insert(ignore_permissions=True)
+		try:
+			frappe.get_doc(
+				{
+					"doctype": "Item Price",
+					"item_code": item_code,
+					"price_list": target_price_list,
+					"price_list_rate": row.price_list_rate,
+					"currency": row.currency,
+					"uom": row.uom,
+					"valid_from": row.valid_from,
+					"valid_upto": row.valid_upto,
+					"selling": 1,
+					"buying": 0,
+				}
+			).insert(ignore_permissions=True)
+		except frappe.QueryTimeoutError:
+			frappe.db.rollback()
+			copied -= pending_copies
+			pending_copies = 0
+			skipped_locked += 1
+			continue
 		copied += 1
-	return copied, skipped_ambiguous
+		pending_copies += 1
+		if pending_copies >= _COMMIT_BATCH_SIZE:
+			frappe.db.commit()
+			pending_copies = 0
+	return copied, skipped_ambiguous, skipped_locked
 
 
 def apply_initial_pim_catalog(outlet_name, file_url):
@@ -124,7 +138,7 @@ def apply_initial_pim_catalog(outlet_name, file_url):
 			if _barcode(row.barcode):
 				barcodes_by_item[row.parent].append(row.barcode)
 
-	updated_names = skipped_ambiguous = 0
+	updated_names = skipped_ambiguous = skipped_locked = pending_name_updates = 0
 	for product in products:
 		matches = set()
 		for barcode in barcodes_by_item[product.item]:
@@ -136,10 +150,23 @@ def apply_initial_pim_catalog(outlet_name, file_url):
 			continue
 		_title = next(iter(matches))[1]
 		if product.public_name != _title:
-			frappe.db.set_value("Shopping Product", product.name, "public_name", _title, update_modified=True)
+			try:
+				frappe.db.set_value("Shopping Product", product.name, "public_name", _title, update_modified=True)
+			except frappe.QueryTimeoutError:
+				frappe.db.rollback()
+				updated_names -= pending_name_updates
+				pending_name_updates = 0
+				skipped_locked += 1
+				continue
 			updated_names += 1
+			pending_name_updates += 1
+			if pending_name_updates >= _COMMIT_BATCH_SIZE:
+				frappe.db.commit()
+				pending_name_updates = 0
 
-	prices_copied, prices_skipped_ambiguous = _copy_missing_prices(source_price_list, target_price_list)
+	prices_copied, prices_skipped_ambiguous, prices_skipped_locked = _copy_missing_prices(
+		source_price_list, target_price_list
+	)
 	frappe.db.commit()
 	return {
 		"outlet": outlet.name,
@@ -147,6 +174,8 @@ def apply_initial_pim_catalog(outlet_name, file_url):
 		"foodpanda_price_list": target_price_list,
 		"public_names_updated": updated_names,
 		"ambiguous_name_matches_skipped": skipped_ambiguous,
+		"locked_name_updates_skipped": skipped_locked,
 		"foodpanda_prices_copied": prices_copied,
 		"ambiguous_source_prices_skipped": prices_skipped_ambiguous,
+		"locked_price_updates_skipped": prices_skipped_locked,
 	}
