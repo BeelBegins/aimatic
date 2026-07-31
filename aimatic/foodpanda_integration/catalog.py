@@ -112,7 +112,9 @@ def get_or_create_foodpanda_product(item_code, outlet_name):
 	return doc
 
 
-def _submit_catalog_job(settings, method, chain_id, vendor_id, payload, outlet_name):
+def _submit_catalog_job(
+	settings, method, chain_id, vendor_id, payload, outlet_name, include_api_response=False
+):
 	is_add = method == "POST"
 	path = _ADD_PRODUCTS_PATH.format(chain_id=chain_id) if is_add else _UPDATE_PRODUCTS_PATH.format(
 		chain_id=chain_id, vendor_id=vendor_id
@@ -143,6 +145,11 @@ def _submit_catalog_job(settings, method, chain_id, vendor_id, payload, outlet_n
 			"submitted_at": now_datetime(),
 		}
 	).insert(ignore_permissions=True)
+	if include_api_response:
+		return job_id, {
+			"http_status": response.status_code,
+			"body": response_data,
+		}
 	return job_id
 
 
@@ -157,9 +164,14 @@ def sync_item(item_code, outlet_name):
 	is_new_product = not product.foodpanda_product_id
 	settings = client.get_settings() if is_new_product else None
 	if is_new_product and not settings.allow_product_creation:
+		error_message = (
+			"Product creation is disabled; map the existing Foodpanda SKU or enable beta product creation"
+		)
+		product.db_set({"sync_status": "Failed", "last_error": error_message})
 		return {
 			"status": "Failed",
-			"error": "Product creation is disabled; map the existing Foodpanda SKU or enable beta product creation",
+			"error": error_message,
+			"source": "ERPNext validation",
 		}
 
 	payload = build_create_payload(item_code, outlet) if is_new_product else build_update_payload(item_code, outlet)
@@ -171,8 +183,14 @@ def sync_item(item_code, outlet_name):
 
 	try:
 		method = "POST" if is_new_product else "PUT"
-		job_id = _submit_catalog_job(
-			settings, method, settings.chain_id, outlet.vendor_id, payload, outlet_name
+		job_id, api_response = _submit_catalog_job(
+			settings,
+			method,
+			settings.chain_id,
+			outlet.vendor_id,
+			payload,
+			outlet_name,
+			include_api_response=True,
 		)
 		product.db_set(
 			{"sync_status": "Pending", "last_job_id": job_id, "pending_content_hash": content_hash, "last_error": ""}
@@ -182,9 +200,20 @@ def sync_item(item_code, outlet_name):
 			f"Foodpanda catalog sync failed: {item_code}", f"Outlet: {outlet_name}", error
 		)
 		product.db_set({"sync_status": "Failed", "last_error": str(error)})
-		return {"status": "Failed", "error": str(error)}
+		result = {"status": "Failed", "error": str(error), "source": "Foodpanda API"}
+		if error.status_code is not None or error.response_body is not None:
+			result["api_response"] = {
+				"http_status": error.status_code,
+				"body": error.response_body,
+			}
+		return result
 
-	return {"status": "Pending", "job_id": job_id}
+	return {
+		"status": "Pending",
+		"job_id": job_id,
+		"source": "Foodpanda API",
+		"api_response": api_response,
+	}
 
 
 def sync_availability(item_code, branch):

@@ -1,6 +1,17 @@
-// "Sync Now" button: pushes this one item to Foodpanda immediately via
-// catalog.sync_item, then reloads the form so sync_status/last_synced/
-// last_error reflect the result.
+// "Sync Now" pushes one item and always shows the sanitized ERPNext/
+// Foodpanda response. The server deliberately excludes credentials/tokens.
+
+function show_foodpanda_sync_response(result) {
+	const status = result.status || "Unknown";
+	const indicator = status === "Failed" ? "red" : status === "Pending" ? "orange" : "green";
+	const response_json = frappe.utils.escape_html(JSON.stringify(result, null, 2));
+
+	frappe.msgprint({
+		title: __("Foodpanda Sync Response"),
+		indicator,
+		message: `<pre style="max-height: 420px; overflow: auto; white-space: pre-wrap;">${response_json}</pre>`,
+	});
+}
 
 frappe.ui.form.on("Foodpanda Product", {
 	refresh(frm) {
@@ -17,13 +28,16 @@ frappe.ui.form.on("Foodpanda Product", {
 				freeze: true,
 				freeze_message: __("Syncing with Foodpanda..."),
 				callback(r) {
-					const status = (r.message || {}).status;
-					if (status === "Failed") {
-						frappe.show_alert({ message: __("Sync failed - check Last Error"), indicator: "red" });
-					} else {
-						frappe.show_alert({ message: __("Synced"), indicator: "green" });
-					}
-					frm.reload_doc();
+					const result = r.message || { status: "Unknown", error: __("No response returned") };
+					frm.reload_doc().then(() => show_foodpanda_sync_response(result));
+				},
+				error(r) {
+					show_foodpanda_sync_response({
+						status: "Failed",
+						source: "ERPNext server",
+						http_status: r.status,
+						error: r.statusText || __("The server request failed"),
+					});
 				},
 			});
 		});

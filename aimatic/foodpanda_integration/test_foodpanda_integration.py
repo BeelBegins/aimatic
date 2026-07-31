@@ -247,7 +247,7 @@ class TestCatalogSync(unittest.TestCase):
 		mock_frappe.get_doc.side_effect = [outlet, existing_product, job_doc]
 		settings = _settings()
 		mock_client.get_settings.return_value = settings
-		submit_response = Mock(json=Mock(return_value={"job_id": "job-123"}))
+		submit_response = Mock(status_code=202, json=Mock(return_value={"job_id": "job-123"}))
 		mock_client.request.return_value = submit_response
 
 		result = catalog.sync_item("ITEM-1", "Outlet-1")
@@ -257,7 +257,74 @@ class TestCatalogSync(unittest.TestCase):
 		self.assertEqual(submit_method, "PUT")
 		self.assertIn("vendor-1", submit_path)
 		self.assertEqual(existing_product.db_set.call_args.args[0]["sync_status"], "Pending")
-		self.assertEqual(result, {"status": "Pending", "job_id": "job-123"})
+		self.assertEqual(
+			result,
+			{
+				"status": "Pending",
+				"job_id": "job-123",
+				"source": "Foodpanda API",
+				"api_response": {"http_status": 202, "body": {"job_id": "job-123"}},
+			},
+		)
+
+	@patch("aimatic.foodpanda_integration.catalog.client")
+	@patch("aimatic.foodpanda_integration.catalog.frappe")
+	def test_sync_item_returns_and_persists_product_creation_disabled_error(self, mock_frappe, mock_client):
+		from aimatic.foodpanda_integration import catalog
+
+		outlet = Mock(catalog_sync_enabled=1)
+		product = Mock(foodpanda_product_id=None)
+		mock_frappe.db.get_value.return_value = "existing-fp-product-name"
+		mock_frappe.get_doc.side_effect = [outlet, product]
+		mock_client.get_settings.return_value = _settings(allow_product_creation=False)
+
+		result = catalog.sync_item("ITEM-1", "Outlet-1")
+
+		self.assertEqual(result["status"], "Failed")
+		self.assertEqual(result["source"], "ERPNext validation")
+		self.assertIn("Product creation is disabled", result["error"])
+		product.db_set.assert_called_once_with({"sync_status": "Failed", "last_error": result["error"]})
+		mock_client.request.assert_not_called()
+
+	@patch("aimatic.foodpanda_integration.catalog.flt", new=_stub_flt)
+	@patch("aimatic.foodpanda_integration.catalog.client")
+	@patch("aimatic.foodpanda_integration.catalog.get_or_create_branch_foodpanda_price_list")
+	@patch("aimatic.foodpanda_integration.catalog.get_branch_defaults")
+	@patch("aimatic.foodpanda_integration.catalog.frappe")
+	def test_sync_item_returns_sanitized_foodpanda_error_body(
+		self, mock_frappe, mock_branch_defaults, mock_price_list, mock_client
+	):
+		from aimatic.foodpanda_integration import catalog
+		from aimatic.foodpanda_integration.client import FoodpandaAPIError
+
+		outlet = Mock(catalog_sync_enabled=1, branch="Branch 1", vendor_id="vendor-1")
+		product = Mock(foodpanda_product_id="ITEM-1", sync_status="Pending", content_hash="old")
+		mock_branch_defaults.return_value = {"finished_goods_warehouse": "WH-1"}
+		mock_price_list.return_value = "Branch 1 Foodpanda Price List"
+		mock_frappe.db.get_value.side_effect = [
+			"existing-fp-product-name",
+			_item_row(),
+			15.0,
+			{"actual_qty": 5, "reserved_qty": 0},
+			None,
+		]
+		mock_frappe.get_doc.side_effect = [outlet, product]
+		mock_client.get_settings.return_value = _settings()
+		mock_client.request.side_effect = FoodpandaAPIError(
+			"Foodpanda catalog request failed with HTTP 400",
+			status_code=400,
+			response_body={"error": "validation_error", "details": ["bad price"]},
+		)
+
+		result = catalog.sync_item("ITEM-1", "Outlet-1")
+
+		self.assertEqual(result["status"], "Failed")
+		self.assertEqual(result["source"], "Foodpanda API")
+		self.assertEqual(result["api_response"]["http_status"], 400)
+		self.assertEqual(result["api_response"]["body"]["error"], "validation_error")
+		product.db_set.assert_called_once_with(
+			{"sync_status": "Failed", "last_error": "Foodpanda catalog request failed with HTTP 400"}
+		)
 
 	@patch("aimatic.foodpanda_integration.catalog.client")
 	@patch("aimatic.foodpanda_integration.catalog.frappe")
