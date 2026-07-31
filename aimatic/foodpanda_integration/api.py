@@ -9,6 +9,7 @@ from aimatic.foodpanda_integration import (
 	catalog_jobs,
 	orders,
 	outlet as outlet_module,
+	pim_catalog,
 	webhooks,
 )
 from aimatic.foodpanda_integration.client import FoodpandaAPIError
@@ -131,6 +132,13 @@ def get_foodpanda_webhook_urls():
 def sync_catalog_item(item_code, outlet):
 	_require_permission()
 	return catalog.sync_item(item_code, outlet)
+
+
+@frappe.whitelist()
+def apply_initial_foodpanda_pim_catalog(outlet, file_url):
+	"""One-time, idempotent PIM-name and missing-price initialization."""
+	_require_permission()
+	return pim_catalog.apply_initial_pim_catalog(outlet, file_url)
 
 
 @frappe.whitelist()

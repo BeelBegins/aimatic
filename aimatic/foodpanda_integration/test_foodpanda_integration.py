@@ -206,7 +206,13 @@ class TestCatalogSync(unittest.TestCase):
 			{"actual_qty": 5, "reserved_qty": 0},  # Bin
 			None,  # Item Barcode - none on file
 		]
-		expected_payload = {"sku": "ITEM-1", "active": True, "price": 15.0, "quantity": 5.0}
+		expected_payload = {
+			"sku": "ITEM-1",
+			"active": True,
+			"price": 15.0,
+			"quantity": 5.0,
+			"max_sales_quantity": 1,
+		}
 		existing_product = Mock(
 			sync_status="Synced",
 			content_hash=catalog.hash_payload(expected_payload),
@@ -325,6 +331,39 @@ class TestCatalogSync(unittest.TestCase):
 		product.db_set.assert_called_once_with(
 			{"sync_status": "Failed", "last_error": "Foodpanda catalog request failed with HTTP 400"}
 		)
+
+	def test_maximum_sales_quantity_uses_quarter_with_one_and_thirty_six_limits(self):
+		from aimatic.foodpanda_integration.catalog import _maximum_sales_quantity
+
+		self.assertEqual(_maximum_sales_quantity(0), 0)
+		self.assertEqual(_maximum_sales_quantity(1), 1)
+		self.assertEqual(_maximum_sales_quantity(19), 4)
+		self.assertEqual(_maximum_sales_quantity(1000), 36)
+
+	@patch("aimatic.foodpanda_integration.catalog.build_update_payload")
+	@patch("aimatic.foodpanda_integration.catalog.client")
+	@patch("aimatic.foodpanda_integration.catalog.frappe")
+	def test_create_payload_prefers_shopping_public_name(self, mock_frappe, mock_client, mock_update_payload):
+		from aimatic.foodpanda_integration import catalog
+
+		mock_frappe.db.get_value.side_effect = [
+			_item_row(item_name="Internal item name"),
+			"category-1",
+			"PIM public name",
+		]
+		mock_client.get_settings.return_value = _settings(catalog_locale="en_PK")
+		mock_update_payload.return_value = {
+			"sku": "ITEM-1",
+			"active": True,
+			"price": 15.0,
+			"quantity": 5,
+			"max_sales_quantity": 1,
+		}
+
+		payload = catalog.build_create_payload("ITEM-1", Mock())
+
+		self.assertEqual(payload["title"], {"en_PK": "PIM public name"})
+		self.assertEqual(payload["categories"], ["category-1"])
 
 	@patch("aimatic.foodpanda_integration.catalog.client")
 	@patch("aimatic.foodpanda_integration.catalog.frappe")

@@ -1,6 +1,7 @@
 import hashlib
 import json
 import uuid
+from math import floor
 
 import frappe
 from frappe import _
@@ -48,6 +49,22 @@ def _get_barcode(item_code):
 	return frappe.db.get_value("Item Barcode", {"parent": item_code}, "barcode")
 
 
+def _maximum_sales_quantity(quantity):
+	"""Keep a customer order to one quarter of the branch's sellable stock.
+
+	Foodpanda expects an integer. An in-stock item must allow at least one
+	unit; zero stock remains inactive and receives a zero limit.
+	"""
+	if quantity <= 0:
+		return 0
+	return min(max(int(floor(quantity / 4)), 1), 36)
+
+
+def _get_public_product_name(item_code, fallback):
+	public_name = frappe.db.get_value("Shopping Product", {"item": item_code}, "public_name")
+	return public_name or fallback
+
+
 def build_update_payload(item_code, outlet):
 	"""Steady-state payload for an existing Foodpanda product - limited to
 	the fields the docs' update example actually shows."""
@@ -61,7 +78,13 @@ def build_update_payload(item_code, outlet):
 	quantity, in_stock = _get_stock(item_code, outlet.branch)
 	active = bool(item.is_sales_item) and not item.disabled and in_stock
 
-	payload = {"sku": item_code, "active": active, "price": price, "quantity": quantity}
+	payload = {
+		"sku": item_code,
+		"active": active,
+		"price": price,
+		"quantity": quantity,
+		"max_sales_quantity": _maximum_sales_quantity(quantity),
+	}
 	barcode = _get_barcode(item_code)
 	if barcode:
 		payload["barcode"] = barcode
@@ -84,7 +107,7 @@ def build_create_payload(item_code, outlet):
 	locale = settings.catalog_locale or "en_PK"
 	payload = build_update_payload(item_code, outlet)
 	barcode = payload.pop("barcode", None)
-	payload["title"] = {locale: item.item_name}
+	payload["title"] = {locale: _get_public_product_name(item_code, item.item_name)}
 	payload["description"] = {locale: item.description or ""}
 	payload["barcodes"] = [barcode] if barcode else []
 	payload["categories"] = [category_id]
