@@ -1,0 +1,19 @@
+{
+ "app": "aimatic",
+ "creation": "2026-07-30 21:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon_type": "App",
+ "idx": 20,
+ "label": "Aimatic",
+ "link": "/desk/aimatic",
+ "link_type": "External",
+ "logo_url": "/assets/aimatic/images/aimatic-logo.svg",
+ "modified": "2026-07-30 21:00:00.000000",
+ "modified_by": "Administrator",
+ "name": "Aimatic",
+ "owner": "Administrator",
+ "roles": [],
+ "standard": 1
+}

@@ -1,0 +1,104 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:branch",
+ "creation": "2026-07-31 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "branch",
+  "vendor_id",
+  "column_break_flags",
+  "catalog_sync_enabled",
+  "order_ingestion_enabled",
+  "section_break_status",
+  "status_cache",
+  "last_status_sync",
+  "last_error"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Foodpanda's vendor/chain code identifying this outlet.",
+   "fieldname": "vendor_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Vendor ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_flags",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "catalog_sync_enabled",
+   "fieldtype": "Check",
+   "label": "Catalog Sync Enabled"
+  },
+  {
+   "default": "0",
+   "fieldname": "order_ingestion_enabled",
+   "fieldtype": "Check",
+   "label": "Order Ingestion Enabled"
+  },
+  {
+   "fieldname": "section_break_status",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "default": "Unknown",
+   "fieldname": "status_cache",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Unknown\nOpen\nClosed\nBusy",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_status_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Status Sync",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_error",
+   "fieldtype": "Long Text",
+   "label": "Last Error",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-31 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Foodpanda Outlet",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC"
+}

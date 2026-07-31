@@ -1,0 +1,130 @@
+{
+ "actions": [],
+ "creation": "2026-07-31 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "environment",
+  "api_host",
+  "column_break_creds",
+  "chain_id",
+  "client_id",
+  "client_secret",
+  "webhook_secret",
+  "section_break_ops",
+  "request_timeout",
+  "maximum_retries",
+  "verify_ssl",
+  "section_break_status",
+  "last_successful_sync",
+  "last_error"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "environment",
+   "fieldtype": "Select",
+   "label": "Environment",
+   "options": "Sandbox\nProduction"
+  },
+  {
+   "description": "Foodpanda Partner API host for the selected environment, e.g. https://api-sandbox.foodpanda.partner.deliveryhero.io or https://foodpanda.partner.deliveryhero.io.",
+   "fieldname": "api_host",
+   "fieldtype": "Data",
+   "label": "API Host"
+  },
+  {
+   "fieldname": "column_break_creds",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Foodpanda chain ID for this partner account - the {chain_id} path segment on every Catalog/Order/Outlet Management endpoint (distinct from the per-branch vendor_id on Foodpanda Outlet).",
+   "fieldname": "chain_id",
+   "fieldtype": "Data",
+   "label": "Chain ID"
+  },
+  {
+   "fieldname": "client_id",
+   "fieldtype": "Data",
+   "label": "Client ID"
+  },
+  {
+   "description": "OAuth client-credentials secret used to obtain access tokens. Never exported as a fixture - set this directly on each site.",
+   "fieldname": "client_secret",
+   "fieldtype": "Password",
+   "label": "Client Secret"
+  },
+  {
+   "description": "Shared secret used to verify the signature header on inbound Foodpanda order webhooks. Never exported as a fixture.",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret"
+  },
+  {
+   "fieldname": "section_break_ops",
+   "fieldtype": "Section Break",
+   "label": "Request behavior"
+  },
+  {
+   "default": "30",
+   "fieldname": "request_timeout",
+   "fieldtype": "Int",
+   "label": "Request Timeout (seconds)"
+  },
+  {
+   "default": "3",
+   "fieldname": "maximum_retries",
+   "fieldtype": "Int",
+   "label": "Maximum Retries"
+  },
+  {
+   "default": "1",
+   "fieldname": "verify_ssl",
+   "fieldtype": "Check",
+   "label": "Verify SSL"
+  },
+  {
+   "fieldname": "section_break_status",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "fieldname": "last_successful_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Successful Sync",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_error",
+   "fieldtype": "Long Text",
+   "label": "Last Error",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-07-31 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Foodpanda Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

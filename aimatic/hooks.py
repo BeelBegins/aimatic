@@ -7,6 +7,8 @@ app_publisher = "Aimatic"
 app_description = "Retail"
 app_email = "sthassan41@gmail.com"
 app_license = "mit"
+app_logo_url = "/assets/aimatic/images/aimatic-logo.svg"
+app_home = "/desk/aimatic"
 
 
 doc_events = {
@@ -84,6 +86,13 @@ doc_events = {
     "Stock Entry": {
         "before_validate": "aimatic.branch_management.events.apply_branch_defaults",
     },
+    # foodpanda_integration: pushes an item's Foodpanda availability whenever
+    # its Bin quantity changes at a branch with catalog sync enabled, so an
+    # item that sells out in ERPNext stops being orderable on Foodpanda
+    # before it can be oversold. Debounced in events.on_bin_update.
+    "Bin": {
+        "on_update": "aimatic.foodpanda_integration.events.on_bin_update",
+    },
     "Branch": {
         "validate": "aimatic.branch_management.events.validate_branch_company_consistency",
         "after_insert": "aimatic.branch_management.events.initialize_branch_selling_price_list",
@@ -154,6 +163,8 @@ doctype_js = {
     "Sales Invoice": "public/js/label_printing_source_buttons.js",
     "Supplier": "public/js/supplier_vendor_performance.js",
     "POS Profile": "public/js/pos_profile_device_enrollment.js",
+    "Foodpanda Outlet": "public/js/foodpanda_outlet_sync.js",
+    "Foodpanda Product": "public/js/foodpanda_product_sync.js",
 }
 
 jinja = {
@@ -313,16 +324,16 @@ fixtures = [
 
 # required_apps = []
 
-# Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "aimatic",
-# 		"logo": "/assets/aimatic/logo.png",
-# 		"title": "Aimatic",
-# 		"route": "/aimatic",
-# 		"has_permission": "aimatic.api.permission.has_app_permission"
-# 	}
-# ]
+# Register Aimatic in Frappe's app switcher. The public Aimatic workspace and
+# its permission-filtered Workspace Sidebar remain the navigation authority.
+add_to_apps_screen = [
+    {
+        "name": app_name,
+        "logo": app_logo_url,
+        "title": app_title,
+        "route": app_home,
+    }
+]
 
 # Includes in <head>
 # ------------------
