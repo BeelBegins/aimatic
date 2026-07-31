@@ -5,13 +5,7 @@ import frappe
 import requests
 from frappe import _
 
-# Confirmed against developer.foodpanda.com/api-specifications (Authentication
-# section) at the time this was written: POST {host}/v2/oauth/token with
-# client_id/client_secret/grant_type=client_credentials, response carries
-# access_token + expires_in. Every other path below (Catalog/Order/Outlet)
-# uses the same {chain_id}/{vendor_id} shape documented there, but has not
-# been exercised against a live sandbox - there are no Foodpanda credentials
-# on file yet. Re-verify against the spec before the first real call.
+OFFICIAL_API_HOST = "https://foodpanda.partner.deliveryhero.io"
 _TOKEN_PATH = "/v2/oauth/token"
 _CACHE_PREFIX = "aimatic:foodpanda:token:"
 _TOKEN_EXPIRY_SAFETY_MARGIN = 60
@@ -48,11 +42,26 @@ def _token_cache_key(client_id):
 	return f"{_CACHE_PREFIX}{client_id}"
 
 
-def _safe_body(response):
+def _redact_sensitive(value):
+	if isinstance(value, dict):
+		return {
+			key: "[redacted]" if key.lower() in {"access_token", "client_secret", "token"} else _redact_sensitive(item)
+			for key, item in value.items()
+		}
+	if isinstance(value, list):
+		return [_redact_sensitive(item) for item in value]
+	return value
+
+
+def _safe_body(response, sensitive_values=None):
 	try:
-		return response.json()
+		return _redact_sensitive(response.json())
 	except Exception:
-		return {"raw_response": response.text[:2000]}
+		raw_response = response.text[:2000]
+		for sensitive_value in sensitive_values or ():
+			if sensitive_value:
+				raw_response = raw_response.replace(str(sensitive_value), "[redacted]")
+		return {"raw_response": raw_response}
 
 
 def _fetch_access_token(settings):
@@ -60,16 +69,21 @@ def _fetch_access_token(settings):
 	if not client_secret:
 		frappe.throw(_("Foodpanda Settings is missing the Client Secret"))
 
-	response = requests.post(
-		f"{settings.api_host.rstrip('/')}{_TOKEN_PATH}",
-		data={
-			"client_id": settings.client_id,
-			"client_secret": client_secret,
-			"grant_type": "client_credentials",
-		},
-		timeout=int(settings.request_timeout or 30),
-		verify=bool(settings.verify_ssl),
-	)
+	try:
+		response = requests.post(
+			f"{settings.api_host.rstrip('/')}{_TOKEN_PATH}",
+			data={
+				"client_id": settings.client_id,
+				"client_secret": client_secret,
+				"grant_type": "client_credentials",
+			},
+			timeout=int(settings.request_timeout or 30),
+			verify=bool(settings.verify_ssl),
+		)
+	except requests.RequestException as error:
+		raise FoodpandaAPIError(
+			f"Foodpanda token request could not connect to {settings.api_host}: {error.__class__.__name__}"
+		) from error
 
 	if response.status_code != 200:
 		# response_body may echo request fields back - never client_secret,
@@ -78,10 +92,13 @@ def _fetch_access_token(settings):
 		raise FoodpandaAPIError(
 			f"Foodpanda token request failed with HTTP {response.status_code}",
 			status_code=response.status_code,
-			response_body=_safe_body(response),
+			response_body=_safe_body(response, sensitive_values=(client_secret,)),
 		)
 
-	data = response.json()
+	try:
+		data = response.json()
+	except (TypeError, ValueError) as error:
+		raise FoodpandaAPIError("Foodpanda token response was not valid JSON") from error
 	token = data.get("access_token")
 	if not token:
 		raise FoodpandaAPIError(
@@ -130,9 +147,14 @@ def request(method, path, settings=None, **kwargs):
 	while True:
 		headers = dict(base_headers)
 		headers["Authorization"] = f"Bearer {token}"
-		response = requests.request(
-			method, url, headers=headers, timeout=timeout, verify=verify, **kwargs
-		)
+		try:
+			response = requests.request(
+				method, url, headers=headers, timeout=timeout, verify=verify, **kwargs
+			)
+		except requests.RequestException as error:
+			raise FoodpandaAPIError(
+				f"Foodpanda API call to {path} could not connect: {error.__class__.__name__}"
+			) from error
 
 		if response.status_code == 401 and allow_token_retry:
 			token = get_access_token(settings, force_refresh=True)

@@ -12,6 +12,8 @@
   "column_break_sync",
   "sync_status",
   "content_hash",
+  "pending_content_hash",
+  "last_job_id",
   "last_synced",
   "last_error"
  ],
@@ -60,6 +62,20 @@
    "fieldname": "content_hash",
    "fieldtype": "Data",
    "label": "Content Hash",
+   "read_only": 1
+  },
+  {
+   "description": "Hash awaiting promotion after Foodpanda confirms the asynchronous job.",
+   "fieldname": "pending_content_hash",
+   "fieldtype": "Data",
+   "label": "Pending Content Hash",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_job_id",
+   "fieldtype": "Link",
+   "label": "Last Catalog Job",
+   "options": "Foodpanda Catalog Job",
    "read_only": 1
   },
   {

@@ -18,9 +18,11 @@ def _stub_flt(value, precision=None, rounding_method=None):
 
 def _settings(**overrides):
 	values = {
-		"api_host": "https://api-sandbox.example",
+		"api_host": "https://foodpanda.partner.deliveryhero.io",
 		"chain_id": "chain-1",
 		"client_id": "client-1",
+		"catalog_locale": "en_PK",
+		"allow_product_creation": False,
 		"request_timeout": 30,
 		"maximum_retries": 2,
 		"verify_ssl": True,
@@ -241,24 +243,21 @@ class TestCatalogSync(unittest.TestCase):
 		existing_product.db_set.side_effect = lambda values: [
 			setattr(existing_product, key, value) for key, value in values.items()
 		]
-		mock_frappe.get_doc.side_effect = [outlet, existing_product]
+		job_doc = Mock()
+		mock_frappe.get_doc.side_effect = [outlet, existing_product, job_doc]
 		settings = _settings()
 		mock_client.get_settings.return_value = settings
 		submit_response = Mock(json=Mock(return_value={"job_id": "job-123"}))
-		status_response = Mock(json=Mock(return_value={"status": "COMPLETED"}))
-		mock_client.request.side_effect = [submit_response, status_response]
+		mock_client.request.return_value = submit_response
 
 		result = catalog.sync_item("ITEM-1", "Outlet-1")
 
-		self.assertEqual(mock_client.request.call_count, 2)
-		submit_method, submit_path = mock_client.request.call_args_list[0].args
+		self.assertEqual(mock_client.request.call_count, 1)
+		submit_method, submit_path = mock_client.request.call_args.args
 		self.assertEqual(submit_method, "PUT")
 		self.assertIn("vendor-1", submit_path)
-		status_method, status_path = mock_client.request.call_args_list[1].args
-		self.assertEqual(status_method, "GET")
-		self.assertIn("job-123", status_path)
-		self.assertEqual(existing_product.db_set.call_args.args[0]["sync_status"], "Synced")
-		self.assertEqual(result, {"status": "Synced"})
+		self.assertEqual(existing_product.db_set.call_args.args[0]["sync_status"], "Pending")
+		self.assertEqual(result, {"status": "Pending", "job_id": "job-123"})
 
 	@patch("aimatic.foodpanda_integration.catalog.client")
 	@patch("aimatic.foodpanda_integration.catalog.frappe")
@@ -273,32 +272,26 @@ class TestCatalogSync(unittest.TestCase):
 		mock_client.request.assert_not_called()
 
 
-class TestOrdersWebhookSignature(unittest.TestCase):
-	@patch("aimatic.foodpanda_integration.orders.frappe")
-	def test_valid_signature_passes(self, mock_frappe):
-		import hashlib
-		import hmac
-
-		from aimatic.foodpanda_integration import orders
+class TestWebhookAuthorization(unittest.TestCase):
+	@patch("aimatic.foodpanda_integration.webhooks.frappe")
+	def test_exact_authorization_value_passes(self, mock_frappe):
+		from aimatic.foodpanda_integration import webhooks
 
 		mock_frappe.get_single.return_value = Mock(get_password=Mock(return_value="whsec"))
-		body = b'{"order_id":"FP-1"}'
-		signature = hmac.new(b"whsec", body, hashlib.sha256).hexdigest()
-
-		orders.verify_webhook_signature(body, signature)  # must not raise
+		webhooks.verify_webhook_authorization("whsec")
 
 		mock_frappe.throw.assert_not_called()
 
-	@patch("aimatic.foodpanda_integration.orders._", new=_NOOP_TRANSLATE)
-	@patch("aimatic.foodpanda_integration.orders.frappe")
-	def test_invalid_signature_throws(self, mock_frappe):
-		from aimatic.foodpanda_integration import orders
+	@patch("aimatic.foodpanda_integration.webhooks._", new=_NOOP_TRANSLATE)
+	@patch("aimatic.foodpanda_integration.webhooks.frappe")
+	def test_invalid_authorization_throws(self, mock_frappe):
+		from aimatic.foodpanda_integration import webhooks
 
 		mock_frappe.get_single.return_value = Mock(get_password=Mock(return_value="whsec"))
 		mock_frappe.throw.side_effect = frappe.PermissionError
 
 		with self.assertRaises(frappe.PermissionError):
-			orders.verify_webhook_signature(b'{"order_id":"FP-1"}', "not-the-right-signature")
+			webhooks.verify_webhook_authorization("not-the-right-secret")
 
 	@patch("aimatic.foodpanda_integration.orders._", new=_NOOP_TRANSLATE)
 	@patch("aimatic.foodpanda_integration.orders.frappe")
@@ -339,14 +332,14 @@ class TestOrdersStockCheck(unittest.TestCase):
 
 
 class TestOrderWebhookIdempotency(unittest.TestCase):
+	@patch("aimatic.foodpanda_integration.api.webhooks")
 	@patch("aimatic.foodpanda_integration.api.orders")
 	@patch("aimatic.foodpanda_integration.api.frappe")
-	def test_duplicate_delivery_returns_existing_result_without_reprocessing(self, mock_frappe, mock_orders):
+	def test_duplicate_delivery_returns_existing_result_without_reprocessing(self, mock_frappe, mock_orders, mock_webhooks):
 		from aimatic.foodpanda_integration import api
 
 		mock_frappe.request.get_data.return_value = b'{"order_id":"FP-1","vendor_id":"v1","items":[]}'
-		mock_frappe.get_request_header.return_value = "sig"
-		mock_frappe.db.get_value.return_value = frappe._dict({"status": "Accepted", "sales_order": "SO-0001"})
+		mock_frappe.db.get_value.return_value = frappe._dict({"name": "LOG-1", "status": "Accepted", "sales_order": "SO-0001"})
 
 		result = api.foodpanda_order_webhook()
 
@@ -355,13 +348,13 @@ class TestOrderWebhookIdempotency(unittest.TestCase):
 		mock_orders.make_order_from_webhook.assert_not_called()
 
 	@patch("aimatic.foodpanda_integration.api.now_datetime", new=_FIXED_DATETIME)
+	@patch("aimatic.foodpanda_integration.api.webhooks")
 	@patch("aimatic.foodpanda_integration.api.orders")
 	@patch("aimatic.foodpanda_integration.api.frappe")
-	def test_failed_order_creation_rejects_with_foodpanda_and_records_failure(self, mock_frappe, mock_orders):
+	def test_failed_order_creation_rejects_with_foodpanda_and_records_failure(self, mock_frappe, mock_orders, mock_webhooks):
 		from aimatic.foodpanda_integration import api
 
 		mock_frappe.request.get_data.return_value = b'{"order_id":"FP-2","vendor_id":"v1","items":[{"sku":"X"}]}'
-		mock_frappe.get_request_header.return_value = "sig"
 		mock_frappe.db.get_value.return_value = None  # no existing log row
 		outlet = Mock()
 		outlet.name = "Outlet-1"
@@ -378,13 +371,13 @@ class TestOrderWebhookIdempotency(unittest.TestCase):
 		mock_orders.reject_order.assert_called_once_with(outlet, "FP-2", reason="Insufficient stock for X")
 
 	@patch("aimatic.foodpanda_integration.api.now_datetime", new=_FIXED_DATETIME)
+	@patch("aimatic.foodpanda_integration.api.webhooks")
 	@patch("aimatic.foodpanda_integration.api.orders")
 	@patch("aimatic.foodpanda_integration.api.frappe")
-	def test_successful_order_creation_accepts_with_foodpanda(self, mock_frappe, mock_orders):
+	def test_successful_order_creation_is_acknowledged_by_webhook_2xx(self, mock_frappe, mock_orders, mock_webhooks):
 		from aimatic.foodpanda_integration import api
 
 		mock_frappe.request.get_data.return_value = b'{"order_id":"FP-3","vendor_id":"v1","items":[{"sku":"X"}]}'
-		mock_frappe.get_request_header.return_value = "sig"
 		mock_frappe.db.get_value.return_value = None
 		outlet = Mock()
 		outlet.name = "Outlet-1"
@@ -398,8 +391,106 @@ class TestOrderWebhookIdempotency(unittest.TestCase):
 		result = api.foodpanda_order_webhook()
 
 		self.assertEqual(result, {"status": "Accepted", "sales_order": "SO-0099"})
-		mock_orders.accept_order.assert_called_once_with(outlet, "FP-3")
+		mock_orders.accept_order.assert_not_called()
 		mock_orders.reject_order.assert_not_called()
+
+
+class TestOfficialFoodpandaContracts(unittest.TestCase):
+	@patch("aimatic.foodpanda_integration.client.requests.post")
+	@patch("aimatic.foodpanda_integration.client.frappe")
+	def test_token_network_failure_is_wrapped_without_traceback_details(self, mock_frappe, mock_post):
+		import requests
+
+		from aimatic.foodpanda_integration.client import FoodpandaAPIError, _fetch_access_token
+
+		mock_post.side_effect = requests.ConnectionError("dns details")
+		with self.assertRaises(FoodpandaAPIError) as ctx:
+			_fetch_access_token(_settings())
+		self.assertIn("could not connect", str(ctx.exception))
+		self.assertNotIn("dns details", str(ctx.exception))
+
+	@patch("aimatic.foodpanda_integration.catalog.now_datetime", new=_FIXED_DATETIME)
+	@patch("aimatic.foodpanda_integration.catalog.client")
+	@patch("aimatic.foodpanda_integration.catalog.frappe")
+	def test_add_products_uses_chain_path_and_vendors_array(self, mock_frappe, mock_client):
+		from aimatic.foodpanda_integration import catalog
+
+		mock_client.request.return_value = Mock(json=Mock(return_value={"job_id": "job-add"}))
+		mock_frappe.get_doc.return_value = Mock()
+		job_id = catalog._submit_catalog_job(
+			_settings(), "POST", "chain-1", "vendor-1", {"sku": "ITEM-1"}, "Outlet-1"
+		)
+		self.assertEqual(job_id, "job-add")
+		method, path = mock_client.request.call_args.args
+		self.assertEqual((method, path), ("POST", "/v2/chains/chain-1/catalog"))
+		self.assertEqual(
+			mock_client.request.call_args.kwargs["json"],
+			{"vendors": ["vendor-1"], "products": [{"sku": "ITEM-1"}]},
+		)
+
+	@patch("aimatic.foodpanda_integration.catalog_jobs.now_datetime", new=_FIXED_DATETIME)
+	@patch("aimatic.foodpanda_integration.catalog_jobs.frappe")
+	def test_catalog_callback_promotes_pending_hash(self, mock_frappe):
+		from aimatic.foodpanda_integration import catalog_jobs
+
+		mock_frappe.db.get_value.return_value = "job-add"
+		mock_frappe.get_all.return_value = [
+			frappe._dict({
+				"name": "product-row", "item_code": "ITEM-1", "foodpanda_product_id": None,
+				"pending_content_hash": "hash-1",
+			})
+		]
+		result = catalog_jobs.process_callback({"job_id": "job-add", "job_status": "COMPLETED"})
+		self.assertEqual(result, {"job_id": "job-add", "status": "Completed", "products_updated": 1})
+		mock_frappe.db.set_value.assert_any_call(
+			"Foodpanda Product", "product-row",
+			{
+				"sync_status": "Synced", "content_hash": "hash-1", "pending_content_hash": "",
+				"last_synced": _FIXED_DATETIME(), "last_error": "", "foodpanda_product_id": "ITEM-1",
+			},
+		)
+
+	@patch("aimatic.foodpanda_integration.orders.frappe")
+	def test_nested_client_vendor_id_resolves_outlet(self, mock_frappe):
+		from aimatic.foodpanda_integration import orders
+
+		mock_frappe.db.get_value.return_value = "Outlet-1"
+		outlet = Mock()
+		mock_frappe.get_doc.return_value = outlet
+		result = orders.resolve_outlet({"client": {"external_partner_config_id": "vendor-1"}})
+		self.assertIs(result, outlet)
+		self.assertEqual(mock_frappe.db.get_value.call_args.args[1]["vendor_id"], "vendor-1")
+
+	@patch("aimatic.foodpanda_integration.orders.client")
+	@patch("aimatic.foodpanda_integration.orders.frappe")
+	def test_ready_for_pickup_uses_documented_status(self, mock_frappe, mock_client):
+		from aimatic.foodpanda_integration import orders
+
+		mock_frappe.db.get_value.return_value = frappe._dict({
+			"name": "LOG-1", "foodpanda_order_id": "FP-1",
+		})
+		mock_client.get_settings.return_value = _settings()
+		result = orders.push_status_update("SO-1", "Ready for Pickup")
+		self.assertEqual(result, {"foodpanda_order_id": "FP-1", "status": "READY_FOR_PICKUP"})
+		self.assertEqual(mock_client.request.call_args.kwargs["json"], {"status": "READY_FOR_PICKUP"})
+
+
+	@patch("aimatic.foodpanda_integration.outlet.now_datetime", new=_FIXED_DATETIME)
+	@patch("aimatic.foodpanda_integration.outlet.add_to_date")
+	@patch("aimatic.foodpanda_integration.outlet.client")
+	@patch("aimatic.foodpanda_integration.outlet.frappe")
+	def test_busy_maps_to_closed_until(self, mock_frappe, mock_client, mock_add_to_date):
+		from aimatic.foodpanda_integration import outlet
+
+		remote_until = Mock()
+		remote_until.isoformat.return_value = "2026-07-31T10:30:00"
+		mock_add_to_date.return_value = remote_until
+		mock_frappe.get_doc.return_value = Mock(vendor_id="vendor-1")
+		mock_client.get_settings.return_value = _settings()
+		outlet.push_outlet_status("Outlet-1", "Busy")
+		payload = mock_client.request.call_args.kwargs["json"]
+		self.assertEqual(payload["status"], "CLOSED_UNTIL")
+		self.assertEqual(payload["closed_reason"], "TOO_BUSY_KITCHEN")
 
 
 if __name__ == "__main__":

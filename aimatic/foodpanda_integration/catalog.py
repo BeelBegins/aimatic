@@ -11,35 +11,11 @@ from aimatic.foodpanda_integration import client
 from aimatic.foodpanda_integration.client import FoodpandaAPIError
 from aimatic.shelf_pricing.utils import get_or_create_branch_foodpanda_price_list
 
-# Confirmed against developer.foodpanda.com/en/documentation/catalog-api-use-cases
-# (2026-07-31) - this supersedes the earlier, less specific api-specifications
-# page. Still not exercised against a live/sandbox call (no credentials on
-# file); re-verify before first use.
-#
-# - POST /v2/chains/{chain_id}/vendors/{vendor_id}/catalog          add products (async, 202 + job_id)
-# - PUT  /v2/chains/{chain_id}/vendors/{vendor_id}/catalog          update products (async, 202 + job_id)
-# - GET  /v2/chains/{chain_id}/catalog/jobs/{job_id}                job status: QUEUED/IN_PROGRESS/COMPLETED/FAILED
-# - GET  /v2/chains/{chain_id}/vendors/{vendor_id}/categories       list categories (not called yet - see below)
-# - POST /v2/chains/{chain_id}/vendors/{vendor_id}/catalog/export   full catalog export
-#
-# Confirmed update-payload fields (docs example: {"products": [{"sku": "LS-33",
-# "active": false, "price": 10}]}): sku, active, price, barcode, quantity,
-# maximum_sales_quantity. "quantity acts as a reference in comparison with the
-# already configured sales buffer" - i.e. push the real stock number, not just
-# a boolean, and let Foodpanda's own buffer decide availability alongside our
-# `active` flag. `maximum_sales_quantity` has no ERPNext-side source and is
-# not sent. The docs also mention a completion webhook for these jobs, not
-# implemented here - this module still does a single synchronous status check
-# instead (see _job_succeeded).
-#
-# The add/create payload's exact field set is NOT shown in the fetched docs
-# (only the update example is) - name/description/category_id below are kept
-# for creation only, on the assumption a brand-new listing needs them, but
-# this is unconfirmed. category_id also depends on Foodpanda Category Map,
-# which is unconfirmed against the categories endpoint above (not yet
-# queried).
-_ADD_PRODUCTS_PATH = "/v2/chains/{chain_id}/vendors/{vendor_id}/catalog"
+_ADD_PRODUCTS_PATH = "/v2/chains/{chain_id}/catalog"
 _UPDATE_PRODUCTS_PATH = "/v2/chains/{chain_id}/vendors/{vendor_id}/catalog"
+_CATALOG_PATH = "/v2/chains/{chain_id}/vendors/{vendor_id}/catalog"
+_CATEGORIES_PATH = "/v2/chains/{chain_id}/vendors/{vendor_id}/categories"
+_EXPORT_PATH = "/v2/chains/{chain_id}/vendors/{vendor_id}/catalog/export"
 _JOB_STATUS_PATH = "/v2/chains/{chain_id}/catalog/jobs/{job_id}"
 
 _JOB_CACHE_PREFIX = "aimatic:foodpanda:bulkexport:"
@@ -93,9 +69,7 @@ def build_update_payload(item_code, outlet):
 
 
 def build_create_payload(item_code, outlet):
-	"""Payload for a brand-new Foodpanda product. Field set beyond the
-	update-payload fields (name/description/category_id) is unconfirmed -
-	see the module docstring."""
+	"""Documented Add Products payload with localized and array fields."""
 	item = frappe.db.get_value(
 		"Item", item_code, ["item_name", "description", "item_group", "disabled", "is_sales_item"], as_dict=True
 	)
@@ -103,10 +77,17 @@ def build_create_payload(item_code, outlet):
 		frappe.throw(_("Item {0} does not exist").format(item_code))
 
 	category_id = frappe.db.get_value("Foodpanda Category Map", item.item_group, "foodpanda_category_id")
+	if not category_id:
+		frappe.throw(_("Item Group {0} has no Foodpanda Category Map").format(item.item_group))
+
+	settings = client.get_settings()
+	locale = settings.catalog_locale or "en_PK"
 	payload = build_update_payload(item_code, outlet)
-	payload["name"] = item.item_name
-	payload["description"] = item.description or ""
-	payload["category_id"] = category_id
+	barcode = payload.pop("barcode", None)
+	payload["title"] = {locale: item.item_name}
+	payload["description"] = {locale: item.description or ""}
+	payload["barcodes"] = [barcode] if barcode else []
+	payload["categories"] = [category_id]
 	return payload
 
 
@@ -131,33 +112,40 @@ def get_or_create_foodpanda_product(item_code, outlet_name):
 	return doc
 
 
-def _submit_catalog_job(settings, method, chain_id, vendor_id, payload):
+def _submit_catalog_job(settings, method, chain_id, vendor_id, payload, outlet_name):
+	is_add = method == "POST"
+	path = _ADD_PRODUCTS_PATH.format(chain_id=chain_id) if is_add else _UPDATE_PRODUCTS_PATH.format(
+		chain_id=chain_id, vendor_id=vendor_id
+	)
+	body = {"vendors": [vendor_id], "products": [payload]} if is_add else {"products": [payload]}
 	response = client.request(
 		method,
-		_ADD_PRODUCTS_PATH.format(chain_id=chain_id, vendor_id=vendor_id),
+		path,
 		settings=settings,
-		json={"products": [payload]},
+		json=body,
 	)
-	return response.json().get("job_id")
-
-
-def _job_succeeded(settings, chain_id, job_id):
-	"""Single status check, not a poll loop - a brand-new job may still show
-	QUEUED/IN_PROGRESS here. That's left as sync_status=Pending (not a
-	failure) for a later manual retry/bulk export pass to pick up, rather
-	than blocking this request on an unbounded wait. Foodpanda's docs mention
-	a completion webhook for these jobs; that's not implemented here yet."""
+	response_data = response.json() or {}
+	job_id = response_data.get("job_id")
 	if not job_id:
-		return None
-	response = client.request(
-		"GET", _JOB_STATUS_PATH.format(chain_id=chain_id, job_id=job_id), settings=settings
-	)
-	status = (response.json().get("status") or "").upper()
-	if status == "COMPLETED":
-		return True
-	if status == "FAILED":
-		return False
-	return None  # QUEUED or IN_PROGRESS
+		raise FoodpandaAPIError("Foodpanda catalog response had no job_id", response_body=response_data)
+
+	frappe.get_doc(
+		{
+			"doctype": "Foodpanda Catalog Job",
+			"job_id": job_id,
+			"operation": "Add" if is_add else "Update",
+			"outlet": outlet_name,
+			"vendor_id": vendor_id,
+			"status": "Pending",
+			"requested_skus": json.dumps([payload.get("sku")]),
+			"request_payload": json.dumps(body, ensure_ascii=False, default=str),
+			"raw_response": json.dumps(response_data, ensure_ascii=False, default=str),
+			"submitted_at": now_datetime(),
+		}
+	).insert(ignore_permissions=True)
+	return job_id
+
+
 
 
 def sync_item(item_code, outlet_name):
@@ -167,27 +155,28 @@ def sync_item(item_code, outlet_name):
 
 	product = get_or_create_foodpanda_product(item_code, outlet_name)
 	is_new_product = not product.foodpanda_product_id
+	settings = client.get_settings() if is_new_product else None
+	if is_new_product and not settings.allow_product_creation:
+		return {
+			"status": "Failed",
+			"error": "Product creation is disabled; map the existing Foodpanda SKU or enable beta product creation",
+		}
+
 	payload = build_create_payload(item_code, outlet) if is_new_product else build_update_payload(item_code, outlet)
 	content_hash = hash_payload(payload)
 
 	if not is_new_product and product.sync_status == "Synced" and product.content_hash == content_hash:
 		return {"status": "Synced", "skipped": True}
+	settings = settings or client.get_settings()
 
-	settings = client.get_settings()
 	try:
 		method = "POST" if is_new_product else "PUT"
-		job_id = _submit_catalog_job(settings, method, settings.chain_id, outlet.vendor_id, payload)
-		succeeded = _job_succeeded(settings, settings.chain_id, job_id)
-
-		if succeeded:
-			values = {"sync_status": "Synced", "content_hash": content_hash, "last_synced": now_datetime(), "last_error": ""}
-			if is_new_product:
-				values["foodpanda_product_id"] = item_code
-			product.db_set(values)
-		elif succeeded is False:
-			product.db_set({"sync_status": "Failed", "last_error": "Foodpanda rejected the catalog job"})
-		else:
-			product.db_set({"sync_status": "Pending", "last_error": ""})
+		job_id = _submit_catalog_job(
+			settings, method, settings.chain_id, outlet.vendor_id, payload, outlet_name
+		)
+		product.db_set(
+			{"sync_status": "Pending", "last_job_id": job_id, "pending_content_hash": content_hash, "last_error": ""}
+		)
 	except FoodpandaAPIError as error:
 		client.log_api_failure(
 			f"Foodpanda catalog sync failed: {item_code}", f"Outlet: {outlet_name}", error
@@ -195,7 +184,7 @@ def sync_item(item_code, outlet_name):
 		product.db_set({"sync_status": "Failed", "last_error": str(error)})
 		return {"status": "Failed", "error": str(error)}
 
-	return {"status": product.sync_status}
+	return {"status": "Pending", "job_id": job_id}
 
 
 def sync_availability(item_code, branch):
@@ -222,19 +211,83 @@ def sync_availability(item_code, branch):
 
 	try:
 		payload = build_update_payload(item_code, outlet)
-		job_id = _submit_catalog_job(settings, "PUT", settings.chain_id, outlet.vendor_id, payload)
-		succeeded = _job_succeeded(settings, settings.chain_id, job_id)
-		status = "Synced" if succeeded else ("Failed" if succeeded is False else "Pending")
+		job_id = _submit_catalog_job(
+			settings, "PUT", settings.chain_id, outlet.vendor_id, payload, outlet_name
+		)
 		frappe.db.set_value(
 			"Foodpanda Product",
 			product.name,
-			{"sync_status": status, "last_synced": now_datetime(), "last_error": "" if succeeded else "Foodpanda job did not complete"},
+			{
+				"sync_status": "Pending",
+				"last_job_id": job_id,
+				"pending_content_hash": hash_payload(payload),
+				"last_error": "",
+			},
 		)
 	except FoodpandaAPIError as error:
 		client.log_api_failure(
 			f"Foodpanda availability sync failed: {item_code}", f"Outlet: {outlet_name}", error
 		)
 		frappe.db.set_value("Foodpanda Product", product.name, {"sync_status": "Failed", "last_error": str(error)})
+
+
+def get_remote_catalog(outlet_name):
+	outlet = frappe.get_doc("Foodpanda Outlet", outlet_name)
+	settings = client.get_settings()
+	response = client.request(
+		"GET",
+		_CATALOG_PATH.format(chain_id=settings.chain_id, vendor_id=outlet.vendor_id),
+		settings=settings,
+	)
+	return response.json()
+
+
+def get_remote_categories(outlet_name):
+	outlet = frappe.get_doc("Foodpanda Outlet", outlet_name)
+	settings = client.get_settings()
+	response = client.request(
+		"GET",
+		_CATEGORIES_PATH.format(chain_id=settings.chain_id, vendor_id=outlet.vendor_id),
+		settings=settings,
+	)
+	return response.json()
+
+
+def request_remote_export(outlet_name):
+	outlet = frappe.get_doc("Foodpanda Outlet", outlet_name)
+	settings = client.get_settings()
+	response = client.request(
+		"POST",
+		_EXPORT_PATH.format(chain_id=settings.chain_id, vendor_id=outlet.vendor_id),
+		settings=settings,
+	)
+	response_data = response.json() or {}
+	job_id = response_data.get("job_id")
+	if not job_id:
+		raise FoodpandaAPIError("Foodpanda catalog export response had no job_id", response_body=response_data)
+	frappe.get_doc({
+		"doctype": "Foodpanda Catalog Job",
+		"job_id": job_id,
+		"operation": "Export",
+		"outlet": outlet_name,
+		"vendor_id": outlet.vendor_id,
+		"status": "Pending",
+		"raw_response": json.dumps(response_data, ensure_ascii=False, default=str),
+		"submitted_at": now_datetime(),
+	}).insert(ignore_permissions=True)
+	return {"job_id": job_id, "status": "Pending"}
+
+
+def refresh_remote_job(job_id):
+	from aimatic.foodpanda_integration import catalog_jobs
+
+	settings = client.get_settings()
+	response = client.request(
+		"GET", _JOB_STATUS_PATH.format(chain_id=settings.chain_id, job_id=job_id), settings=settings
+	)
+	payload = response.json() or {}
+	payload.setdefault("job_id", job_id)
+	return catalog_jobs.process_callback(payload)
 
 
 def _job_cache_key(job_id):

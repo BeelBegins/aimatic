@@ -1,6 +1,3 @@
-import hashlib
-import hmac
-
 import frappe
 from frappe import _
 from frappe.utils import flt, nowdate
@@ -10,35 +7,22 @@ from aimatic.foodpanda_integration import client
 from aimatic.foodpanda_integration.client import FoodpandaAPIError
 from aimatic.shelf_pricing.utils import get_or_create_branch_foodpanda_price_list
 
-# Path confirmed against developer.foodpanda.com/api-specifications (Order
-# section): PUT is used for both accept and reject/cancel, keyed by a
-# `status` field. The exact enum strings (ACCEPTED/CANCELLED below) and the
-# inbound webhook's signature header/scheme are NOT confirmed against a real
-# payload sample - there are no Foodpanda credentials on file yet. Both are
-# isolated to single named constants specifically so they're a one-line fix
-# once a real webhook delivery or sandbox response is available.
 _ORDER_PATH = "/v2/chains/{chain_id}/orders/{order_id}"
-_SIGNATURE_HEADER = "X-Foodpanda-Signature"
-_STATUS_ACCEPTED = "ACCEPTED"
 _STATUS_REJECTED = "CANCELLED"
+_CANCELLATION_REASON_ITEM_UNAVAILABLE = "ITEM_UNAVAILABLE"
+_ALLOWED_OUTBOUND_STATUSES = {"READY_FOR_PICKUP", "DISPATCHED"}
 _FOODPANDA_CUSTOMER = "Foodpanda"
 
 
-def verify_webhook_signature(raw_body, signature_header):
-	settings = frappe.get_single("Foodpanda Settings")
-	secret = settings.get_password("webhook_secret", raise_exception=False)
-	if not secret:
-		frappe.throw(_("Foodpanda webhook secret is not configured"), frappe.PermissionError)
-	if not signature_header:
-		frappe.throw(_("Missing webhook signature"), frappe.PermissionError)
-
-	expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
-	if not hmac.compare_digest(expected, signature_header):
-		frappe.throw(_("Webhook signature verification failed"), frappe.PermissionError)
-
-
 def resolve_outlet(payload):
-	vendor_id = payload.get("vendor_id") or payload.get("vendor_code")
+	client_payload = payload.get("client") or {}
+	vendor_id = (
+		client_payload.get("external_partner_config_id")
+		or client_payload.get("store_id")
+		or client_payload.get("id")
+		or payload.get("vendor_id")
+		or payload.get("vendor_code")
+	)
 	if not vendor_id:
 		frappe.throw(_("Webhook payload is missing a vendor id"))
 
@@ -107,7 +91,9 @@ def make_order_from_webhook(payload, outlet):
 
 	for row in items:
 		item_code = row.get("sku") or row.get("product_id")
-		qty = flt(row.get("quantity") or row.get("qty") or 1)
+		pricing = row.get("pricing") or {}
+		qty = flt(pricing.get("quantity") or row.get("quantity") or row.get("qty") or 1)
+		unit_price = pricing.get("unit_price")
 		if not item_code or not frappe.db.exists("Item", item_code):
 			frappe.throw(_("Unknown item {0} in Foodpanda order").format(item_code))
 
@@ -121,7 +107,10 @@ def make_order_from_webhook(payload, outlet):
 		if available + 0.0001 < qty:
 			frappe.throw(_("Insufficient stock for {0}").format(item_code))
 
-		doc.append("items", {"item_code": item_code, "qty": qty, "warehouse": warehouse})
+		item_values = {"item_code": item_code, "qty": qty, "warehouse": warehouse}
+		if unit_price is not None:
+			item_values.update({"rate": flt(unit_price), "price_list_rate": flt(unit_price)})
+		doc.append("items", item_values)
 
 	doc.run_method("set_missing_values")
 	doc.run_method("calculate_taxes_and_totals")
@@ -129,27 +118,9 @@ def make_order_from_webhook(payload, outlet):
 	return doc
 
 
-def accept_order(outlet, foodpanda_order_id):
-	settings = client.get_settings()
-	try:
-		client.request(
-			"PUT",
-			_ORDER_PATH.format(chain_id=settings.chain_id, order_id=foodpanda_order_id),
-			settings=settings,
-			json={"status": _STATUS_ACCEPTED},
-		)
-	except FoodpandaAPIError as error:
-		client.log_api_failure(
-			f"Foodpanda order accept failed: {foodpanda_order_id}", f"Outlet: {outlet.name}", error
-		)
-		raise
-
-
 def reject_order(outlet, foodpanda_order_id, reason=None):
 	settings = client.get_settings()
-	payload = {"status": _STATUS_REJECTED}
-	if reason:
-		payload["cancellation"] = {"reason": reason}
+	payload = {"status": _STATUS_REJECTED, "cancellation": {"reason": _CANCELLATION_REASON_ITEM_UNAVAILABLE}}
 	try:
 		client.request(
 			"PUT",
@@ -165,11 +136,34 @@ def reject_order(outlet, foodpanda_order_id, reason=None):
 
 
 def push_status_update(sales_order, status):
-	"""Extension point for preparing/ready/picked-up sync-back, intentionally
-	not wired to anything yet - there is no existing kitchen/fulfillment
-	status-transition hook in this app to attach it to (confirmed while
-	researching this integration), so guessing at that lifecycle here would
-	be speculative. Call this explicitly once such a trigger exists."""
-	raise NotImplementedError(
-		"push_status_update has no caller yet - wire it to a real fulfillment status transition first"
+	remote_status = str(status or "").upper().replace(" ", "_")
+	if remote_status not in _ALLOWED_OUTBOUND_STATUSES:
+		frappe.throw(_("Foodpanda order status must be READY_FOR_PICKUP or DISPATCHED"))
+
+	order_log = frappe.db.get_value(
+		"Foodpanda Order Log",
+		{"sales_order": sales_order},
+		["name", "foodpanda_order_id"],
+		as_dict=True,
 	)
+	if not order_log:
+		frappe.throw(_("Sales Order {0} is not linked to a Foodpanda order").format(sales_order))
+
+	settings = client.get_settings()
+	try:
+		client.request(
+			"PUT",
+			_ORDER_PATH.format(chain_id=settings.chain_id, order_id=order_log.foodpanda_order_id),
+			settings=settings,
+			json={"status": remote_status},
+		)
+	except FoodpandaAPIError as error:
+		client.log_api_failure(
+			f"Foodpanda order status failed: {order_log.foodpanda_order_id}",
+			f"Sales Order: {sales_order}; status: {remote_status}",
+			error,
+		)
+		raise
+
+	frappe.db.set_value("Foodpanda Order Log", order_log.name, "remote_status", remote_status)
+	return {"foodpanda_order_id": order_log.foodpanda_order_id, "status": remote_status}

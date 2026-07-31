@@ -12,6 +12,8 @@
   "client_id",
   "client_secret",
   "webhook_secret",
+  "catalog_locale",
+  "allow_product_creation",
   "section_break_ops",
   "request_timeout",
   "maximum_retries",
@@ -28,13 +30,16 @@
    "label": "Enabled"
   },
   {
+   "default": "Production",
    "fieldname": "environment",
    "fieldtype": "Select",
    "label": "Environment",
-   "options": "Sandbox\nProduction"
+   "options": "Production",
+   "read_only": 1
   },
   {
-   "description": "Foodpanda Partner API host for the selected environment, e.g. https://api-sandbox.foodpanda.partner.deliveryhero.io or https://foodpanda.partner.deliveryhero.io.",
+   "default": "https://foodpanda.partner.deliveryhero.io",
+   "description": "Official Partner API origin. Foodpanda catalog testing uses a designated live test vendor; there is no separate catalog sandbox hostname.",
    "fieldname": "api_host",
    "fieldtype": "Data",
    "label": "API Host"
@@ -61,10 +66,24 @@
    "label": "Client Secret"
   },
   {
-   "description": "Shared secret used to verify the signature header on inbound Foodpanda order webhooks. Never exported as a fixture.",
+   "description": "Exact static Authorization value configured in Foodpanda Vendor Portal for order and assortment callbacks. It may be an opaque token or the complete Basic value. Never exported as a fixture.",
    "fieldname": "webhook_secret",
    "fieldtype": "Password",
    "label": "Webhook Secret"
+  },
+  {
+   "default": "en_PK",
+   "description": "Locale key used for localized catalog title and description values.",
+   "fieldname": "catalog_locale",
+   "fieldtype": "Data",
+   "label": "Catalog Locale"
+  },
+  {
+   "default": "0",
+   "description": "Allow the beta Add Products API for unmapped SKUs. Enable only after Foodpanda confirms the account and designated test vendor are enabled for product creation.",
+   "fieldname": "allow_product_creation",
+   "fieldtype": "Check",
+   "label": "Allow Product Creation"
   },
   {
    "fieldname": "section_break_ops",

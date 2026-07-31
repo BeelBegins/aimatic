@@ -1,18 +1,14 @@
 import frappe
 from frappe import _
-from frappe.utils import now_datetime
+from frappe.utils import add_to_date, now_datetime
 
 from aimatic.foodpanda_integration import client
 from aimatic.foodpanda_integration.client import FoodpandaAPIError
 
-# Path confirmed against developer.foodpanda.com/api-specifications (Outlet
-# Management section) at the time this was written - not yet exercised
-# against a live/sandbox call. The exact status enum casing (OPEN/CLOSED/BUSY
-# vs. lowercase) is not confirmed - re-verify both before first use.
 _OUTLET_STATUS_PATH = "/v2/chains/{chain_id}/vendors/{vendor_id}/status"
 
-_STATUS_API_VALUES = {"Open": "OPEN", "Closed": "CLOSED", "Busy": "BUSY"}
-_API_STATUS_VALUES = {value: key for key, value in _STATUS_API_VALUES.items()}
+_STATUS_API_VALUES = {"Open": "OPEN", "Closed": "CLOSED_TODAY", "Busy": "CLOSED_UNTIL"}
+_API_STATUS_VALUES = {"OPEN": "Open", "CLOSED_TODAY": "Closed", "CLOSED": "Closed", "CLOSED_UNTIL": "Busy"}
 
 
 def push_outlet_status(outlet_name, status, reason=None, closed_until=None):
@@ -22,6 +18,9 @@ def push_outlet_status(outlet_name, status, reason=None, closed_until=None):
 	outlet = frappe.get_doc("Foodpanda Outlet", outlet_name)
 	settings = client.get_settings()
 	payload = {"status": _STATUS_API_VALUES[status]}
+	if status == "Busy":
+		reason = reason or "TOO_BUSY_KITCHEN"
+		closed_until = closed_until or add_to_date(now_datetime(), minutes=30).isoformat()
 	if reason:
 		payload["closed_reason"] = reason
 	if closed_until:

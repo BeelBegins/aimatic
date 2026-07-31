@@ -2,9 +2,15 @@ import json
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime
+from frappe.utils import get_url, now_datetime
 
-from aimatic.foodpanda_integration import catalog, orders, outlet as outlet_module
+from aimatic.foodpanda_integration import (
+	catalog,
+	catalog_jobs,
+	orders,
+	outlet as outlet_module,
+	webhooks,
+)
 from aimatic.foodpanda_integration.client import FoodpandaAPIError
 
 _ALLOWED_ROLES = {"System Manager", "Buying Price Control"}
@@ -21,14 +27,13 @@ def _require_permission():
 @frappe.whitelist(allow_guest=True)
 def foodpanda_order_webhook():
 	"""Inbound endpoint Foodpanda calls when an order is placed/updated.
-	Verifies the signature, dedupes by foodpanda_order_id, and turns a new
+	Verifies the static Authorization value, dedupes by foodpanda_order_id, and turns a new
 	order into a draft Sales Order - see aimatic.foodpanda_integration.orders
 	for the per-step logic and why the log row is committed before the
 	Sales-Order-creation savepoint is opened.
 	"""
 	raw = frappe.request.get_data()
-	signature = frappe.get_request_header(orders._SIGNATURE_HEADER)
-	orders.verify_webhook_signature(raw, signature)
+	webhooks.verify_webhook_authorization()
 
 	try:
 		payload = json.loads(raw)
@@ -39,23 +44,35 @@ def foodpanda_order_webhook():
 	if not foodpanda_order_id:
 		frappe.throw(_("Webhook payload is missing order_id"))
 
+	remote_status = str(payload.get("status") or "RECEIVED").upper()
 	existing = frappe.db.get_value(
 		"Foodpanda Order Log",
 		{"foodpanda_order_id": foodpanda_order_id},
-		["status", "sales_order"],
+		["name", "status", "sales_order"],
 		as_dict=True,
 	)
 	if existing:
-		return {"status": existing.status, "sales_order": existing.sales_order, "duplicate": True}
+		local_status = {"CANCELLED": "Rejected", "DELIVERED": "Fulfilled"}.get(remote_status, existing.status)
+		frappe.db.set_value("Foodpanda Order Log", existing.name, {
+			"status": local_status,
+			"remote_status": remote_status,
+			"raw_payload": raw.decode("utf-8", errors="replace"),
+		})
+		return {"status": local_status, "sales_order": existing.sales_order, "duplicate": True}
 
+	if remote_status != "RECEIVED":
+		return {"status": "Ignored", "remote_status": remote_status, "reason": "Original order was not received"}
 	outlet = orders.resolve_outlet(payload)
 
 	log = frappe.get_doc(
 		{
 			"doctype": "Foodpanda Order Log",
 			"foodpanda_order_id": foodpanda_order_id,
+			"order_code": payload.get("order_code"),
 			"outlet": outlet.name,
 			"status": "Received",
+			"remote_status": remote_status,
+			"transport_type": payload.get("transport_type"),
 			"raw_payload": raw.decode("utf-8", errors="replace"),
 			"received_at": now_datetime(),
 		}
@@ -82,20 +99,62 @@ def foodpanda_order_webhook():
 		return {"status": "Failed", "error": str(error)}
 
 	log.db_set({"status": "Accepted", "sales_order": sales_order.name})
-	try:
-		orders.accept_order(outlet, foodpanda_order_id)
-	except FoodpandaAPIError as error:
-		# The Sales Order exists but Foodpanda wasn't told - flag for manual
-		# follow-up rather than deleting an order that's already in ERPNext.
-		log.db_set({"error": f"Sales Order {sales_order.name} created but the accept call failed: {error}"})
 
 	return {"status": "Accepted", "sales_order": sales_order.name}
+
+
+@frappe.whitelist(allow_guest=True)
+def foodpanda_catalog_webhook():
+	"""Assortment/catalog completion callback configured in Vendor Portal."""
+	webhooks.verify_webhook_authorization()
+	raw = frappe.request.get_data()
+	try:
+		payload = json.loads(raw)
+	except (TypeError, ValueError):
+		frappe.throw(_("Invalid JSON payload"))
+	return catalog_jobs.process_callback(payload)
+
+
+@frappe.whitelist()
+def get_foodpanda_webhook_urls():
+	_require_permission()
+	base_url = get_url().rstrip("/")
+	method_base = f"{base_url}/api/method/aimatic.foodpanda_integration.api"
+	return {
+		"order_webhook_url": f"{method_base}.foodpanda_order_webhook",
+		"assortment_webhook_url": f"{method_base}.foodpanda_catalog_webhook",
+		"authorization": "Use the exact Webhook Secret value stored in Foodpanda Settings",
+	}
 
 
 @frappe.whitelist()
 def sync_catalog_item(item_code, outlet):
 	_require_permission()
 	return catalog.sync_item(item_code, outlet)
+
+
+@frappe.whitelist()
+def retrieve_foodpanda_catalog(outlet):
+	_require_permission()
+	return catalog.get_remote_catalog(outlet)
+
+
+@frappe.whitelist()
+def retrieve_foodpanda_categories(outlet):
+	_require_permission()
+	return catalog.get_remote_categories(outlet)
+
+
+@frappe.whitelist()
+def request_foodpanda_catalog_export(outlet):
+	_require_permission()
+	return catalog.request_remote_export(outlet)
+
+
+@frappe.whitelist()
+def refresh_foodpanda_catalog_job(job_id):
+	_require_permission()
+	return catalog.refresh_remote_job(job_id)
 
 
 @frappe.whitelist()
@@ -108,6 +167,12 @@ def start_catalog_bulk_export(outlet):
 def get_catalog_bulk_export_status(job_id):
 	_require_permission()
 	return catalog.get_bulk_export_status(job_id)
+
+
+@frappe.whitelist()
+def update_foodpanda_order_status(sales_order, status):
+	_require_permission()
+	return orders.push_status_update(sales_order, status)
 
 
 @frappe.whitelist()
