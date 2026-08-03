@@ -56,16 +56,16 @@ def get_customer_snapshot(doc):
     customer_data = {}
 
     if getattr(doc, "customer", None):
+        customer_fields = ["customer_name", "tax_id", "mobile_no"]
+        customer_fields.extend(
+            fieldname
+            for fieldname in ("tax_strn", "tax_ntn", "tax_nic")
+            if frappe.db.has_column("Customer", fieldname)
+        )
         customer_data = frappe.db.get_value(
             "Customer",
             doc.customer,
-            [
-                "customer_name",
-                "tax_strn",
-                "tax_ntn",
-                "tax_nic",
-                "mobile_no",
-            ],
+            customer_fields,
             as_dict=True,
         ) or {}
 
@@ -84,6 +84,8 @@ def get_customer_snapshot(doc):
         "ntn": (
             getattr(doc, "tax_ntn", None)
             or customer_data.get("tax_ntn")
+            or getattr(doc, "tax_id", None)
+            or customer_data.get("tax_id")
             or ""
         ),
         "cnic": (

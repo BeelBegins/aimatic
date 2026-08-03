@@ -563,6 +563,23 @@ class TestPreviewCartValidation(_AimTestCase):
                 [{"item_code": _ITEM_CODE or "X", "qty": 1}],
             )
 
+    @_require_fixtures
+    def test_preview_uses_human_cashier_opening_not_terminal_user(self):
+        """Electron preview must resolve the shift by cashier_user."""
+        from aimatic.offline_pos.api import preview_cart
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _POS_PROFILE_NAME
+        _create_opening_entry(profile, user=cashier)
+
+        with self.assertRaisesRegex(frappe.ValidationError, "Invalid Customer"):
+            preview_cart(
+                profile,
+                "_NONEXISTENT_CUSTOMER_XYZ",
+                [{"item_code": _ITEM_CODE or "X", "qty": 1}],
+                cashier_user=cashier,
+            )
+
 
 # ---------------------------------------------------------------------------
 # preview_cart — functional tests
@@ -618,6 +635,35 @@ class TestPreviewCartFunctional(_AimTestCase):
             except frappe.ValidationError:
                 pass
             mock_build.assert_not_called()
+
+    # -- zero-rate guard -------------------------------------------------------
+
+    def test_zero_rate_item_throws(self):
+        """An item with no priced Item Price for this selling price list
+        resolves to rate=0 through ERPNext's own pricing pipeline; this must
+        be rejected rather than sold for free."""
+        from aimatic.offline_pos.api import preview_cart
+
+        code = "_AIM Zero Rate Test Item"
+        if not frappe.db.exists("Item", code):
+            ig = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "All Item Groups"
+            frappe.get_doc({
+                "doctype": "Item",
+                "item_code": code,
+                "item_name": code,
+                "item_group": ig,
+                "stock_uom": "Nos",
+                "is_sales_item": 1,
+            }).insert(ignore_permissions=True)
+        # Deliberately no Item Price row for this item on any price list.
+
+        with _patch_fbr():
+            with self.assertRaises(frappe.ValidationError):
+                preview_cart(
+                    self.pos_name,
+                    self.customer_name,
+                    [{"item_code": code, "qty": 1}],
+                )
 
     # -- payload parsing ------------------------------------------------------
 

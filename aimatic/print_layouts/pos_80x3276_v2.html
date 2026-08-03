@@ -101,6 +101,11 @@ html, body {
   font-weight: 700;
   margin-top: 2px;
 }
+.rc-contact {
+  font-size: 10.5px;
+  line-height: 1.45;
+  margin-top: 2px;
+}
 
 /* ── doc title strip ── */
 .rc-title {
@@ -399,8 +404,8 @@ html, body {
   margin: 3px 0;
 }
 .rc-fbr-qr img {
-  width: 70px;
-  height: 70px;
+  width: 55px;
+  height: 55px;
 }
 
 /* ── terms (darkened for thermal printing) ── */
@@ -448,23 +453,20 @@ html, body {
 </style>
   {% set ctx = get_pos_receipt_context(doc) %}
   {% set ntn = ctx.ntn %}
+  {% set branch_info = ctx.branch_info %}
   {% set receipt_terms = ctx.receipt_terms %}
 
   <div class="rc-header">
     <div class="rc-company">{{ doc.company }}</div>
-    {%- set branch_label = doc.branch or doc.pos_profile or "" -%}
+    {%- set branch_label = branch_info.name or doc.pos_profile or "" -%}
     {% if branch_label %}<div class="rc-branch">{{ branch_label }}</div>{% endif %}
-    {% if doc.company_address %}
-      {% set ca = frappe.db.get_value("Address", doc.company_address, ["address_line1","address_line2","city","state","pincode","phone"], as_dict=True) %}
-      {% if ca %}
-      <div class="rc-addr">
-        {{ ca.get("address_line1") or "" }}{% if ca.get("address_line2") %}, {{ ca.get("address_line2") }}{% endif %}<br>
-        {{ ca.get("city") or "" }}{% if ca.get("state") %}, {{ ca.get("state") }}{% endif %}{% if ca.get("pincode") %} - {{ ca.get("pincode") }}{% endif %}
-        {% if ca.get("phone") %}<br>Tel: {{ ca.get("phone") }}{% endif %}
-      </div>
-      {% endif %}
+    {% if branch_info.address %}
+      <div class="rc-addr">{% for line in branch_info.address.split("\n") %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</div>
     {% endif %}
-    {% if ntn %}<div class="rc-ntn">NTN: {{ ntn }}</div>{% endif %}
+    {% if branch_info.phone or branch_info.email %}
+      <div class="rc-contact">{% if branch_info.phone %}Tel: {{ branch_info.phone }}{% endif %}{% if branch_info.phone and branch_info.email %} | {% endif %}{% if branch_info.email %}{{ branch_info.email }}{% endif %}</div>
+    {% endif %}
+    {% if branch_info.tax_id or ntn %}<div class="rc-ntn">NTN: {{ branch_info.tax_id or ntn }}</div>{% endif %}
   </div>
 
   <hr class="d-dash">
@@ -484,6 +486,7 @@ html, body {
       <span>{{ (doc.posting_time | string).split(":")[:2] | join(":") }}</span>
     </div>
     <div class="rc-meta-row"><span><span class="rc-meta-lbl">Customer:</span> {{ doc.customer_name }}</span></div>
+    {% if branch_info.cashier_name %}<div class="rc-meta-row"><span><span class="rc-meta-lbl">Cashier:</span> {{ branch_info.cashier_name }}</span></div>{% endif %}
     {%- if doc.tax_id -%}<div class="rc-meta-row"><span><span class="rc-meta-lbl">NTN:</span> {{ doc.tax_id }}</span></div>{%- endif -%}
   </div>
 
@@ -501,9 +504,8 @@ html, body {
   {% for item in doc.items %}
     <div class="rc-item">
       <div class="rc-item-name">{{ item.item_name }}</div>
-      <div class="rc-item-code">{{ ctx.item_barcodes[item.name] }}</div>
       <div class="rc-item-nums">
-        <span class="c-desc">&nbsp;</span>
+        <span class="c-desc">{{ ctx.item_barcodes[item.name] }}</span>
         <span class="c-num">{{ item.qty | int }}{{ " " ~ item.uom if item.uom and item.uom != "Nos" else "" }}</span>
         <span class="c-num">{{ item.get_formatted("rate", doc) }}</span>
         <span class="c-num">{{ item.get_formatted("amount", doc) }}</span>
@@ -599,14 +601,6 @@ html, body {
     <div class="rc-fbr-inv"><b>FBR Invoice No.</b>{{ doc.custom_fbr_invoice_number }}</div>
     <div class="rc-fbr-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&amp;data={{ doc.custom_fbr_invoice_number | urlencode }}" alt="FBR QR"></div>
     {% if doc.custom_fbr_usin %}<div class="rc-fbr-row"><span>USIN</span><span style="word-break:break-all; text-align:right; max-width:60%;">{{ doc.custom_fbr_usin }}</span></div>{% endif %}
-  </div>
-  {% endif %}
-
-  {% if doc.payments %}
-  <div class="rc-pay-section">
-    <div class="rc-pay-title">Tendered / Change</div>
-    <div class="rc-pay-row total"><span>Tendered Amount</span><span>{{ doc.get_formatted("paid_amount", doc) }}</span></div>
-    <div class="rc-pay-row change"><span>Change</span><span>{{ frappe.utils.fmt_money(doc.change_amount or 0, currency=doc.currency) }}</span></div>
   </div>
   {% endif %}
 

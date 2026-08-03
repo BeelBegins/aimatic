@@ -3,6 +3,7 @@ import frappe
 
 DOCTYPE = "Item"
 POS_ROLES = ("POS User", "POS Supervisor")
+REPORT_ROLES = ("Buying Price Control",)
 PERMISSION_FIELDS = (
     "permlevel",
     "role",
@@ -31,7 +32,8 @@ def _target_rows():
     standard DocPerm set (Item Manager/Stock Manager/etc - silently lost the
     moment any Custom DocPerm exists for a doctype, see hooks.py's comment on
     the POS User/POS Supervisor fixture block) plus the two POS role
-    read+export grants.
+    read+export grants, plus Buying Price Control's read+report grant (added
+    2026-08-03 for the Branch Price Sheet report - see REPORT_ROLES).
     """
     rows = []
 
@@ -43,6 +45,17 @@ def _target_rows():
     for role in POS_ROLES:
         row = {field: 0 for field in PERMISSION_FIELDS}
         row.update({"role": role, "permlevel": 0, "read": 1, "export": 1})
+        rows.append(row)
+
+    for role in REPORT_ROLES:
+        # Buying Price Control has zero standing permission on any doctype
+        # otherwise - it exists purely as a code-level gate in
+        # price_export/shelf_pricing/foodpanda_price_import. The Branch
+        # Price Sheet report (ref_doctype=Item) needs frappe.has_permission
+        # ("Item", "report") to pass for this role (see query_report.py's
+        # run()), hence read+report here.
+        row = {field: 0 for field in PERMISSION_FIELDS}
+        row.update({"role": role, "permlevel": 0, "read": 1, "report": 1})
         rows.append(row)
 
     return rows

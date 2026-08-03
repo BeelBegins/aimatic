@@ -320,6 +320,104 @@ The exact backup path is site-specific and should be recorded in the migration n
 - `siezal` (`itemasterghuritown.xlsx`, Ghouri Town): Company/Branch/Cost Center/Warehouse target is
   the site's one real branch, `Ghouri Town Phase V`; posting date is the run date, set explicitly at
   run time rather than left to default (per the existing `hsm` script convention).
+- `szl` S1/Ghouri Town VIP (2026-08-02, `ItemData&Onhand.xlsx`, `import_szl_s1_stock.py`): a
+  **stock-only** variant of the pattern above -- szl's Item/Item Barcode catalog had already been
+  bulk-copied from `siezal` via raw SQL (`import_siezal_catalog_to_szl.py`), so most of this sheet's
+  16,346 rows matched an existing Item by barcode; only 164 (163 real + 1 junk "TEST3" row) needed a
+  newly created Item, using the same category/pricing/barcode logic as `import_siezal_items.py`.
+  Warehouse `S1 - Ghouri Town VIP - SSM`; posting date fixed at `2026-08-02` per explicit decision
+  (not left to `today()`, since the calendar date moved on mid-session). 2,589 of 16,346 rows had
+  negative Onhand (~16%, confirmed expected S1 data, not a red flag) and were imported as Material
+  Issue per the existing convention above. Also fixed as prerequisites, per explicit instruction:
+  `Stock Settings.default_warehouse` was still pointing at the disabled generic `Stores - SSM`
+  warehouse (cleared), `valuation_method` was still ERPNext's `FIFO` default instead of this app's
+  standard Moving Average (changed), and 284 `Item Default` rows still carried the same stale
+  `Stores - SSM` default (cleared).
+  - **New gotcha found here**: a raw-SQL bulk copy of autonamed documents across sites (like
+    `import_siezal_catalog_to_szl.py`'s `tabItem` copy) does **not** bring along the corresponding
+    `tabSeries` counter row, since that table isn't part of the copy. The first live run of the new-item
+    creation phase kept generating the *same* already-taken name (`STO-ITEM-2026-00001`, an item that
+    already existed from the original copy) for every one of the 163 new items, because `make_autoname`
+    was computing "next" off szl's own uninitialized counter (`0`/missing) rather than the true highest
+    existing suffix (`16490`). Each failed insert's `frappe.db.rollback()` also undid that call's own
+    counter increment, so it never progressed. Fixed by seeding `tabSeries` directly (`INSERT INTO
+    tabSeries (name, current) VALUES ('STO-ITEM-2026-', 16490)` -- the exact series key is
+    `frappe.model.naming.parse_naming_series("STO-ITEM-.YYYY.-")`, not a string to guess by hand) to the
+    true max suffix before creating any new Item. **Check this before any future cross-site raw-SQL
+    copy of an autonamed doctype, on the target site, before running any script that creates more of
+    that doctype.**
+  - **Second gotcha**: 7 pre-existing Items (already `disabled=1` on `siezal`, all discontinued
+    "... Off" crockery variants e.g. "Rice Plate Off") had real Onhand in this sheet. A disabled Item
+    can't receive a Stock Entry at all (ERPNext's `validate_item` throws "not active"), which crashed a
+    whole chunk the first time through. Fixed by having the main script skip (not crash on) disabled
+    items during stock-row preparation, logging each one's qty/rate for a human decision, then a small
+    separate one-off follow-up script (`import_szl_s1_stock_reenable_disabled.py`) re-enabled all 7
+    (confirmed: real physical stock at S1 today, per explicit decision) and posted their stock in one
+    extra Material Receipt, same Temporary Opening treatment as everything else.
+  - Chunked runs (`STOCK_ENTRY_CHUNK_SIZE = 200`, same as `import_siezal_items.py`) are made
+    resumable via a deterministic `remarks` tag per chunk (`"{POSITIVE_TAG} chunk {n}"` /
+    `"{NEGATIVE_TAG} chunk {n}"`, checked with `frappe.db.exists` before creating) -- this run's
+    console session was genuinely killed by a shell timeout partway through, and re-running picked up
+    cleanly without double-posting any chunk. `import_siezal_items.py` itself has no such guard (fine
+    for a single uninterrupted run there); add one for any future long site run expected to run over a
+    plain interactive `bench console` session.
+  - **Third gotcha, the most serious one -- a real gap in what looked like a clean completion**:
+    after the run reported success, a Bin-level cross-check (`SELECT COUNT(*) FROM tabBin WHERE
+    warehouse=... AND item_code IN (<the 163 new items>)`) found **zero** of them had any stock
+    posted at all, despite the run's own printed stats claiming `items_created: 163`. Root cause,
+    reconstructed from all three run logs: Run 1 and Run 2 both hit the `tabSeries` gotcha above on
+    every one of the 164 new-item rows, so by the time Run 2 finished posting *all* 69 positive + 13
+    negative Stock Entry chunks, none of the 164 new items existed yet -- their rows were correctly
+    excluded from those chunks. Run 3 (after seeding `tabSeries`) successfully created 163 of them,
+    but by then every chunk tag already existed from Run 2, so the stock-entry phase saw "already
+    done" and skipped creating anything new -- these 163 items' own Onhand was silently never
+    posted. Worse, 7 of the 163 (rows 1057-1068, a run of "FRAME ..." items) don't exist at all: a
+    *later* row in the same uncommitted batch (row 1634, a genuine junk "TEST3" row) raised an
+    exception, and the script's own `frappe.db.rollback()` on that exception rolled back
+    *everything since the last periodic commit checkpoint* (every 1,000 rows) -- including these 7
+    Items' just-inserted-but-not-yet-committed rows. The run's own in-memory stats counter had
+    already incremented before the rollback, so the printed summary was simply wrong and gave no
+    indication anything was missing.
+    - **The fix, `import_szl_s1_stock_fix_gap.py`**: created the 7 still-missing Items, then checked
+      **every** new item directly against `Bin` (not against any run's printed stats) to find the
+      163 that had no stock yet, and posted one additional Material Receipt (148 rows) + Material
+      Issue (15 rows) covering exactly that gap.
+    - **Lesson for any future script in this pattern**: (1) a bare `frappe.db.rollback()` inside a
+      per-row `except` block is only safe if commits happen *every row*, not periodically -- a
+      periodic/batched commit checkpoint means one bad row can silently erase every good row since
+      the last checkpoint, with no trace in the printed stats; commit after every successful row
+      instead, or catch-and-skip without any rollback wide enough to reach prior rows. (2) Never
+      trust a migration run's own printed "created" counts as proof of completion -- verify against
+      the actual persisted state (here, `Bin` existence per item) before declaring a stock import
+      done, exactly as the reconciliation-before-execution step already does for the *pre*-run
+      counts.
+  - **GST posted separately, `import_szl_s1_gst_opening.py`**: `CurCost` in the source sheet is
+    tax-inclusive (see "Tax-exclusive valuation rate" above), so the GST embedded in it is backed
+    out before being used as the Stock Entry rate and, without a further step, is simply discarded
+    from the books -- never posted anywhere. Per explicit decision 2026-08-02, it is instead carried
+    forward as an opening balance on the existing `GST - SSM` account (Liability, under `Duties and
+    Taxes`; zero prior GL usage before this) via one Journal Entry against `Temporary Opening`, for
+    the exact signed total (`Σ qty × (CurCost − exclusive_rate)` across every successfully-resolved
+    row, so a negative-Onhand row's GST correctly nets out the same way its Material Issue already
+    reduced stock) -- Rs 5,937,176.17 on the final, gap-fixed pass. This account nets input GST
+    against future output GST liability rather than tracking a separate recoverable-asset ledger,
+    since no dedicated "Sales Tax Recoverable"-style asset account exists in this CoA; revisit if
+    that ever needs to be tracked distinctly from output GST.
+  - Final state confirmed (after the gap fix and the GST posting): 16,345 Bin rows in S1's
+    warehouse -- exactly every real row in the sheet except the one genuine "TEST3" junk row -- net
+    stock value ~Rs 35,608,824.31 (`Stock In Hand`), GST ~Rs 5,937,176.17 (`GST - SSM`), and
+    `Temporary Opening`'s net balance (~Rs 41,546,000.48 credit) matches the sheet's own raw
+    tax-inclusive `Σ Onhand × CurCost` to within rounding, as it must by construction. Supplier
+    opening balances for S1 are a separate, later step; `close_migration_opening_balance.py` should
+    not be run until those are posted too (its own residual-close logic expects every opening-entry
+    half, stock/GST/vendor, to be in place first).
+  - **Selling-price gap repaired 2026-08-03**: the stock-only script created S1 Item Prices only
+    for newly created Items, so a direct workbook reconciliation found just 163 matching prices
+    and 16,180 missing prices for already-existing barcode matches. After a current database backup
+    (`20260803_031351-szl-database.sql.gz`), `update_szl_s1_sale_prices.py` created the missing rows
+    in `S1 - Ghouri Town VIP Selling Price List`. Final verification is 16,343 distinct Item Price
+    rows and 16,343 exact positive-`Slprice` matches. The only excluded workbook rows are the known
+    unmatched `TEST3` junk row and two resolved Items whose `Slprice` is zero/blank.
 
 ## Reference Scripts
 
@@ -335,6 +433,21 @@ actually uploaded on that site; only the script itself is centralized.
   `"NULL"`/junk-row handling, spreadsheet footer-row filtering) and the `MRP` fallback chain
   documented above, all first introduced for `siezal`. Prefer this one as the starting point for a
   new site's script.
+- `import_szl_s1_stock.py` / `import_szl_s1_stock_reenable_disabled.py` /
+  `import_szl_s1_stock_fix_gap.py` / `import_szl_s1_gst_opening.py` (2026-08-02) — the stock-only
+  variant for a site whose Item catalog was already bulk-copied from another site (see
+  "Site-Specific Import Targets" above for the full gotcha list: `tabSeries` not carried over by a
+  raw-SQL catalog copy, disabled Items blocking a Stock Entry, chunk-level resumability via a
+  `remarks` tag, and — the important one — a periodic-commit-checkpoint `rollback()` silently
+  erasing prior-committed-looking-but-not-yet-committed rows, caught only by verifying against `Bin`
+  directly rather than trusting the run's own printed stats). `import_szl_s1_gst_opening.py` posts
+  the GST backed out of the tax-inclusive source rate as a separate opening balance against
+  `GST - SSM`, per the S1 entry above.
+- `update_szl_s1_sale_prices.py` (2026-08-03) — dry-run-by-default repair/reconciliation for S1's
+  `ItemData&Onhand.xlsx`: matches either source barcode to `Item Barcode`, creates or corrects every
+  positive `Slprice` in the S1 Selling Price List, commits in resumable chunks, and refuses
+  ambiguous/duplicate matches. Set the script-specific `S1_PRICE_UPDATE_LIVE = True` console
+  variable only after the live-operation gate and a current backup.
 - `close_migration_opening_balance.py` (2026-07-23) — the cross-cutting final step, shared across
   sites, not item- or supplier-specific: closes the `Temporary Opening` suspense account's residual
   balance to `Opening Balance Equity` once both imports for a site are complete. See "Opening-stock

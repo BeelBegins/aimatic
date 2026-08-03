@@ -163,3 +163,5 @@ covered here.
 - `siezal` (`vendordataghouritown.xlsx`, Ghouri Town): Company/Branch target is the site's one real
   branch, `Ghouri Town Phase V`; `POSTING_DATE` is the run date, set explicitly rather than left to
   default, matching this doc's existing guidance above.
+
+- `szl` (`import_szl_suppliers.py`) uses the exact linked Ghouri Town workbook at `sites/szl/private/files/vendordataghouritown.xlsx`; its final blank row is a summary row and must be excluded from vendor data. The target has multiple branches, so the script explicitly sets `BRANCH_OVERRIDE = "S1 - Ghouri Town VIP"`; every opening-entry account row receives that branch and its cost center. The cutover run is dated `2026-08-04` for the planned go-live.

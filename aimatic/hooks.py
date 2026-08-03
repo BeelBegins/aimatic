@@ -152,6 +152,9 @@ doctype_js = {
         # Live preview only - prefills custom_fp_price from the branch's
         # current Foodpanda Price List. Shared with Purchase Order/Invoice.
         "public/js/foodpanda_price_prefill.js",
+        # Live preview only - prefills custom_shelf_price (Sale Price) from
+        # the branch's current Selling Price List rate, for reference/edit.
+        "public/js/current_sale_price_preview.js",
     ],
     "Purchase Order": [
         "public/js/purchase_history_autofill.js",
@@ -162,9 +165,18 @@ doctype_js = {
     "Stock Entry": "public/js/label_printing_source_buttons.js",
     "Sales Invoice": "public/js/label_printing_source_buttons.js",
     "Supplier": "public/js/supplier_vendor_performance.js",
+    "Price List": "public/js/price_list_barcode_search.js",
     "POS Profile": "public/js/pos_profile_device_enrollment.js",
     "Foodpanda Outlet": "public/js/foodpanda_outlet_sync.js",
     "Foodpanda Product": "public/js/foodpanda_product_sync.js",
+    "Branch": "public/js/branch_foodpanda_price_import.js",
+}
+
+# Desk list helpers: resolve every barcode through the Item Barcode child table,
+# then filter the parent Item or its Item Price rows without denormalizing data.
+doctype_list_js = {
+    "Item": "public/js/barcode_list_search.js",
+    "Item Price": "public/js/barcode_list_search.js",
 }
 
 jinja = {
@@ -268,7 +280,7 @@ fixtures = [
                 "Customer", "Customer Group", "Territory", "Item Price", "Bin",
                 "Branch", "Print Format",
             ]],
-            ["role", "in", ["POS User", "POS Supervisor"]],
+            ["role", "in", ["POS User", "POS Supervisor", "Buying Price Control"]],
         ],
     },
     # Item is deliberately NOT fixture-tracked here, unlike the other doctypes above -
@@ -463,9 +475,11 @@ scheduler_events = {
 		"aimatic.ai.tasks.run_scheduled_questions",
 		"aimatic.ai.tasks.check_alert_rules",
 		# Safety net: a standalone fixture sync (bypassing `bench migrate`)
-		# resets Tax Formula.gst_account to the shared fixture's placeholder
-		# and skips the after_migrate repair below. This self-heals daily.
-		"aimatic.tax_formula_setup.repair_dangling_gst_accounts",
+		# resets Tax Formula.gst_account/advance_tax_account to the shared
+		# fixture's values (a placeholder for gst_account, blank for
+		# advance_tax_account) and skips the after_migrate repair below.
+		# This self-heals daily.
+		"aimatic.tax_formula_setup.repair_dangling_tax_formula_accounts",
 	],
 }
 

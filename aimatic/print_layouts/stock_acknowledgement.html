@@ -4,6 +4,10 @@
 html, body { width: 200mm; margin: 0; padding: 0; }
 .print-format { width: 200mm !important; max-width: 200mm !important; min-height: 0 !important; margin: 0 auto !important; padding: 0 !important; font-family: Arial, Helvetica, sans-serif; font-size: 6.3pt; color: #000; }
 .aim-title { text-align: center; font-size: 10pt; font-weight: 700; margin: 0 0 1mm; }
+.aim-brand { width: 100%; border-collapse: collapse; margin: 0 0 1mm; }
+.aim-brand td { border: 0; padding: 0; vertical-align: middle; }
+.aim-brand img { max-width: 24mm; max-height: 14mm; object-fit: contain; }
+.aim-brand .brand-name { text-align: right; font-size: 8pt; font-weight: 700; }
 .aim-head { width: 100%; border-collapse: collapse; margin: 0 0 1mm; }
 .aim-head td { border: 0; padding: .35mm 1mm; vertical-align: top; }
 .aim-label { font-weight: 700; white-space: nowrap; }
@@ -47,6 +51,10 @@ html, body { width: 200mm; margin: 0; padding: 0; }
 {% set trade_offer = doc.custom_total_trade_offer or 0 %}
 {% set grand_line_total = doc.custom_grand_line_total or doc.grand_total or 0 %}
 {% set all_items = doc.items or [] %}
+{% set company_logo = frappe.db.get_value("Company", doc.company, "company_logo") or frappe.db.get_value("File", {"attached_to_doctype": "Company", "attached_to_name": doc.company}, "file_url") %}
+{% if company_logo %}
+<table class="aim-brand"><tr><td><img src="{{ frappe.utils.get_url(company_logo) }}" alt="{{ doc.company }}" /></td><td class="brand-name">{{ doc.company }}</td></tr></table>
+{% endif %}
 <div class="aim-title">{{ title }}{{ branch_title }}</div>
 <table class="aim-head">
  <tr>

@@ -25,6 +25,82 @@ def _get_primary_barcodes(item_codes):
     return barcodes
 
 
+def _get_receipt_branch_context(doc):
+    """Resolve the receipt header from the invoice's branch/profile masters.
+
+    Branch owns the customer-facing branch identity and contact details;
+    POS Profile may override the address for a particular terminal. Company
+    values remain the fallback so older invoices continue to print complete
+    headers before branch fields have been populated.
+    """
+    profile = frappe.db.get_value(
+        "POS Profile",
+        doc.pos_profile,
+        ["branch", "company_address"],
+        as_dict=True,
+    ) if doc.pos_profile else None
+    branch_name = doc.branch or (profile.branch if profile else None)
+    branch = frappe.get_cached_doc("Branch", branch_name) if branch_name else None
+
+    profile_address = profile.company_address if profile else None
+    address_name = profile_address or doc.company_address
+    address = (
+        frappe.db.get_value(
+            "Address",
+            address_name,
+            ["address_line1", "address_line2", "city", "state", "pincode", "phone", "email_id"],
+            as_dict=True,
+        )
+        if address_name
+        else None
+    )
+
+    company = frappe.db.get_value(
+        "Company", doc.company, ["tax_id", "phone_no", "email"], as_dict=True
+    ) or {}
+    branch_address = branch.get("custom_receipt_address") if branch else None
+    address_text = branch_address or "\n".join(
+        part
+        for part in (
+            address.get("address_line1") if address else None,
+            address.get("address_line2") if address else None,
+            ", ".join(
+                part
+                for part in (
+                    address.get("city") if address else None,
+                    address.get("state") if address else None,
+                )
+                if part
+            ),
+            address.get("pincode") if address else None,
+        )
+        if part
+    )
+
+    phone = (branch.get("custom_receipt_phone") if branch else None) or (
+        address.get("phone") if address else None
+    ) or company.get("phone_no")
+    email = (branch.get("custom_receipt_email") if branch else None) or (
+        address.get("email_id") if address else None
+    ) or company.get("email")
+    tax_id = (branch.get("custom_receipt_tax_id") if branch else None) or company.get("tax_id")
+
+    cashier_name = doc.get("custom_cashier_full_name")
+    if not cashier_name and doc.get("custom_cashier_user"):
+        cashier_name = frappe.db.get_value("User", doc.custom_cashier_user, "full_name")
+    if not cashier_name and doc.owner:
+        cashier_name = frappe.db.get_value("User", doc.owner, "full_name") or doc.owner
+
+    return {
+        "name": branch_name,
+        "address": address_text,
+        "phone": phone,
+        "email": email,
+        "tax_id": tax_id,
+        "cashier_name": cashier_name,
+    }
+
+
 def get_pos_receipt_context(doc):
     """Everything the POS receipt print formats need beyond the invoice's
     own fields: the FBR sales-tax/service-fee amounts (matched by Sales
@@ -62,7 +138,7 @@ def get_pos_receipt_context(doc):
     item_codes = [item.item_code for item in doc.items if item.item_code]
     master_barcodes = _get_primary_barcodes(item_codes)
     item_barcodes = {
-        item.name: item.get("barcode") or master_barcodes.get(item.item_code) or item.item_code or ""
+        item.name: item.get("barcode") or master_barcodes.get(item.item_code) or ""
         for item in doc.items
     }
 
@@ -75,6 +151,7 @@ def get_pos_receipt_context(doc):
     return {
         "item_barcodes": item_barcodes,
         "ntn": frappe.db.get_value("Company", doc.company, "tax_id"),
+        "branch_info": _get_receipt_branch_context(doc),
         "receipt_terms": receipt_terms,
         "fbr_sales_tax": fbr_sales_tax,
         "fbr_pos_fee": fbr_pos_fee,

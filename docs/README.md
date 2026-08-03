@@ -107,6 +107,14 @@ Every sale and refund is recorded against the correct branch and warehouse autom
 Stock and accounting only update once a cashier's shift is formally closed out at day's end —
 not the instant a sale happens — this is expected behavior, not a delay or a bug.
 
+For the S1 Food Panda counter, a cashier can choose Credit Sale only when using the
+dedicated Food Panda POS Profile and the Food Panda customer. The sale is recorded as an
+outstanding Food Panda receivable; it does not post directly to the bank. Accounts later
+records the monthly payout with a normal Payment Entry from the Food Panda receivable to the
+bank account. This is for orders manually billed at the POS counter; the separate Foodpanda
+integration is configured independently.
+
+
 On Android, the large synced item/barcode catalogue is stored separately from the small live
 cart and queue state. Existing installs migrate this automatically. This keeps barcode scans
 responsive because adding one item no longer rewrites the complete catalogue to disk.
@@ -271,13 +279,17 @@ every till in normal day-to-day operation once a branch's FBR settings are prope
 
 ### Barcode and shelf-label printing
 
+Each ERPNext Price List form includes a **Search Barcode** action. Staff can scan or enter a
+complete barcode to open that Price List's matching Item Price row. The Item list and the Item
+Price report reached through **Add / Edit Prices** also provide the same barcode search action.
+
 Staff can print barcode labels or A4 shelf-price labels directly from a submitted Purchase
 Receipt, Delivery Note, Sales Invoice, or stock transfer — with configurable label templates
 (size, columns, fonts, which fields appear) so different label types (small barcode stickers
 vs. full shelf-price cards) can be maintained without any code changes.
 
 The print layouts themselves — barcode labels, shelf labels, the purchase receipt/invoice print
-layouts, and the POS receipt layouts — ship automatically with the app. An implementer setting
+layouts, and the POS receipt layouts — ship automatically with the app. POS customer receipts show each item's plain barcode text directly below its description when a barcode is available. An implementer setting
 up a new site does not need to manually recreate any of these; they're already there the moment
 the app is installed.
 

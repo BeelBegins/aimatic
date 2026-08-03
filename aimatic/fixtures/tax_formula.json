@@ -5,23 +5,10 @@
   "discount_account": null,
   "docstatus": 0,
   "doctype": "Tax Formula",
-  "formula_name": "GST Std (Excl Scheme)",
-  "formula_string": "(rate*(qty-custom_scheme_qty)*custom_gst_per)/100",
-  "formula_type": "gst",
-  "gst_account": "Sales Tax on Goods - ST",
-  "modified": "2026-07-09 03:16:05.227963",
-  "name": "GST Std (Excl Scheme)"
- },
- {
-  "advance_tax_account": null,
-  "description": null,
-  "discount_account": null,
-  "docstatus": 0,
-  "doctype": "Tax Formula",
   "formula_name": "GST TO Only",
   "formula_string": "(((rate-custom_trade_offer)*custom_gst_per)/100)*(qty-custom_scheme_qty)",
   "formula_type": "gst",
-  "gst_account": "Sales Tax on Goods - ST",
+  "gst_account": "GST - SSM",
   "modified": "2026-07-09 03:16:04.278289",
   "name": "GST TO Only"
  },
@@ -34,35 +21,9 @@
   "formula_name": "GST Disc Only",
   "formula_string": "(((rate-((rate*custom_discount_per)/100))*custom_gst_per)/100)*(qty-custom_scheme_qty)",
   "formula_type": "gst",
-  "gst_account": "Sales Tax on Goods - ST",
+  "gst_account": "GST - SSM",
   "modified": "2026-07-09 03:16:03.806623",
   "name": "GST Disc Only"
- },
- {
-  "advance_tax_account": null,
-  "description": null,
-  "discount_account": null,
-  "docstatus": 0,
-  "doctype": "Tax Formula",
-  "formula_name": "GST Disc + TO (Excl Scheme)",
-  "formula_string": "(((rate-((rate*custom_discount_per)/100)-custom_trade_offer)*custom_gst_per)/100)*(qty-custom_scheme_qty)",
-  "formula_type": "gst",
-  "gst_account": "Sales Tax on Goods - ST",
-  "modified": "2026-07-09 03:16:02.766137",
-  "name": "GST Disc + TO (Excl Scheme)"
- },
- {
-  "advance_tax_account": null,
-  "description": null,
-  "discount_account": null,
-  "docstatus": 0,
-  "doctype": "Tax Formula",
-  "formula_name": "GST Disc + TO (Incl Scheme)",
-  "formula_string": "((((rate*qty)-(rate*(qty-custom_scheme_qty)*custom_discount_per/100)-(custom_trade_offer*qty))*custom_gst_per)/100)",
-  "formula_type": "gst",
-  "gst_account": "Sales Tax on Goods - ST",
-  "modified": "2026-07-09 03:16:03.270050",
-  "name": "GST Disc + TO (Incl Scheme)"
  },
  {
   "advance_tax_account": null,
@@ -73,38 +34,12 @@
   "formula_name": "GST Exempted",
   "formula_string": "custom_gst_per*0",
   "formula_type": "gst",
-  "gst_account": "Sales Tax on Goods - ST",
+  "gst_account": "GST - SSM",
   "modified": "2026-06-15 06:53:04.660892",
   "name": "GST Exempted"
  },
  {
-  "advance_tax_account": null,
-  "description": null,
-  "discount_account": null,
-  "docstatus": 0,
-  "doctype": "Tax Formula",
-  "formula_name": "Adv Std (Excl Scheme)",
-  "formula_string": "custom_advance_tax_per*(custom_gross_total+custom_gst_amount)/100",
-  "formula_type": "advance_tax",
-  "gst_account": null,
-  "modified": "2026-07-09 03:16:01.677360",
-  "name": "Adv Std (Excl Scheme)"
- },
- {
-  "advance_tax_account": null,
-  "description": null,
-  "discount_account": null,
-  "docstatus": 0,
-  "doctype": "Tax Formula",
-  "formula_name": "Adv Std (Incl Scheme)",
-  "formula_string": "custom_advance_tax_per*((rate*qty)+custom_gst_amount)/100",
-  "formula_type": "advance_tax",
-  "gst_account": null,
-  "modified": "2026-07-09 03:16:01.138803",
-  "name": "Adv Std (Incl Scheme)"
- },
- {
-  "advance_tax_account": null,
+  "advance_tax_account": "Advance Tax Deducted by Suppliers - SSM",
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -117,20 +52,7 @@
   "name": "Adv On TP"
  },
  {
-  "advance_tax_account": null,
-  "description": null,
-  "discount_account": null,
-  "docstatus": 0,
-  "doctype": "Tax Formula",
-  "formula_name": "Adv TP + GST - TO",
-  "formula_string": "custom_advance_tax_per*((rate*(qty-custom_scheme_qty))-((qty-custom_scheme_qty)*custom_trade_offer)+custom_gst_amount)/100",
-  "formula_type": "advance_tax",
-  "gst_account": null,
-  "modified": "2026-07-09 03:16:00.042845",
-  "name": "Adv TP + GST - TO"
- },
- {
-  "advance_tax_account": null,
+  "advance_tax_account": "Advance Tax Deducted by Suppliers - SSM",
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -143,7 +65,7 @@
   "name": "Adv TP + GST - Disc - TO"
  },
  {
-  "advance_tax_account": null,
+  "advance_tax_account": "Advance Tax Deducted by Suppliers - SSM",
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -156,7 +78,7 @@
   "name": "Adv TP + GST + FED - Disc - TO"
  },
  {
-  "advance_tax_account": null,
+  "advance_tax_account": "Advance Tax Deducted by Suppliers - SSM",
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -195,7 +117,7 @@
   "name": "FED Per from Amount"
  },
  {
-  "advance_tax_account": null,
+  "advance_tax_account": "Advance Tax Deducted by Suppliers - SSM",
   "description": null,
   "discount_account": null,
   "docstatus": 0,
@@ -216,7 +138,7 @@
   "formula_name": "GST Std (Incl Scheme)",
   "formula_string": "(rate*qty*custom_gst_per)/100",
   "formula_type": "gst",
-  "gst_account": "Sales Tax on Goods - ST",
+  "gst_account": "GST - SSM",
   "modified": "2026-07-09 03:16:04.778004",
   "name": "GST Std (Incl Scheme)"
  },
@@ -226,12 +148,51 @@
   "discount_account": null,
   "docstatus": 0,
   "doctype": "Tax Formula",
-  "formula_name": "Adv TP + GST - Disc",
-  "formula_string": "custom_advance_tax_per*((rate*(qty-custom_scheme_qty))-(rate*(qty-custom_scheme_qty)*custom_discount_per/100)+custom_gst_amount)/100",
+  "formula_name": "GST Disc + TO (Incl Scheme)",
+  "formula_string": "((((rate*qty)-(rate*(qty-custom_scheme_qty)*custom_discount_per/100)-(custom_trade_offer*qty))*custom_gst_per)/100)",
+  "formula_type": "gst",
+  "gst_account": "GST - SSM",
+  "modified": "2026-07-09 03:16:03.270050",
+  "name": "GST Disc + TO (Incl Scheme)"
+ },
+ {
+  "advance_tax_account": "Advance Tax Deducted by Suppliers - SSM",
+  "description": null,
+  "discount_account": null,
+  "docstatus": 0,
+  "doctype": "Tax Formula",
+  "formula_name": "Adv TP + GST - TO",
+  "formula_string": "custom_advance_tax_per*((rate*(qty-custom_scheme_qty))-((qty-custom_scheme_qty)*custom_trade_offer)+custom_gst_amount)/100",
   "formula_type": "advance_tax",
-  "gst_account": "",
-  "modified": "2026-07-09 03:15:58.960488",
-  "name": "Adv TP + GST - Disc"
+  "gst_account": null,
+  "modified": "2026-07-09 03:16:00.042845",
+  "name": "Adv TP + GST - TO"
+ },
+ {
+  "advance_tax_account": "Advance Tax Deducted by Suppliers - SSM",
+  "description": null,
+  "discount_account": null,
+  "docstatus": 0,
+  "doctype": "Tax Formula",
+  "formula_name": "Adv Std (Excl Scheme)",
+  "formula_string": "custom_advance_tax_per*(custom_gross_total+custom_gst_amount)/100",
+  "formula_type": "advance_tax",
+  "gst_account": null,
+  "modified": "2026-07-09 03:16:01.677360",
+  "name": "Adv Std (Excl Scheme)"
+ },
+ {
+  "advance_tax_account": null,
+  "description": null,
+  "discount_account": null,
+  "docstatus": 0,
+  "doctype": "Tax Formula",
+  "formula_name": "GST Std (Excl Scheme)",
+  "formula_string": "(rate*(qty-custom_scheme_qty)*custom_gst_per)/100",
+  "formula_type": "gst",
+  "gst_account": "GST - SSM",
+  "modified": "2026-07-09 03:16:05.227963",
+  "name": "GST Std (Excl Scheme)"
  },
  {
   "advance_tax_account": "",
@@ -242,8 +203,47 @@
   "formula_name": "3rd Schedule",
   "formula_string": "(custom_mrp*(custom_gst_per/(100+custom_gst_per)))*(qty-custom_scheme_qty)",
   "formula_type": "gst",
-  "gst_account": "Sales Tax on Goods - ST",
+  "gst_account": "GST - SSM",
   "modified": "2026-06-15 08:53:52.884816",
   "name": "3rd Schedule"
+ },
+ {
+  "advance_tax_account": "Advance Tax Deducted by Suppliers - SSM",
+  "description": null,
+  "discount_account": null,
+  "docstatus": 0,
+  "doctype": "Tax Formula",
+  "formula_name": "Adv Std (Incl Scheme)",
+  "formula_string": "custom_advance_tax_per*((rate*qty)+custom_gst_amount)/100",
+  "formula_type": "advance_tax",
+  "gst_account": null,
+  "modified": "2026-07-09 03:16:01.138803",
+  "name": "Adv Std (Incl Scheme)"
+ },
+ {
+  "advance_tax_account": null,
+  "description": null,
+  "discount_account": null,
+  "docstatus": 0,
+  "doctype": "Tax Formula",
+  "formula_name": "GST Disc + TO (Excl Scheme)",
+  "formula_string": "(((rate-((rate*custom_discount_per)/100)-custom_trade_offer)*custom_gst_per)/100)*(qty-custom_scheme_qty)",
+  "formula_type": "gst",
+  "gst_account": "GST - SSM",
+  "modified": "2026-07-09 03:16:02.766137",
+  "name": "GST Disc + TO (Excl Scheme)"
+ },
+ {
+  "advance_tax_account": "Advance Tax Deducted by Suppliers - SSM",
+  "description": null,
+  "discount_account": null,
+  "docstatus": 0,
+  "doctype": "Tax Formula",
+  "formula_name": "Adv TP + GST - Disc",
+  "formula_string": "custom_advance_tax_per*((rate*(qty-custom_scheme_qty))-(rate*(qty-custom_scheme_qty)*custom_discount_per/100)+custom_gst_amount)/100",
+  "formula_type": "advance_tax",
+  "gst_account": "",
+  "modified": "2026-07-09 03:15:58.960488",
+  "name": "Adv TP + GST - Disc"
  }
 ]

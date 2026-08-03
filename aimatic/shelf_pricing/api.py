@@ -113,6 +113,47 @@ def get_current_foodpanda_price(item_code, branch):
 
 
 @frappe.whitelist()
+def get_current_branch_sale_price(item_code, branch):
+    """Read-only lookup backing the client-side custom_shelf_price prefill
+    (see public/js/current_sale_price_preview.js) - returns whatever rate is
+    currently in this branch's Selling Price List for this item, or 0 if
+    none yet. Deliberately does not call get_or_create_branch_price_list - a
+    plain read must not have the side effect of creating that list. Falls
+    back to Selling Settings.selling_price_list only so a branch that has no
+    dedicated list yet still shows something meaningful.
+    """
+    if not item_code or not branch:
+        return {"rate": 0}
+
+    price_list = frappe.db.get_value("Branch", branch, "default_selling_price_list") or (
+        frappe.db.get_single_value("Selling Settings", "selling_price_list")
+    )
+    if not price_list:
+        return {"rate": 0}
+
+    rate = frappe.db.get_value(
+        "Item Price",
+        {"item_code": item_code, "price_list": price_list, "selling": 1},
+        "price_list_rate",
+    )
+    return {"rate": flt(rate)}
+
+
+@frappe.whitelist()
+def get_current_mrp(item_code):
+    """Read-only lookup backing the client-side custom_mrp prefill (see
+    public/js/current_sale_price_preview.js) - returns the item's current
+    global Item.custom_mrp, or 0 if unset. MRP is a single global value (not
+    branch/price-list scoped - see the shelf-pricing skill), unlike
+    get_current_branch_sale_price/get_current_foodpanda_price.
+    """
+    if not item_code:
+        return {"mrp": 0}
+
+    return {"mrp": flt(frappe.db.get_value("Item", item_code, "custom_mrp"))}
+
+
+@frappe.whitelist()
 def apply_foodpanda_price_update(purchase_receipt):
     doc = _get_submitted_receipt(purchase_receipt)
     if doc.custom_foodpanda_price_update_status == "Updated":

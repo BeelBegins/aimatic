@@ -18,6 +18,9 @@ _ALLOWED_REFUND_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_CLOSE_SHIFT_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_CASHIER_ROLES = {"POS User", "POS Supervisor", "System Manager"}
 _CASHIER_OFFLINE_LOGIN_VALID_DAYS = 7
+_FOOD_PANDA_PROFILE = "S1 Food Panda"
+_FOOD_PANDA_CUSTOMER = "Food Panda"
+_FOOD_PANDA_CREDIT_MODE = "Food Panda Credit"
 
 # Master-data doctypes the terminal client is allowed to read via
 # get_terminal_resource/list_terminal_resources below - see those functions'
@@ -204,6 +207,21 @@ def _load_customer(customer_name):
         frappe.throw(_("Not permitted to read Customer: {0}").format(customer_name))
 
     return cust
+
+
+def _is_food_panda_credit_sale(pos, customer):
+	"""Return whether the request is the dedicated S1 Food Panda credit flow.
+
+	The marker is intentionally narrow: a client cannot turn an ordinary POS
+	Profile or another Customer into a credit sale by sending the special
+	payment mode. The profile, customer, and exact S1 configuration must all
+	match server-side.
+	"""
+	return (
+		pos.name == _FOOD_PANDA_PROFILE
+		and cint(pos.get("custom_is_foodpanda_profile"))
+		and customer == _FOOD_PANDA_CUSTOMER
+	)
 
 
 def _parse_json_param(value, name="parameter"):
@@ -876,6 +894,25 @@ def get_cashier_context(pos_profile, hardware_id):
 # Shared invoice builder
 # ---------------------------------------------------------------------------
 
+def _validate_nonzero_rates(doc):
+    """Reject a POS Invoice line whose priced rate came back zero (e.g. no
+    active Item Price for this branch's selling price list, or a barcode
+    resolving to the wrong Item). Checked after set_missing_values/
+    calculate_taxes_and_totals/apply_pricing_rule_on_transaction have all run,
+    so this only catches a genuinely un-priced or misconfigured item - not a
+    row still mid-calculation. No existing flow (loyalty redemption is a
+    document-level deduction; Gift Voucher redemption is its own payment row,
+    never an item line) depends on a zero net rate reaching this point.
+    """
+    for row in doc.items:
+        if flt(row.net_rate) <= 0:
+            frappe.throw(
+                _("Rate must be greater than zero for item {0}. Check that it has an active price for this branch.").format(
+                    row.item_code
+                )
+            )
+
+
 def _build_pos_invoice_doc(
     pos,
     cust,
@@ -973,6 +1010,8 @@ def _build_pos_invoice_doc(
         validate_coupon_code(coupon_code)
 
     apply_pricing_rule_on_transaction(doc)
+
+    _validate_nonzero_rates(doc)
 
     if int(redeem_loyalty_points or 0):
         from erpnext.accounts.doctype.loyalty_program.loyalty_program import (
@@ -1226,6 +1265,7 @@ def preview_cart(
     redeem_loyalty_points=0,
     loyalty_points=0,
     gift_voucher_code=None,
+    cashier_user=None,
 ):
     """Build an unsaved POS Invoice and return priced/taxed cart preview.
 
@@ -1238,7 +1278,14 @@ def preview_cart(
     _enforce_bearer_profile(pos_profile)
 
     pos = _load_pos_profile(pos_profile)
-    _validate_pos_opening_entry(pos.name)
+    is_bearer = _is_bearer_authenticated_request()
+    cashier_user = _resolve_cashier_user(cashier_user, pos.name, None, is_bearer)
+    # Older Electron builds did not send cashier_user. Preserve their original
+    # terminal-user behavior while corrected clients identify the human cashier
+    # whose submitted Opening Entry owns this preview.
+    cashier_user = cashier_user or frappe.session.user
+    _validate_cashier_identity(cashier_user, pos)
+    _validate_pos_opening_entry(pos.name, cashier_user)
     cust = _load_customer(customer)
 
     items = _parse_json_param(items, "items")
@@ -1390,7 +1437,7 @@ def submit_online_sale(
     local_offline_session_id=None,
     hardware_id=None,
 ):
-    """Create and submit a POS Invoice from the Electron terminal.
+    """Create and submit a paid or S1 Food Panda credit POS Invoice.
 
     Idempotent: if a POS Invoice with the same terminal_invoice_id already exists
     it is returned immediately without creating a duplicate.  This protects
@@ -1410,6 +1457,11 @@ def submit_online_sale(
     still enabled, still permitted on this POS Profile, and opening_entry
     must actually belong to this cashier.  An offline cache can go stale, so
     none of this is trusted from Electron without a fresh check.
+
+    The only unpaid path is a single zero-amount ``Food Panda Credit`` marker
+    on the dedicated ``S1 Food Panda`` profile for the ``Food Panda`` customer.
+    It leaves the customer receivable outstanding; all other sales still need
+    full positive payment rows.
 
     offline_authenticated sales must report offline_auth_method exactly as
     "cashier_pin" — a locally cached full account password is not an
@@ -1601,7 +1653,7 @@ def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
 
     Rules enforced:
     - Every mode_of_payment must be in the POS Profile's allowed list.
-    - Every amount must be positive.
+    - Every ordinary amount must be positive.
     - Non-cash payments cannot individually exceed the remaining payable amount.
     - Cash may exceed payable (creates change).
     - Total payments must cover payable_after_loyalty_and_gift_voucher.
@@ -1616,6 +1668,40 @@ def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
     allowed_modes = {p.mode_of_payment for p in (pos.get("payments") or [])}
     if not allowed_modes:
         frappe.throw(_("POS Profile has no payment modes configured"))
+
+    credit_rows = [
+        p for p in payments_data
+        if (p.get("mode_of_payment") or "").strip() == _FOOD_PANDA_CREDIT_MODE
+    ]
+    if credit_rows:
+        if not _is_food_panda_credit_sale(pos, doc.customer):
+            frappe.throw(
+                _(
+                    "Food Panda credit sales are restricted to the S1 Food Panda "
+                    "POS Profile and Food Panda customer."
+                ),
+                frappe.PermissionError,
+            )
+        if len(payments_data) != 1 or flt(credit_rows[0].get("amount") or 0, 2) != 0:
+            frappe.throw(_("Food Panda Credit must be submitted as one zero-amount marker row."))
+        if gift_voucher_amount:
+            frappe.throw(_("Food Panda credit sales cannot use a gift voucher."))
+
+        # ERPNext requires at least one payment child row on an is_pos invoice,
+        # but its GL builder skips zero-amount rows. This marker therefore
+        # keeps the POS Invoice/shift flow intact while leaving the customer
+        # receivable outstanding for a later Payment Entry.
+        doc.set("payments", [])
+        doc.append("payments", {"mode_of_payment": _FOOD_PANDA_CREDIT_MODE, "amount": 0})
+        doc.change_amount = 0
+        doc.base_change_amount = 0
+        return
+
+    if _is_food_panda_credit_sale(pos, doc.customer):
+        frappe.throw(
+            _("S1 Food Panda sales must use the Food Panda Credit payment."),
+            frappe.PermissionError,
+        )
 
     _mop_type_cache = {}
 
