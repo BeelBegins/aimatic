@@ -1243,8 +1243,8 @@ def _https_request():
 class TestPosAdminAuthorization(_AimTestCase):
     """authorize_pos_admin_action / consume_pos_admin_authorization - the
     supervisor step-up primitive shared by close_shift (offline_pos/api.py's
-    close_pos_session) and void_item (Electron client only, no server
-    document of its own)."""
+    close_pos_session), plus void_item and clear_cart (Electron client only,
+    with no server document of their own)."""
 
     def test_authorize_success(self):
         from aimatic.offline_pos.api import authorize_pos_admin_action
@@ -1266,6 +1266,28 @@ class TestPosAdminAuthorization(_AimTestCase):
         log = frappe.get_all(
             "POS Admin Audit Log",
             filters={"user": supervisor, "action": "void_item", "status": "success"},
+        )
+        self.assertEqual(len(log), 1)
+
+    def test_clear_cart_authorize_and_consume(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action, consume_pos_admin_authorization
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request():
+            minted = authorize_pos_admin_action(supervisor, password, "clear_cart", "TEST-TERM-1")
+            result = consume_pos_admin_authorization(minted["token"], "clear_cart", "TEST-TERM-1")
+
+        self.assertTrue(result["success"])
+        auth = frappe.get_all(
+            "POS Admin Authorization",
+            filters={"user": supervisor, "action": "clear_cart", "terminal_id": "TEST-TERM-1"},
+            fields=["used"],
+        )
+        self.assertEqual(len(auth), 1)
+        self.assertEqual(auth[0].used, 1)
+        log = frappe.get_all(
+            "POS Admin Audit Log",
+            filters={"user": supervisor, "action": "clear_cart", "status": "token_consumed"},
         )
         self.assertEqual(len(log), 1)
 

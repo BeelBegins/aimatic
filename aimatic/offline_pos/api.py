@@ -12,7 +12,14 @@ from aimatic.pos_shared import returned_qty_by_row
 from aimatic.aimatic.offline_pos.device_auth import hash_device_token, validate_device_proof
 
 _MAX_PAGE_SIZE = 1000
-_ALLOWED_POS_ADMIN_ACTIONS = {"setup_pin", "reset_pin", "change_credentials", "close_shift", "void_item"}
+_ALLOWED_POS_ADMIN_ACTIONS = {
+    "setup_pin",
+    "reset_pin",
+    "change_credentials",
+    "close_shift",
+    "void_item",
+    "clear_cart",
+}
 _ALLOWED_POS_ADMIN_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_REFUND_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_CLOSE_SHIFT_ROLES = {"POS Supervisor", "System Manager"}
@@ -400,7 +407,7 @@ def _consume_pos_admin_authorization_token(token, action, terminal_id):
     """Validate, single-use-consume, and audit a POS Admin Authorization
     token. Shared by the whitelisted consume_pos_admin_authorization (called
     directly by Electron for actions with no server document of their own,
-    e.g. void_item) and by close_pos_session (called in-process, in the same
+    e.g. void_item or clear_cart) and by close_pos_session (called in-process, in the same
     DB transaction as the close itself, so a token is never burned if the
     close subsequently fails/rolls back for an unrelated reason).
 
