@@ -19,6 +19,7 @@ _ALLOWED_POS_ADMIN_ACTIONS = {
     "close_shift",
     "void_item",
     "clear_cart",
+    "refund",
 }
 _ALLOWED_POS_ADMIN_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_REFUND_ROLES = {"POS Supervisor", "System Manager"}
@@ -105,6 +106,7 @@ def _validate_pos_opening_entry(pos_profile_name, user=None):
             title=_("POS Opening Entry Missing"),
         )
 
+    _reject_if_failed_closing(opening_entries[0].name)
     return opening_entries[0]
 
 
@@ -163,6 +165,46 @@ def _validate_cashier_identity(cashier_user, pos, required_roles=None):
     return roles
 
 
+def _get_failed_closing_for_opening(opening_entry):
+    """Return the submitted Failed POS Closing Entry for this opening, if any."""
+    if not opening_entry:
+        return None
+    return frappe.db.get_value(
+        "POS Closing Entry",
+        {
+            "pos_opening_entry": opening_entry,
+            "docstatus": 1,
+            "status": "Failed",
+        },
+        ["name", "error_message"],
+        as_dict=True,
+    )
+
+
+def _reject_if_failed_closing(opening_entry):
+    """Block new sales/refunds while a Failed closing still owns this shift.
+
+    ERPNext leaves the Opening Entry Open when consolidation fails, so the
+    terminal would otherwise keep selling into a shift that cannot finish.
+    Close Shift already retries the Failed document; until that succeeds,
+    refuse submit (and preview) paths with the closing's own error message.
+    """
+    failed = _get_failed_closing_for_opening(opening_entry)
+    if not failed:
+        return
+
+    from frappe.utils import strip_html
+
+    detail = strip_html(failed.error_message or "") or _("Unknown consolidation error")
+    frappe.throw(
+        _(
+            "Shift close failed ({0}). Fix the closing error, then retry Close Shift. "
+            "New sales and refunds are blocked until then.\n\n{1}"
+        ).format(failed.name, detail),
+        title=_("Shift Close Failed"),
+    )
+
+
 def _require_open_entry_for_cashier(opening_entry, cashier_user, pos):
     """Load a submitted, Open POS Opening Entry and confirm it belongs to
     cashier_user and this POS Profile.  Never matches on the authenticated
@@ -198,6 +240,7 @@ def _require_open_entry_for_cashier(opening_entry, cashier_user, pos):
     if entry.docstatus != 1 or entry.status != "Open":
         frappe.throw(_("POS Opening Entry {0} is not open").format(opening_entry))
 
+    _reject_if_failed_closing(entry.name)
     return entry
 
 
@@ -920,6 +963,28 @@ def _validate_nonzero_rates(doc):
             )
 
 
+def _resolve_item_code_from_barcode(barcode):
+    """Resolve Item Barcode → item code with case-insensitive matching.
+
+    Shelf/legacy labels are often typed in a different case than the stored
+    barcode (e.g. ``s5`` vs ``S5``). Exact match first, then LOWER() fallback.
+    """
+    if not barcode:
+        return None
+    code = frappe.db.get_value("Item Barcode", {"barcode": barcode}, "parent")
+    if code:
+        return code
+    rows = frappe.db.sql(
+        """
+        SELECT parent FROM `tabItem Barcode`
+        WHERE LOWER(barcode) = LOWER(%s)
+        LIMIT 1
+        """,
+        (barcode,),
+    )
+    return rows[0][0] if rows else None
+
+
 def _build_pos_invoice_doc(
     pos,
     cust,
@@ -978,7 +1043,7 @@ def _build_pos_invoice_doc(
         uom = it.get("uom")
 
         if not item_code and barcode:
-            item_code = frappe.db.get_value("Item Barcode", {"barcode": barcode}, "parent")
+            item_code = _resolve_item_code_from_barcode(barcode)
 
         if not item_code:
             frappe.throw(
@@ -1695,9 +1760,11 @@ def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
             frappe.throw(_("Food Panda credit sales cannot use a gift voucher."))
 
         # ERPNext requires at least one payment child row on an is_pos invoice,
-        # but its GL builder skips zero-amount rows. This marker therefore
-        # keeps the POS Invoice/shift flow intact while leaving the customer
-        # receivable outstanding for a later Payment Entry.
+        # but its GL builder skips zero-amount rows and POS Invoice.on_submit
+        # clears amount=0 rows via clear_unallocated_mode_of_payments. Append
+        # the marker here for validate; offline_pos.events restores it after
+        # that clear so shift consolidation still sees a payment mode while the
+        # customer receivable stays outstanding for a later Payment Entry.
         doc.set("payments", [])
         doc.append("payments", {"mode_of_payment": _FOOD_PANDA_CREDIT_MODE, "amount": 0})
         doc.change_amount = 0
@@ -1996,6 +2063,9 @@ def get_active_pos_session(pos_profile, cashier_user):
     matched = next((e for e in profile_open if e.user == cashier_user), None)
 
     if matched:
+        failed = _get_failed_closing_for_opening(matched.name)
+        from frappe.utils import strip_html
+
         return {
             "opening_entry": matched.name,
             "user": matched.user,
@@ -2006,7 +2076,13 @@ def get_active_pos_session(pos_profile, cashier_user):
             "status": matched.status,
             "docstatus": matched.docstatus,
             "period_start_date": matched.period_start_date,
-            "reason": "Active session found",
+            "reason": (
+                "Shift close failed — fix the closing error, then retry Close Shift"
+                if failed
+                else "Active session found"
+            ),
+            "failed_closing": failed.name if failed else None,
+            "failed_closing_error": strip_html(failed.error_message or "") if failed else None,
             "other_open_sessions": [],
         }
 
@@ -2035,6 +2111,8 @@ def get_active_pos_session(pos_profile, cashier_user):
             if other_open
             else "No submitted open POS Opening Entry exists for this cashier"
         ),
+        "failed_closing": None,
+        "failed_closing_error": None,
         "other_open_sessions": other_open,
     }
 
@@ -2134,14 +2212,32 @@ def close_pos_session(opening_entry, cashier_user, closing_balances, notes=None,
     existing = frappe.db.get_value(
         "POS Closing Entry",
         {"pos_opening_entry": opening.name, "docstatus": ("in", [0, 1])},
-        ["name", "docstatus"],
+        ["name", "docstatus", "status"],
         as_dict=True,
     )
     if existing:
-        if existing.docstatus == 1:
+        if existing.docstatus == 1 and existing.status != "Failed":
             return _build_closing_session_response(
                 frappe.get_doc("POS Closing Entry", existing.name), opening.name
             )
+        if existing.docstatus == 1 and existing.status == "Failed":
+            # ERPNext leaves a submitted Failed closing when consolidation
+            # errors; Desk exposes Retry. Mirror that so the terminal can
+            # recover after the underlying invoice issue is fixed.
+            failed = frappe.get_doc("POS Closing Entry", existing.name)
+            terminal_user = frappe.session.user
+            try:
+                frappe.set_user("Administrator")
+                failed.retry()
+            finally:
+                frappe.set_user(terminal_user)
+            failed.reload()
+            if failed.status == "Failed":
+                frappe.throw(
+                    failed.error_message
+                    or _("POS Closing Entry {0} failed again.").format(failed.name)
+                )
+            return _build_closing_session_response(failed, opening.name)
         frappe.throw(
             _("A draft POS Closing Entry {0} already exists for this shift. Please resolve it before closing again.").format(
                 existing.name
@@ -2694,12 +2790,18 @@ def _pos_profile_user_allowed(pos, fieldname, user):
     return user in allowed_users
 
 
-def _require_refund_permission(pos, user=None):
-    """Require a refund role, or an explicit POS Profile user allow-list entry.
+def _require_refund_permission(pos, user=None, supervisor_token=None):
+    """Require a refund role, profile allow-list entry, or supervisor token.
 
     user defaults to the authenticated session user; callers acting on behalf
     of a separate human cashier (e.g. submit_pos_refund) pass cashier_user
     explicitly so the check runs against the cashier, not the terminal.
+
+    A plain POS User may refund when a supervisor supplies an unused
+    supervisor_token minted for action ``refund`` on this POS Profile's
+    terminal (same step-up primitive as close_shift / void_item). The token
+    is consumed here in the same DB transaction as the refund insert, so a
+    failed/rolled-back refund never burns the authorization.
     """
     user = user or frappe.session.user
     roles = set(frappe.get_roles(user))
@@ -2719,9 +2821,21 @@ def _require_refund_permission(pos, user=None):
             frappe.PermissionError,
         )
 
-    frappe.throw(
-        _("Refund requires POS Supervisor or System Manager role"),
-        frappe.PermissionError,
+    terminal_id = pos.get("custom_terminal_id")
+    if not terminal_id:
+        frappe.throw(
+            _(
+                "POS Profile {0} has no Terminal ID assigned - supervisor authorization cannot be verified."
+            ).format(pos.name)
+        )
+    if not supervisor_token:
+        frappe.throw(
+            _("Supervisor authorization is required to refund."),
+            frappe.PermissionError,
+        )
+    _require_https_for_pos_admin_authorization()
+    _consume_pos_admin_authorization_token(
+        supervisor_token, action="refund", terminal_id=terminal_id
     )
 
 
@@ -3089,6 +3203,7 @@ def submit_pos_refund(
     offline_auth_method=None,
     local_offline_session_id=None,
     hardware_id=None,
+    supervisor_token=None,
 ):
     """Create and submit a return POS Invoice against an original sale.
 
@@ -3102,7 +3217,8 @@ def submit_pos_refund(
     terminal's own authenticated API identity — validated the same way
     submit_online_sale validates its cashier: must be enabled, permitted on
     this POS Profile, and (via _require_refund_permission) either hold a
-    refund role or be explicitly allow-listed on the POS Profile. If
+    refund role, be explicitly allow-listed on the POS Profile, or supply a
+    valid unused supervisor_token minted for action ``refund``. If
     pos_opening_entry is given it must belong to cashier_user; otherwise
     cashier_user must have some other open shift on this POS Profile. The
     return invoice's `owner` is reattributed to cashier_user after submit,
@@ -3158,7 +3274,7 @@ def submit_pos_refund(
     pos = _get_pos_profile_or_throw(original.pos_profile)
     cashier_user = _resolve_cashier_user(cashier_user, original.pos_profile, hardware_id, is_bearer)
     _validate_cashier_for_sale(cashier_user, pos)
-    _require_refund_permission(pos, cashier_user)
+    _require_refund_permission(pos, cashier_user, supervisor_token=supervisor_token)
     if pos_opening_entry:
         _require_open_entry_for_cashier(pos_opening_entry, cashier_user, pos)
     else:

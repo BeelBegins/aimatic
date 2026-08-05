@@ -1,19 +1,58 @@
-// "Sync Full Catalog" button: enqueues catalog.start_bulk_export for this
-// outlet and polls status until done. This bulk path exists for onboarding a
-// branch's whole catalog to Foodpanda - day-to-day availability stays in
-// sync automatically via the Bin stock-change hook (see
-// foodpanda_integration/events.py); this button is not needed for that.
+// "Map by Barcode" links Foodpanda's existing catalog to Items using barcode
+// (never Item Code). "Sync Full Catalog" then PUTs price/stock for mapped
+// rows only. Day-to-day availability still follows Bin updates via events.py.
 
 frappe.ui.form.on("Foodpanda Outlet", {
 	refresh(frm) {
 		if (frm.is_new() || !frm.doc.catalog_sync_enabled) {
 			return;
 		}
+		frm.add_custom_button(__("Map by Barcode"), () => {
+			aimatic_map_foodpanda_catalog_by_barcode(frm);
+		});
 		frm.add_custom_button(__("Sync Full Catalog"), () => {
 			aimatic_start_foodpanda_bulk_export(frm);
 		});
 	},
 });
+
+function aimatic_map_foodpanda_catalog_by_barcode(frm) {
+	frappe.call({
+		method: "aimatic.foodpanda_integration.api.map_foodpanda_catalog_by_barcode",
+		args: { outlet: frm.doc.name },
+		freeze: true,
+		freeze_message: __("Matching Foodpanda catalog by barcode..."),
+		callback(r) {
+			const result = r.message || {};
+			const file_url = result.file_url;
+			let message =
+				__(
+					"Remote: {0}. Mapped: {1} (updated {2}). No barcode: {3}. Unmatched: {4}. Ambiguous: {5}.",
+					[
+						result.remote_total || 0,
+						result.mapped || 0,
+						result.updated || 0,
+						result.skipped_no_barcode || 0,
+						result.skipped_unmatched || 0,
+						result.skipped_ambiguous || 0,
+					]
+				);
+			if (file_url) {
+				message +=
+					`<p><a href="${frappe.utils.escape_html(file_url)}" target="_blank" rel="noopener">` +
+					__("Download matching Excel") +
+					"</a></p>";
+				window.open(file_url);
+			}
+			frappe.msgprint({
+				title: __("Barcode Mapping"),
+				indicator: result.mapped ? "green" : "orange",
+				message,
+			});
+			frm.reload_doc();
+		},
+	});
+}
 
 function aimatic_start_foodpanda_bulk_export(frm) {
 	frappe.call({

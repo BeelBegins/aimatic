@@ -40,3 +40,4 @@ aimatic.patches.repair_item_price_custom_docperms
 aimatic.patches.repair_pos_role_custom_docperms
 aimatic.patches.create_branch_foodpanda_price_list
 aimatic.patches.create_purchase_fp_price_field
+aimatic.patches.create_item_price_barcodes_field

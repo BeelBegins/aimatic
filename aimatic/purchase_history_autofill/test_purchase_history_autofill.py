@@ -27,7 +27,10 @@ from types import SimpleNamespace
 import frappe
 from frappe.utils import add_days, nowdate
 
-from aimatic.purchase_history_autofill.events import autofill_purchase_receipt_item_fields
+from aimatic.purchase_history_autofill.events import (
+    autofill_purchase_invoice_item_fields,
+    autofill_purchase_receipt_item_fields,
+)
 from aimatic.purchase_history_autofill.utils import (
     _ALWAYS_EXCLUDE,
     apply_history_to_row,
@@ -435,3 +438,30 @@ class TestMapperIntegration(_PHATestCase):
         row = pr.items[0]
         self.assertEqual(row.custom_gst_per, 17.0)
         self.assertEqual(row.custom_mrp, 150.0)
+
+
+class TestPurchaseInvoiceAutofill(_PHATestCase):
+    @_require_branch
+    def test_purchase_invoice_hook_fills_history(self):
+        self._make_pr(SUPPLIER_A, _BRANCH, ITEM_A, days_ago=1, gst_per=17, mrp=150)
+
+        pi = frappe.get_doc({
+            "doctype": "Purchase Invoice",
+            "supplier": SUPPLIER_A,
+            "company": _BRANCH.company,
+            "branch": _BRANCH.name,
+            "posting_date": nowdate(),
+            "items": [{
+                "item_code": ITEM_A,
+                "qty": 5,
+                "rate": 99,
+                "warehouse": _BRANCH.finished_goods_warehouse,
+                "cost_center": _BRANCH.cost_center,
+            }],
+        })
+        autofill_purchase_invoice_item_fields(pi)
+        row = pi.items[0]
+        self.assertEqual(row.custom_gst_per, 17.0)
+        self.assertEqual(row.custom_mrp, 150.0)
+        self.assertEqual(row.qty, 5)
+        self.assertEqual(row.rate, 99)

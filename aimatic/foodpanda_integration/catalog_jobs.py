@@ -91,7 +91,18 @@ def process_callback(payload):
 				"last_error": "",
 			}
 			if not product.foodpanda_product_id:
-				product_values["foodpanda_product_id"] = product.item_code
+				# Prefer the SKU we submitted (barcode / mapped Foodpanda SKU),
+				# never the ERPNext Item Code.
+				requested = []
+				job_requested = frappe.db.get_value(
+					"Foodpanda Catalog Job", {"job_id": job_id}, "requested_skus"
+				)
+				try:
+					requested = json.loads(job_requested or "[]")
+				except (TypeError, ValueError):
+					requested = []
+				submitted_sku = requested[0] if requested else None
+				product_values["foodpanda_product_id"] = submitted_sku or product.item_code
 		else:
 			product_values = {
 				"sync_status": "Failed" if status == "Failed" or product_error else "Pending",

@@ -5,6 +5,7 @@ from frappe.utils import flt, nowdate
 from aimatic.branch_management.utils import get_branch_defaults
 from aimatic.foodpanda_integration import client
 from aimatic.foodpanda_integration.client import FoodpandaAPIError
+from aimatic.foodpanda_integration.catalog import _barcode_variants
 from aimatic.shelf_pricing.utils import get_or_create_branch_foodpanda_price_list
 
 _ORDER_PATH = "/v2/chains/{chain_id}/orders/{order_id}"
@@ -53,6 +54,29 @@ def _foodpanda_customer():
 	return _FOODPANDA_CUSTOMER
 
 
+def _resolve_order_item_code(sku, outlet_name):
+	"""Map a Foodpanda order SKU to an Item via barcode mapping, never assume Item Code."""
+	if not sku:
+		return None
+	sku = str(sku).strip()
+
+	mapped = frappe.db.get_value(
+		"Foodpanda Product",
+		{"outlet": outlet_name, "foodpanda_product_id": sku},
+		"item_code",
+	)
+	if mapped:
+		return mapped
+
+	candidates = []
+	for variant in _barcode_variants(sku):
+		candidates.extend(frappe.get_all("Item Barcode", filters={"barcode": variant}, pluck="parent"))
+		if frappe.db.exists("Item", variant):
+			candidates.append(variant)
+	unique = list({code for code in candidates if code})
+	return unique[0] if len(unique) == 1 else None
+
+
 def make_order_from_webhook(payload, outlet):
 	"""Builds and inserts a draft Sales Order from a Foodpanda order webhook
 	payload - modeled on aimatic.shopping.api._make_order, including staying
@@ -90,12 +114,13 @@ def make_order_from_webhook(payload, outlet):
 	doc.flags.ignore_permissions = True
 
 	for row in items:
-		item_code = row.get("sku") or row.get("product_id")
+		remote_sku = row.get("sku") or row.get("product_id")
 		pricing = row.get("pricing") or {}
 		qty = flt(pricing.get("quantity") or row.get("quantity") or row.get("qty") or 1)
 		unit_price = pricing.get("unit_price")
-		if not item_code or not frappe.db.exists("Item", item_code):
-			frappe.throw(_("Unknown item {0} in Foodpanda order").format(item_code))
+		item_code = _resolve_order_item_code(remote_sku, outlet.name)
+		if not item_code:
+			frappe.throw(_("Unknown item {0} in Foodpanda order").format(remote_sku))
 
 		bin_row = (
 			frappe.db.get_value(

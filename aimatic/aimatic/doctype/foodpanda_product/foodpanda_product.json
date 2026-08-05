@@ -37,7 +37,7 @@
    "reqd": 1
   },
   {
-   "description": "Blank until the first successful create call - presence decides create vs. update on the next push.",
+   "description": "Foodpanda catalog SKU for PUT updates. Set by barcode mapping from the remote catalog (never the ERPNext Item Code).",
    "fieldname": "foodpanda_product_id",
    "fieldtype": "Data",
    "label": "Foodpanda Product ID",

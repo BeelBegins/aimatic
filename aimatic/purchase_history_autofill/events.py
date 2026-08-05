@@ -60,3 +60,11 @@ def autofill_purchase_order_item_fields(doc, method=None):
     for the shared logic.
     """
     _autofill_item_fields(doc, "Purchase Order Item")
+
+
+def autofill_purchase_invoice_item_fields(doc, method=None):
+    """before_validate hook on Purchase Invoice. Same Supplier + Branch +
+    Item history as PO/PR - sourced from submitted Purchase Receipt/Purchase
+    Invoice rows, never from draft documents or Purchase Orders.
+    """
+    _autofill_item_fields(doc, "Purchase Invoice Item")

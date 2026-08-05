@@ -17,7 +17,21 @@ def get_columns(max_barcodes):
 		*barcode_columns,
 		{"label": "UOM", "fieldname": "uom", "fieldtype": "Link", "options": "UOM", "width": 80},
 		{"label": "Current Selling Price", "fieldname": "selling_price", "fieldtype": "Currency", "width": 140},
-		{"label": "Foodpanda Price", "fieldname": "foodpanda_price", "fieldtype": "Currency", "width": 130},
+		{"label": "MRP", "fieldname": "mrp", "fieldtype": "Currency", "width": 110},
+		{
+			"label": "Foodpanda Price (Editable)",
+			"fieldname": "foodpanda_price",
+			"fieldtype": "Currency",
+			"width": 165,
+			"editable": 1,
+		},
+		{"label": "FP Active", "fieldname": "foodpanda_active", "fieldtype": "Check", "width": 85},
+		{
+			"label": "FP Available Qty",
+			"fieldname": "available_qty",
+			"fieldtype": "Float",
+			"width": 120,
+		},
 		{"label": "Stock In Hand", "fieldname": "stock_in_hand", "fieldtype": "Float", "width": 110},
 		{
 			"label": "Cost Price (Excl. Taxes)",
@@ -46,6 +60,28 @@ def execute(filters=None):
 		frappe.throw(frappe._("Not permitted to view this branch."), frappe.PermissionError)
 
 	data = get_branch_price_sheet_rows(branch)
+	item_search = (filters.get("item_search") or "").strip().lower()
+	availability = filters.get("availability")
+	price_status = filters.get("foodpanda_price_status")
+
+	def include_row(row):
+		if item_search:
+			haystack = " ".join(
+				[row.get("item_code") or "", row.get("item_name") or "", *row.get("_barcodes", [])]
+			).lower()
+			if item_search not in haystack:
+				return False
+		if availability == "In Stock" and row.get("available_qty", 0) <= 0:
+			return False
+		if availability == "Out of Stock" and row.get("available_qty", 0) > 0:
+			return False
+		if price_status == "With Price" and not row.get("foodpanda_price"):
+			return False
+		if price_status == "Missing Price" and row.get("foodpanda_price"):
+			return False
+		return True
+
+	data = [row for row in data if include_row(row)]
 
 	max_barcodes = max((len(row["_barcodes"]) for row in data), default=0)
 	for row in data:

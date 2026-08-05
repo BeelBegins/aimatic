@@ -16,6 +16,9 @@ doc_events = {
         "validate": "aimatic.fbr_pos.events.validate_pos_invoice",
         "before_submit": "aimatic.fbr_pos.events.before_submit_pos_invoice",
         "on_submit": [
+            # Runs after POS Invoice.clear_unallocated_mode_of_payments deletes
+            # amount=0 payment rows — restores the Food Panda Credit marker.
+            "aimatic.offline_pos.events.restore_food_panda_credit_payment_marker",
             "aimatic.loyalty.events.on_submit_correct_loyalty_points",
             "aimatic.gift_voucher.events.on_submit_issue_gift_voucher",
         ],
@@ -26,6 +29,14 @@ doc_events = {
     },
     "Customer": {
         "validate": "aimatic.offline_pos.customer_validation.validate_customer",
+    },
+    # Denormalize the Item's ordered barcode child rows into a read-only Item
+    # Price field so Frappe's standard Export Data feature can include them.
+    "Item": {
+        "on_update": "aimatic.item_pricing.barcodes.sync_item_barcodes_to_prices",
+    },
+    "Item Price": {
+        "before_validate": "aimatic.item_pricing.barcodes.set_item_price_barcodes",
     },
     # Auto-assigns a new Account's account_number (when left blank) to the
     # next free number in the numeric block implied by its parent account -
@@ -59,6 +70,7 @@ doc_events = {
         "before_validate": [
             "aimatic.branch_management.events.apply_branch_defaults",
             "aimatic.purchase_printing.populate_old_purchase_snapshot",
+            "aimatic.purchase_history_autofill.events.autofill_purchase_invoice_item_fields",
         ],
         "on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
     },
@@ -145,9 +157,10 @@ override_whitelisted_methods = {
 doctype_js = {
     "Purchase Receipt": [
         "public/js/purchase_receipt_label_printing.js",
+        "public/js/purchase_items_excel_grid.js",
         # Live preview only - see purchase_history_autofill/events.py for
         # the actual server-side guarantee this mirrors. Shared with
-        # Purchase Order below.
+        # Purchase Order / Purchase Invoice below.
         "public/js/purchase_history_autofill.js",
         # Live preview only - prefills custom_fp_price from the branch's
         # current Foodpanda Price List. Shared with Purchase Order/Invoice.
@@ -157,10 +170,15 @@ doctype_js = {
         "public/js/current_sale_price_preview.js",
     ],
     "Purchase Order": [
+        "public/js/purchase_items_excel_grid.js",
         "public/js/purchase_history_autofill.js",
         "public/js/foodpanda_price_prefill.js",
     ],
-    "Purchase Invoice": "public/js/foodpanda_price_prefill.js",
+    "Purchase Invoice": [
+        "public/js/purchase_items_excel_grid.js",
+        "public/js/purchase_history_autofill.js",
+        "public/js/foodpanda_price_prefill.js",
+    ],
     "Delivery Note": "public/js/label_printing_source_buttons.js",
     "Stock Entry": "public/js/label_printing_source_buttons.js",
     "Sales Invoice": "public/js/label_printing_source_buttons.js",
@@ -481,6 +499,13 @@ scheduler_events = {
 		# This self-heals daily.
 		"aimatic.tax_formula_setup.repair_dangling_tax_formula_accounts",
 	],
+	# Branch Foodpanda SFTP: each Branch sets its own schedule time; this cron
+	# only checks which enabled branches are due (about every 15 minutes).
+	"cron": {
+		"*/15 * * * *": [
+			"aimatic.price_export.foodpanda_sftp.run_scheduled_foodpanda_sftp_uploads",
+		],
+	},
 }
 
 # Testing

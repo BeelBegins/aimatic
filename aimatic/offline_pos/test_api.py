@@ -1242,9 +1242,9 @@ def _https_request():
 
 class TestPosAdminAuthorization(_AimTestCase):
     """authorize_pos_admin_action / consume_pos_admin_authorization - the
-    supervisor step-up primitive shared by close_shift (offline_pos/api.py's
-    close_pos_session), plus void_item and clear_cart (Electron client only,
-    with no server document of their own)."""
+    supervisor step-up primitive shared by close_shift and refund
+    (consumed inside those submits), plus void_item and clear_cart
+    (Electron client-consumed; no server document of their own)."""
 
     def test_authorize_success(self):
         from aimatic.offline_pos.api import authorize_pos_admin_action
@@ -1288,6 +1288,28 @@ class TestPosAdminAuthorization(_AimTestCase):
         log = frappe.get_all(
             "POS Admin Audit Log",
             filters={"user": supervisor, "action": "clear_cart", "status": "token_consumed"},
+        )
+        self.assertEqual(len(log), 1)
+
+    def test_refund_authorize_and_consume(self):
+        from aimatic.offline_pos.api import authorize_pos_admin_action, consume_pos_admin_authorization
+
+        supervisor, password = _make_cashier(roles=("POS Supervisor",))
+        with _https_request():
+            minted = authorize_pos_admin_action(supervisor, password, "refund", "TEST-TERM-1")
+            result = consume_pos_admin_authorization(minted["token"], "refund", "TEST-TERM-1")
+
+        self.assertTrue(result["success"])
+        auth = frappe.get_all(
+            "POS Admin Authorization",
+            filters={"user": supervisor, "action": "refund", "terminal_id": "TEST-TERM-1"},
+            fields=["used"],
+        )
+        self.assertEqual(len(auth), 1)
+        self.assertEqual(auth[0].used, 1)
+        log = frappe.get_all(
+            "POS Admin Audit Log",
+            filters={"user": supervisor, "action": "refund", "status": "token_consumed"},
         )
         self.assertEqual(len(log), 1)
 
@@ -1963,6 +1985,130 @@ class TestSubmitOnlineSaleCashier(_AimTestCase):
         if not _ITEM_CODE:
             raise unittest.SkipTest("No item fixture on site")
         return _ITEM_CODE
+
+
+class TestFoodPandaCreditPaymentMarker(_AimTestCase):
+    """Zero-amount Food Panda Credit rows must survive POS Invoice submit.
+
+    ERPNext's clear_unallocated_mode_of_payments deletes amount=0 payment
+    children on submit; without the restore hook, shift consolidation fails
+    with "At least one mode of payment is required for POS invoice."
+    """
+
+    def test_restore_reinserts_marker_when_payments_were_cleared(self):
+        from aimatic.offline_pos.api import (
+            _FOOD_PANDA_CREDIT_MODE,
+            _FOOD_PANDA_CUSTOMER,
+            _FOOD_PANDA_PROFILE,
+        )
+        from aimatic.offline_pos.events import restore_food_panda_credit_payment_marker
+
+        inserted = []
+
+        class _Row:
+            def db_insert(self):
+                inserted.append(self.__dict__.copy())
+
+        class _Doc:
+            doctype = "POS Invoice"
+            docstatus = 1
+            name = "POS-INV-TEST"
+            pos_profile = _FOOD_PANDA_PROFILE
+            customer = _FOOD_PANDA_CUSTOMER
+            company = "Test Co"
+            payments = []
+
+            def append(self, field, values):
+                row = _Row()
+                row.__dict__.update(values)
+                self.payments.append(row)
+                return row
+
+        pos = frappe._dict(
+            name=_FOOD_PANDA_PROFILE,
+            custom_is_foodpanda_profile=1,
+            get=lambda key, default=None: 1 if key == "custom_is_foodpanda_profile" else default,
+        )
+        # frappe._dict.get exists; make getattr-style access work for cint(pos.get(...))
+        pos["custom_is_foodpanda_profile"] = 1
+
+        with (
+            patch("aimatic.offline_pos.events.frappe.get_cached_doc", return_value=pos),
+            patch("aimatic.offline_pos.events.frappe.db.exists", return_value=None),
+            patch("aimatic.offline_pos.events.frappe.db.sql", return_value=[]),
+            patch(
+                "aimatic.offline_pos.events.frappe.db.get_value",
+                side_effect=lambda *a, **k: (
+                    "1311 - Receivable" if a and a[0] == "Mode of Payment Account" else "General"
+                ),
+            ),
+        ):
+            restore_food_panda_credit_payment_marker(_Doc())
+
+        self.assertEqual(len(inserted), 1)
+        self.assertEqual(inserted[0]["mode_of_payment"], _FOOD_PANDA_CREDIT_MODE)
+        self.assertEqual(inserted[0]["amount"], 0)
+
+    def test_restore_skips_non_food_panda_invoices(self):
+        from aimatic.offline_pos.events import restore_food_panda_credit_payment_marker
+
+        doc = frappe._dict(
+            doctype="POS Invoice",
+            docstatus=1,
+            name="POS-INV-OTHER",
+            pos_profile="S1GT Counter 1",
+            customer="Walk-in",
+            company="Test Co",
+        )
+        pos = frappe._dict(name="S1GT Counter 1", custom_is_foodpanda_profile=0)
+        pos["custom_is_foodpanda_profile"] = 0
+
+        with patch("aimatic.offline_pos.events.frappe.get_cached_doc", return_value=pos):
+            restore_food_panda_credit_payment_marker(doc)
+
+
+class TestFailedClosingBlocksSales(_AimTestCase):
+    """A Failed POS Closing must freeze new sales/refunds on that open shift."""
+
+    def test_reject_if_failed_closing_throws(self):
+        from aimatic.offline_pos.api import _reject_if_failed_closing
+
+        with patch(
+            "aimatic.offline_pos.api._get_failed_closing_for_opening",
+            return_value=frappe._dict(
+                name="POS-CLO-FAIL",
+                error_message="<p>Valuation Rate required</p>",
+            ),
+        ):
+            with self.assertRaises(frappe.ValidationError) as ctx:
+                _reject_if_failed_closing("POS-OPE-OPEN")
+        self.assertIn("Shift close failed", str(ctx.exception))
+        self.assertIn("POS-CLO-FAIL", str(ctx.exception))
+        self.assertIn("Valuation Rate required", str(ctx.exception))
+        self.assertNotIn("<p>", str(ctx.exception))
+
+    def test_reject_if_failed_closing_noop_when_clean(self):
+        from aimatic.offline_pos.api import _reject_if_failed_closing
+
+        with patch(
+            "aimatic.offline_pos.api._get_failed_closing_for_opening",
+            return_value=None,
+        ):
+            _reject_if_failed_closing("POS-OPE-OPEN")
+
+
+class TestBarcodeCaseInsensitiveResolve(_AimTestCase):
+    def test_resolve_falls_back_to_lower_match(self):
+        from aimatic.offline_pos.api import _resolve_item_code_from_barcode
+
+        with (
+            patch("aimatic.offline_pos.api.frappe.db.get_value", return_value=None),
+            patch(
+                "aimatic.offline_pos.api.frappe.db.sql",
+                return_value=[("STO-ITEM-S5",)],
+            ),
+        ):
+            self.assertEqual(_resolve_item_code_from_barcode("s5"), "STO-ITEM-S5")
 
 
 class TestSubmitPosRefundCashier(_AimTestCase):

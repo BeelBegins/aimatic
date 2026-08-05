@@ -166,6 +166,13 @@ def refresh_foodpanda_catalog_job(job_id):
 
 
 @frappe.whitelist()
+def map_foodpanda_catalog_by_barcode(outlet):
+	"""Match existing Foodpanda catalog products to Items by barcode."""
+	_require_permission()
+	return catalog.map_remote_catalog_by_barcode(outlet)
+
+
+@frappe.whitelist()
 def start_catalog_bulk_export(outlet):
 	_require_permission()
 	return catalog.start_bulk_export(outlet)

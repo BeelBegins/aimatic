@@ -340,6 +340,25 @@ class TestCatalogSync(unittest.TestCase):
 		self.assertEqual(_maximum_sales_quantity(19), 4)
 		self.assertEqual(_maximum_sales_quantity(1000), 36)
 
+	def test_barcode_variants_drop_foodpanda_leading_zero(self):
+		from aimatic.foodpanda_integration.catalog import _barcode_variants
+
+		variants = set(_barcode_variants("08851932354998"))
+		self.assertIn("08851932354998", variants)
+		self.assertIn("8851932354998", variants)
+		self.assertIn("08851932354998"[1:], variants)
+
+	def test_resolve_items_matches_local_barcode_without_leading_zero(self):
+		from aimatic.foodpanda_integration.catalog import _resolve_items_for_remote_barcodes
+		from unittest.mock import patch
+
+		index = {"8851932354998": {"STO-ITEM-2026-09410"}}
+		with patch("aimatic.foodpanda_integration.catalog.frappe") as mock_frappe:
+			mock_frappe.db.exists.return_value = False
+			items, matched = _resolve_items_for_remote_barcodes(["08851932354998"], index)
+		self.assertEqual(items, ["STO-ITEM-2026-09410"])
+		self.assertEqual(matched, "8851932354998")
+
 	@patch("aimatic.foodpanda_integration.catalog.build_update_payload")
 	@patch("aimatic.foodpanda_integration.catalog.client")
 	@patch("aimatic.foodpanda_integration.catalog.frappe")
@@ -349,11 +368,12 @@ class TestCatalogSync(unittest.TestCase):
 		mock_frappe.db.get_value.side_effect = [
 			_item_row(item_name="Internal item name"),
 			"category-1",
+			"6281001234567",  # Item Barcode
 			"PIM public name",
 		]
 		mock_client.get_settings.return_value = _settings(catalog_locale="en_PK")
 		mock_update_payload.return_value = {
-			"sku": "ITEM-1",
+			"sku": "6281001234567",
 			"active": True,
 			"price": 15.0,
 			"quantity": 5,
@@ -364,6 +384,9 @@ class TestCatalogSync(unittest.TestCase):
 
 		self.assertEqual(payload["title"], {"en_PK": "PIM public name"})
 		self.assertEqual(payload["categories"], ["category-1"])
+		self.assertEqual(payload["barcodes"], ["6281001234567"])
+		mock_update_payload.assert_called_once()
+		self.assertEqual(mock_update_payload.call_args.kwargs.get("foodpanda_sku"), "6281001234567")
 
 	@patch("aimatic.foodpanda_integration.catalog.client")
 	@patch("aimatic.foodpanda_integration.catalog.frappe")
@@ -423,18 +446,62 @@ class TestOrdersStockCheck(unittest.TestCase):
 
 		mock_branch_defaults.return_value = {"finished_goods_warehouse": "WH-1"}
 		mock_price_list.return_value = "Branch 1 Foodpanda Price List"
-		mock_frappe.db.exists.side_effect = [True, True]  # Customer exists, Item exists
+		mock_frappe.db.exists.return_value = True  # Customer exists
 		mock_frappe.db.get_value.side_effect = [
 			"Company 1",  # Branch -> company
+			"ITEM-1",  # Foodpanda Product mapping for SKU
 			{"actual_qty": 1, "reserved_qty": 0},  # Bin: only 1 available
 		]
 		mock_frappe.throw.side_effect = frappe.ValidationError
-		outlet = Mock(branch="Branch 1")
+		outlet = Mock(branch="Branch 1", name="Outlet-1")
 
-		payload = {"order_id": "FP-1", "items": [{"sku": "ITEM-1", "quantity": 5}]}
+		payload = {"order_id": "FP-1", "items": [{"sku": "vendorcode-1", "quantity": 5}]}
 
 		with self.assertRaises(frappe.ValidationError):
 			orders.make_order_from_webhook(payload, outlet)
+
+	@patch("aimatic.foodpanda_integration.catalog.flt", new=_stub_flt)
+	@patch("aimatic.foodpanda_integration.catalog.get_or_create_branch_foodpanda_price_list")
+	@patch("aimatic.foodpanda_integration.catalog.get_branch_defaults")
+	@patch("aimatic.foodpanda_integration.catalog.frappe")
+	def test_update_payload_uses_barcode_not_item_code(self, mock_frappe, mock_branch_defaults, mock_price_list):
+		from aimatic.foodpanda_integration import catalog
+
+		mock_branch_defaults.return_value = {"finished_goods_warehouse": "WH-1"}
+		mock_price_list.return_value = "Branch 1 Foodpanda Price List"
+		mock_frappe.db.get_value.side_effect = [
+			_item_row(),
+			15.0,
+			{"actual_qty": 8, "reserved_qty": 0},
+			"6281001234567",
+		]
+		payload = catalog.build_update_payload("STO-ITEM-1", Mock(branch="Branch 1"))
+		self.assertEqual(payload["sku"], "6281001234567")
+		self.assertEqual(payload["barcode"], "6281001234567")
+		self.assertNotEqual(payload["sku"], "STO-ITEM-1")
+
+	@patch("aimatic.foodpanda_integration.catalog.flt", new=_stub_flt)
+	@patch("aimatic.foodpanda_integration.catalog.get_or_create_branch_foodpanda_price_list")
+	@patch("aimatic.foodpanda_integration.catalog.get_branch_defaults")
+	@patch("aimatic.foodpanda_integration.catalog.frappe")
+	def test_update_payload_prefers_mapped_foodpanda_sku(
+		self, mock_frappe, mock_branch_defaults, mock_price_list
+	):
+		from aimatic.foodpanda_integration import catalog
+
+		mock_branch_defaults.return_value = {"finished_goods_warehouse": "WH-1"}
+		mock_price_list.return_value = "Branch 1 Foodpanda Price List"
+		mock_frappe.db.get_value.side_effect = [
+			_item_row(),
+			15.0,
+			{"actual_qty": 8, "reserved_qty": 0},
+			"6281001234567",
+		]
+		payload = catalog.build_update_payload(
+			"STO-ITEM-1", Mock(branch="Branch 1"), foodpanda_sku="vendorcode-99"
+		)
+		self.assertEqual(payload["sku"], "vendorcode-99")
+		self.assertEqual(payload["barcode"], "6281001234567")
 
 
 class TestOrderWebhookIdempotency(unittest.TestCase):
@@ -539,7 +606,10 @@ class TestOfficialFoodpandaContracts(unittest.TestCase):
 	def test_catalog_callback_promotes_pending_hash(self, mock_frappe):
 		from aimatic.foodpanda_integration import catalog_jobs
 
-		mock_frappe.db.get_value.return_value = "job-add"
+		mock_frappe.db.get_value.side_effect = [
+			"job-add",  # Foodpanda Catalog Job name
+			'["6281001234567"]',  # requested_skus submitted to Foodpanda
+		]
 		mock_frappe.get_all.return_value = [
 			frappe._dict({
 				"name": "product-row", "item_code": "ITEM-1", "foodpanda_product_id": None,
@@ -552,7 +622,7 @@ class TestOfficialFoodpandaContracts(unittest.TestCase):
 			"Foodpanda Product", "product-row",
 			{
 				"sync_status": "Synced", "content_hash": "hash-1", "pending_content_hash": "",
-				"last_synced": _FIXED_DATETIME(), "last_error": "", "foodpanda_product_id": "ITEM-1",
+				"last_synced": _FIXED_DATETIME(), "last_error": "", "foodpanda_product_id": "6281001234567",
 			},
 		)
 

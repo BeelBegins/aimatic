@@ -260,6 +260,38 @@ be traced back, and cancelling a receipt safely undoes its own price change — 
 nothing more recent has already overwritten it, so an old correction can never accidentally
 clobber a newer price.
 
+The **Branch Price Sheet** report brings the branch's selling price, MRP, Foodpanda price,
+stock and current cost into one view. Use the filters at the top to find an item or barcode,
+show in-stock/out-of-stock Foodpanda items, or find items with a missing Foodpanda price.
+The **Foodpanda Price** cells are editable: after making the required changes, click **Save
+Foodpanda Prices** to update that branch's own Foodpanda Price List. The save checks that no
+one else changed the same prices after the report loaded, so a newer correction is not silently
+overwritten.
+
+For a larger offline update, use the report's normal **Export → Excel** action, change only the
+**Foodpanda Price (Editable)** cells, then choose **Foodpanda → Import Updated Excel** on the same
+report and upload that `.xlsx` file. The importer finds the report header even when the export
+includes filter rows, identifies each row by Item Code, and updates only the selected branch's
+Foodpanda price. Blank or non-positive prices are skipped and reported; duplicate Item Codes are
+rejected. All other exported columns—including selling price, MRP, stock, active, quantity, cost,
+and barcodes—are ignored and can never be imported back as master or stock changes. Each run keeps
+the source workbook and counts on a Foodpanda Price Import Log.
+
+Click **Download Foodpanda CSV** to get the vendor-upload shape
+(`barcode, sku, price, active, quantity`) for the rows currently shown by the report filters.
+The report fills `active` and `quantity` automatically from currently sellable stock in the
+branch's finished-goods warehouse (`actual stock - reserved stock`); staff do not type or upload
+stock back into ERPNext. Rows without a primary barcode or a positive Foodpanda price are skipped
+and counted in the on-screen message. MRP continues to come from the branch's own selling price
+list, not the global Item MRP. For an item whose latest cost comes from migrated opening stock,
+the report keeps the Stock Entry rate as **Cost Excl. Taxes** and reconstructs **Cost Incl. Taxes**
+with the item's FBR tax rate—the opening migration deliberately kept GST out of stock valuation
+and posted it separately, so Stock Entry `valuation_rate` itself is not tax-inclusive.
+
+To push that same CSV to Foodpanda over SFTP (per-branch credentials, manual or scheduled),
+see the Roman Urdu KPO/admin guide:
+[Foodpanda SFTP — KPO & Administrator Guide (Roman Urdu)](foodpanda-sftp-kpo-guide-roman.md).
+
 ### FBR e-invoicing (Pakistan tax compliance)
 
 Every POS sale is automatically reported to Pakistan's Federal Board of Revenue (FBR) as
@@ -282,6 +314,8 @@ every till in normal day-to-day operation once a branch's FBR settings are prope
 Each ERPNext Price List form includes a **Search Barcode** action. Staff can scan or enter a
 complete barcode to open that Price List's matching Item Price row. The Item list and the Item
 Price report reached through **Add / Edit Prices** also provide the same barcode search action.
+When Item Price records are downloaded through **Export Data**, the exportable **Barcodes** field
+contains every barcode configured on the linked Item, in barcode-row order and comma-separated.
 
 Staff can print barcode labels or A4 shelf-price labels directly from a submitted Purchase
 Receipt, Delivery Note, Sales Invoice, or stock transfer — with configurable label templates
@@ -375,8 +409,10 @@ and per-site scripts used for this.
 - **Branch/Sales/Purchase/Stock/Accounts Managers, System Manager** — can override the
   branch/warehouse/cost-center a document would otherwise auto-fill, for the rare cases that
   genuinely need it (e.g. inter-branch stock transfers).
-- **POS Supervisor** — can process refunds and close a shift on the POS terminal, in addition
-  to normal cashier actions.
+- **POS Supervisor** — can process refunds, close a shift, void an item, and authorize a normal
+  cashier to refund, void an item, clear a full cart, or close a shift on the POS terminal.
+  Those step-ups ask for fresh online supervisor credentials (password is never remembered;
+  the last supervisor username may be prefilled).
 - **Restaurant Waiter** — signs in to the separate Restaurant Android app, sees only permitted
   Restaurant Profiles/tables, opens table orders, sends idempotent kitchen tickets, and requests bills.
 - **Kitchen User** — updates queued kitchen tickets through the restricted Restaurant service;
