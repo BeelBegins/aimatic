@@ -1,117 +1,125 @@
-# Foodpanda SFTP Catalog Upload — KPO & Administrator Guide (Roman Urdu)
+# Foodpanda SFTP — Kaise use karein (KPO & Admin)
 
-Yeh guide **KPOs** aur **Administrators** ke liye hai. Is se aap branch ki Foodpanda prices / stock CSV ko Foodpanda ke SFTP server par bhej sakte ho — pehle jaisa CSV download karke manually portal pe upload karne ki zaroorat nahi (jab SFTP set ho).
+Yeh simple guide hai un logon ke liye jo roz Foodpanda prices dekhte / update karte hain, aur unke liye jo pehli dafa branch pe SFTP setup karte hain.
 
-**Site:** `https://szl.aimatic.tech`  
-**Role:** `Buying Price Control` ya `System Manager`
+**Kab use karein:** jab aap Foodpanda ko nayi prices / stock CSV bhejna chahte ho — CSV download karke alag se portal pe upload karne ki zaroorat nahi.
 
----
-
-## Pehle samajh lo (short)
-
-1. Har **Branch** par alag SFTP settings hoti hain (host, port, username, password, time).
-2. **Ghouri Town** aur **Misrial** ka username same ho sakta hai — farq **port** mein hota hai.
-3. Jis store ka port blank ho, system khud **22** use karta hai. Blank field kabhi `0` dikhaye to tension nahi — matlab default 22.
-4. Pehle **manual upload** successful karo, phir **Enabled** + **Schedule Time** on karo.
+**Site:** https://szl.aimatic.tech  
+**Permission:** `Buying Price Control` ya `System Manager`
 
 ---
 
-## Part A — Administrator: pehli dafa setup (Branch)
+## 1) Pehle yeh 4 baatein yaad rakhain
 
-1. Desk kholo → **Branch** → apni branch select karo  
-   Example: `S1 - Ghouri Town VIP`
-2. Neeche **Foodpanda SFTP** section bharao:
+1. **Har store / Branch ka setup alag hai** — host, port, username, password, time usi Branch form pe likhe jate hain.
+2. **Ghouri Town** aur **Misrial** ka **username same** ho sakta hai. Farq aksar **port** mein hota hai.
+3. **Port blank** chhorna theek hai → system **22** use karta hai. Kabhi blank save hone ke baad `0` dikhe to tension nahi (matlab 22).
+4. Pehli dafa: pehle **manual upload** Success karo, phir auto schedule **Enabled** karo.
 
-| Field | Kya likhna hai |
+---
+
+## 2) Administrator — pehli dafa setup (sirf ek dafa per branch)
+
+### Aap kahan jaain
+1. Desk kholo: https://szl.aimatic.tech  
+2. Search mein **Branch** likho → apni branch kholo  
+   Example: **S1 - Ghouri Town VIP**
+
+### Form pe kya bharein (Foodpanda SFTP section)
+
+| Field | Aap kya karein |
 |---|---|
-| **Foodpanda SFTP Host** | Foodpanda wala host (jaise `vendor-automation-sftp-live-ap.prod.aws.qcommerce.live`) |
-| **Foodpanda SFTP Port** | Agar Foodpanda ne alag port diya ho to woh; warna **blank chhor do** (22) |
-| **Foodpanda SFTP Username** | `FP_PK_...` wala username |
-| **Foodpanda SFTP Password** | Password (kisi ko share / WhatsApp / Excel mein mat likho) |
-| **Foodpanda SFTP Remote Path** | Agar Foodpanda ne folder diya ho to woh; warna blank |
-| **Foodpanda SFTP Schedule Time** | Rozana auto-upload ka time (site time, jaise `06:30:00`) |
-| **Foodpanda SFTP Enabled** | Abhi **off** rakho — pehle manual test |
+| **Host** | Foodpanda ka SFTP host paste karo |
+| **Port** | Alag port diya ho to likho; warna **khali chhor do** |
+| **Username** | `FP_PK_...` wala username |
+| **Password** | Password yahan type / paste karo |
+| **Remote Path** | Folder diya ho to likho; warna khali |
+| **Schedule Time** | Rozana auto upload ka time (jaise `06:30:00`) — site time |
+| **Enabled** | Abhi **tick mat karo** — pehle test upload |
 
-3. **Save** karo.
-4. Manual upload chalao (neeche Part B). Success aaye tab **Enabled** on karo aur Save.
+### Phir
+1. **Save** dabao.  
+2. Neeche **Section 3** wala manual upload ek dafa chalao.  
+3. Jab **Success** aa jaye, tab **Enabled** tick karke **Save** karo.
 
-**Do branches, same username, different port:**  
-Har branch par username same, port alag. Example: Ghouri blank/22, Misrial apna port.
-
----
-
-## Part B — KPO / Admin: manual upload (jab zaroorat ho)
-
-### Option 1 — Poori branch catalog
-
-1. **Branch** form kholo.
-2. Upar **Foodpanda** menu → **Upload Catalog via SFTP**.
-3. Confirm karo.
-4. Result dekho:
-   - **Success** = file Foodpanda tak pahunch gayi
-   - **Failed** = error message + log link check karo
-5. Log dekhne ke liye: **Foodpanda SFTP Upload Log**
-
-### Option 2 — Sirf filtered items (Branch Price Sheet)
-
-1. Report kholo: **Branch Price Sheet**  
-   (`Desk → Aimatic → Branch Price Sheet` ya search)
-2. **Branch** select karo.
-3. Filters lagaao (jaise In Stock, With Price, ya specific item).
-4. Agar Foodpanda price change ki ho to pehle **Save Foodpanda Prices**.
-5. **Foodpanda** → **Upload Foodpanda CSV via SFTP**.
-6. Sirf jo rows ab report mein dikh rahi hain, woh upload hongi.
-
-**Download Foodpanda CSV** ab bhi hai — woh sirf file download karta hai, SFTP nahi.
+**Do stores, same username:**  
+Har Branch pe username same rakh sakte ho; **port** us store ka alag set karo (Misrial pe jo port Foodpanda ne diya).
 
 ---
 
-## Part C — Automatic daily schedule
+## 3) KPO / Admin — abhi upload karna ho (manual)
 
-1. Branch par **Foodpanda SFTP Schedule Time** set karo (jaise subah `06:30:00`).
-2. Manual upload ek dafa **Success** confirm karo.
+Do tareeqe hain. Jo situation ho, woh choose karo.
+
+### Tareeqa A — Poori branch ki list bhejni ho
+
+**Kab:** saari Foodpanda items update karni hon.
+
+1. Apni **Branch** form kholo.  
+2. Upar buttons mein **Foodpanda** pe click karo.  
+3. **Upload Catalog via SFTP** choose karo.  
+4. Confirm pe **Yes** dabao.  
+5. Screen pe result aayega:
+   - **Success** → file Foodpanda ko mil gayi  
+   - **Failed** → error padho; **Foodpanda SFTP Upload Log** khol ke detail dekho  
+
+### Tareeqa B — Sirf kuch items / filters wale rows
+
+**Kab:** sirf in-stock, ya missing-price fix, ya kuch items change hue hon.
+
+1. Desk pe **Branch Price Sheet** report kholo.  
+2. Upar **Branch** select karo (sahi store).  
+3. Filters lagaao (jaise In Stock, With Price, item search).  
+4. Agar price change ki hai:
+   - pehle **Foodpanda → Save Foodpanda Prices**  
+   - phir upload  
+5. **Foodpanda → Upload Foodpanda CSV via SFTP** dabao.  
+6. Confirm karo.  
+7. Sirf jo rows **abhi report mein dikh rahi hain**, wahi jaayengi.
+
+**Note:** **Download Foodpanda CSV** alag cheez hai — woh file aapke computer pe save karti hai, Foodpanda ko nahi bhejti.
+
+---
+
+## 4) Auto daily upload (schedule)
+
+**Kab:** roz same time pe automatically bhejni ho.
+
+1. Branch form → **Schedule Time** set karo (example: `06:30:00`).  
+2. Ek dafa **manual upload Success** confirm karo (Section 3).  
 3. **Foodpanda SFTP Enabled** tick karo → **Save**.
 
-System roughly har **15 minute** check karta hai. Jab branch ka time ho jaye aur aaj abhi successful upload na hua ho, tab auto upload chalega.
+Uske baad system bar-baar check karta hai (lagbhag har 15 minute). Jab aapka time ho chuka ho aur aaj abhi Success na hua ho, tab upload khud chalega.
 
-- Har branch ka **apna time** ho sakta hai.
-- Manual upload kisi bhi waqt chal sakta hai (schedule time ki zaroorat nahi).
+- Har branch ka time alag ho sakta hai.  
+- Manual upload schedule se pehle / baad kisi bhi waqt chal sakta hai.
 
 ---
 
-## Success / fail — kya check karein
+## 5) Success ya fail — aap kahan dekhein
 
-Branch form par:
+Branch form pe:
 
-- **Last Foodpanda SFTP Upload** — last success time  
-- **Last Foodpanda SFTP Error** — last error (password yahan nahi aata)
+- **Last Foodpanda SFTP Upload** → last successful time  
+- **Last Foodpanda SFTP Error** → agar fail hua to short error  
 
-Poori history: DocType **Foodpanda SFTP Upload Log**  
-Wahan status, filename, kitni rows, skip count, aur kabhi CSV copy bhi mil sakti hai.
+Poori history ke liye Desk pe **Foodpanda SFTP Upload Log** kholo — status, filename, kitni rows gayi / skip hui.
 
-Common issues:
+### Common problems (simple)
 
-| Error / masla | Matlab / fix |
+| Aapko kya dikha | Aap kya karein |
 |---|---|
-| `No module named 'paramiko'` | IT / admin — server package missing (bench pe install) |
-| `[Errno 2] /foodpanda-....csv` | Galat remote path tha; ab blank path home pe jata hai — dubara try |
-| Missing host / username / password | Branch SFTP fields incomplete |
-| Port `0` dikhe | Blank Int field — system 22 use karta hai; theek hai |
+| Missing host / username / password | Branch pe SFTP fields complete karke Save, phir dubara try |
+| Port `0` dikh raha hai | Normal hai agar blank chhora tha — system 22 use karta hai |
+| `[Errno 2] /foodpanda-....csv` | Remote Path khali rakho (ya sahi folder), dubara upload |
+| `No module named 'paramiko'` | IT / admin ko bolo — server pe package chahiye |
 
 ---
 
-## Daily KPO checklist (short)
+## 6) Roz ka chhota checklist (KPO)
 
-1. Branch Price Sheet mein Foodpanda prices theek hain?  
-2. Zaroorat ho to **Save Foodpanda Prices**.  
-3. Manual chahiye to **Upload … via SFTP**.  
-4. Auto chahiye to Enabled + Schedule Time set (admin).  
-5. Fail ho to Upload Log + Last Error dekho; password screen share mat karo.
-
----
-
-## Security (zaroori)
-
-- Password Branch ke Password field mein hi rakho.
-- Password Excel, WhatsApp, email, ya screenshot mein mat bhejo.
-- Fixtures / git / code mein password kabhi na dalein.
+1. Branch Price Sheet mein prices theek hain?  
+2. Change kiye hon to **Save Foodpanda Prices**.  
+3. Abhi bhejni ho to **Upload … via SFTP**.  
+4. Roz auto chahiye to admin se **Enabled + Schedule Time** confirm karo.  
+5. Fail ho to **Upload Log** + Branch pe **Last Error** dekho.
