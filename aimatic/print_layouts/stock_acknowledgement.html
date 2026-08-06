@@ -102,10 +102,9 @@ html, body { width: 200mm; margin: 0; padding: 0; }
     <tr><td class="summary-label">Total Discount</td><td class="summary-value">{{ frappe.utils.fmt_money(discount, currency=doc.currency) }}</td></tr>
     <tr><td class="summary-label">GST Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(gst_total, currency=doc.currency) }}</td></tr>
     <tr><td class="summary-label">FED Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(fed_total, currency=doc.currency) }}</td></tr>
-    <tr><td class="summary-label">WHT (Advance Tax) Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(advance_tax_total, currency=doc.currency) }}</td></tr>
+    <tr><td class="summary-label">Advance Tax Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(advance_tax_total, currency=doc.currency) }}</td></tr>
     <tr><td class="summary-label">Trade Offer</td><td class="summary-value">{{ frappe.utils.fmt_money(trade_offer, currency=doc.currency) }}</td></tr>
     <tr class="grand-total"><td class="summary-label">Grand Total</td><td class="summary-value">{{ frappe.utils.fmt_money(grand_line_total, currency=doc.currency) }}</td></tr>
-    <tr><td class="summary-label">Total After WHT</td><td class="summary-value">{{ frappe.utils.fmt_money(grand_line_total - advance_tax_total, currency=doc.currency) }}</td></tr>
    </table>
   </td>
  </tr>
