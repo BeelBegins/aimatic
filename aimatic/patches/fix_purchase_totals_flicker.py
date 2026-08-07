@@ -1,8 +1,23 @@
-"""Stop PO/PR custom_total_gross flicker from tax-calc client script loops."""
+"""Ensure PO/PR tax-calc Client Scripts include the Total Gross flicker fix.
 
+Surgical string transforms only match the szl-era script shape. Other sites
+still have older Tax Cal scripts, so this patch prefers the fixture copy and
+falls back to in-place transforms when the live script already has the
+intermediate helpers.
+"""
+
+from __future__ import annotations
+
+import json
 import re
+from pathlib import Path
 
 import frappe
+
+TARGETS = (
+	"Client Script for Tax Cal For Purchase Order",
+	"prv1",
+)
 
 COOLDOWN_DECL = """    let calculationRunning = false;
     let calculationQueued = false;
@@ -26,6 +41,16 @@ NEW_REFRESH_FN = """    function refreshItemsAfterCalculation(frm) {
         return;
     }
 """
+
+
+def _fixture_scripts() -> dict[str, str]:
+	path = Path(__file__).resolve().parents[1] / "fixtures" / "client_script.json"
+	rows = json.loads(path.read_text(encoding="utf-8"))
+	return {
+		row["name"]: row.get("script") or ""
+		for row in rows
+		if row.get("name") in TARGETS
+	}
 
 
 def patch_refresh_fn(script: str) -> str:
@@ -180,13 +205,10 @@ def patch_rate_handler(script: str) -> str:
 	return script.replace(old, new, 1)
 
 
-def apply_all(script: str) -> str:
-	if "calculationCooldownUntil" in script:
-		return script  # already patched
-	# prv1 (and some Desk exports) use CRLF; normalize for matching.
+def apply_surgical(script: str) -> str:
+	"""Transform the szl intermediate script shape in place."""
 	nl = "\r\n" if "\r\n" in script else "\n"
 	work = script.replace("\r\n", "\n") if nl == "\r\n" else script
-
 	if OLD_DECL not in work:
 		raise RuntimeError("decl block not found")
 	work = work.replace(OLD_DECL, COOLDOWN_DECL, 1)
@@ -196,22 +218,38 @@ def apply_all(script: str) -> str:
 	work = patch_schedule(work)
 	work = patch_refresh_dirty(work)
 	work = patch_rate_handler(work)
-
 	if nl == "\r\n":
 		work = work.replace("\n", "\r\n")
 	return work
 
 
+def resolve_script(name: str, live: str, fixtures: dict[str, str]) -> str | None:
+	if "calculationCooldownUntil" in (live or "") and 'Do NOT call frm.refresh_field("items")' in (
+		live or ""
+	):
+		return None  # already good
+
+	fixture = fixtures.get(name) or ""
+	if "calculationCooldownUntil" in fixture:
+		return fixture
+
+	if live and "function refreshItemsAfterCalculation" in live:
+		return apply_surgical(live)
+
+	raise RuntimeError(
+		f"{name}: no flicker-fix fixture script and live script is not surgically patchable"
+	)
+
+
 def execute():
-	targets = [
-		"Client Script for Tax Cal For Purchase Order",
-		"prv1",
-	]
-	for name in targets:
+	fixtures = _fixture_scripts()
+	for name in TARGETS:
+		if not frappe.db.exists("Client Script", name):
+			continue
 		doc = frappe.get_doc("Client Script", name)
 		before = doc.script or ""
-		after = apply_all(before)
-		if after == before:
+		after = resolve_script(name, before, fixtures)
+		if after is None or after == before:
 			print(name, "already patched or unchanged")
 			continue
 		doc.script = after
