@@ -188,6 +188,17 @@
    "collapsible": 1,
    "indent": 0,
    "keep_closed": 0,
+   "label": "Purchase by Supplier Principal",
+   "link_to": "Purchase by Supplier Principal",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
    "label": "Item-wise Purchase Register",
    "link_to": "Item-wise Purchase Register",
    "link_type": "Report",
@@ -507,6 +518,42 @@
   {
    "child": 1,
    "collapsible": 1,
+   "icon": "layout-dashboard",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Foodpanda Catalog",
+   "link_to": "foodpanda-catalog-console",
+   "link_type": "Page",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "table",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Foodpanda Catalog Sheet",
+   "link_to": "Foodpanda Catalog Sheet",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "file-spreadsheet",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Branch Price Sheet",
+   "link_to": "Branch Price Sheet",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
    "icon": "settings",
    "indent": 0,
    "keep_closed": 0,
@@ -536,6 +583,18 @@
    "keep_closed": 0,
    "label": "Foodpanda Product",
    "link_to": "Foodpanda Product",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "list",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Foodpanda Catalog Job",
+   "link_to": "Foodpanda Catalog Job",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
@@ -790,7 +849,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-07-31 00:00:00.000000",
+ "modified": "2026-08-12 01:25:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Aimatic",
