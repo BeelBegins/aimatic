@@ -292,6 +292,15 @@ To push that same CSV to Foodpanda over SFTP (per-branch credentials, manual or 
 see the Roman Urdu KPO/admin guide:
 [Foodpanda SFTP — KPO & Administrator Guide (Roman Urdu)](foodpanda-sftp-kpo-guide-roman.md).
 
+**Partner API synchronized outlet** (catalog import/map, Catalog Sheet, price/stock/active
+push, orders, outlet status) is documented in English here:
+[Foodpanda synchronized outlet — done, left, and how it works](foodpanda-synchronized-outlet.md).
+Site-wide credentials and webhook setup: open **Foodpanda Settings** in Desk and use
+**Show README**, or read
+[`aimatic/doctype/foodpanda_settings/README.md`](../aimatic/aimatic/doctype/foodpanda_settings/README.md).
+That is the path toward keeping each Foodpanda outlet in sync from ERPNext without
+manual portal uploads.
+
 ### FBR e-invoicing (Pakistan tax compliance)
 
 Every POS sale is automatically reported to Pakistan's Federal Board of Revenue (FBR) as
