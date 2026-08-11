@@ -165,3 +165,15 @@ covered here.
   default, matching this doc's existing guidance above.
 
 - `szl` (`import_szl_suppliers.py`) uses the exact linked Ghouri Town workbook at `sites/szl/private/files/vendordataghouritown.xlsx`; its final blank row is a summary row and must be excluded from vendor data. The target has multiple branches, so the script explicitly sets `BRANCH_OVERRIDE = "S1 - Ghouri Town VIP"`; every opening-entry account row receives that branch and its cost center. The cutover run is dated `2026-08-04` for the planned go-live.
+
+## Principal tagging (multi-company distributors)
+
+After NTN merge, brand/company lines that lived as separate legacy SupplierCodes are restored on the
+merged Supplier via `Supplier.custom_principals` (child DocType `Supplier Principal`, Link →
+`Principal`). Purchase Order / Receipt / Invoice carry `custom_principal` (blank by default;
+required only when the supplier has at least one allowed Principal; dropdown filtered to that
+list). No Item/Brand auto-fill and no Accounting Dimension in the first pass.
+
+Seed on szl from the same vendor workbook (parenthetical labels, multi-row NTN groups only;
+skips `SIEZAL*` sister-store names): `seed_szl_supplier_principals.py` (dry-run by default).
+Report: `Purchase by Supplier Principal`.

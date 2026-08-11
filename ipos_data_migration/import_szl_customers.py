@@ -20,7 +20,8 @@ LOYALTY_CONVERSION_FACTOR = 1.0  # 1 Loyalty Point = Rs 1
 LOYALTY_EXPIRY_DAYS = 365
 # True -> parse and print counts only, no insert/submit/commit. Set False for
 # the real pass, only after reviewing the dry-run summary and taking a backup.
-DRY_RUN = False
+# Keep True by default: importing/executing this file must never mutate szl.
+DRY_RUN = True
 # ---------------------------------------------------------------------------------
 
 NS = {

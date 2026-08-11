@@ -117,6 +117,9 @@ function setup_items_excel_grid(frm) {
 
     $wrapper.find(".form-grid-container").attr("tabindex", "0");
 
+    // Drop any leftover viewport-pin overlays from earlier experiments.
+    $(".excel-grid-viewport-header-pin, .excel-grid-viewport-hbar-pin").remove();
+
     $(document)
         .off("keydown.excelItemsGrid")
         .on("keydown.excelItemsGrid", function (event) {
@@ -231,9 +234,10 @@ function queue_items_grid_header_sync($wrapper) {
 }
 
 function inject_items_excel_css() {
-    if (document.getElementById("items-excel-grid-css")) {
+    if (document.getElementById("items-excel-grid-css-v2")) {
         return;
     }
+    $("#items-excel-grid-css").remove();
 
     const css = `
         body.excel-items-grid-body-lock {
@@ -392,22 +396,22 @@ function inject_items_excel_css() {
         }
 
         .excel-items-grid .form-grid-container::-webkit-scrollbar {
-            width: 11px;
-            height: 11px;
+            width: 14px;
+            height: 14px;
         }
 
         .excel-items-grid .form-grid-container::-webkit-scrollbar-thumb {
-            background: rgba(100, 116, 139, 0.35);
+            background: rgba(100, 116, 139, 0.4);
             border-radius: 8px;
-            border: 3px solid var(--excel-solid-bg);
+            border: 2px solid var(--excel-solid-bg);
         }
 
         .excel-items-grid .form-grid-container::-webkit-scrollbar-thumb:hover {
-            background: rgba(100, 116, 139, 0.55);
+            background: rgba(100, 116, 139, 0.6);
         }
 
         .excel-items-grid .form-grid-container::-webkit-scrollbar-track {
-            background: transparent;
+            background: rgba(100, 116, 139, 0.08);
         }
 
         .excel-items-grid .grid-body,
@@ -656,15 +660,16 @@ function inject_items_excel_css() {
     `;
 
     $("<style>", {
-        id: "items-excel-grid-css",
+        id: "items-excel-grid-css-v2",
         text: css,
     }).appendTo("head");
 }
 
 function inject_items_grid_overlap_fix_css() {
-    if (document.getElementById("items-excel-grid-overlap-fix-css")) {
+    if (document.getElementById("items-excel-grid-overlap-fix-css-v2")) {
         return;
     }
+    $("#items-excel-grid-overlap-fix-css").remove();
 
     const css = `
         .excel-items-grid .form-grid-container {
@@ -786,7 +791,7 @@ function inject_items_grid_overlap_fix_css() {
     `;
 
     $("<style>", {
-        id: "items-excel-grid-overlap-fix-css",
+        id: "items-excel-grid-overlap-fix-css-v2",
         text: css,
     }).appendTo("head");
 }
