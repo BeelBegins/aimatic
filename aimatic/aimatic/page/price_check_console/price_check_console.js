@@ -80,7 +80,23 @@ aimatic.PriceCheckPage = class PriceCheckPage {
 				this.render_result(barcode, r.message);
 				this.clear_barcode();
 			},
-			error: () => this.clear_barcode(),
+			error: (r) => {
+				const msg =
+					(r && r.message) ||
+					(r && r._server_messages && (() => {
+						try {
+							const parsed = JSON.parse(r._server_messages);
+							return (parsed || []).map((m) => {
+								try { return JSON.parse(m).message; } catch (e) { return m; }
+							}).filter(Boolean).join(' ');
+						} catch (e) {
+							return null;
+						}
+					})()) ||
+					__('Price lookup failed. Try scanning again.');
+				frappe.show_alert({ message: msg, indicator: 'red' });
+				this.clear_barcode();
+			},
 		});
 	}
 

@@ -1,0 +1,40 @@
+{
+ "app": "aimatic",
+ "charts": [],
+ "content": "[{\"id\": \"pcHeader\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Price Check</b></span>\", \"col\": 12}}, {\"id\": \"pcShortcut\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Price Check\", \"col\": 4}}]",
+ "creation": "2026-08-07 19:10:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "scan",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Price Check",
+ "links": [],
+ "modified": "2026-08-07 19:10:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Price Check",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [
+  {
+   "role": "Price Check"
+  }
+ ],
+ "sequence_id": 5.0,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "label": "Price Check",
+   "type": "URL",
+   "url": "/app/price-check-console"
+  }
+ ]
+}
