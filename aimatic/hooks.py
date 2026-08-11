@@ -33,6 +33,11 @@ doc_events = {
     # Denormalize the Item's ordered barcode child rows into a read-only Item
     # Price field so Frappe's standard Export Data feature can include them.
     "Item": {
+        "autoname": "aimatic.item_naming.events.autoname_item_code_from_series",
+        "validate": [
+            "aimatic.item_naming.events.block_duplicate_barcode_on_create",
+            "aimatic.item_naming.events.ensure_item_barcode_row",
+        ],
         "on_update": "aimatic.item_pricing.barcodes.sync_item_barcodes_to_prices",
     },
     "Item Price": {
@@ -65,13 +70,17 @@ doc_events = {
             "aimatic.purchase_printing.populate_old_purchase_snapshot",
             "aimatic.purchase_history_autofill.events.autofill_purchase_order_item_fields",
         ],
+        "validate": "aimatic.purchase_principal.validate_purchase_principal",
     },
     "Purchase Invoice": {
         "before_validate": [
             "aimatic.branch_management.events.apply_branch_defaults",
             "aimatic.purchase_printing.populate_old_purchase_snapshot",
             "aimatic.purchase_history_autofill.events.autofill_purchase_invoice_item_fields",
+            "aimatic.purchase_supplier_invoice.prefill_purchase_invoice_supplier_invoice",
+            "aimatic.purchase_principal.prefill_purchase_invoice_principal",
         ],
+        "validate": "aimatic.purchase_principal.validate_purchase_principal",
         "on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
     },
     "Purchase Receipt": {
@@ -79,7 +88,16 @@ doc_events = {
             "aimatic.branch_management.events.apply_branch_defaults",
             "aimatic.purchase_printing.populate_old_purchase_snapshot",
             "aimatic.purchase_history_autofill.events.autofill_purchase_receipt_item_fields",
+            "aimatic.purchase_supplier_invoice.prefill_purchase_receipt_supplier_invoice",
+            "aimatic.purchase_principal.prefill_purchase_receipt_principal",
         ],
+        "validate": "aimatic.purchase_principal.validate_purchase_principal",
+        # Desk amend ignores Custom Field no_copy; force Pending so the
+        # submit dialog / retry buttons can apply prices for the amendment.
+        "before_insert": "aimatic.shelf_pricing.events.reset_price_update_status_on_amend",
+        # After validate: PR commercial Server Script ("Before Save") sets
+        # custom_price_after_taxes during validate, so GM % must run here.
+        "before_save": "aimatic.shelf_pricing.events.set_shelf_gm_percent",
         # shelf_pricing: Shelf Price must not undercut cost before the
         # receipt is allowed to submit. The actual branch/Foodpanda price
         # propagation is client-script-driven (popups + retry buttons)
@@ -142,6 +160,10 @@ doc_events = {
 
 auth_hooks = [
     "aimatic.aimatic.offline_pos.device_auth.validate_android_pos_device_auth",
+    # Foodpanda WebhookKeyAuth often arrives as "Bearer <secret>". Frappe core
+    # treats two-part Authorization as OAuth/API-key and 401s Guest before the
+    # allow_guest catalog/order methods run — accept matching webhook secret first.
+    "aimatic.foodpanda_integration.webhooks.validate_foodpanda_webhook_auth",
 ]
 
 # Redirects frappe.integrations.oauth2.get_token to our own implementation so
@@ -149,11 +171,21 @@ auth_hooks = [
 # applies without modifying frappe core. See aimatic/aimatic/oauth/endpoints.py.
 override_whitelisted_methods = {
     "frappe.integrations.oauth2.get_token": "aimatic.aimatic.oauth.endpoints.get_token",
+    # Prefill Supplier Invoice No on Create (PO/PR → child); editable after.
+    "erpnext.buying.doctype.purchase_order.purchase_order.make_purchase_receipt": (
+        "aimatic.purchase_supplier_invoice.make_purchase_receipt"
+    ),
+    "erpnext.buying.doctype.purchase_order.purchase_order.make_purchase_invoice": (
+        "aimatic.purchase_supplier_invoice.make_purchase_invoice_from_po"
+    ),
+    "erpnext.stock.doctype.purchase_receipt.purchase_receipt.make_purchase_invoice": (
+        "aimatic.purchase_supplier_invoice.make_purchase_invoice_from_pr"
+    ),
 }
 
 # Label Printing module: adds a "Create Barcode Labels" button to Purchase
-# Receipt, Delivery Note, Stock Entry, and Sales Invoice via client script
-# only. None of these doctypes are ever modified server-side.
+# Receipt, Purchase Order, Delivery Note, Stock Entry, and Sales Invoice via
+# client script only. None of these doctypes are ever modified server-side.
 doctype_js = {
     "Purchase Receipt": [
         "public/js/purchase_receipt_label_printing.js",
@@ -168,16 +200,26 @@ doctype_js = {
         # Live preview only - prefills custom_shelf_price (Sale Price) from
         # the branch's current Selling Price List rate, for reference/edit.
         "public/js/current_sale_price_preview.js",
+        # Live read-only GM % between Sale Price and Price After Taxes.
+        "public/js/shelf_gm_percent.js",
+        # Resolve item_code for barcodes pasted via Items grid Upload.
+        "public/js/purchase_barcode_import.js",
+        "public/js/purchase_principal.js",
     ],
     "Purchase Order": [
         "public/js/purchase_items_excel_grid.js",
         "public/js/purchase_history_autofill.js",
         "public/js/foodpanda_price_prefill.js",
+        "public/js/label_printing_source_buttons.js",
+        # Resolve item_code for barcodes pasted via Items grid Upload.
+        "public/js/purchase_barcode_import.js",
+        "public/js/purchase_principal.js",
     ],
     "Purchase Invoice": [
         "public/js/purchase_items_excel_grid.js",
         "public/js/purchase_history_autofill.js",
         "public/js/foodpanda_price_prefill.js",
+        "public/js/purchase_principal.js",
     ],
     "Delivery Note": "public/js/label_printing_source_buttons.js",
     "Stock Entry": "public/js/label_printing_source_buttons.js",
@@ -186,6 +228,7 @@ doctype_js = {
     "Price List": "public/js/price_list_barcode_search.js",
     "POS Profile": "public/js/pos_profile_device_enrollment.js",
     "Foodpanda Outlet": "public/js/foodpanda_outlet_sync.js",
+    "Foodpanda Settings": "public/js/foodpanda_settings.js",
     "Foodpanda Product": "public/js/foodpanda_product_sync.js",
     "Branch": "public/js/branch_foodpanda_price_import.js",
 }
@@ -298,7 +341,7 @@ fixtures = [
                 "Customer", "Customer Group", "Territory", "Item Price", "Bin",
                 "Branch", "Print Format",
             ]],
-            ["role", "in", ["POS User", "POS Supervisor", "Buying Price Control"]],
+            ["role", "in", ["POS User", "POS Supervisor", "Buying Price Control", "Price Check"]],
         ],
     },
     # Item is deliberately NOT fixture-tracked here, unlike the other doctypes above -
@@ -462,15 +505,34 @@ add_to_apps_screen = [
 
 # Permissions
 # -----------
-# Permissions evaluated in scripted ways
-
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+# Price Check kiosk users inherit Desk User's Item select/report via Frappe's
+# automatic Desk User role. Deny stock/master doctypes for pure Price Check
+# accounts so floor terminals cannot browse Item/Bin or stock value reports.
+_price_check_perm = "aimatic.price_check.permissions.get_permission_query_conditions"
+_price_check_has = "aimatic.price_check.permissions.has_permission"
+permission_query_conditions = {
+	dt: _price_check_perm
+	for dt in (
+		"Bin",
+		"Batch",
+		"Delivery Note",
+		"Item",
+		"Item Price",
+		"Item Barcode",
+		"POS Invoice",
+		"Purchase Invoice",
+		"Purchase Order",
+		"Purchase Receipt",
+		"Sales Invoice",
+		"Sales Order",
+		"Serial No",
+		"Stock Entry",
+		"Stock Ledger Entry",
+		"Stock Reconciliation",
+		"Warehouse",
+	)
+}
+has_permission = {dt: _price_check_has for dt in permission_query_conditions}
 
 # Document Events
 # ---------------
@@ -596,3 +658,13 @@ before_tests = "aimatic.install.before_tests"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
+
+# Stock Ledger barcodes column (Desk report URL unchanged). Applied on hooks
+# import and again on first request so gunicorn --preload / late workers pick it up.
+from aimatic.stock_reports.stock_ledger_barcodes import patch_stock_ledger_report
+
+patch_stock_ledger_report()
+
+before_request = [
+	"aimatic.stock_reports.stock_ledger_barcodes.patch_stock_ledger_report",
+]
