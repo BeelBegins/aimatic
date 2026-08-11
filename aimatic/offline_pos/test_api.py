@@ -488,6 +488,54 @@ class TestGetItemBarcodes(_AimTestCase):
         self.assertIn("rows", result)
 
 
+class TestResolvePosCatalogItem(_AimTestCase):
+    @_require_fixtures
+    def test_requires_login(self):
+        from aimatic.offline_pos.api import resolve_pos_catalog_item
+
+        frappe.set_user("Guest")
+        with self.assertRaises((FrappePermissionError, frappe.PermissionError, frappe.AuthenticationError)):
+            resolve_pos_catalog_item(_ITEM_CODE, _POS_PROFILE_NAME)
+
+    @_require_fixtures
+    def test_resolves_by_item_code(self):
+        from aimatic.offline_pos.api import resolve_pos_catalog_item
+
+        result = resolve_pos_catalog_item(_ITEM_CODE, _POS_PROFILE_NAME)
+        self.assertEqual(result["item"]["name"], _ITEM_CODE)
+        self.assertEqual(result["price_list"], frappe.db.get_value("POS Profile", _POS_PROFILE_NAME, "selling_price_list"))
+        self.assertIn("barcodes", result)
+        self.assertIn("prices", result)
+        self.assertIn("stock", result)
+        self.assertIn("conversions", result)
+
+    @_require_fixtures
+    def test_resolves_by_barcode(self):
+        from aimatic.offline_pos.api import resolve_pos_catalog_item
+
+        barcode = frappe.db.sql(
+            """
+            SELECT ib.barcode
+            FROM `tabItem Barcode` ib
+            INNER JOIN `tabItem` i ON i.name = ib.parent
+            WHERE i.disabled = 0 AND i.is_sales_item = 1 AND ib.barcode != ''
+            LIMIT 1
+            """
+        )
+        if not barcode:
+            raise unittest.SkipTest("No active item barcode found")
+        result = resolve_pos_catalog_item(barcode[0][0], _POS_PROFILE_NAME)
+        self.assertTrue(result["item"]["name"])
+        self.assertTrue(any(row["barcode"] == barcode[0][0] for row in result["barcodes"]))
+
+    @_require_fixtures
+    def test_missing_item_throws(self):
+        from aimatic.offline_pos.api import resolve_pos_catalog_item
+
+        with self.assertRaises(frappe.ValidationError):
+            resolve_pos_catalog_item("_MISSING_POS_CATALOG_XYZ_", _POS_PROFILE_NAME)
+
+
 # ---------------------------------------------------------------------------
 # preview_cart — auth guard
 # ---------------------------------------------------------------------------
@@ -1088,12 +1136,15 @@ class TestPosRefund(_AimTestCase):
             net_amount=180,
         )
 
-        _preserve_original_return_row_values(row, original, 1)
+        # Refunding warehouse deliberately differs from the original row's "Stores"
+        # to assert it comes from the refunding profile, not copied off the original.
+        _preserve_original_return_row_values(row, original, 1, "Counter-2 Warehouse")
 
         self.assertEqual(row.item_code, "ITEM-A")
         self.assertEqual(row.rate, 50)
         self.assertEqual(row.amount, -50)
         self.assertEqual(row.net_amount, -45)
+        self.assertEqual(row.warehouse, "Counter-2 Warehouse")
 
     def test_build_refund_response_includes_fbr_item_and_totals(self):
         from unittest.mock import patch as _patch
@@ -2067,6 +2118,75 @@ class TestFoodPandaCreditPaymentMarker(_AimTestCase):
             restore_food_panda_credit_payment_marker(doc)
 
 
+class TestFoodPandaCreditRefundPayments(_AimTestCase):
+    """Food Panda refunds must keep the zero-amount credit marker."""
+
+    def test_set_refund_payments_forces_zero_marker(self):
+        from aimatic.offline_pos.api import (
+            _FOOD_PANDA_CREDIT_MODE,
+            _FOOD_PANDA_CUSTOMER,
+            _FOOD_PANDA_PROFILE,
+            _set_refund_payments,
+        )
+
+        doc = frappe._dict(
+            customer=_FOOD_PANDA_CUSTOMER,
+            grand_total=-1279.0,
+            payments=[],
+        )
+        doc.set = lambda field, value: setattr(doc, field, value)
+        doc.append = lambda field, values: doc.payments.append(frappe._dict(values)) or doc.payments[-1]
+
+        pos = frappe._dict(
+            name=_FOOD_PANDA_PROFILE,
+            custom_is_foodpanda_profile=1,
+            payments=[frappe._dict(mode_of_payment=_FOOD_PANDA_CREDIT_MODE)],
+        )
+        pos["custom_is_foodpanda_profile"] = 1
+
+        _set_refund_payments(
+            doc,
+            pos,
+            [{"mode_of_payment": _FOOD_PANDA_CREDIT_MODE, "amount": -1279}],
+        )
+
+        self.assertEqual(len(doc.payments), 1)
+        self.assertEqual(doc.payments[0].mode_of_payment, _FOOD_PANDA_CREDIT_MODE)
+        self.assertEqual(doc.payments[0].amount, 0)
+        self.assertEqual(doc.paid_amount, 0)
+        self.assertEqual(doc.base_paid_amount, 0)
+
+    def test_set_refund_payments_rejects_non_credit_mode(self):
+        from aimatic.offline_pos.api import (
+            _FOOD_PANDA_CREDIT_MODE,
+            _FOOD_PANDA_CUSTOMER,
+            _FOOD_PANDA_PROFILE,
+            _set_refund_payments,
+        )
+
+        doc = frappe._dict(
+            customer=_FOOD_PANDA_CUSTOMER,
+            grand_total=-100.0,
+            payments=[],
+        )
+        pos = frappe._dict(
+            name=_FOOD_PANDA_PROFILE,
+            custom_is_foodpanda_profile=1,
+            payments=[
+                frappe._dict(mode_of_payment=_FOOD_PANDA_CREDIT_MODE),
+                frappe._dict(mode_of_payment="Cash"),
+            ],
+        )
+        pos["custom_is_foodpanda_profile"] = 1
+
+        with self.assertRaises(frappe.PermissionError):
+            _set_refund_payments(
+                doc,
+                pos,
+                [{"mode_of_payment": "Cash", "amount": -100}],
+            )
+
+
 class TestFailedClosingBlocksSales(_AimTestCase):
     """A Failed POS Closing must freeze new sales/refunds on that open shift."""
 
@@ -2101,14 +2221,31 @@ class TestBarcodeCaseInsensitiveResolve(_AimTestCase):
     def test_resolve_falls_back_to_lower_match(self):
         from aimatic.offline_pos.api import _resolve_item_code_from_barcode
 
-        with (
-            patch("aimatic.offline_pos.api.frappe.db.get_value", return_value=None),
-            patch(
-                "aimatic.offline_pos.api.frappe.db.sql",
-                return_value=[("STO-ITEM-S5",)],
-            ),
+        with patch(
+            "aimatic.offline_pos.api.frappe.db.sql",
+            side_effect=[
+                [],  # variant IN miss
+                [("STO-ITEM-S5",)],  # LOWER fallback hit
+            ],
         ):
             self.assertEqual(_resolve_item_code_from_barcode("s5"), "STO-ITEM-S5")
+
+    def test_resolve_matches_gtin_leading_zero_variant(self):
+        from aimatic.offline_pos.api import _resolve_item_code_from_barcode
+
+        with patch(
+            "aimatic.offline_pos.api.frappe.db.sql",
+            return_value=[("STO-ITEM-UPC",)],
+        ) as sql:
+            self.assertEqual(
+                _resolve_item_code_from_barcode("0671866150071"),
+                "STO-ITEM-UPC",
+            )
+            args = sql.call_args[0]
+            self.assertIn("barcode IN %(variants)s", args[0])
+            variants = sql.call_args[0][1]["variants"]
+            self.assertIn("671866150071", variants)
+            self.assertIn("0671866150071", variants)
 
 
 class TestSubmitPosRefundCashier(_AimTestCase):

@@ -964,16 +964,30 @@ def _validate_nonzero_rates(doc):
 
 
 def _resolve_item_code_from_barcode(barcode):
-    """Resolve Item Barcode → item code with case-insensitive matching.
+    """Resolve Item Barcode → item code with GTIN padding + case-insensitive match.
 
-    Shelf/legacy labels are often typed in a different case than the stored
-    barcode (e.g. ``s5`` vs ``S5``). Exact match first, then LOWER() fallback.
+    Shelf scanners often emit EAN-13 with a leading 0 for UPC-A labels stored
+    as 12 digits (and the reverse). Exact match first across variants, then
+    LOWER() fallback for typed case mismatches (e.g. ``s5`` vs ``S5``).
     """
     if not barcode:
         return None
-    code = frappe.db.get_value("Item Barcode", {"barcode": barcode}, "parent")
-    if code:
-        return code
+    from aimatic.barcode_utils import barcode_variants
+
+    variants = barcode_variants(barcode)
+    if variants:
+        rows = frappe.db.sql(
+            """
+            SELECT parent FROM `tabItem Barcode`
+            WHERE barcode IN %(variants)s
+            ORDER BY parent ASC, idx ASC
+            LIMIT 1
+            """,
+            {"variants": variants},
+        )
+        if rows:
+            return rows[0][0]
+
     rows = frappe.db.sql(
         """
         SELECT parent FROM `tabItem Barcode`
@@ -1158,6 +1172,126 @@ def get_item_barcodes(limit_start=0, limit_page_length=500, modified_after=None)
     next_start = start + len(rows) if has_more else None
 
     return {"rows": rows, "next_start": next_start, "has_more": has_more}
+
+
+@frappe.whitelist()
+def resolve_pos_catalog_item(barcode_or_item_code=None, pos_profile=None):
+    """Resolve one active sales item for a POS terminal catalog miss.
+
+    Returns the Item row plus barcodes, selling prices for the profile price
+    list, warehouse stock, and UOM conversions so the client can upsert into
+    local SQLite and continue the scan without a full catalogue sync.
+    """
+    _require_login()
+    _enforce_bearer_profile(pos_profile)
+
+    query = (barcode_or_item_code or "").strip()
+    if not query:
+        frappe.throw(_("barcode_or_item_code is required"))
+    if not pos_profile:
+        frappe.throw(_("pos_profile is required"))
+
+    pos = _load_pos_profile(pos_profile)
+    price_list = pos.selling_price_list
+    warehouse = pos.warehouse
+    if not price_list:
+        frappe.throw(_("POS Profile {0} has no Selling Price List").format(pos.name))
+    if not warehouse:
+        frappe.throw(_("POS Profile {0} has no Warehouse").format(pos.name))
+
+    item_code = _resolve_item_code_from_barcode(query)
+    if not item_code:
+        item_code = frappe.db.get_value("Item", {"name": query}, "name")
+    if not item_code:
+        rows = frappe.db.sql(
+            "SELECT name FROM `tabItem` WHERE LOWER(name) = LOWER(%s) LIMIT 1",
+            (query,),
+        )
+        item_code = rows[0][0] if rows else None
+    if not item_code:
+        frappe.throw(_("Item not found for {0}").format(query))
+
+    item = frappe.db.get_value(
+        "Item",
+        item_code,
+        [
+            "name",
+            "item_name",
+            "item_group",
+            "stock_uom",
+            "is_stock_item",
+            "is_sales_item",
+            "disabled",
+            "has_batch_no",
+            "has_serial_no",
+            "modified",
+        ],
+        as_dict=True,
+    )
+    if not item:
+        frappe.throw(_("Item not found for {0}").format(query))
+    if cint(item.disabled):
+        frappe.throw(_("Item {0} is disabled").format(item.name))
+    if not cint(item.is_sales_item):
+        frappe.throw(_("Item {0} is not a sales item").format(item.name))
+
+    barcodes = frappe.db.sql(
+        """
+        SELECT parent AS item_code, barcode, uom, modified
+        FROM `tabItem Barcode`
+        WHERE parent = %(item_code)s AND barcode != ''
+        ORDER BY idx ASC
+        """,
+        {"item_code": item.name},
+        as_dict=True,
+    )
+    prices = frappe.get_all(
+        "Item Price",
+        filters={"item_code": item.name, "price_list": price_list, "selling": 1},
+        fields=[
+            "name",
+            "item_code",
+            "uom",
+            "price_list_rate",
+            "currency",
+            "valid_from",
+            "valid_upto",
+            "modified",
+        ],
+        order_by="modified desc",
+    )
+    stock = frappe.get_all(
+        "Bin",
+        filters={"item_code": item.name, "warehouse": warehouse},
+        fields=[
+            "item_code",
+            "warehouse",
+            "actual_qty",
+            "reserved_qty",
+            "projected_qty",
+            "modified",
+        ],
+    )
+    conversions = frappe.db.sql(
+        """
+        SELECT parent AS item_code, uom, conversion_factor, modified
+        FROM `tabUOM Conversion Detail`
+        WHERE parenttype = 'Item' AND parent = %(item_code)s
+        ORDER BY idx ASC
+        """,
+        {"item_code": item.name},
+        as_dict=True,
+    )
+
+    return {
+        "item": item,
+        "barcodes": barcodes,
+        "prices": prices,
+        "stock": stock,
+        "conversions": conversions,
+        "price_list": price_list,
+        "warehouse": warehouse,
+    }
 
 
 @frappe.whitelist()
@@ -2863,8 +2997,13 @@ def _validate_refund_quantities(original, requested):
             )
 
 
-def _preserve_original_return_row_values(row, original_row, qty):
-    """Keep refund unit valuation tied to the original submitted row."""
+def _preserve_original_return_row_values(row, original_row, qty, warehouse):
+    """Keep refund unit valuation tied to the original submitted row.
+
+    warehouse is the REFUNDING POS Profile's warehouse, not the original sale's —
+    returned stock lands wherever the refund is actually processed, which may be
+    a different POS Profile/branch than the original sale.
+    """
     sold = abs(flt(original_row.qty))
     if sold <= 0:
         frappe.throw(_("Original quantity is invalid for row {0}").format(original_row.name))
@@ -2875,7 +3014,7 @@ def _preserve_original_return_row_values(row, original_row, qty):
     row.uom = original_row.uom
     row.stock_uom = original_row.stock_uom
     row.conversion_factor = flt(original_row.conversion_factor) or 1
-    row.warehouse = original_row.warehouse
+    row.warehouse = warehouse
     row.rate = flt(original_row.rate, 6)
     row.price_list_rate = flt(original_row.price_list_rate, 6)
     row.discount_percentage = flt(original_row.discount_percentage, 6)
@@ -2953,11 +3092,42 @@ def _set_refund_payments(doc, pos, payments_data):
     - Amounts are normalised to ERPNext's negative return convention.
     - Total refunded cannot exceed the calculated refund payable.
     - Split payments are preserved.
+    - S1 Food Panda credit returns use the same zero-amount Food Panda Credit
+      marker as sales. A non-zero MoP amount against the Receivable-type
+      Food Panda account fails consolidation with "Customer is required
+      against Receivable account"; the credit note reduces customer AR via
+      the invoice GL / return_against link instead. Client amounts are ignored
+      and forced to zero so older terminals keep working.
     """
     grand_total = flt(doc.grand_total, 2)  # negative for a return
     allowed_modes = {p.mode_of_payment for p in (pos.get("payments") or [])}
     if not allowed_modes:
         frappe.throw(_("POS Profile has no payment modes configured"))
+
+    if _is_food_panda_credit_sale(pos, doc.customer):
+        if _FOOD_PANDA_CREDIT_MODE not in allowed_modes:
+            frappe.throw(
+                _("Payment mode '{0}' is not allowed in POS Profile {1}").format(
+                    _FOOD_PANDA_CREDIT_MODE, pos.name
+                )
+            )
+        if isinstance(payments_data, list) and payments_data:
+            for p in payments_data:
+                mode = (p.get("mode_of_payment") or "").strip()
+                if not mode:
+                    frappe.throw(_("Each refund payment row must have mode_of_payment"))
+                if mode != _FOOD_PANDA_CREDIT_MODE:
+                    frappe.throw(
+                        _("S1 Food Panda refunds must use the Food Panda Credit payment."),
+                        frappe.PermissionError,
+                    )
+        doc.set("payments", [])
+        doc.append("payments", {"mode_of_payment": _FOOD_PANDA_CREDIT_MODE, "amount": 0})
+        doc.paid_amount = 0
+        doc.base_paid_amount = 0
+        doc.change_amount = 0
+        doc.base_change_amount = 0
+        return
 
     rows = []
     if isinstance(payments_data, list) and len(payments_data) == 1:
@@ -3106,6 +3276,12 @@ def get_pos_invoice_for_refund(invoice_name):
 
     Never uses current Item Price or current Item tax config — every value comes
     from the original submitted POS Invoice and its FBR item snapshot.
+
+    Deliberately not profile-bound: any enrolled device with read permission may
+    look up any invoice, since a refund is no longer required to happen on the
+    same POS Profile the item was sold under (see submit_pos_refund). Actual
+    refund authorization — role/allow-list/supervisor-token, same-Company,
+    shift-open — is enforced there, not here.
     """
     _require_login()
     if not invoice_name:
@@ -3113,7 +3289,6 @@ def get_pos_invoice_for_refund(invoice_name):
 
     original = frappe.get_doc("POS Invoice", invoice_name)
     original.check_permission("read")
-    _enforce_bearer_profile(original.pos_profile)
 
     if original.docstatus != 1:
         frappe.throw(_("Original POS Invoice must be submitted"))
@@ -3194,6 +3369,7 @@ def submit_pos_refund(
     terminal_refund_id,
     original_invoice,
     cashier_user,
+    pos_profile=None,
     pos_opening_entry=None,
     reason=None,
     items=None,
@@ -3213,19 +3389,30 @@ def submit_pos_refund(
     to FBR exactly once. Electron never calls FBR. The Rs.1 POS service fee is
     neither added nor refunded on returns (see fbr_pos.accounting).
 
+    pos_profile is the REFUNDING terminal's own POS Profile — the counter/branch
+    actually processing this refund, which may differ from the POS Profile the
+    item was originally sold under. Any POS Profile may refund any other POS
+    Profile's sale as long as both share the same Company (a refund across
+    Companies would need different GL accounts entirely; not supported). The
+    return invoice, its warehouse, and its FBR credit note all post under this
+    refunding profile/branch, not the original sale's — stock and cash for the
+    return land wherever it's actually processed. Falls back to
+    original.pos_profile when omitted, for compatibility with older Electron
+    builds that predate this parameter (pre-existing same-profile behavior).
+
     cashier_user is the human cashier processing the refund — never the
     terminal's own authenticated API identity — validated the same way
     submit_online_sale validates its cashier: must be enabled, permitted on
-    this POS Profile, and (via _require_refund_permission) either hold a
-    refund role, be explicitly allow-listed on the POS Profile, or supply a
-    valid unused supervisor_token minted for action ``refund``. If
+    the refunding POS Profile, and (via _require_refund_permission) either hold
+    a refund role, be explicitly allow-listed on the refunding POS Profile, or
+    supply a valid unused supervisor_token minted for action ``refund``. If
     pos_opening_entry is given it must belong to cashier_user; otherwise
-    cashier_user must have some other open shift on this POS Profile. The
-    return invoice's `owner` is reattributed to cashier_user after submit,
+    cashier_user must have some other open shift on the refunding POS Profile.
+    The return invoice's `owner` is reattributed to cashier_user after submit,
     for the same reason submit_online_sale does this: ERPNext's POS Closing
-    Entry matches shift invoices by `owner`, not by any cashier-specific
-    business field, so an unattributed refund would be invisible to that
-    cashier's shift close/reconciliation.
+    Entry matches shift invoices by `owner` AND by exact `pos_profile` (core,
+    not customizable), so an unattributed or wrong-profile refund would be
+    invisible to that cashier's shift close/reconciliation.
     """
     _require_login()
     is_bearer = _is_bearer_authenticated_request()
@@ -3269,10 +3456,21 @@ def submit_pos_refund(
     if cint(getattr(original, "is_return", 0)):
         frappe.throw(_("Cannot refund a return invoice"))
 
+    # Refunding profile: the terminal actually processing this refund, which may
+    # differ from the profile the item was originally sold under. Falls back to
+    # the original's profile for older Electron builds that predate this param.
+    refund_pos_profile = pos_profile or original.pos_profile
+
     # Cashier identity, refund authorization, and shift checks — all against
-    # cashier_user, never the terminal's own authenticated session.
-    pos = _get_pos_profile_or_throw(original.pos_profile)
-    cashier_user = _resolve_cashier_user(cashier_user, original.pos_profile, hardware_id, is_bearer)
+    # cashier_user and the REFUNDING profile, never the terminal's own
+    # authenticated session and never the original sale's profile.
+    pos = _get_pos_profile_or_throw(refund_pos_profile)
+    if pos.company != original.company:
+        frappe.throw(
+            _("This invoice was sold under a different Company and cannot be refunded here."),
+            frappe.PermissionError,
+        )
+    cashier_user = _resolve_cashier_user(cashier_user, refund_pos_profile, hardware_id, is_bearer)
     _validate_cashier_for_sale(cashier_user, pos)
     _require_refund_permission(pos, cashier_user, supervisor_token=supervisor_token)
     if pos_opening_entry:
@@ -3299,7 +3497,7 @@ def submit_pos_refund(
     from erpnext.controllers.sales_and_purchase_return import make_return_doc
 
     return_doc = make_return_doc("POS Invoice", original.name)
-    return_doc.pos_profile = original.pos_profile
+    return_doc.pos_profile = pos.name
     return_doc.set_posting_time = 1
     return_doc.posting_date = nowdate()
     return_doc.posting_time = nowtime()
@@ -3315,6 +3513,7 @@ def submit_pos_refund(
                 row,
                 original_by_name[original_row],
                 requested[original_row],
+                pos.warehouse,
             )
             kept.append(row)
     if not kept:
@@ -3325,9 +3524,10 @@ def submit_pos_refund(
     if return_doc.meta.has_field("custom_terminal_refund_id"):
         return_doc.custom_terminal_refund_id = terminal_refund_id
     if return_doc.meta.has_field("custom_terminal_id"):
-        return_doc.custom_terminal_id = getattr(original, "custom_terminal_id", None) or ""
+        # The refunding terminal, not the original sale's — they can now differ.
+        return_doc.custom_terminal_id = pos.get("custom_terminal_id") or ""
     if return_doc.meta.has_field("custom_hardware_id"):
-        return_doc.custom_hardware_id = getattr(original, "custom_hardware_id", None) or ""
+        return_doc.custom_hardware_id = hardware_id or ""
     if reason and return_doc.meta.has_field("remarks"):
         return_doc.remarks = reason
 
