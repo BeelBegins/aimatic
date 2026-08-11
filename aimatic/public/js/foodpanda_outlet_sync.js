@@ -1,91 +1,135 @@
-// "Map by Barcode" links Foodpanda's existing catalog to Items using barcode
-// (never Item Code). "Sync Full Catalog" then PUTs price/stock for mapped
-// rows only. Day-to-day availability still follows Bin updates via events.py.
+// Foodpanda Outlet — simple catalog actions.
+// Daily stock still follows Bin updates via events.py.
 
 frappe.ui.form.on("Foodpanda Outlet", {
 	refresh(frm) {
-		if (frm.is_new() || !frm.doc.catalog_sync_enabled) {
+		if (frm.is_new()) {
 			return;
 		}
-		frm.add_custom_button(__("Map by Barcode"), () => {
-			aimatic_map_foodpanda_catalog_by_barcode(frm);
+
+		frm.add_custom_button(__("Open Catalog Console"), () => {
+			frappe.route_options = { outlet: frm.doc.name };
+			frappe.set_route("foodpanda-catalog-console");
 		});
-		frm.add_custom_button(__("Sync Full Catalog"), () => {
-			aimatic_start_foodpanda_bulk_export(frm);
-		});
+
+		if (!frm.doc.catalog_sync_enabled) {
+			frm.dashboard.clear_headline();
+			frm.dashboard.set_headline_alert(
+				__("Catalog sync is disabled. Enable Catalog Sync to manage prices and stock."),
+				"orange"
+			);
+			return;
+		}
+
+		aimatic_render_foodpanda_outlet_dashboard(frm);
+
+		frm.add_custom_button(__("Update prices & stock"), () => {
+			aimatic_start_foodpanda_bulk_push(frm);
+		}, __("Catalog"));
+		frm.add_custom_button(__("Refresh product links"), () => {
+			aimatic_start_foodpanda_import_and_map(frm);
+		}, __("Catalog"));
 	},
 });
 
-function aimatic_map_foodpanda_catalog_by_barcode(frm) {
+function aimatic_render_foodpanda_outlet_dashboard(frm) {
 	frappe.call({
-		method: "aimatic.foodpanda_integration.api.map_foodpanda_catalog_by_barcode",
+		method: "aimatic.foodpanda_integration.api.get_outlet_catalog_dashboard",
 		args: { outlet: frm.doc.name },
-		freeze: true,
-		freeze_message: __("Matching Foodpanda catalog by barcode..."),
 		callback(r) {
-			const result = r.message || {};
-			const file_url = result.file_url;
-			let message =
-				__(
-					"Remote: {0}. Mapped: {1} (updated {2}). No barcode: {3}. Unmatched: {4}. Ambiguous: {5}.",
-					[
-						result.remote_total || 0,
-						result.mapped || 0,
-						result.updated || 0,
-						result.skipped_no_barcode || 0,
-						result.skipped_unmatched || 0,
-						result.skipped_ambiguous || 0,
-					]
-				);
-			if (file_url) {
-				message +=
-					`<p><a href="${frappe.utils.escape_html(file_url)}" target="_blank" rel="noopener">` +
-					__("Download matching Excel") +
-					"</a></p>";
-				window.open(file_url);
-			}
-			frappe.msgprint({
-				title: __("Barcode Mapping"),
-				indicator: result.mapped ? "green" : "orange",
-				message,
+			const d = r.message || {};
+			frm.dashboard.clear_headline();
+			frm.dashboard.set_headline(
+				d.summary_line ||
+					__(
+						"{0} ready · {1} need attention · {2} not linked",
+						[d.mapped_sku_count || 0, d.failed_count || 0, d.unmapped_remote_count || 0]
+					)
+			);
+		},
+	});
+}
+
+function aimatic_start_foodpanda_import_and_map(frm) {
+	frappe.confirm(
+		__(
+			"Download the latest Foodpanda product list and link matching barcodes to ERPNext items?"
+		),
+		() => {
+			frappe.call({
+				method: "aimatic.foodpanda_integration.api.start_import_and_map",
+				args: { outlet: frm.doc.name },
+				freeze: true,
+				freeze_message: __("Starting product link refresh..."),
+				callback(r) {
+					const result = r.message || {};
+					frappe.msgprint({
+						title: __("Refresh started"),
+						indicator: "blue",
+						message: __(
+							"Job {0} is running in the background. Open Catalog Console and click Refresh status in a few minutes.",
+							[result.job_id || ""]
+						),
+					});
+					frm.reload_doc();
+				},
 			});
-			frm.reload_doc();
-		},
-	});
+		}
+	);
 }
 
-function aimatic_start_foodpanda_bulk_export(frm) {
+function aimatic_start_foodpanda_bulk_push(frm) {
 	frappe.call({
-		method: "aimatic.foodpanda_integration.api.start_catalog_bulk_export",
+		method: "aimatic.foodpanda_integration.api.get_outlet_catalog_dashboard",
 		args: { outlet: frm.doc.name },
-		freeze: true,
-		freeze_message: __("Starting catalog export..."),
 		callback(r) {
-			const status = r.message;
-			if (!status || !status.job_id) {
-				frappe.show_alert({ message: __("Could not start the export"), indicator: "red" });
-				return;
-			}
-			aimatic_poll_foodpanda_bulk_export(status.job_id);
+			const mapped = (r.message && r.message.mapped_sku_count) || 0;
+			frappe.confirm(
+				__("Send current prices and stock to Foodpanda for {0} linked products?", [mapped]),
+				() => {
+					frappe.call({
+						method: "aimatic.foodpanda_integration.api.start_catalog_bulk_push",
+						args: { outlet: frm.doc.name },
+						freeze: true,
+						freeze_message: __("Starting price and stock update..."),
+						callback(res) {
+							const status = res.message;
+							if (!status || !status.job_id) {
+								frappe.show_alert({
+									message: __("Could not start the update"),
+									indicator: "red",
+								});
+								return;
+							}
+							aimatic_poll_foodpanda_bulk_push(status.job_id);
+						},
+						error() {
+							frappe.show_alert({
+								message: __("Could not start the update"),
+								indicator: "red",
+							});
+						},
+					});
+				}
+			);
 		},
 	});
 }
 
-function aimatic_poll_foodpanda_bulk_export(job_id) {
+function aimatic_poll_foodpanda_bulk_push(job_id) {
 	const dialog = new frappe.ui.Dialog({
-		title: __("Foodpanda Catalog Export"),
+		title: __("Updating Foodpanda prices & stock"),
 		fields: [{ fieldname: "progress_html", fieldtype: "HTML" }],
 	});
 	dialog.show();
 
 	const render = (status) => {
-		const synced = status.synced || 0;
-		const failed = status.failed || 0;
-		const total = status.total || 0;
 		dialog.fields_dict.progress_html.$wrapper.html(
 			`<p>${__("Status")}: ${frappe.utils.escape_html(status.status || "")}</p>` +
-				`<p>${__("Synced")}: ${synced} / ${total}</p>` +
-				(failed ? `<p style="color:var(--red-500)">${__("Failed")}: ${failed}</p>` : "")
+				`<p>${__("Done")}: ${status.synced || 0} / ${status.total || 0}</p>` +
+				(status.failed
+					? `<p style="color:var(--red-500)">${__("Failed")}: ${status.failed}</p>`
+					: "")
 		);
 	};
 
@@ -99,17 +143,24 @@ function aimatic_poll_foodpanda_bulk_export(job_id) {
 				if (!status) {
 					clearInterval(timer);
 					dialog.hide();
-					frappe.show_alert({ message: __("Export job expired"), indicator: "orange" });
+					frappe.show_alert({ message: __("Update job expired"), indicator: "orange" });
 					return;
 				}
 				render(status);
 				if (status.status === "done") {
 					clearInterval(timer);
 					frappe.show_alert({
-						message: __("Catalog export finished: {0} synced, {1} failed", [status.synced || 0, status.failed || 0]),
+						message: __("Update complete: {0} ok, {1} failed", [
+							status.synced || 0,
+							status.failed || 0,
+						]),
 						indicator: status.failed ? "orange" : "green",
 					});
 				}
+			},
+			error() {
+				clearInterval(timer);
+				dialog.hide();
 			},
 		});
 	};

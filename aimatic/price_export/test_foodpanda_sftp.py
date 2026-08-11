@@ -34,6 +34,27 @@ class TestFoodpandaSftpCsv(unittest.TestCase):
 			],
 		)
 
+	def test_inactive_if_qty_lte_marks_low_stock_inactive(self):
+		from aimatic.price_export.foodpanda_sftp import resolve_foodpanda_active
+
+		self.assertEqual(resolve_foodpanda_active(3, 3), 0)
+		self.assertEqual(resolve_foodpanda_active(4, 3), 1)
+		self.assertEqual(resolve_foodpanda_active(0, 3), 0)
+		self.assertEqual(resolve_foodpanda_active(3, None), 1)
+		self.assertEqual(resolve_foodpanda_active(3, ""), 1)
+
+		rows = [
+			{"item_code": "A", "barcode1": "111", "foodpanda_price": 10, "available_qty": 3},
+			{"item_code": "B", "barcode1": "222", "foodpanda_price": 10, "available_qty": 4},
+			{"item_code": "C", "barcode1": "333", "foodpanda_price": 10, "available_qty": 0},
+		]
+		csv_rows, skipped = build_foodpanda_csv_rows("S1", rows=rows, inactive_if_qty_lte=3)
+		self.assertEqual(skipped, 0)
+		self.assertEqual(
+			[(row["barcode"], row["active"], row["quantity"]) for row in csv_rows],
+			[("111", 0, 3.0), ("222", 1, 4.0), ("333", 0, 0.0)],
+		)
+
 	def test_csv_bytes_include_header(self):
 		payload = build_foodpanda_csv_bytes(
 			[{"barcode": "111", "sku": "", "price": 10, "active": 1, "quantity": 2}]

@@ -43,11 +43,39 @@ def _primary_barcode(row):
 	return ""
 
 
-def build_foodpanda_csv_rows(branch, rows=None):
+def parse_inactive_if_qty_lte(value):
+	"""Return a non-negative threshold, or None when the rule is off.
+
+	Blank/None disables the rule (CSV active follows quantity > 0).
+	"""
+	if value is None or value == "":
+		return None
+	threshold = flt(value)
+	if threshold < 0:
+		return None
+	return threshold
+
+
+def resolve_foodpanda_active(quantity, inactive_if_qty_lte=None):
+	"""Foodpanda CSV ``active`` flag from sellable qty and optional threshold.
+
+	When ``inactive_if_qty_lte`` is set (e.g. 3), quantity at or below that
+	threshold is inactive. Otherwise active means quantity > 0.
+	"""
+	quantity = max(flt(quantity), 0)
+	threshold = parse_inactive_if_qty_lte(inactive_if_qty_lte)
+	if threshold is None:
+		return 1 if quantity > 0 else 0
+	return 0 if quantity <= threshold else 1
+
+
+def build_foodpanda_csv_rows(branch, rows=None, inactive_if_qty_lte=None):
 	"""Return (csv_rows, skipped_count) for the vendor-upload shape.
 
 	When ``rows`` is None, load the full branch price sheet. Otherwise treat
 	``rows`` as already-filtered sheet row dicts (report upload path).
+	``inactive_if_qty_lte`` comes from Branch Price Sheet's report filter;
+	Branch/scheduler uploads leave it unset.
 	"""
 	source_rows = rows if rows is not None else get_branch_price_sheet_rows(branch)
 	csv_rows = []
@@ -64,7 +92,7 @@ def build_foodpanda_csv_rows(branch, rows=None):
 				"barcode": barcode,
 				"sku": "",
 				"price": price,
-				"active": 1 if quantity > 0 else 0,
+				"active": resolve_foodpanda_active(quantity, inactive_if_qty_lte),
 				"quantity": quantity,
 			}
 		)
@@ -252,14 +280,18 @@ def _sheet_rows_for_item_codes(branch, item_codes):
 	return [row for row in get_branch_price_sheet_rows(branch) if row.get("item_code") in wanted]
 
 
-def upload_foodpanda_csv(branch, rows=None, trigger=TRIGGER_BRANCH, require_enabled=False):
+def upload_foodpanda_csv(
+	branch, rows=None, trigger=TRIGGER_BRANCH, require_enabled=False, inactive_if_qty_lte=None
+):
 	"""Build CSV for ``branch`` and upload via that branch's SFTP settings.
 
 	Returns a dict safe for Desk/RPC (no password). Raises on validation
 	errors before connecting; connection failures are logged then re-raised.
 	"""
 	settings = _load_sftp_settings(branch, require_enabled=require_enabled)
-	csv_rows, skipped = build_foodpanda_csv_rows(branch, rows=rows)
+	csv_rows, skipped = build_foodpanda_csv_rows(
+		branch, rows=rows, inactive_if_qty_lte=inactive_if_qty_lte
+	)
 	filename = _csv_filename(branch)
 	csv_bytes = build_foodpanda_csv_bytes(csv_rows)
 
@@ -321,7 +353,7 @@ def upload_branch_foodpanda_csv(branch):
 
 
 @frappe.whitelist()
-def upload_branch_price_sheet_foodpanda_csv(branch, item_codes=None):
+def upload_branch_price_sheet_foodpanda_csv(branch, item_codes=None, inactive_if_qty_lte=None):
 	"""Report-scoped upload; ``item_codes`` limits to currently filtered rows."""
 	require_export_permission()
 	if not branch:
@@ -329,7 +361,13 @@ def upload_branch_price_sheet_foodpanda_csv(branch, item_codes=None):
 	if item_codes is not None and isinstance(item_codes, str):
 		item_codes = frappe.parse_json(item_codes)
 	rows = _sheet_rows_for_item_codes(branch, item_codes)
-	return upload_foodpanda_csv(branch, rows=rows, trigger=TRIGGER_REPORT, require_enabled=False)
+	return upload_foodpanda_csv(
+		branch,
+		rows=rows,
+		trigger=TRIGGER_REPORT,
+		require_enabled=False,
+		inactive_if_qty_lte=inactive_if_qty_lte,
+	)
 
 
 def _already_uploaded_today(branch, now=None):

@@ -60,6 +60,19 @@ def process_callback(payload):
 
 	if job_name:
 		frappe.db.set_value("Foodpanda Catalog Job", job_name, values)
+		if (
+			status == "Completed"
+			and download_url
+			and frappe.db.get_value("Foodpanda Catalog Job", job_name, "operation") == "Export"
+		):
+			frappe.enqueue(
+				"aimatic.foodpanda_integration.catalog_export.download_and_store_export",
+				queue="long",
+				foodpanda_job_id=job_id,
+				enqueue_after_commit=True,
+				job_name=f"Foodpanda export download {job_id[:8]}",
+				timeout=3600,
+			)
 	else:
 		vendor_id = payload.get("platform_vendor_id") or payload.get("vendor_id")
 		outlet_name = frappe.db.get_value("Foodpanda Outlet", {"vendor_id": vendor_id}, "name") if vendor_id else None
@@ -81,7 +94,9 @@ def process_callback(payload):
 		fields=["name", "item_code", "foodpanda_product_id", "pending_content_hash"],
 	)
 	for product in products:
-		product_error = _feedback_for_sku(payload, product.item_code)
+		product_error = _feedback_for_sku(
+			payload, product.foodpanda_product_id or product.item_code
+		)
 		if status == "Completed" and not product_error:
 			product_values = {
 				"sync_status": "Synced",

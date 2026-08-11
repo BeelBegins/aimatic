@@ -18,6 +18,8 @@
   "section_break_details",
   "requested_skus",
   "download_url",
+  "export_file",
+  "product_count",
   "request_payload",
   "raw_response",
   "error"
@@ -87,8 +89,20 @@
   },
   {
    "fieldname": "download_url",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Download URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "export_file",
+   "fieldtype": "Attach",
+   "label": "Export File",
+   "read_only": 1
+  },
+  {
+   "fieldname": "product_count",
+   "fieldtype": "Int",
+   "label": "Product Count",
    "read_only": 1
   },
   {

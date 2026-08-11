@@ -14,7 +14,14 @@
   "section_break_status",
   "status_cache",
   "last_status_sync",
-  "last_error"
+  "last_error",
+  "section_break_catalog",
+  "auto_map_on_catalog_import",
+  "column_break_catalog_stats",
+  "last_catalog_import_job",
+  "last_catalog_import_at",
+  "remote_sku_count",
+  "mapped_sku_count"
  ],
  "fields": [
   {
@@ -75,6 +82,47 @@
    "fieldname": "last_error",
    "fieldtype": "Long Text",
    "label": "Last Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_catalog",
+   "fieldtype": "Section Break",
+   "label": "Catalog"
+  },
+  {
+   "default": "1",
+   "description": "When a Partner catalog export completes, automatically run barcode mapping in the background.",
+   "fieldname": "auto_map_on_catalog_import",
+   "fieldtype": "Check",
+   "label": "Auto Map on Catalog Import"
+  },
+  {
+   "fieldname": "column_break_catalog_stats",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_catalog_import_job",
+   "fieldtype": "Link",
+   "label": "Last Catalog Import Job",
+   "options": "Foodpanda Catalog Job",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_catalog_import_at",
+   "fieldtype": "Datetime",
+   "label": "Last Catalog Import At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remote_sku_count",
+   "fieldtype": "Int",
+   "label": "Remote SKU Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mapped_sku_count",
+   "fieldtype": "Int",
+   "label": "Mapped SKU Count",
    "read_only": 1
   }
  ],

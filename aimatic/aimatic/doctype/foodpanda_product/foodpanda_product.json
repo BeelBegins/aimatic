@@ -9,6 +9,7 @@
   "item_code",
   "outlet",
   "foodpanda_product_id",
+  "portal_active",
   "column_break_sync",
   "sync_status",
   "content_hash",
@@ -40,8 +41,18 @@
    "description": "Foodpanda catalog SKU for PUT updates. Set by barcode mapping from the remote catalog (never the ERPNext Item Code).",
    "fieldname": "foodpanda_product_id",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Foodpanda Product ID",
    "read_only": 1
+  },
+  {
+   "default": "1",
+   "description": "Desired active flag on Foodpanda. When unchecked, catalog PUT forces inactive even if stock remains. When checked, active still requires a sales item with stock.",
+   "fieldname": "portal_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Portal Active"
   },
   {
    "fieldname": "column_break_sync",
