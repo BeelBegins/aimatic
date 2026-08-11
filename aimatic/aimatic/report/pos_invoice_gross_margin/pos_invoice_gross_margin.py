@@ -93,6 +93,9 @@ def get_rows(filters):
 			pii.`qty`,
 			pii.`stock_qty`,
 			pii.`base_net_amount` AS sales,
+			pii.`custom_fbr_tax_category` AS tax_category,
+			pii.`custom_fbr_tax_rate` AS tax_rate,
+			pii.`custom_fbr_sales_tax` AS sales_tax,
 			item.`is_stock_item`,
 			sii.`name` AS consolidated_item,
 			(
@@ -145,6 +148,9 @@ def get_branch_expression():
 def _set_margin_values(row, precision):
 	row = frappe._dict(row)
 	row.sales = flt(row.sales, precision)
+	row.tax_rate = flt(row.tax_rate, precision)
+	row.sales_tax = flt(row.sales_tax, precision)
+	row.sales_incl_tax = flt(row.sales + row.sales_tax, precision)
 	row.selling_rate = flt(abs(row.sales / row.qty), precision) if flt(row.qty) else 0
 
 	if row.direct_cogs is not None:
@@ -176,6 +182,8 @@ def _set_margin_values(row, precision):
 def get_total_row(data, precision):
 	covered = [row for row in data if row.get("has_ledger_cogs")]
 	total_sales = flt(sum(row.sales for row in covered), precision)
+	total_sales_tax = flt(sum(row.sales_tax for row in covered), precision)
+	total_sales_incl_tax = flt(sum(row.sales_incl_tax for row in covered), precision)
 	total_cogs = flt(sum(row.cogs for row in covered), precision)
 	total_margin = flt(total_sales - total_cogs, precision)
 
@@ -184,6 +192,8 @@ def get_total_row(data, precision):
 			"pos_invoice": _("Total"),
 			"item_name": _("COGS-covered rows"),
 			"sales": total_sales,
+			"sales_tax": total_sales_tax,
+			"sales_incl_tax": total_sales_incl_tax,
 			"cogs": total_cogs,
 			"gross_margin": total_margin,
 			"gross_margin_percentage": (
@@ -241,7 +251,8 @@ def get_report_summary(data, currency, precision):
 
 def get_message():
 	return _(
-		"Sales is the POS item net amount in company currency. COGS is the signed "
+		"Sales is the POS item net amount excluding item-level FBR sales tax. Sales Incl. Tax "
+		"adds the stored FBR sales-tax snapshot. COGS is the signed "
 		"stock-value change posted by the consolidated Sales Invoice, including "
 		"packed items. Returns reverse Sales and COGS. Blank margin values mean "
 		"ledger COGS is not yet available; pending POS Closing rows are excluded by default."
@@ -264,7 +275,11 @@ def get_columns(currency):
 		{"label": _("Stock UOM"), "fieldname": "stock_uom", "fieldtype": "Link", "options": "UOM", "width": 90},
 		{"label": _("Qty"), "fieldname": "stock_qty", "fieldtype": "Float", "width": 80},
 		{"label": _("Selling Rate"), "fieldname": "selling_rate", "fieldtype": "Currency", "options": "currency", "width": 105},
-		{"label": _("Sales"), "fieldname": "sales", "fieldtype": "Currency", "options": "currency", "width": 110},
+		{"label": _("Sales (Excl. Tax)"), "fieldname": "sales", "fieldtype": "Currency", "options": "currency", "width": 125},
+		{"label": _("Tax Category"), "fieldname": "tax_category", "fieldtype": "Data", "width": 180},
+		{"label": _("Tax Rate"), "fieldname": "tax_rate", "fieldtype": "Percent", "width": 85},
+		{"label": _("Sales Tax"), "fieldname": "sales_tax", "fieldtype": "Currency", "options": "currency", "width": 110},
+		{"label": _("Sales Incl. Tax"), "fieldname": "sales_incl_tax", "fieldtype": "Currency", "options": "currency", "width": 125},
 		{"label": _("COGS Rate"), "fieldname": "cogs_rate", "fieldtype": "Currency", "options": "currency", "width": 105},
 		{"label": _("COGS"), "fieldname": "cogs", "fieldtype": "Currency", "options": "currency", "width": 110},
 		{"label": _("Gross Margin"), "fieldname": "gross_margin", "fieldtype": "Currency", "options": "currency", "width": 120},

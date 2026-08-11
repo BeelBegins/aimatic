@@ -51,6 +51,10 @@ html, body { width: 200mm; margin: 0; padding: 0; }
 {% set trade_offer = doc.custom_total_trade_offer or 0 %}
 {% set grand_line_total = doc.custom_grand_line_total or doc.grand_total or 0 %}
 {% set all_items = doc.items or [] %}
+{% set wht_category = frappe.db.get_value("Supplier", doc.supplier, "tax_withholding_category") or "" %}
+{% set wht_group = frappe.db.get_value("Supplier", doc.supplier, "tax_withholding_group") or "" %}
+{% set wht_rate_rows = frappe.db.sql("SELECT tax_withholding_rate FROM `tabTax Withholding Rate` WHERE parent=%s AND tax_withholding_group=%s AND from_date<=%s AND to_date>=%s ORDER BY idx LIMIT 1", (wht_category, wht_group, doc.posting_date, doc.posting_date)) if wht_category and wht_group else [] %}
+{% set wht_rate = (wht_rate_rows[0][0] if wht_rate_rows else 0) | float %}
 {% set company_logo = frappe.db.get_value("Company", doc.company, "company_logo") or frappe.db.get_value("File", {"attached_to_doctype": "Company", "attached_to_name": doc.company}, "file_url") %}
 {% if company_logo %}
 <table class="aim-brand"><tr><td><img src="{{ frappe.utils.get_url(company_logo) }}" alt="{{ doc.company }}" /></td><td class="brand-name">{{ doc.company }}</td></tr></table>
@@ -105,6 +109,7 @@ html, body { width: 200mm; margin: 0; padding: 0; }
     <tr><td class="summary-label">Advance Tax Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(advance_tax_total, currency=doc.currency) }}</td></tr>
     <tr><td class="summary-label">Trade Offer</td><td class="summary-value">{{ frappe.utils.fmt_money(trade_offer, currency=doc.currency) }}</td></tr>
     <tr class="grand-total"><td class="summary-label">Grand Total</td><td class="summary-value">{{ frappe.utils.fmt_money(grand_line_total, currency=doc.currency) }}</td></tr>
+    {% if wht_rate %}<tr><td class="summary-label">Estimated Withholding Tax at Payment ({{ "%.2f"|format(wht_rate) }}%)</td><td class="summary-value">{{ frappe.utils.fmt_money((gross * wht_rate / 100), currency=doc.currency) }}</td></tr>{% endif %}
    </table>
   </td>
  </tr>

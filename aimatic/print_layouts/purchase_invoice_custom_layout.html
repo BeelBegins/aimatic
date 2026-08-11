@@ -31,6 +31,10 @@
 {% set gst = doc.custom_total_gst or 0 %}
 {% set trade_offer = doc.custom_total_trade_offer or 0 %}
 {% set advance_tax = doc.custom_total_advance_tax or 0 %}
+{% set wht_category = frappe.db.get_value("Supplier", doc.supplier, "tax_withholding_category") or "" %}
+{% set wht_group = frappe.db.get_value("Supplier", doc.supplier, "tax_withholding_group") or "" %}
+{% set wht_rate_rows = frappe.db.sql("SELECT tax_withholding_rate FROM `tabTax Withholding Rate` WHERE parent=%s AND tax_withholding_group=%s AND from_date<=%s AND to_date>=%s ORDER BY idx LIMIT 1", (wht_category, wht_group, doc.posting_date, doc.posting_date)) if wht_category and wht_group else [] %}
+{% set wht_rate = (wht_rate_rows[0][0] if wht_rate_rows else 0) | float %}
 {% set branch_title = doc.branch and (' (' ~ doc.branch|upper ~ ')') or '' %}
 {% set item_context = get_purchase_print_item_context(doc) %}
 {% set totals = namespace(qty=0, inv_qty=0, scheme_qty=0, gst=0, advance_tax=0, gross=0, line=0) %}
@@ -64,6 +68,7 @@
   <td class="aim-label">Reference</td><td colspan="2">{{ doc.remarks or doc.instructions or '' }}</td>
   <td class="aim-summary">Trade Offer</td><td class="aim-summary">{{ frappe.utils.fmt_money(trade_offer, currency=doc.currency) }}</td>
  </tr>
+ <tr><td></td><td></td><td></td><td class="aim-summary">Estimated Withholding Tax at Payment ({{ "%.2f"|format(wht_rate) }}%)</td><td class="aim-summary">{{ frappe.utils.fmt_money((gross * wht_rate / 100), currency=doc.currency) }}</td></tr>
 </table>
 <table class="aim-grid">
  <thead><tr>

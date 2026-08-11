@@ -44,6 +44,23 @@ function aimatic_save_foodpanda_prices(report) {
 	});
 }
 
+function aimatic_inactive_if_qty_lte(report) {
+	const raw = report.get_filter_value("inactive_if_qty_lte");
+	if (raw === null || raw === undefined || raw === "") {
+		return null;
+	}
+	const threshold = flt(raw);
+	return threshold < 0 ? null : threshold;
+}
+
+function aimatic_foodpanda_active(quantity, inactive_if_qty_lte) {
+	quantity = Math.max(flt(quantity), 0);
+	if (inactive_if_qty_lte === null || inactive_if_qty_lte === undefined || inactive_if_qty_lte === "") {
+		return quantity > 0 ? 1 : 0;
+	}
+	return quantity <= flt(inactive_if_qty_lte) ? 0 : 1;
+}
+
 function aimatic_download_foodpanda_csv(report) {
 	return aimatic_flush_grid_editor(report).then(() => {
 		if (aimatic_pending_foodpanda_prices.size) {
@@ -51,6 +68,7 @@ function aimatic_download_foodpanda_csv(report) {
 			return;
 		}
 
+		const inactive_if_qty_lte = aimatic_inactive_if_qty_lte(report);
 		const output = [["barcode", "sku", "price", "active", "quantity"]];
 		let skipped = 0;
 		(report.data || []).forEach((row) => {
@@ -61,7 +79,13 @@ function aimatic_download_foodpanda_csv(report) {
 				return;
 			}
 			const quantity = Math.max(flt(row.available_qty), 0);
-			output.push([barcode, "", price, quantity > 0 ? 1 : 0, quantity]);
+			output.push([
+				barcode,
+				"",
+				price,
+				aimatic_foodpanda_active(quantity, inactive_if_qty_lte),
+				quantity,
+			]);
 		});
 
 		const branch = report.get_filter_value("branch") || "branch";
@@ -124,7 +148,11 @@ function aimatic_upload_foodpanda_csv_sftp(report) {
 			() => {
 				frappe.call({
 					method: "aimatic.price_export.foodpanda_sftp.upload_branch_price_sheet_foodpanda_csv",
-					args: { branch, item_codes },
+					args: {
+						branch,
+						item_codes,
+						inactive_if_qty_lte: aimatic_inactive_if_qty_lte(report),
+					},
 					freeze: true,
 					freeze_message: __("Uploading Foodpanda CSV via SFTP..."),
 					callback(r) {
@@ -237,6 +265,15 @@ frappe.query_reports["Branch Price Sheet"] = {
 			fieldtype: "Select",
 			options: "\nWith Price\nMissing Price",
 			default: "With Price",
+		},
+		{
+			fieldname: "inactive_if_qty_lte",
+			label: __("Inactive if FP Qty ≤"),
+			fieldtype: "Int",
+			default: 3,
+			description: __(
+				"Foodpanda CSV/SFTP marks rows inactive when FP Available Qty is at or below this number. Clear the field to use stock-only active (qty > 0)."
+			),
 		},
 	],
 	onload(report) {

@@ -4,6 +4,7 @@
 import frappe
 
 from aimatic.price_export.api import get_branch_price_sheet_rows, require_export_permission
+from aimatic.price_export.foodpanda_sftp import resolve_foodpanda_active
 
 
 def get_columns(max_barcodes):
@@ -63,6 +64,7 @@ def execute(filters=None):
 	item_search = (filters.get("item_search") or "").strip().lower()
 	availability = filters.get("availability")
 	price_status = filters.get("foodpanda_price_status")
+	inactive_if_qty_lte = filters.get("inactive_if_qty_lte")
 
 	def include_row(row):
 		if item_search:
@@ -88,6 +90,10 @@ def execute(filters=None):
 		barcodes = row.pop("_barcodes")
 		for i in range(max_barcodes):
 			row[f"barcode{i + 1}"] = barcodes[i] if i < len(barcodes) else ""
+		# Preview matches CSV/SFTP active when the report filter is set.
+		row["foodpanda_active"] = resolve_foodpanda_active(
+			row.get("available_qty"), inactive_if_qty_lte
+		)
 
 	columns = get_columns(max_barcodes)
 	return columns, data

@@ -3,6 +3,50 @@ from frappe import _
 from frappe.utils import flt
 
 
+def compute_shelf_gm_percent(shelf_price, cost_after_taxes):
+    """Gross margin % on Sale Price vs Price After Taxes.
+
+    Matches purchase_receipt_custom_layout: (sale - cost) / sale * 100.
+    Returns 0 when Sale Price is blank/zero so KPOs see a clear empty state
+    rather than a divide-by-zero.
+    """
+    sale = flt(shelf_price)
+    if sale <= 0:
+        return 0.0
+    return flt((sale - flt(cost_after_taxes)) / sale * 100, 2)
+
+
+def set_shelf_gm_percent(doc, method=None):
+    """Keep read-only GM % in sync whenever cost or Sale Price changes.
+
+    Skip submitted docs: older receipts still store 0 after the field was
+    added, and mutating GM% on Update hits allow_on_submit=0 ("Not allowed
+    to change GM% after submission"), which also blocks Create Invoice when
+    a client preview has already dirtied the form.
+    """
+    if getattr(doc, "docstatus", 0) == 1:
+        return
+
+    for row in doc.items:
+        row.custom_gm_percent = compute_shelf_gm_percent(
+            row.custom_shelf_price,
+            row.custom_price_after_taxes,
+        )
+
+
+def reset_price_update_status_on_amend(doc, method=None):
+    """Desk amend copies no_copy fields (frappe.model.copy_doc with
+    from_amend=true skips the no_copy gate). An amended Purchase Receipt
+    must not inherit Updated/Skipped or the submit dialog / retry buttons
+    will no-op and leave shelf/Foodpanda prices stale.
+    """
+    if not getattr(doc, "amended_from", None):
+        return
+
+    doc.custom_branch_price_update_status = "Pending"
+    doc.custom_foodpanda_price_update_status = "Pending"
+
+
 def validate_shelf_price_before_submit(doc, method=None):
     """Shelf Price must never undercut cost. Only enforced for rows where a
     shelf price was actually entered - the field isn't mandatory, and many
