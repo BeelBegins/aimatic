@@ -1,12 +1,17 @@
-// Adds a "Create Barcode Labels" button to Delivery Note, Stock Entry, and
-// Sales Invoice, mirroring the one Purchase Receipt already has
+// Adds a "Create Barcode Labels" button to Delivery Note, Stock Entry,
+// Sales Invoice, and Purchase Order, mirroring Purchase Receipt
 // (purchase_receipt_label_printing.js). Kept as a separate file/doctype_js
-// entry per doctype so Purchase Receipt's existing, working script is left
-// untouched.
-["Delivery Note", "Stock Entry", "Sales Invoice"].forEach((doctype) => {
+// entry per doctype so Purchase Receipt's existing script is left untouched.
+["Delivery Note", "Stock Entry", "Sales Invoice", "Purchase Order"].forEach((doctype) => {
 	frappe.ui.form.on(doctype, {
 		refresh(frm) {
-			if (frm.doc.docstatus !== 1) {
+			// PO allows draft + submitted (pre-receipt labeling); others stay
+			// submitted-only. Cancelled docs never get a button.
+			if (doctype === "Purchase Order") {
+				if (frm.doc.docstatus === 2 || frm.is_new()) {
+					return;
+				}
+			} else if (frm.doc.docstatus !== 1) {
 				return;
 			}
 			if (doctype === "Stock Entry" && frm.doc.purpose !== "Material Transfer") {

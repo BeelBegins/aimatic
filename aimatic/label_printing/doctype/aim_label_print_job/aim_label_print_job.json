@@ -14,6 +14,7 @@
   "column_break_header",
   "source_type",
   "purchase_receipt",
+  "purchase_order",
   "delivery_note",
   "stock_entry",
   "sales_invoice",
@@ -81,7 +82,7 @@
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Source Type",
-   "options": "Purchase Receipt\nDelivery Note\nStock Entry\nSales Invoice\nManual",
+   "options": "Purchase Receipt\nPurchase Order\nDelivery Note\nStock Entry\nSales Invoice\nManual",
    "reqd": 1
   },
   {
@@ -90,6 +91,14 @@
    "fieldtype": "Link",
    "label": "Purchase Receipt",
    "options": "Purchase Receipt"
+  },
+  {
+   "depends_on": "eval:doc.source_type=='Purchase Order'",
+   "description": "Draft or submitted Purchase Orders can be used for labeling.",
+   "fieldname": "purchase_order",
+   "fieldtype": "Link",
+   "label": "Purchase Order",
+   "options": "Purchase Order"
   },
   {
    "depends_on": "eval:doc.source_type=='Delivery Note'",
@@ -222,7 +231,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-05 00:00:03.000000",
+ "modified": "2026-08-07 15:51:00.000000",
  "modified_by": "Administrator",
  "module": "Label Printing",
  "name": "AIM Label Print Job",

@@ -1,5 +1,6 @@
 const SOURCE_LINK_FIELDS = {
 	"Purchase Receipt": "purchase_receipt",
+	"Purchase Order": "purchase_order",
 	"Delivery Note": "delivery_note",
 	"Stock Entry": "stock_entry",
 	"Sales Invoice": "sales_invoice",
@@ -50,6 +51,10 @@ frappe.ui.form.on("AIM Label Print Job", {
 
 	purchase_receipt(frm) {
 		populate_items_from_source(frm, "Purchase Receipt", frm.doc.purchase_receipt);
+	},
+
+	purchase_order(frm) {
+		populate_items_from_source(frm, "Purchase Order", frm.doc.purchase_order);
 	},
 
 	delivery_note(frm) {

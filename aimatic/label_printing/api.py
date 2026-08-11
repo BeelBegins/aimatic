@@ -40,6 +40,8 @@ def get_base_template_code(label_type):
 # has item_code/uom/batch_no, but qty and warehouse fieldnames differ.
 _SOURCE_TYPE_CONFIG = {
     "Purchase Receipt": {"qty_field": "received_qty", "warehouse_field": "warehouse"},
+    # PO labels are often needed before goods arrive; qty is ordered qty.
+    "Purchase Order": {"qty_field": "qty", "warehouse_field": "warehouse"},
     "Delivery Note": {"qty_field": "qty", "warehouse_field": "warehouse"},
     "Sales Invoice": {"qty_field": "qty", "warehouse_field": "warehouse"},
     # Material Transfer only: t_warehouse is where the stock (and the items
@@ -50,6 +52,7 @@ _SOURCE_TYPE_CONFIG = {
 # AIM Label Print Job's own Link field that stores each source type's document.
 _SOURCE_LINK_FIELDS = {
     "Purchase Receipt": "purchase_receipt",
+    "Purchase Order": "purchase_order",
     "Delivery Note": "delivery_note",
     "Sales Invoice": "sales_invoice",
     "Stock Entry": "stock_entry",
@@ -57,6 +60,7 @@ _SOURCE_LINK_FIELDS = {
 
 _SOURCE_DESCRIPTION_FIELD = {
     "Purchase Receipt": "supplier",
+    "Purchase Order": "supplier",
     "Sales Invoice": "customer",
     "Delivery Note": "customer",
 }
@@ -68,7 +72,12 @@ def _get_submitted_source_doc(source_type, source_name):
         frappe.throw(_("Unsupported label source type: {0}").format(source_type))
 
     doc = frappe.get_doc(source_type, source_name)
-    if doc.docstatus != 1:
+    # Purchase Order: draft or submitted (pre-receipt labeling). All other
+    # sources stay submitted-only so cancelled/draft stock docs can't label.
+    if source_type == "Purchase Order":
+        if doc.docstatus == 2:
+            frappe.throw(_("Cancelled Purchase Order cannot be used for labeling."))
+    elif doc.docstatus != 1:
         frappe.throw(_("{0} {1} must be submitted first.").format(_(source_type), source_name))
     if source_type == "Stock Entry" and doc.purpose != "Material Transfer":
         frappe.throw(_("Only Material Transfer Stock Entries can be used for labeling."))
@@ -79,13 +88,17 @@ def _get_submitted_source_doc(source_type, source_name):
 def _resolve_price_list(doc, price_list=None):
     """Priority: an explicitly passed-in price list (e.g. already set on the
     Label Print Job) > the source document's own Selling Price List (Delivery
-    Note/Sales Invoice) > the site-wide default Selling Price List. Purchase
-    Receipt/Stock Entry have no selling price list of their own, so they
-    always fall through to the site default."""
+    Note/Sales Invoice) > the source Branch's selling list > the site-wide
+    default Selling Price List. Purchase Receipt/Order/Stock Entry have no
+    selling price list of their own, so they fall through to branch/site."""
     if price_list:
         return price_list
     if doc.meta.has_field("selling_price_list") and doc.get("selling_price_list"):
         return doc.get("selling_price_list")
+    if doc.get("branch"):
+        branch_pl = frappe.db.get_value("Branch", doc.branch, "default_selling_price_list")
+        if branch_pl:
+            return branch_pl
     return frappe.db.get_single_value("Selling Settings", "selling_price_list")
 
 
@@ -106,7 +119,7 @@ def _build_rows_from_source_doc(doc, config, label_type, price_list=None):
             item_code=item_row.item_code,
             label_type=label_type,
             uom=item_row.uom,
-            batch_no=item_row.batch_no,
+            batch_no=item_row.get("batch_no"),
             price_list=resolved_price_list,
             company=doc.get("company"),
             purchase_qty=qty,
@@ -118,13 +131,16 @@ def _build_rows_from_source_doc(doc, config, label_type, price_list=None):
         if not warehouse:
             warehouse = item_row.get(config["warehouse_field"])
 
+    if not warehouse and doc.get("set_warehouse"):
+        warehouse = doc.set_warehouse
+
     return rows, warehouse, resolved_price_list
 
 
 @frappe.whitelist()
 def create_from_source_document(source_type, source_name, template=None, price_list=None):
-    """Create a Draft AIM Label Print Job pre-filled from a submitted source
-    document's items (Purchase Receipt, Delivery Note, Sales Invoice, or a
+    """Create a Draft AIM Label Print Job pre-filled from a source document's
+    items (Purchase Receipt/Order, Delivery Note, Sales Invoice, or a
     Material Transfer Stock Entry). Does not modify the source document."""
     frappe.has_permission(source_type, doc=source_name, ptype="read", throw=True)
     frappe.has_permission("AIM Label Print Job", ptype="create", throw=True)
@@ -159,7 +175,7 @@ def create_from_purchase_receipt(purchase_receipt, template=None):
 
 @frappe.whitelist()
 def get_items_from_source_document(source_type, source_name, label_type="Barcode Label", price_list=None):
-    """Return item rows + company/warehouse/price_list for a submitted source
+    """Return item rows + company/warehouse/price_list for a source
     document, to populate an AIM Label Print Job form when a source document
     is picked directly on the job (rather than via the source doc's own
     button). Respects a price_list already set on the job if passed in."""
@@ -178,11 +194,15 @@ def get_items_from_source_document(source_type, source_name, label_type="Barcode
 @frappe.validate_and_sanitize_search_inputs
 def query_source_documents(doctype, txt, searchfield, start, page_len, filters):
     """Link-field query shared by AIM Label Print Job's source-document
-    pickers (Purchase Receipt/Delivery Note/Sales Invoice/Stock Entry):
-    submitted docs only, latest first, with supplier/customer (or transfer
-    warehouses, for Stock Entry) shown as the dropdown description."""
+    pickers (Purchase Receipt/Order/Delivery Note/Sales Invoice/Stock Entry):
+    latest first, with supplier/customer (or transfer warehouses, for Stock
+    Entry) shown as the dropdown description. Purchase Order allows draft +
+    submitted; other sources stay submitted-only."""
     base_filters = dict(filters or {})
-    base_filters["docstatus"] = 1
+    if doctype == "Purchase Order":
+        base_filters.setdefault("docstatus", ["!=", 2])
+    else:
+        base_filters["docstatus"] = 1
     if doctype == "Stock Entry":
         base_filters.setdefault("purpose", "Material Transfer")
 
@@ -195,12 +215,13 @@ def query_source_documents(doctype, txt, searchfield, start, page_len, filters):
     elif doctype == "Stock Entry":
         fields += ["s_warehouse", "t_warehouse"]
 
+    date_field = "transaction_date" if doctype == "Purchase Order" else "posting_date"
     rows = frappe.get_list(
         doctype,
         filters=base_filters,
         or_filters=or_filters,
         fields=fields,
-        order_by="posting_date desc, creation desc",
+        order_by=f"{date_field} desc, creation desc",
         start=cint(start),
         page_length=cint(page_len),
     )
