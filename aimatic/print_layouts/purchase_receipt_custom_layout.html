@@ -47,7 +47,7 @@ html, body { width: 297mm; margin: 0; padding: 0; }
 {% set wht_rate = (wht_rate_rows[0][0] if wht_rate_rows else 0) | float %}
 {% set branch_title = doc.branch and (' (' ~ doc.branch|upper ~ ')') or '' %}
 {% set item_context = get_purchase_print_item_context(doc) %}
-{% set totals = namespace(qty=0, inv_qty=0, scheme_qty=0, gst=0, advance_tax=0, gross=0, line=0) %}
+{% set totals = namespace(actual_qty=0, inv_qty=0, scheme_qty=0, gst=0, advance_tax=0, gross=0, line=0) %}
 {% set company_logo = frappe.db.get_value("Company", doc.company, "company_logo") or frappe.db.get_value("File", {"attached_to_doctype": "Company", "attached_to_name": doc.company}, "file_url") %}
 {% if company_logo %}
 <table class="aim-brand"><tr><td><img src="{{ frappe.utils.get_url(company_logo) }}" alt="{{ doc.company }}" /></td><td class="brand-name">{{ doc.company }}</td></tr></table>
@@ -73,7 +73,7 @@ html, body { width: 297mm; margin: 0; padding: 0; }
 <table class="aim-grid">
  <thead><tr>
   <th style="width:2%">S#</th><th style="width:7%">Barcode</th><th style="width:10%">Description</th>
-  <th style="width:3.5%">Qty</th><th style="width:3.5%">Inv.<br>Qty</th><th style="width:3.5%">Sch<br>Qty</th>
+  <th style="width:3.5%">Actual<br>Qty</th><th style="width:3.5%">Total<br>Qty</th><th style="width:3.5%">Sch<br>Qty</th>
   <th style="width:5.5%">Vendor<br>Rate</th><th style="width:3%">Disc.<br>%</th><th style="width:2.5%">GST<br>%</th>
   <th style="width:5%">GST<br>Amount</th><th style="width:3%">Adv.<br>Tax %</th><th style="width:5%">Adv.<br>Tax Amt</th>
   <th style="width:5%">New Cost<br>Price</th><th style="width:5%">Old Cost<br>Price</th><th style="width:6.5%">Line<br>Total</th>
@@ -83,9 +83,9 @@ html, body { width: 297mm; margin: 0; padding: 0; }
  <tbody>
  {% for row in doc.items %}
   {% set row_ctx = item_context.get(row.name, {}) %}
-  {% set qty = row.qty or 0 %}
-  {% set inv_qty = row.custom_inventory_qty or row.received_qty or qty %}
+  {% set inv_qty = row.qty or row.received_qty or 0 %}
   {% set scheme_qty = row.custom_scheme_qty or 0 %}
+  {% set actual_qty = inv_qty - scheme_qty if inv_qty >= scheme_qty else 0 %}
   {% set vendor_rate = row.custom_vendor_rate or row.rate or 0 %}
   {% set discount_per = row.custom_discount_per or row.discount_percentage or 0 %}
   {% set gst_per = row.custom_gst_per or 0 %}
@@ -101,7 +101,7 @@ html, body { width: 297mm; margin: 0; padding: 0; }
   {% set margin = sale - new_cost %}
   {% set margin_perc = sale and (margin / sale) * 100 or 0 %}
   {% set barcode_value = row.barcode or row_ctx.barcode or row.item_code or '' %}
-  {% set totals.qty = totals.qty + qty %}
+  {% set totals.actual_qty = totals.actual_qty + actual_qty %}
   {% set totals.inv_qty = totals.inv_qty + inv_qty %}
   {% set totals.scheme_qty = totals.scheme_qty + scheme_qty %}
   {% set totals.gst = totals.gst + gst_amount %}
@@ -110,7 +110,7 @@ html, body { width: 297mm; margin: 0; padding: 0; }
   {% set totals.line = totals.line + line_total %}
   <tr>
    <td class="center">{{ loop.index }}</td><td class="barcode">{{ barcode_value }}</td><td class="desc">{{ row.item_name or row.description }}</td>
-   <td class="num">{{ frappe.utils.flt(qty, 2) }}</td><td class="num">{{ frappe.utils.flt(inv_qty, 2) }}</td><td class="num">{{ frappe.utils.flt(scheme_qty, 2) }}</td>
+   <td class="num">{{ frappe.utils.flt(actual_qty, 2) }}</td><td class="num">{{ frappe.utils.flt(inv_qty, 2) }}</td><td class="num">{{ frappe.utils.flt(scheme_qty, 2) }}</td>
    <td class="num">{{ frappe.utils.fmt_money(vendor_rate, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.flt(discount_per, 2) }}</td><td class="num">{{ frappe.utils.flt(gst_per, 2) }}</td>
    <td class="num">{{ frappe.utils.fmt_money(gst_amount, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.flt(advance_tax_per, 2) }}</td><td class="num">{{ frappe.utils.fmt_money(advance_tax_amount, currency=doc.currency) }}</td>
    <td class="num">{{ frappe.utils.fmt_money(new_cost, currency=doc.currency) }}</td><td class="num">{{ frappe.utils.fmt_money(old_cost, currency=doc.currency) }}</td><td class="num line-total">{{ frappe.utils.fmt_money(line_total, currency=doc.currency) }}</td>
@@ -122,7 +122,7 @@ html, body { width: 297mm; margin: 0; padding: 0; }
  <tfoot>
   <tr>
    <td colspan="3">Total</td>
-   <td class="num">{{ frappe.utils.flt(totals.qty, 2) }}</td>
+   <td class="num">{{ frappe.utils.flt(totals.actual_qty, 2) }}</td>
    <td class="num">{{ frappe.utils.flt(totals.inv_qty, 2) }}</td>
    <td class="num">{{ frappe.utils.flt(totals.scheme_qty, 2) }}</td>
    <td colspan="3"></td>
