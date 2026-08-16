@@ -560,7 +560,7 @@ html, body {
   {%- endif -%}
 
   {%- set loyalty_earned = ctx.loyalty_earned -%}
-  {%- set loyalty_balance = ctx.loyalty_balance -%}
+  {%- set loyalty_balance = ctx.get("loyalty_balance") -%}
   {%- set loyalty_redeemed_pts = doc.loyalty_points or 0 -%}
   {%- if (loyalty_balance is not none) or (loyalty_earned and loyalty_earned.loyalty_points) or (loyalty_redeemed_pts and doc.loyalty_amount) -%}
   <div class="rc-loyalty">
