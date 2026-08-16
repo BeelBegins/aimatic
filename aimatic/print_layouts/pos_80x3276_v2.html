@@ -560,8 +560,9 @@ html, body {
   {%- endif -%}
 
   {%- set loyalty_earned = ctx.loyalty_earned -%}
+  {%- set loyalty_balance = ctx.loyalty_balance -%}
   {%- set loyalty_redeemed_pts = doc.loyalty_points or 0 -%}
-  {%- if (loyalty_earned and loyalty_earned.loyalty_points) or (loyalty_redeemed_pts and doc.loyalty_amount) -%}
+  {%- if (loyalty_balance is not none) or (loyalty_earned and loyalty_earned.loyalty_points) or (loyalty_redeemed_pts and doc.loyalty_amount) -%}
   <div class="rc-loyalty">
     <div class="rc-loyalty-title">Loyalty Points</div>
     {%- if loyalty_redeemed_pts and doc.loyalty_amount -%}
@@ -569,6 +570,9 @@ html, body {
     {%- endif -%}
     {%- if loyalty_earned and loyalty_earned.loyalty_points -%}
     <div class="rc-loyalty-row"><span>Earned This Sale</span><span>+{{ loyalty_earned.loyalty_points }} pts</span></div>
+    {%- endif -%}
+    {%- if loyalty_balance is not none -%}
+    <div class="rc-loyalty-row"><span>Balance</span><span>{{ loyalty_balance }} pts</span></div>
     {%- endif -%}
   </div>
   {%- endif -%}
