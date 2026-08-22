@@ -49,5 +49,13 @@ frappe.ui.form.on('Supplier', {
             };
             frappe.set_route('vendor-performance-console');
         });
+
+        frm.add_custom_button(__('Vendor Stock Positions'), () => {
+            frappe.route_options = {
+                supplier: frm.doc.name,
+                company: frappe.defaults.get_user_default('Company') || undefined,
+            };
+            frappe.set_route('vendor-stock-positions-console');
+        });
     },
 });

@@ -166,6 +166,17 @@
    "collapsible": 1,
    "indent": 0,
    "keep_closed": 0,
+   "label": "Vendor Stock Positions",
+   "link_to": "vendor-stock-positions-console",
+   "link_type": "Page",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
    "label": "Purchase Analytics",
    "link_to": "Purchase Analytics",
    "link_type": "Report",
@@ -849,7 +860,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-12 01:25:00.000000",
+ "modified": "2026-08-22 20:10:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Aimatic",

@@ -1,0 +1,446 @@
+
+.vendor-stock-positions-page {
+    font-size: 13px;
+    color: var(--text-color);
+    padding-bottom: var(--padding-2xl, 32px);
+}
+
+.vendor-stock-positions-page * {
+    box-sizing: border-box;
+}
+
+/* ---------- Header note / definitions callout ---------- */
+
+.vendor-stock-positions-page .vp-note {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--border-radius-md);
+    background: var(--alert-bg-info, var(--subtle-fg));
+    color: var(--alert-text-info, var(--text-color));
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.vendor-stock-positions-page .vp-note .vp-note-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+    color: inherit;
+}
+
+.vendor-stock-positions-page .vp-note .vp-note-icon svg {
+    width: 15px;
+    height: 15px;
+    stroke: currentColor;
+}
+
+.vendor-stock-positions-page .vp-note-body > div {
+    margin-bottom: 3px;
+}
+
+.vendor-stock-positions-page .vp-note-body > div:last-child {
+    margin-bottom: 0;
+}
+
+.vendor-stock-positions-page .vp-note strong {
+    font-weight: 600;
+}
+
+/* ---------- KPI card grid ---------- */
+
+.vendor-stock-positions-page .vp-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    margin-bottom: 28px;
+}
+
+.vendor-stock-positions-page .vp-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-radius: var(--border-radius-lg, 12px);
+    padding: 16px 18px;
+    background: var(--card-bg);
+    box-shadow: var(--card-shadow, 0 1px 2px rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vendor-stock-positions-page .vp-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.vendor-stock-positions-page .vp-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--vp-accent, var(--dark-border-color));
+}
+
+.vendor-stock-positions-page .vp-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.vendor-stock-positions-page .vp-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--vp-accent-bg, var(--subtle-fg));
+    color: var(--vp-accent, var(--text-muted));
+    flex-shrink: 0;
+}
+
+.vendor-stock-positions-page .vp-card-icon svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+}
+
+.vendor-stock-positions-page .vp-card-label {
+    color: var(--text-muted);
+    font-size: 11.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.vendor-stock-positions-page .vp-card-value {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--heading-color, var(--text-color));
+    font-variant-numeric: tabular-nums;
+}
+
+.vendor-stock-positions-page .vp-card-subvalue {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* Accent themes per KPI category */
+.vendor-stock-positions-page .vp-card.vp-accent-stock { --vp-accent: var(--text-on-gray, #6b7280); --vp-accent-bg: var(--bg-light-gray, var(--subtle-fg)); }
+.vendor-stock-positions-page .vp-card.vp-accent-revenue { --vp-accent: var(--text-on-blue, #3b82f6); --vp-accent-bg: var(--bg-light-blue, var(--subtle-fg)); }
+.vendor-stock-positions-page .vp-card.vp-accent-cogs { --vp-accent: var(--text-on-orange, #d97706); --vp-accent-bg: var(--bg-orange, var(--subtle-fg)); }
+.vendor-stock-positions-page .vp-card.vp-accent-margin { --vp-accent: var(--text-on-green, #16a34a); --vp-accent-bg: var(--bg-green, var(--subtle-fg)); }
+.vendor-stock-positions-page .vp-card.vp-accent-purchase { --vp-accent: var(--text-on-purple, #8b5cf6); --vp-accent-bg: var(--bg-purple, var(--subtle-fg)); }
+.vendor-stock-positions-page .vp-card.vp-accent-receipt { --vp-accent: var(--text-on-pink, #db2777); --vp-accent-bg: var(--bg-pink, var(--subtle-fg)); }
+.vendor-stock-positions-page .vp-card.vp-accent-payable { --vp-accent: var(--text-on-red, #ef4444); --vp-accent-bg: var(--bg-red, var(--subtle-fg)); }
+.vendor-stock-positions-page .vp-card.vp-accent-payment { --vp-accent: var(--text-on-cyan, #06b6d4); --vp-accent-bg: var(--bg-cyan, var(--subtle-fg)); }
+
+.vendor-stock-positions-page .vp-value-positive { color: var(--text-on-green, #16a34a); }
+.vendor-stock-positions-page .vp-value-negative { color: var(--text-on-red, #ef4444); }
+
+/* ---------- Sections ---------- */
+
+.vendor-stock-positions-page .vp-section {
+    margin-bottom: 24px;
+}
+
+.vendor-stock-positions-page .vp-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.vendor-stock-positions-page .vp-section-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vendor-stock-positions-page .vp-section-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: var(--subtle-fg);
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.vendor-stock-positions-page .vp-section-icon svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+}
+
+.vendor-stock-positions-page .vp-section-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--heading-color, var(--text-color));
+}
+
+.vendor-stock-positions-page .vp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--control-bg);
+    color: var(--text-muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.vendor-stock-positions-page .vp-badge svg {
+    width: 10px;
+    height: 10px;
+    stroke: currentColor;
+}
+
+.vendor-stock-positions-page .vp-badge-danger {
+    background: var(--alert-bg-danger, var(--bg-red));
+    color: var(--alert-text-danger, var(--text-on-red));
+}
+
+.vendor-stock-positions-page .vp-badge-warning {
+    background: var(--alert-bg-warning, var(--bg-yellow));
+    color: var(--alert-text-warning, var(--text-on-yellow));
+}
+
+/* ---------- Tables ---------- */
+
+.vendor-stock-positions-page .vp-table-wrap {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    overflow: auto;
+    background: var(--card-bg);
+    box-shadow: var(--card-shadow, none);
+}
+
+.vendor-stock-positions-page .vp-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1400px;
+}
+
+.vendor-stock-positions-page .vp-table th,
+.vendor-stock-positions-page .vp-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    font-size: 12.5px;
+}
+
+.vendor-stock-positions-page .vp-table th {
+    background: var(--subtle-fg);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+}
+
+.vendor-stock-positions-page .vp-table td.vp-num,
+.vendor-stock-positions-page .vp-table th.vp-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.vendor-stock-positions-page .vp-table tbody tr {
+    transition: background 0.1s ease;
+}
+
+.vendor-stock-positions-page .vp-table tbody tr:nth-child(even) {
+    background: var(--subtle-fg);
+}
+
+.vendor-stock-positions-page .vp-table tbody tr:hover {
+    background: var(--control-bg-on-gray, var(--control-bg));
+}
+
+.vendor-stock-positions-page .vp-table tbody tr.vp-row-flagged,
+.vendor-stock-positions-page .vp-table tbody tr.vp-row-flagged:nth-child(even) {
+    background: var(--alert-bg-danger, rgba(239, 68, 68, 0.08));
+}
+
+.vendor-stock-positions-page .vp-table tbody tr.vp-row-flagged:hover {
+    background: var(--alert-bg-danger, rgba(239, 68, 68, 0.14));
+    filter: brightness(0.97);
+}
+
+.vendor-stock-positions-page .vp-table tbody tr.vp-row-warning,
+.vendor-stock-positions-page .vp-table tbody tr.vp-row-warning:nth-child(even) {
+    background: var(--alert-bg-warning, rgba(234, 179, 8, 0.1));
+}
+
+.vendor-stock-positions-page .vp-table tbody tr.vp-row-warning:hover {
+    background: var(--alert-bg-warning, rgba(234, 179, 8, 0.16));
+    filter: brightness(0.97);
+}
+
+.vendor-stock-positions-page .vp-table tr:last-child td {
+    border-bottom: none;
+}
+
+.vendor-stock-positions-page .vp-table a {
+    font-weight: 600;
+}
+
+/* ---------- Empty / loading states ---------- */
+
+.vendor-stock-positions-page .vp-empty,
+.vendor-stock-positions-page .vp-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    border: 1px dashed var(--border-color);
+    border-radius: var(--border-radius-lg, 12px);
+    background: var(--card-bg);
+    font-size: 13px;
+}
+
+.vendor-stock-positions-page .vp-empty .vp-state-icon,
+.vendor-stock-positions-page .vp-loading .vp-state-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--subtle-fg);
+    color: var(--text-muted);
+}
+
+.vendor-stock-positions-page .vp-empty .vp-state-icon svg,
+.vendor-stock-positions-page .vp-loading .vp-state-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+}
+
+.vendor-stock-positions-page .vp-loading .vp-state-icon {
+    animation: vp-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes vp-pulse {
+    0%, 100% { opacity: 0.45; transform: scale(0.94); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
+.vendor-stock-positions-page .vp-empty.text-danger {
+    border-color: var(--alert-bg-danger, var(--border-color));
+    color: var(--alert-text-danger, var(--text-color));
+}
+
+.vendor-stock-positions-page .vp-item-title {
+    font-weight: 600;
+    color: var(--heading-color, var(--text-color));
+}
+
+.vendor-stock-positions-page .vp-item-meta {
+    color: var(--text-muted);
+    margin-top: 3px;
+    font-size: 11.5px;
+}
+
+/* ---------- Drill-through placeholder ---------- */
+
+.vendor-stock-positions-page .vp-drill-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 28px 20px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--border-radius-lg, 12px);
+    background: var(--subtle-fg);
+    text-align: center;
+}
+
+.vendor-stock-positions-page .vp-drill-placeholder .vp-state-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--card-bg);
+    color: var(--text-muted);
+    box-shadow: var(--card-shadow, none);
+}
+
+.vendor-stock-positions-page .vp-drill-placeholder .vp-state-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+}
+
+.vendor-stock-positions-page .vp-drill-placeholder p {
+    color: var(--text-muted);
+    font-size: 12.5px;
+    max-width: 480px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.vendor-stock-positions-page .vp-drill-placeholder button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vendor-stock-positions-page .vp-drill-placeholder button svg {
+    width: 13px;
+    height: 13px;
+    stroke: currentColor;
+}
+
+.vendor-stock-positions-page .vp-drill-summary {
+    margin-bottom: 14px;
+    max-width: 280px;
+}
+
+/* Stock Positions extras */
+.vendor-stock-positions-page .vsp-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+.vendor-stock-positions-page .vsp-search {
+    min-width: 220px;
+    max-width: 360px;
+    flex: 1;
+}
+.vendor-stock-positions-page .vsp-meta {
+    color: var(--text-muted);
+    font-size: 12px;
+}
