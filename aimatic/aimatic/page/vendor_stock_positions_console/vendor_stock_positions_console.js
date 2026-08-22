@@ -230,6 +230,7 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 				<div class="vp-note-icon">${frappe.utils.icon('info', 'sm')}</div>
 				<div class="vp-note-body">
 					<div><strong>${__('Stock values')}:</strong> ${frappe.utils.escape_html(data.stock_definition_note || '')}</div>
+					<div><strong>${__('Incl. taxes')}:</strong> ${frappe.utils.escape_html(data.stock_incl_tax_note || '')}</div>
 					<div><strong>${__('Cost of goods sold')}:</strong> ${frappe.utils.escape_html(data.cogs_definition_note || '')}</div>
 					<div class="vp-item-meta">${frappe.utils.escape_html(data.item_sources_note || '')}</div>
 					<div class="vp-item-meta">${__('Window')}: ${frappe.datetime.str_to_user(data.date_from)} → ${frappe.datetime.str_to_user(data.date_to)} · ${frappe.utils.escape_html(data.supplier_name || data.supplier || '')}</div>
@@ -238,6 +239,8 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 			</div>
 			<div class="vp-grid">
 				${this.card('stock', 'package', __('Stock Value (at Cost)'), this.money(summary.stock_value), `${this.number(summary.stock_qty)} ${__('qty')} · ${this.number(summary.stock_item_count)} ${__('items')}`)}
+				${this.card('receipt', 'tag', __('Stock Value (Incl Taxes)'), this.money(summary.stock_value_incl_tax), `${this.number(summary.stock_qty)} ${__('qty')} · ${__('estimated')}`)}
+				${this.card('payable', 'percent', __('Tax on Stock'), this.money(summary.stock_tax_amount), __('Incl taxes − at cost'))}
 				${this.card('purchase', 'layers', __('Linked SKUs'), this.number(summary.linked_item_count), groupByWarehouse ? `${this.number(summary.warehouse_count)} ${__('warehouses with stock')}` : `${this.number(summary.row_count)} ${__('stock rows')}`)}
 				${this.card('revenue', 'trending-up', __('Sales Revenue (Window)'), this.money(summary.sales_amount), `${this.number(summary.sales_qty)} ${__('qty')} · ${this.number(summary.sales_doc_count)} ${__('docs')}`)}
 				${this.card('cogs', 'shopping-bag', __('Cost of Goods Sold (Window)'), this.money(summary.cogs_amount), `${this.number(summary.cogs_qty)} ${__('qty')}`)}
@@ -322,6 +325,8 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 					${warehouseCells}
 					<td class="vp-num">${this.number(row.stock_qty)}</td>
 					<td class="vp-num">${this.money(row.stock_value)}</td>
+					<td class="vp-num">${this.money(row.stock_value_incl_tax)}</td>
+					<td class="vp-num">${this.money(row.stock_tax_amount)}</td>
 					<td class="vp-num">${this.number(row.purchase_qty_in_window)}</td>
 					<td class="vp-num">${this.money(row.purchase_amount_in_window)}</td>
 					<td class="vp-num">${this.money(row.purchase_tax_amount_in_window)}</td>
@@ -352,7 +357,9 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 							<th>${__('Item')}</th>
 							${warehouseHeaders}
 							<th class="vp-num">${__('Stock Qty')}</th>
-							<th class="vp-num">${__('Stock Value')}</th>
+							<th class="vp-num">${__('Stock Value (at Cost)')}</th>
+							<th class="vp-num">${__('Stock Value (Incl Taxes)')}</th>
+							<th class="vp-num">${__('Tax on Stock')}</th>
 							<th class="vp-num">${__('Total Purchase Qty')}</th>
 							<th class="vp-num">${__('Purchase Amount (Excl Tax)')}</th>
 							<th class="vp-num">${__('Purchase Tax / GST')}</th>

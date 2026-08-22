@@ -1527,6 +1527,54 @@ def _get_last_sale_by_item(
     return latest
 
 
+def _estimate_stock_value_incl_tax(
+    stock_qty,
+    stock_value,
+    last_purchase_rate=None,
+    last_purchase_rate_incl_tax=None,
+    fbr_tax_rate=None,
+):
+    """Estimate tax-inclusive stock value from Bin cost stock.
+
+    Prefer qty × last purchase rate incl tax; else scale Bin stock_value by the
+    last purchase incl/excl ratio; else apply Item.custom_fbr_tax_rate to Bin
+    stock_value. Returns (stock_value_incl_tax, stock_tax_amount, basis).
+    """
+    qty = flt(stock_qty)
+    value = flt(stock_value)
+    rate_excl = flt(last_purchase_rate)
+    rate_incl = flt(last_purchase_rate_incl_tax)
+    fbr = flt(fbr_tax_rate)
+
+    if qty and rate_incl > 0:
+        incl = rate_incl * qty
+        return incl, incl - value, 'last_purchase_rate_incl_tax'
+    if value and rate_excl > 0 and rate_incl > rate_excl:
+        incl = value * (rate_incl / rate_excl)
+        return incl, incl - value, 'last_purchase_tax_factor'
+    if value and fbr > 0:
+        incl = value * (1.0 + fbr / 100.0)
+        return incl, incl - value, 'item_fbr_tax_rate'
+    return value, 0.0, 'at_cost'
+
+
+def _get_item_fbr_tax_rates(item_codes: list[str]) -> dict[str, float]:
+    if not item_codes:
+        return {}
+    if not frappe.get_meta('Item').has_field('custom_fbr_tax_rate'):
+        return {}
+    rows = frappe.db.sql(
+        '''
+        SELECT name, IFNULL(custom_fbr_tax_rate, 0) AS custom_fbr_tax_rate
+        FROM `tabItem`
+        WHERE name IN %(item_codes)s
+        ''',
+        {'item_codes': tuple(item_codes)},
+        as_dict=True,
+    )
+    return {row.name: flt(row.custom_fbr_tax_rate) for row in rows}
+
+
 def _get_stock_positions(
     item_codes: list[str],
     company: str,
@@ -1545,8 +1593,11 @@ def _get_stock_positions(
             'warehouse_count': 0,
             'stock_qty': 0,
             'stock_value': 0,
+            'stock_value_incl_tax': 0,
+            'stock_tax_amount': 0,
             'truncated': False,
             'total_row_count': 0,
+            'by_item': {},
         }, []
 
     row_limit = max(1, min(cint(row_limit or _MAX_STOCK_POSITION_ROWS), _MAX_STOCK_POSITION_ROWS))
@@ -1600,13 +1651,25 @@ def _get_stock_positions(
     item_codes_with_stock = {row.item_code for row in grouped_rows}
     warehouses_with_stock = {row.warehouse for row in grouped_rows if row.get('warehouse')}
 
+    by_item: dict[str, dict] = {}
+    for row in grouped_rows:
+        agg = by_item.setdefault(
+            row.item_code,
+            {'item_code': row.item_code, 'stock_qty': 0.0, 'stock_value': 0.0},
+        )
+        agg['stock_qty'] += flt(row.stock_qty)
+        agg['stock_value'] += flt(row.stock_value)
+
     summary = {
         'item_count': len(item_codes_with_stock),
         'warehouse_count': len(warehouses_with_stock) if group_by_warehouse else 0,
         'stock_qty': sum(flt(row.stock_qty) for row in grouped_rows),
         'stock_value': sum(flt(row.stock_value) for row in grouped_rows),
+        'stock_value_incl_tax': 0,
+        'stock_tax_amount': 0,
         'truncated': truncated,
         'total_row_count': total_row_count,
+        'by_item': by_item,
     }
 
     rows = []
@@ -1624,6 +1687,49 @@ def _get_stock_positions(
     return summary, rows
 
 
+def _apply_stock_incl_tax_to_rows(
+    rows: list[dict],
+    *,
+    last_purchase_by_item: dict,
+    fbr_rates: dict[str, float],
+):
+    for row in rows:
+        last_purchase = last_purchase_by_item.get(row['item_code'], {})
+        incl, tax, basis = _estimate_stock_value_incl_tax(
+            row.get('stock_qty'),
+            row.get('stock_value'),
+            last_purchase_rate=last_purchase.get('rate'),
+            last_purchase_rate_incl_tax=last_purchase.get('rate_incl_tax') or last_purchase.get('rate'),
+            fbr_tax_rate=fbr_rates.get(row['item_code']),
+        )
+        row['stock_value_incl_tax'] = flt(incl)
+        row['stock_tax_amount'] = flt(tax)
+        row['stock_tax_basis'] = basis
+    return rows
+
+
+def _summarize_stock_incl_tax(
+    by_item: dict[str, dict],
+    *,
+    last_purchase_by_item: dict,
+    fbr_rates: dict[str, float],
+) -> tuple[float, float]:
+    stock_value_incl_tax = 0.0
+    stock_tax_amount = 0.0
+    for item_code, agg in (by_item or {}).items():
+        last_purchase = last_purchase_by_item.get(item_code, {})
+        incl, tax, _basis = _estimate_stock_value_incl_tax(
+            agg.get('stock_qty'),
+            agg.get('stock_value'),
+            last_purchase_rate=last_purchase.get('rate'),
+            last_purchase_rate_incl_tax=last_purchase.get('rate_incl_tax') or last_purchase.get('rate'),
+            fbr_tax_rate=fbr_rates.get(item_code),
+        )
+        stock_value_incl_tax += flt(incl)
+        stock_tax_amount += flt(tax)
+    return flt(stock_value_incl_tax), flt(stock_tax_amount)
+
+
 def _enrich_stock_position_rows(
     rows: list[dict],
     *,
@@ -1633,6 +1739,8 @@ def _enrich_stock_position_rows(
     date_to,
     branch: str | None,
     warehouse_list: list[str] | None,
+    last_purchase_by_item: dict | None = None,
+    fbr_rates: dict[str, float] | None = None,
 ):
     if not rows:
         return rows
@@ -1667,12 +1775,15 @@ def _enrich_stock_position_rows(
         date_to=date_to,
         warehouse_list=warehouse_list,
     )
-    last_purchase_by_item = _get_last_purchase_by_item(
-        supplier=supplier,
-        company=company,
-        item_codes=row_item_codes,
-        branch=branch,
-    )
+    if last_purchase_by_item is None:
+        last_purchase_by_item = _get_last_purchase_by_item(
+            supplier=supplier,
+            company=company,
+            item_codes=row_item_codes,
+            branch=branch,
+        )
+    if fbr_rates is None:
+        fbr_rates = _get_item_fbr_tax_rates(row_item_codes)
     last_sale_by_item = _get_last_sale_by_item(
         item_codes=row_item_codes,
         company=company,
@@ -1705,6 +1816,12 @@ def _enrich_stock_position_rows(
         row['last_sale_rate'] = flt(last_sale.get('rate'))
         row['last_sale_doc'] = last_sale.get('sales_invoice')
         row['last_sale_doctype'] = last_sale.get('doctype')
+
+    _apply_stock_incl_tax_to_rows(
+        rows,
+        last_purchase_by_item=last_purchase_by_item,
+        fbr_rates=fbr_rates,
+    )
     return rows
 
 
@@ -1731,6 +1848,27 @@ def _build_vendor_stock_positions(
         group_by_warehouse=group_by_warehouse,
         row_limit=row_limit,
     )
+
+    stock_item_codes = list((stock_summary.get('by_item') or {}).keys()) or [
+        row['item_code'] for row in stock_rows
+    ]
+    last_purchase_by_item = _get_last_purchase_by_item(
+        supplier=supplier,
+        company=company,
+        item_codes=stock_item_codes,
+        branch=branch,
+    ) if stock_item_codes else {}
+    fbr_rates = _get_item_fbr_tax_rates(stock_item_codes) if stock_item_codes else {}
+    stock_value_incl_tax, stock_tax_amount = _summarize_stock_incl_tax(
+        stock_summary.get('by_item') or {},
+        last_purchase_by_item=last_purchase_by_item,
+        fbr_rates=fbr_rates,
+    )
+    stock_summary['stock_value_incl_tax'] = stock_value_incl_tax
+    stock_summary['stock_tax_amount'] = stock_tax_amount
+    # Do not ship the full by-item map to the client.
+    stock_summary.pop('by_item', None)
+
     stock_rows = _enrich_stock_position_rows(
         stock_rows,
         supplier=supplier,
@@ -1739,6 +1877,8 @@ def _build_vendor_stock_positions(
         date_to=date_to,
         branch=branch,
         warehouse_list=warehouse_list,
+        last_purchase_by_item=last_purchase_by_item,
+        fbr_rates=fbr_rates,
     )
 
     sales_summary = _get_sales_summary(
@@ -1771,8 +1911,12 @@ def _build_vendor_stock_positions(
         'lookback_days': lookback_days,
         'group_by_warehouse': group_by_warehouse,
         'stock_definition_note': _(
-            'Stock position shows current stock of supplier-linked SKUs valued at cost, '
+            'Stock position shows current stock of supplier-linked SKUs valued at cost (Bin stock value), '
             'not exact remaining units by supplier origin. Use Vendor Performance for FIFO origin attribution.'
+        ),
+        'stock_incl_tax_note': _(
+            'Stock Value (Incl Taxes) estimates tax-on-hand: prefer qty × last purchase rate incl tax from this '
+            'supplier; else scale Bin cost by that purchase tax factor; else apply Item FBR tax rate to Bin cost.'
         ),
         'item_sources_note': _(
             'Supplier-linked SKUs are resolved from Item Supplier, Item Default, and actual submitted purchase history.'
@@ -1787,6 +1931,8 @@ def _build_vendor_stock_positions(
             'warehouse_count': cint(stock_summary.get('warehouse_count')),
             'stock_qty': flt(stock_summary.get('stock_qty')),
             'stock_value': flt(stock_summary.get('stock_value')),
+            'stock_value_incl_tax': flt(stock_summary.get('stock_value_incl_tax')),
+            'stock_tax_amount': flt(stock_summary.get('stock_tax_amount')),
             'sales_qty': flt(sales_summary.get('sales_qty')),
             'sales_amount': sales_amount,
             'sales_doc_count': cint(sales_summary.get('doc_count')),
@@ -1856,8 +2002,10 @@ def export_vendor_stock_positions(
         headers.extend(['Warehouse', 'Branch'])
     headers.extend(
         [
-            'Stock Qty (at Cost)',
+            'Stock Qty',
             f'Stock Value (at Cost) ({currency})',
+            f'Stock Value (Incl Taxes) ({currency})',
+            f'Tax on Stock ({currency})',
             'Total Purchase Qty',
             f'Total Purchase Amount Excl Tax ({currency})',
             f'Purchase Tax / GST ({currency})',
@@ -1887,6 +2035,8 @@ def export_vendor_stock_positions(
             [
                 flt(row.get('stock_qty')),
                 flt(row.get('stock_value')),
+                flt(row.get('stock_value_incl_tax')),
+                flt(row.get('stock_tax_amount')),
                 flt(row.get('purchase_qty_in_window')),
                 flt(row.get('purchase_amount_in_window')),
                 flt(row.get('purchase_tax_amount_in_window')),
