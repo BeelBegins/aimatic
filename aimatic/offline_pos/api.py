@@ -999,6 +999,27 @@ def _resolve_item_code_from_barcode(barcode):
     return rows[0][0] if rows else None
 
 
+def _apply_pos_profile_accounting_context(doc, pos):
+    """Stamp Branch and Cost Center from the terminal's POS Profile.
+
+    POS Invoice is excluded from apply_branch_defaults, and ERPNext
+    set_pos_fields does not copy the Branch accounting dimension. Without an
+    explicit stamp, Branch only appears when the API session user happens to
+    have a Branch User Permission default — which fails for cashiers without
+    that permission and can tag the wrong store when a multi-branch user
+    covers another counter. The POS Profile is the owned source of truth for
+    the terminal; always overwrite when the profile has values.
+    """
+    branch = pos.get("branch") if hasattr(pos, "get") else getattr(pos, "branch", None)
+    cost_center = (
+        pos.get("cost_center") if hasattr(pos, "get") else getattr(pos, "cost_center", None)
+    )
+    if doc.meta.has_field("branch") and branch:
+        doc.branch = branch
+    if doc.meta.has_field("cost_center") and cost_center:
+        doc.cost_center = cost_center
+
+
 def _build_pos_invoice_doc(
     pos,
     cust,
@@ -1090,6 +1111,9 @@ def _build_pos_invoice_doc(
     )
 
     doc.run_method("set_missing_values", True)
+    # After set_missing_values: profile Branch/Cost Center own the terminal,
+    # not the session user's Branch default (see helper docstring).
+    _apply_pos_profile_accounting_context(doc, pos)
     doc.run_method("calculate_taxes_and_totals")
 
     if coupon_code:
@@ -3501,6 +3525,9 @@ def submit_pos_refund(
     return_doc.set_posting_time = 1
     return_doc.posting_date = nowdate()
     return_doc.posting_time = nowtime()
+    # Refund posts under the refunding terminal's profile/branch, which may
+    # differ from the original sale (same-company cross-branch refunds).
+    _apply_pos_profile_accounting_context(return_doc, pos)
 
     # Restrict to requested rows and quantities (return quantities are negative).
     original_by_name = {r.name: r for r in original.items}

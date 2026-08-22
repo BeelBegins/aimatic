@@ -302,6 +302,48 @@ class TestNormalizePakMobile(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# _apply_pos_profile_accounting_context — pure unit tests (no DB)
+# ---------------------------------------------------------------------------
+
+class TestApplyPosProfileAccountingContext(unittest.TestCase):
+    """Branch/Cost Center must come from the POS Profile, not the session user."""
+
+    def _doc(self, branch=None, cost_center=None, fields=("branch", "cost_center")):
+        return SimpleNamespace(
+            branch=branch,
+            cost_center=cost_center,
+            meta=SimpleNamespace(has_field=lambda name, _fields=fields: name in _fields),
+        )
+
+    def test_stamps_branch_and_cost_center_from_profile(self):
+        from aimatic.offline_pos.api import _apply_pos_profile_accounting_context
+
+        doc = self._doc()
+        pos = SimpleNamespace(branch="Store A", cost_center="CC-A")
+        _apply_pos_profile_accounting_context(doc, pos)
+        self.assertEqual(doc.branch, "Store A")
+        self.assertEqual(doc.cost_center, "CC-A")
+
+    def test_overwrites_wrong_session_default_branch(self):
+        from aimatic.offline_pos.api import _apply_pos_profile_accounting_context
+
+        doc = self._doc(branch="Other Store", cost_center="Other CC")
+        pos = SimpleNamespace(branch="Store A", cost_center="CC-A")
+        _apply_pos_profile_accounting_context(doc, pos)
+        self.assertEqual(doc.branch, "Store A")
+        self.assertEqual(doc.cost_center, "CC-A")
+
+    def test_leaves_blank_when_profile_has_no_values(self):
+        from aimatic.offline_pos.api import _apply_pos_profile_accounting_context
+
+        doc = self._doc(branch="Keep Me", cost_center="Keep CC")
+        pos = SimpleNamespace(branch=None, cost_center="")
+        _apply_pos_profile_accounting_context(doc, pos)
+        self.assertEqual(doc.branch, "Keep Me")
+        self.assertEqual(doc.cost_center, "Keep CC")
+
+
+# ---------------------------------------------------------------------------
 # customer_validation — integration tests
 # ---------------------------------------------------------------------------
 
