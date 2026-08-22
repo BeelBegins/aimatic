@@ -412,8 +412,9 @@ add_to_apps_screen = [
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/aimatic/css/aimatic.css"
-# app_include_js = "/assets/aimatic/js/aimatic.js"
+# Desk Help float (how-to guidance) — separate from AI Assistant Console BI page
+app_include_css = "aimatic_help.bundle.css"
+app_include_js = "aimatic_help.bundle.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/aimatic/css/aimatic.css"
