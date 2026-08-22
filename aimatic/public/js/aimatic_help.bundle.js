@@ -4,7 +4,7 @@
  */
 frappe.provide("aimatic.help_float");
 
-(() => {
+(function () {
 	"use strict";
 
 	if (window.__aimaticHelpFloatMounted) {
@@ -15,12 +15,19 @@ frappe.provide("aimatic.help_float");
 	const ICON =
 		'<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.5a8 8 0 0 0-8 8c0 2.6 1.2 4.9 3.1 6.4V21l3.2-1.7c.55.1 1.12.2 1.7.2a8 8 0 0 0 0-16Z" stroke="#fff" stroke-width="1.6"/><path d="M9.2 11.2h5.6M9.2 14h3.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
+	const LAUNCHER_STYLE =
+		"position:fixed;right:16px;bottom:20px;z-index:2147483000;width:56px;height:56px;" +
+		"border-radius:14px;border:2px solid rgba(255,255,255,0.45);background:#0f766e;color:#fff;" +
+		"cursor:pointer;display:flex;align-items:center;justify-content:center;" +
+		"box-shadow:0 10px 28px rgba(15,118,110,0.45);";
+
 	function el(tag, attrs, html) {
 		const node = document.createElement(tag);
 		if (attrs) {
 			Object.keys(attrs).forEach((key) => {
 				if (key === "className") node.className = attrs[key];
 				else if (key === "text") node.textContent = attrs[key];
+				else if (key === "style") node.setAttribute("style", attrs[key]);
 				else node.setAttribute(key, attrs[key]);
 			});
 		}
@@ -29,11 +36,17 @@ frappe.provide("aimatic.help_float");
 	}
 
 	function escapeHtml(text) {
-		return frappe.utils.escape_html(String(text || ""));
+		if (frappe.utils && frappe.utils.escape_html) {
+			return frappe.utils.escape_html(String(text || ""));
+		}
+		return String(text || "")
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;");
 	}
 
 	function linkify(text) {
-		// Safe-ish: escape first, then restore markdown [label](/app/...) and bare /app/ links
 		let html = escapeHtml(text);
 		html = html.replace(
 			/\[([^\]]+)\]\((\/app\/[^)\s]+)\)/g,
@@ -68,13 +81,15 @@ frappe.provide("aimatic.help_float");
 
 	function readDeskContext() {
 		const route = frappe.get_route ? frappe.get_route() : [];
-		const routeStr = frappe.get_route_str ? frappe.get_route_str() : (route || []).join("/");
+		const routeStr = frappe.get_route_str
+			? frappe.get_route_str()
+			: (route || []).join("/");
 		let doctype = null;
 		let docname = null;
 		if (Array.isArray(route) && route.length >= 2 && (route[0] === "Form" || route[0] === "List")) {
 			doctype = route[1];
 			if (route[0] === "Form" && route[2]) docname = route[2];
-		} else if (cur_frm && cur_frm.doctype) {
+		} else if (typeof cur_frm !== "undefined" && cur_frm && cur_frm.doctype) {
 			doctype = cur_frm.doctype;
 			docname = cur_frm.docname || (cur_frm.doc && cur_frm.doc.name) || null;
 		}
@@ -88,7 +103,7 @@ frappe.provide("aimatic.help_float");
 					documentation_url = meta.documentation || null;
 				}
 			} catch (e) {
-				/* meta may be unloaded */
+				/* ignore */
 			}
 		}
 		return {
@@ -99,6 +114,19 @@ frappe.provide("aimatic.help_float");
 			documentation_url,
 			help_links: collectHelpLinks(routeStr),
 		};
+	}
+
+	function currentUser() {
+		return (
+			(frappe.session && frappe.session.user) ||
+			(frappe.boot && frappe.boot.user && frappe.boot.user.name) ||
+			null
+		);
+	}
+
+	function onDesk() {
+		const path = window.location.pathname || "";
+		return path.indexOf("/app") === 0 || path === "/app" || path.indexOf("/desk") === 0;
 	}
 
 	class HelpFloat {
@@ -120,10 +148,11 @@ frappe.provide("aimatic.help_float");
 				{
 					className: "aimatic-help-launcher",
 					type: "button",
-					"aria-label": __("Aimatic Help"),
+					"aria-label": "Aimatic Help",
 					"aria-expanded": "false",
 					"aria-controls": "aimatic-help-panel",
-					title: __("Aimatic Help"),
+					title: "Aimatic Help",
+					style: LAUNCHER_STYLE,
 				},
 				ICON
 			);
@@ -131,16 +160,16 @@ frappe.provide("aimatic.help_float");
 				className: "aimatic-help-panel",
 				id: "aimatic-help-panel",
 				role: "dialog",
-				"aria-label": __("Aimatic Help"),
+				"aria-label": "Aimatic Help",
 			});
 
 			const head = el("div", { className: "aimatic-help-head" });
 			const headText = el("div");
-			headText.appendChild(el("div", { className: "aimatic-help-head-title", text: __("Aimatic Help") }));
+			headText.appendChild(el("div", { className: "aimatic-help-head-title", text: "Aimatic Help" }));
 			headText.appendChild(
 				el("div", {
 					className: "aimatic-help-head-sub",
-					text: __("How to use ERPNext — not the reporting assistant"),
+					text: "How to use ERPNext — not the reporting assistant",
 				})
 			);
 			this.contextEl = el("div", { className: "aimatic-help-context" });
@@ -148,7 +177,7 @@ frappe.provide("aimatic.help_float");
 			const closeBtn = el("button", {
 				className: "aimatic-help-close",
 				type: "button",
-				"aria-label": __("Close"),
+				"aria-label": "Close",
 				text: "×",
 			});
 			head.appendChild(headText);
@@ -156,7 +185,7 @@ frappe.provide("aimatic.help_float");
 
 			this.body = el("div", { className: "aimatic-help-body", "aria-live": "polite" });
 			this.appendBot(
-				__("Hi! Ask how to use the screen you are on — Item, Price List, Stock, Accounts, and more.")
+				"Hi! Ask how to use the screen you are on — Item, Price List, Stock, Accounts, and more."
 			);
 
 			this.suggestions = el("div", { className: "aimatic-help-suggestions" });
@@ -165,12 +194,12 @@ frappe.provide("aimatic.help_float");
 			this.input = el("textarea", {
 				className: "aimatic-help-input",
 				rows: "1",
-				placeholder: __("Ask how to do something…"),
+				placeholder: "Ask how to do something…",
 			});
 			this.sendBtn = el("button", {
 				className: "aimatic-help-send",
 				type: "button",
-				text: __("Send"),
+				text: "Send",
 			});
 			foot.appendChild(this.input);
 			foot.appendChild(this.sendBtn);
@@ -196,7 +225,7 @@ frappe.provide("aimatic.help_float");
 				const a = e.target.closest("a[data-ah-route]");
 				if (!a) return;
 				const href = a.getAttribute("data-ah-route") || a.getAttribute("href");
-				if (href && href.startsWith("/app/")) {
+				if (href && href.startsWith("/app/") && frappe.set_route) {
 					e.preventDefault();
 					const path = href.replace(/^\/app\//, "");
 					frappe.set_route(path.split("/"));
@@ -206,26 +235,22 @@ frappe.provide("aimatic.help_float");
 
 		bindRouter() {
 			if (frappe.router && frappe.router.on) {
-				frappe.router.on("change", () => {
-					this.refreshContext();
-				});
+				frappe.router.on("change", () => this.refreshContext());
 			}
-			$(document).on("page-change", () => {
-				this.refreshContext();
-			});
+			if (window.jQuery) {
+				jQuery(document).on("page-change", () => this.refreshContext());
+			}
 		}
 
 		refreshContext() {
 			this.context = readDeskContext();
 			const label = this.context.doctype || this.context.module || "ERPNext";
-			this.contextEl.innerHTML = "";
-			this.contextEl.appendChild(document.createTextNode(__("Helping with: ")));
+			this.contextEl.textContent = "";
+			this.contextEl.appendChild(document.createTextNode("Helping with: "));
 			const strong = document.createElement("strong");
 			strong.textContent = label;
 			this.contextEl.appendChild(strong);
-			if (this.open) {
-				this.loadStarters();
-			}
+			if (this.open) this.loadStarters();
 		}
 
 		toggle(force) {
@@ -298,7 +323,7 @@ frappe.provide("aimatic.help_float");
 			if (!text || this.sending) return;
 			this.sending = true;
 			this.sendBtn.disabled = true;
-			this.sendBtn.textContent = __("…");
+			this.sendBtn.textContent = "…";
 			this.input.value = "";
 			this.appendUser(text);
 			this.suggestions.innerHTML = "";
@@ -314,7 +339,7 @@ frappe.provide("aimatic.help_float");
 							context: JSON.stringify(this.context),
 						},
 						callback: (r) => {
-							const reply = (r.message && r.message.reply) || __("No reply.");
+							const reply = (r.message && r.message.reply) || "No reply.";
 							this.history.push({ role: "user", content: text });
 							this.history.push({ role: "assistant", content: reply });
 							if (this.history.length > 24) {
@@ -323,45 +348,55 @@ frappe.provide("aimatic.help_float");
 							this.appendBot(reply);
 						},
 						error: () => {
-							this.appendBot(__("Help is temporarily unavailable. Try again shortly."));
+							this.appendBot("Help is temporarily unavailable. Try again shortly.");
 						},
 						always: () => {
 							this.sending = false;
 							this.sendBtn.disabled = false;
-							this.sendBtn.textContent = __("Send");
+							this.sendBtn.textContent = "Send";
 						},
 					});
 				})
 				.catch(() => {
-					this.appendBot(__("Could not start a help session. Please refresh Desk."));
+					this.appendBot("Could not start a help session. Please refresh Desk.");
 					this.sending = false;
 					this.sendBtn.disabled = false;
-					this.sendBtn.textContent = __("Send");
+					this.sendBtn.textContent = "Send";
 				});
 		}
 	}
 
-	function boot() {
-		if (aimatic.help_float.instance) {
-			return;
+	function tryMount() {
+		try {
+			if (aimatic.help_float.instance) return true;
+			if (document.querySelector("[data-aimatic-help-root]")) return true;
+			const user = currentUser();
+			if (!user || user === "Guest") return false;
+			if (!onDesk()) return false;
+			if (!document.body) return false;
+			aimatic.help_float.instance = new HelpFloat();
+			return true;
+		} catch (e) {
+			console.error("Aimatic Help float failed to mount", e);
+			return false;
 		}
-		const user =
-			(frappe.session && frappe.session.user) ||
-			(frappe.boot && frappe.boot.user && frappe.boot.user.name);
-		if (!user || user === "Guest") {
-			return;
-		}
-		// Desk only (not website / login)
-		if (!window.location.pathname.startsWith("/app")) {
-			return;
-		}
-		aimatic.help_float.instance = new HelpFloat();
 	}
 
-	// Desk sets session in desk.js then fires app_ready — mount then, not earlier.
-	$(document).on("app_ready", boot);
-	// If this bundle loads after Desk already started:
-	if (frappe.boot && frappe.boot.user && frappe.boot.user.name && frappe.boot.user.name !== "Guest") {
-		boot();
+	function scheduleMount() {
+		if (tryMount()) return;
+		let tries = 0;
+		const timer = setInterval(function () {
+			tries += 1;
+			if (tryMount() || tries >= 60) {
+				clearInterval(timer);
+			}
+		}, 500);
 	}
+
+	if (window.jQuery) {
+		jQuery(document).on("app_ready", tryMount);
+	} else {
+		document.addEventListener("app_ready", tryMount);
+	}
+	scheduleMount();
 })();
