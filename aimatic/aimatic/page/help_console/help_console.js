@@ -1,16 +1,13 @@
 frappe.pages["help-console"].on_page_load = function (wrapper) {
 	const page = frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Aimatic Help"),
+		title: __("Help"),
 		single_column: true,
 	});
 
 	const $body = $(page.body);
 	$body.html(`
 		<div class="aimatic-help-page" style="max-width:720px;margin:0 auto;padding:16px;">
-			<p class="text-muted" style="margin-bottom:12px;">
-				${__("How-to guidance for ERPNext. This is not the reporting AI Assistant.")}
-			</p>
 			<div class="aimatic-help-page-context text-muted" style="margin-bottom:8px;font-size:12px;"></div>
 			<div class="aimatic-help-page-messages" style="min-height:320px;max-height:55vh;overflow:auto;border:1px solid var(--border-color);border-radius:8px;padding:12px;background:var(--fg-color);margin-bottom:12px;"></div>
 			<div class="aimatic-help-page-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;"></div>

@@ -148,10 +148,10 @@ frappe.provide("aimatic.help_float");
 				{
 					className: "aimatic-help-launcher",
 					type: "button",
-					"aria-label": "Aimatic Help",
+					"aria-label": "Help",
 					"aria-expanded": "false",
 					"aria-controls": "aimatic-help-panel",
-					title: "Aimatic Help",
+					title: "Help",
 					style: LAUNCHER_STYLE,
 				},
 				ICON
@@ -160,18 +160,12 @@ frappe.provide("aimatic.help_float");
 				className: "aimatic-help-panel",
 				id: "aimatic-help-panel",
 				role: "dialog",
-				"aria-label": "Aimatic Help",
+				"aria-label": "Help",
 			});
 
 			const head = el("div", { className: "aimatic-help-head" });
 			const headText = el("div");
-			headText.appendChild(el("div", { className: "aimatic-help-head-title", text: "Aimatic Help" }));
-			headText.appendChild(
-				el("div", {
-					className: "aimatic-help-head-sub",
-					text: "How to use ERPNext — not the reporting assistant",
-				})
-			);
+			headText.appendChild(el("div", { className: "aimatic-help-head-title", text: "Help" }));
 			this.contextEl = el("div", { className: "aimatic-help-context" });
 			headText.appendChild(this.contextEl);
 			const closeBtn = el("button", {
@@ -377,7 +371,7 @@ frappe.provide("aimatic.help_float");
 			aimatic.help_float.instance = new HelpFloat();
 			return true;
 		} catch (e) {
-			console.error("Aimatic Help float failed to mount", e);
+			console.error("Help float failed to mount", e);
 			return false;
 		}
 	}
