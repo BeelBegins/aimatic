@@ -342,21 +342,26 @@ frappe.provide("aimatic.help_float");
 	}
 
 	function boot() {
-		if (!frappe.session || !frappe.session.user || frappe.session.user === "Guest") {
+		if (aimatic.help_float.instance) {
 			return;
 		}
-		// Desk only
+		const user =
+			(frappe.session && frappe.session.user) ||
+			(frappe.boot && frappe.boot.user && frappe.boot.user.name);
+		if (!user || user === "Guest") {
+			return;
+		}
+		// Desk only (not website / login)
 		if (!window.location.pathname.startsWith("/app")) {
 			return;
 		}
 		aimatic.help_float.instance = new HelpFloat();
 	}
 
-	if (document.readyState === "loading") {
-		document.addEventListener("DOMContentLoaded", () => {
-			frappe.after_ajax ? frappe.after_ajax(boot) : boot();
-		});
-	} else {
-		frappe.ready ? frappe.ready(boot) : boot();
+	// Desk sets session in desk.js then fires app_ready — mount then, not earlier.
+	$(document).on("app_ready", boot);
+	// If this bundle loads after Desk already started:
+	if (frappe.boot && frappe.boot.user && frappe.boot.user.name && frappe.boot.user.name !== "Guest") {
+		boot();
 	}
 })();
