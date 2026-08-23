@@ -84,6 +84,33 @@ class TestClientTokenCache(unittest.TestCase):
 		self.assertNotIn("super-secret-value", str(ctx.exception.response_body))
 
 
+class TestGetChainId(unittest.TestCase):
+	def test_prefers_outlet_chain_over_settings(self):
+		from aimatic.foodpanda_integration.client import get_chain_id
+
+		outlet = Mock(chain_id="outlet-chain")
+		self.assertEqual(get_chain_id(outlet, settings=_settings()), "outlet-chain")
+
+	def test_falls_back_to_settings_when_outlet_chain_blank(self):
+		from aimatic.foodpanda_integration.client import get_chain_id
+
+		outlet = Mock(chain_id="")
+		self.assertEqual(get_chain_id(outlet, settings=_settings()), "chain-1")
+
+	@patch("aimatic.foodpanda_integration.client._", new=lambda x: x)
+	@patch("aimatic.foodpanda_integration.client.frappe")
+	def test_throws_when_neither_has_chain(self, mock_frappe):
+		from aimatic.foodpanda_integration.client import get_chain_id
+
+		def throw(msg):
+			raise ValueError(msg)
+
+		mock_frappe.throw.side_effect = throw
+		mock_frappe._ = lambda x: x
+		with self.assertRaises(ValueError):
+			get_chain_id(Mock(chain_id=""), settings=_settings(chain_id=""))
+
+
 class TestClientRequest(unittest.TestCase):
 	@patch("aimatic.foodpanda_integration.client.time")
 	@patch("aimatic.foodpanda_integration.client.requests")
@@ -254,6 +281,7 @@ class TestCatalogSync(unittest.TestCase):
 		mock_frappe.get_doc.side_effect = [outlet, existing_product, job_doc]
 		settings = _settings()
 		mock_client.get_settings.return_value = settings
+		mock_client.get_chain_id.return_value = "chain-1"
 		submit_response = Mock(status_code=202, json=Mock(return_value={"job_id": "job-123"}))
 		mock_client.request.return_value = submit_response
 

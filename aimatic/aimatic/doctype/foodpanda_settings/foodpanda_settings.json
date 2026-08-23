@@ -18,6 +18,14 @@
   "request_timeout",
   "maximum_retries",
   "verify_ssl",
+  "section_break_sftp",
+  "sftp_host",
+  "sftp_port",
+  "sftp_username",
+  "sftp_password",
+  "sftp_column_break",
+  "sftp_remote_path",
+  "sftp_filename_prefix",
   "section_break_status",
   "last_successful_sync",
   "last_error"
@@ -49,10 +57,10 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Foodpanda chain ID for this partner account - the {chain_id} path segment on every Catalog/Order/Outlet Management endpoint (distinct from the per-branch vendor_id on Foodpanda Outlet).",
+   "description": "Default chain ID used only when a Foodpanda Outlet has no chain ID of its own. Each branch can have a separate chain — set Chain ID on Foodpanda Outlet.",
    "fieldname": "chain_id",
    "fieldtype": "Data",
-   "label": "Chain ID"
+   "label": "Default Chain ID"
   },
   {
    "fieldname": "client_id",
@@ -109,6 +117,54 @@
    "label": "Verify SSL"
   },
   {
+   "fieldname": "section_break_sftp",
+   "fieldtype": "Section Break",
+   "label": "SFTP catalog upload"
+  },
+  {
+   "default": "vendor-automation-sftp-live-ap.prod.aws.qcommerce.live",
+   "description": "Foodpanda central vendor-automation SFTP host. Shared by every outlet; the uploaded filename identifies the vendor.",
+   "fieldname": "sftp_host",
+   "fieldtype": "Data",
+   "label": "SFTP Host"
+  },
+  {
+   "default": "22",
+   "description": "Foodpanda SFTP always uses port 22, regardless of chain.",
+   "fieldname": "sftp_port",
+   "fieldtype": "Int",
+   "label": "SFTP Port"
+  },
+  {
+   "fieldname": "sftp_username",
+   "fieldtype": "Data",
+   "label": "SFTP Username"
+  },
+  {
+   "description": "SFTP password. Never exported as a fixture.",
+   "fieldname": "sftp_password",
+   "fieldtype": "Password",
+   "label": "SFTP Password"
+  },
+  {
+   "fieldname": "sftp_column_break",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Catalog",
+   "description": "Remote folder for catalog-only (double-file) uploads. Usually Catalog. Leave blank to upload into the SFTP login home. Do not use a leading slash on chrooted accounts.",
+   "fieldname": "sftp_remote_path",
+   "fieldtype": "Data",
+   "label": "SFTP Remote Path"
+  },
+  {
+   "default": "catalog",
+   "description": "Must match the prefix configured in Foodpanda Vendor Portal → Integrations. Uploaded file is {prefix}_{vendor_id}.csv. Do not put the vendor ID in this prefix.",
+   "fieldname": "sftp_filename_prefix",
+   "fieldtype": "Data",
+   "label": "SFTP Filename Prefix"
+  },
+  {
    "fieldname": "section_break_status",
    "fieldtype": "Section Break",
    "label": "Status"
@@ -129,7 +185,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-31 00:00:00.000000",
+ "modified": "2026-08-18 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Foodpanda Settings",

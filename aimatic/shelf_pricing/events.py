@@ -16,13 +16,33 @@ def compute_shelf_gm_percent(shelf_price, cost_after_taxes):
     return flt((sale - flt(cost_after_taxes)) / sale * 100, 2)
 
 
-def set_shelf_gm_percent(doc, method=None):
-    """Keep read-only GM % in sync whenever cost or Sale Price changes.
+def compute_shelf_price_from_gm(cost_after_taxes, gm_percent, round_whole=True):
+    """Invert GM % into Sale Price: sale = cost / (1 - gm/100).
 
-    Skip submitted docs: older receipts still store 0 after the field was
-    added, and mutating GM% on Update hits allow_on_submit=0 ("Not allowed
-    to change GM% after submission"), which also blocks Create Invoice when
-    a client preview has already dirtied the form.
+    KPOs typically enter whole margins (20 / 15 / 10) then round the
+    resulting shelf price to the nearest rupee. Returns None when GM % is
+    blank or >= 100 (would divide by zero / go non-positive).
+    """
+    gm = flt(gm_percent)
+    cost = flt(cost_after_taxes)
+    if gm >= 100:
+        return None
+    denom = 1 - (gm / 100)
+    if abs(denom) < 1e-12:
+        return None
+    sale = cost / denom
+    if round_whole:
+        return flt(round(sale))
+    return flt(sale, 2)
+
+
+def set_shelf_gm_percent(doc, method=None):
+    """Keep GM % in sync with final Sale Price vs Price After Taxes.
+
+    Desk entry can drive Sale Price from an edited GM % (client); on save
+    we recompute GM % from the stored prices so print/layout stay honest
+    after whole-rupee rounding. Skip submitted docs: older receipts still
+    store 0, and mutating GM% on Update hits allow_on_submit=0.
     """
     if getattr(doc, "docstatus", 0) == 1:
         return

@@ -125,6 +125,10 @@ def _ensure_workspace():
 		ws.sequence_id = 5
 
 	ws.title = WORKSPACE
+	# Frappe v16 requires every Workspace record to declare its document type.
+	# Older copies of this workspace predate that requirement, so set it even
+	# when reusing an existing record.
+	ws.type = "Workspace"
 	ws.content = content
 	ws.parent_page = ""
 	ws.is_hidden = 0

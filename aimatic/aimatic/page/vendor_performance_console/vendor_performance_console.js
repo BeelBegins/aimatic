@@ -14,6 +14,16 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
             single_column: true,
         });
         this.page.set_primary_action(__('Refresh'), () => this.refresh());
+        this.page.add_inner_button(__('Vendor Stock Positions'), () => {
+            const filters = this.get_filters();
+            frappe.route_options = {
+                supplier: filters.supplier || undefined,
+                company: filters.company || undefined,
+                branch: filters.branch || undefined,
+                warehouse: filters.warehouse || undefined,
+            };
+            frappe.set_route('vendor-stock-positions-console');
+        });
         this.drill = {};
         this.build_filters();
         this.build_layout();

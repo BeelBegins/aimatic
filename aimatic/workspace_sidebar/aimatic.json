@@ -140,6 +140,17 @@
    "type": "Link"
   },
   {
+   "child": 1,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Stock Aging with History",
+   "link_to": "Stock Aging with History",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
    "child": 0,
    "collapsible": 1,
    "icon": "shopping-cart",
@@ -860,7 +871,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-22 20:10:00.000000",
+ "modified": "2026-08-23 19:50:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Aimatic",

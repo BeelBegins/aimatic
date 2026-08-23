@@ -6,6 +6,10 @@ app_title = "Aimatic"
 app_publisher = "Aimatic"
 app_description = "Retail"
 app_email = "sthassan41@gmail.com"
+
+# Serve the Aimatic marketing page at the public root when Website Settings has
+# no site-specific home page configured. System-user role/workspace routing is
+# still resolved first by Frappe's home-page selector.
 app_license = "mit"
 app_logo_url = "/assets/aimatic/images/aimatic-logo.svg"
 app_home = "/desk/aimatic"
@@ -50,6 +54,9 @@ doc_events = {
     "Account": {
         "validate": "aimatic.coa_numbering.events.auto_assign_account_number",
     },
+    "Journal Entry": {
+        "before_validate": "aimatic.journal_entry_cost_center.sync_journal_entry_cost_centers",
+    },
     # Branch Management: derives cost_center / set_warehouse / rejected_warehouse
     # from the document's Branch so normal Sales/Purchase users never pick these
     # (and can't pick them wrong). POS Invoice is deliberately excluded - see
@@ -79,6 +86,7 @@ doc_events = {
             "aimatic.purchase_history_autofill.events.autofill_purchase_invoice_item_fields",
             "aimatic.purchase_supplier_invoice.prefill_purchase_invoice_supplier_invoice",
             "aimatic.purchase_principal.prefill_purchase_invoice_principal",
+            "aimatic.purchase_return_stock.ensure_purchase_invoice_return_updates_stock",
         ],
         "validate": "aimatic.purchase_principal.validate_purchase_principal",
         "on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
@@ -205,6 +213,7 @@ doctype_js = {
         # Resolve item_code for barcodes pasted via Items grid Upload.
         "public/js/purchase_barcode_import.js",
         "public/js/purchase_principal.js",
+        "public/js/relationship_manager.js",
     ],
     "Purchase Order": [
         "public/js/purchase_items_excel_grid.js",
@@ -214,16 +223,31 @@ doctype_js = {
         # Resolve item_code for barcodes pasted via Items grid Upload.
         "public/js/purchase_barcode_import.js",
         "public/js/purchase_principal.js",
+        "public/js/relationship_manager.js",
     ],
     "Purchase Invoice": [
         "public/js/purchase_items_excel_grid.js",
         "public/js/purchase_history_autofill.js",
         "public/js/foodpanda_price_prefill.js",
         "public/js/purchase_principal.js",
+        "public/js/purchase_return_stock.js",
+        "public/js/relationship_manager.js",
     ],
-    "Delivery Note": "public/js/label_printing_source_buttons.js",
+    "Material Request": "public/js/relationship_manager.js",
+    "Quotation": "public/js/relationship_manager.js",
+    "Sales Order": "public/js/relationship_manager.js",
+    "Delivery Note": [
+        "public/js/label_printing_source_buttons.js",
+        "public/js/relationship_manager.js",
+    ],
     "Stock Entry": "public/js/label_printing_source_buttons.js",
-    "Sales Invoice": "public/js/label_printing_source_buttons.js",
+    "Sales Invoice": [
+        "public/js/label_printing_source_buttons.js",
+        "public/js/relationship_manager.js",
+    ],
+    "Payment Entry": "public/js/relationship_manager.js",
+    "Landed Cost Voucher": "public/js/relationship_manager.js",
+    "Journal Entry": "public/js/journal_entry_cost_center.js",
     "Supplier": "public/js/supplier_vendor_performance.js",
     "Price List": "public/js/price_list_barcode_search.js",
     "POS Profile": "public/js/pos_profile_device_enrollment.js",

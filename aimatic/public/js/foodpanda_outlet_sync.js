@@ -11,6 +11,44 @@ frappe.ui.form.on("Foodpanda Outlet", {
 			frappe.route_options = { outlet: frm.doc.name };
 			frappe.set_route("foodpanda-catalog-console");
 		});
+		frm.add_custom_button(__("Upload Catalog via SFTP"), () => {
+			frappe.confirm(
+				__("Upload {0} Foodpanda catalog CSV via SFTP as {1}_{2}.csv?", [
+					frm.doc.branch || frm.doc.name,
+					frm.doc.sftp_filename_prefix || "catalog",
+					frm.doc.vendor_id || "vendor_id",
+				]),
+				() => {
+					frappe.call({
+						method: "aimatic.price_export.foodpanda_sftp.upload_outlet_foodpanda_csv",
+						args: { outlet: frm.doc.name },
+						freeze: true,
+						freeze_message: __("Uploading Foodpanda CSV via SFTP..."),
+						callback: (r) => {
+							const result = r.message || {};
+							const failed = result.status === "Failed";
+							frappe.msgprint({
+								title: failed
+									? __("Foodpanda SFTP Upload Failed")
+									: __("Foodpanda SFTP Upload Complete"),
+								message: [
+									`${__("Status")}: <b>${frappe.utils.escape_html(result.status || "")}</b>`,
+									`${__("Filename")}: ${frappe.utils.escape_html(result.filename || "")}`,
+									`${__("Rows uploaded")}: ${result.row_count || 0}`,
+									result.error
+										? `${__("Error")}: ${frappe.utils.escape_html(result.error)}`
+										: "",
+								]
+									.filter(Boolean)
+									.join("<br>"),
+								indicator: failed ? "red" : "green",
+							});
+							frm.reload_doc();
+						},
+					});
+				}
+			);
+		}, __("SFTP"));
 
 		if (!frm.doc.catalog_sync_enabled) {
 			frm.dashboard.clear_headline();

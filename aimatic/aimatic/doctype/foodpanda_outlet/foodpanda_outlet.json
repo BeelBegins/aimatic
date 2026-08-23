@@ -8,6 +8,7 @@
  "field_order": [
   "branch",
   "vendor_id",
+  "chain_id",
   "column_break_flags",
   "catalog_sync_enabled",
   "order_ingestion_enabled",
@@ -21,7 +22,14 @@
   "last_catalog_import_job",
   "last_catalog_import_at",
   "remote_sku_count",
-  "mapped_sku_count"
+  "mapped_sku_count",
+  "section_break_sftp",
+  "sftp_enabled",
+  "sftp_schedule_time",
+  "sftp_filename_prefix",
+  "sftp_column_break",
+  "sftp_last_upload",
+  "sftp_last_error"
  ],
  "fields": [
   {
@@ -35,12 +43,19 @@
    "unique": 1
   },
   {
-   "description": "Foodpanda's vendor/chain code identifying this outlet.",
+   "description": "Foodpanda vendor/store code for this outlet. Used in Partner API paths and as the SFTP filename suffix: {prefix}_{vendor_id}.csv.",
    "fieldname": "vendor_id",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Vendor ID",
    "reqd": 1
+  },
+  {
+   "description": "Foodpanda chain ID for this branch. Each outlet can have its own chain. Used as {chain_id} on catalog, order, and outlet APIs. Falls back to Foodpanda Settings Default Chain ID when blank.",
+   "fieldname": "chain_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Chain ID"
   },
   {
    "fieldname": "column_break_flags",
@@ -124,11 +139,52 @@
    "fieldtype": "Int",
    "label": "Mapped SKU Count",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_sftp",
+   "fieldtype": "Section Break",
+   "label": "SFTP catalog upload"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the scheduler uploads this outlet once per day at SFTP Schedule Time (site timezone). Manual upload still works without this. SFTP host/user/password live on Foodpanda Settings.",
+   "fieldname": "sftp_enabled",
+   "fieldtype": "Check",
+   "label": "SFTP Enabled"
+  },
+  {
+   "depends_on": "sftp_enabled",
+   "description": "Daily auto-upload time in the site timezone.",
+   "fieldname": "sftp_schedule_time",
+   "fieldtype": "Time",
+   "label": "SFTP Schedule Time"
+  },
+  {
+   "description": "Optional override of Foodpanda Settings SFTP Filename Prefix for this outlet. Leave blank to use the Settings prefix.",
+   "fieldname": "sftp_filename_prefix",
+   "fieldtype": "Data",
+   "label": "SFTP Filename Prefix"
+  },
+  {
+   "fieldname": "sftp_column_break",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sftp_last_upload",
+   "fieldtype": "Datetime",
+   "label": "Last SFTP Upload",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sftp_last_error",
+   "fieldtype": "Small Text",
+   "label": "Last SFTP Error",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-31 00:00:00.000000",
+ "modified": "2026-08-18 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Foodpanda Outlet",

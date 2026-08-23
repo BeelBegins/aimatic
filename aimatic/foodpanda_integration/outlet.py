@@ -29,7 +29,9 @@ def push_outlet_status(outlet_name, status, reason=None, closed_until=None):
 	try:
 		client.request(
 			"PUT",
-			_OUTLET_STATUS_PATH.format(chain_id=settings.chain_id, vendor_id=outlet.vendor_id),
+			_OUTLET_STATUS_PATH.format(
+				chain_id=client.get_chain_id(outlet, settings=settings), vendor_id=outlet.vendor_id
+			),
 			settings=settings,
 			json=payload,
 		)
@@ -53,7 +55,9 @@ def pull_outlet_status(outlet_name):
 	try:
 		response = client.request(
 			"GET",
-			_OUTLET_STATUS_PATH.format(chain_id=settings.chain_id, vendor_id=outlet.vendor_id),
+			_OUTLET_STATUS_PATH.format(
+				chain_id=client.get_chain_id(outlet, settings=settings), vendor_id=outlet.vendor_id
+			),
 			settings=settings,
 		)
 	except FoodpandaAPIError as error:

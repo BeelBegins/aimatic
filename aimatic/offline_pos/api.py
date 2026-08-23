@@ -1,5 +1,7 @@
 import json
 import secrets
+import time
+from random import uniform
 
 import frappe
 from frappe import _
@@ -28,6 +30,26 @@ _ALLOWED_CASHIER_ROLES = {"POS User", "POS Supervisor", "System Manager"}
 _CASHIER_OFFLINE_LOGIN_VALID_DAYS = 7
 _FOOD_PANDA_PROFILE = "S1 Food Panda"
 _FOOD_PANDA_CUSTOMER = "Food Panda"
+
+# A slow FBR gateway call inside doc.submit() holds the POS Invoice naming
+# series row lock (tabSeries FOR UPDATE, taken during doc.insert()) for the
+# rest of the request, since Frappe doesn't commit mid-request. Any other
+# terminal inserting a POS Invoice under the same series queues behind it and
+# can hit MySQL's own lock wait timeout (error 1205) first. Retrying the whole
+# insert+submit a couple of times, each against a freshly rebuilt document,
+# absorbs that contention instead of surfacing it to the cashier as a failed
+# sale. See offline-pos skill / current-state.md for the incident this fixes.
+_LOCK_WAIT_TIMEOUT_MYSQL_ERRNO = 1205
+_LOCK_WAIT_MAX_ATTEMPTS = 3
+
+
+def _is_lock_wait_timeout(exc):
+    args = getattr(exc, "args", None)
+    return bool(args) and args[0] == _LOCK_WAIT_TIMEOUT_MYSQL_ERRNO
+
+
+def _lock_wait_retry_backoff(attempt):
+    return uniform(0.3, 1.0) * (attempt + 1)
 _FOOD_PANDA_CREDIT_MODE = "Food Panda Credit"
 
 # Master-data doctypes the terminal client is allowed to read via
@@ -1749,116 +1771,138 @@ def submit_online_sale(
     items = _parse_json_param(items, "items")
     payments = _parse_json_param(payments, "payments")
 
-    # Build and price the invoice through the full ERPNext pipeline (no FBR yet)
-    doc = _build_pos_invoice_doc(
-        pos, cust, items, coupon_code, redeem_loyalty_points, loyalty_points
-    )
-
-    # Apply FBR snapshot + accounting rows to obtain the true grand_total that
-    # includes FBR sales tax and the FBR POS service fee.  No payment rows are
-    # set on the doc at this point, so adjust_cash_payment_to_grand_total is a
-    # no-op and does not interfere.
-    from aimatic.fbr_pos.accounting import apply_fbr_accounting_rows
-    from aimatic.fbr_pos.payload_builder import build_pos_payload
-
-    build_pos_payload(doc)
-    apply_fbr_accounting_rows(doc)
-
-    # Gift voucher redemption is a payment-side concern, applied after FBR
-    # accounting so it never touches grand_total / the FBR payload — see
-    # aimatic.gift_voucher for why this must be a Mode of Payment row and not
-    # a discount. Loaded here (not earlier) so it reflects any loyalty
-    # redemption already folded into doc.loyalty_amount above.
-    gift_voucher_doc = None
-    gift_voucher_amount = 0.0
-    if gift_voucher_code:
-        from aimatic.gift_voucher.api import _load_active_gift_voucher
-
-        gift_voucher_doc = _load_active_gift_voucher(gift_voucher_code, cust.name)
-        criteria = frappe.get_cached_doc("Gift Voucher Criteria", gift_voucher_doc.criteria)
-        payable_before_voucher = flt(
-            flt(doc.grand_total, 2) - flt(getattr(doc, "loyalty_amount", 0) or 0, 2), 2
+    def _build_and_submit_invoice():
+        # Build and price the invoice through the full ERPNext pipeline (no FBR yet).
+        # Rebuilt fresh on every retry attempt below — cheap, side-effect-free
+        # (no DB writes until the savepoint block), and avoids reusing a `doc`
+        # object whose name/docstatus a prior failed insert()/submit() already
+        # mutated in memory.
+        doc = _build_pos_invoice_doc(
+            pos, cust, items, coupon_code, redeem_loyalty_points, loyalty_points
         )
-        if payable_before_voucher < flt(criteria.minimum_redemption_value, 2):
-            frappe.throw(
-                _("This sale must be at least {0} to redeem this gift voucher").format(
-                    criteria.minimum_redemption_value
-                )
+
+        # Apply FBR snapshot + accounting rows to obtain the true grand_total that
+        # includes FBR sales tax and the FBR POS service fee.  No payment rows are
+        # set on the doc at this point, so adjust_cash_payment_to_grand_total is a
+        # no-op and does not interfere.
+        from aimatic.fbr_pos.accounting import apply_fbr_accounting_rows
+        from aimatic.fbr_pos.payload_builder import build_pos_payload
+
+        build_pos_payload(doc)
+        apply_fbr_accounting_rows(doc)
+
+        # Gift voucher redemption is a payment-side concern, applied after FBR
+        # accounting so it never touches grand_total / the FBR payload — see
+        # aimatic.gift_voucher for why this must be a Mode of Payment row and not
+        # a discount. Loaded here (not earlier) so it reflects any loyalty
+        # redemption already folded into doc.loyalty_amount above.
+        gift_voucher_doc = None
+        gift_voucher_amount = 0.0
+        if gift_voucher_code:
+            from aimatic.gift_voucher.api import _load_active_gift_voucher
+
+            gift_voucher_doc = _load_active_gift_voucher(gift_voucher_code, cust.name)
+            criteria = frappe.get_cached_doc("Gift Voucher Criteria", gift_voucher_doc.criteria)
+            payable_before_voucher = flt(
+                flt(doc.grand_total, 2) - flt(getattr(doc, "loyalty_amount", 0) or 0, 2), 2
             )
-        # Excess voucher value over the bill is forfeited, not carried forward.
-        gift_voucher_amount = min(flt(gift_voucher_doc.amount, 2), max(0.0, payable_before_voucher))
+            if payable_before_voucher < flt(criteria.minimum_redemption_value, 2):
+                frappe.throw(
+                    _("This sale must be at least {0} to redeem this gift voucher").format(
+                        criteria.minimum_redemption_value
+                    )
+                )
+            # Excess voucher value over the bill is forfeited, not carried forward.
+            gift_voucher_amount = min(flt(gift_voucher_doc.amount, 2), max(0.0, payable_before_voucher))
 
-    # Validate the client-supplied payments against the server-computed grand_total
-    # and write them onto the doc.
-    _validate_and_set_payments(doc, pos, payments, gift_voucher_amount=gift_voucher_amount)
-
-    if gift_voucher_doc and gift_voucher_amount > 0:
-        # Appended after _validate_and_set_payments, which resets doc.payments to
-        # only the client-sent rows — this one is server-only and must never be
-        # sent/chosen by the terminal (the Mode of Payment isn't in any POS
-        # Profile's allowed list, so a client-sent row for it would be rejected).
-        doc.append("payments", {"mode_of_payment": "Gift Voucher", "amount": gift_voucher_amount})
-
-    # Stamp terminal identifiers before insert so they are stored with the record
-    _set_terminal_fields(doc, terminal_invoice_id, terminal_id, hardware_id)
-    _set_cashier_offline_fields(
-        doc,
-        cashier_user,
-        cashier_full_name,
-        offline_authenticated,
-        offline_auth_method,
-        local_offline_session_id,
-    )
-
-    # Insert + submit within a named savepoint so any unexpected failure rolls back
-    # cleanly without aborting the outer transaction.
-    sp = "submit_online_sale"
-    frappe.db.savepoint(sp)
-    try:
-        doc.insert()   # validate hook fires: FBR snapshot + accounting rows (idempotent)
-        doc.submit()   # before_submit hook fires: FBR API call
-        # ERPNext's POS Closing Entry attributes shift invoices by the `owner`
-        # metadata field (see build_invoice_query in pos_closing_entry.py), not
-        # by any cashier-specific business field.  The invoice was inserted
-        # under the terminal's own authenticated session, so owner defaults to
-        # the terminal — reattribute it to the actual cashier so end-of-shift
-        # closing/reconciliation finds this invoice under the right shift.
-        frappe.db.set_value("POS Invoice", doc.name, "owner", cashier_user, update_modified=False)
-        doc.owner = cashier_user
+        # Validate the client-supplied payments against the server-computed grand_total
+        # and write them onto the doc.
+        _validate_and_set_payments(doc, pos, payments, gift_voucher_amount=gift_voucher_amount)
 
         if gift_voucher_doc and gift_voucher_amount > 0:
-            # Lock the voucher row and re-check it's still Active before marking
-            # it Redeemed, so a concurrent redemption of the same code loses this
-            # race cleanly (raises here, rolling back the whole submission)
-            # rather than double-spending the voucher.
-            frappe.db.sql(
-                "SELECT name FROM `tabGift Voucher` WHERE name = %s FOR UPDATE",
-                (gift_voucher_doc.name,),
-            )
-            current_status = frappe.db.get_value("Gift Voucher", gift_voucher_doc.name, "status")
-            if current_status != "Active":
-                frappe.throw(_("This gift voucher is no longer available for redemption"))
-            frappe.db.set_value(
-                "Gift Voucher",
-                gift_voucher_doc.name,
-                {
-                    "status": "Redeemed",
-                    "redeemed_against_invoice": doc.name,
-                    "redeemed_on": now_datetime(),
-                },
-            )
+            # Appended after _validate_and_set_payments, which resets doc.payments to
+            # only the client-sent rows — this one is server-only and must never be
+            # sent/chosen by the terminal (the Mode of Payment isn't in any POS
+            # Profile's allowed list, so a client-sent row for it would be rejected).
+            doc.append("payments", {"mode_of_payment": "Gift Voucher", "amount": gift_voucher_amount})
 
-        frappe.db.release_savepoint(sp)
-    except frappe.UniqueValidationError:
-        frappe.db.rollback(save_point=sp)
-        # Race condition: a concurrent request created the same invoice first
-        existing_name = _find_existing_invoice(terminal_invoice_id)
-        if existing_name:
-            return _build_submission_response(frappe.get_doc("POS Invoice", existing_name))
-        raise
-    except Exception:
-        frappe.db.rollback(save_point=sp)
-        raise
+        # Stamp terminal identifiers before insert so they are stored with the record
+        _set_terminal_fields(doc, terminal_invoice_id, terminal_id, hardware_id)
+        _set_cashier_offline_fields(
+            doc,
+            cashier_user,
+            cashier_full_name,
+            offline_authenticated,
+            offline_auth_method,
+            local_offline_session_id,
+        )
+
+        # Insert + submit within a named savepoint so any unexpected failure rolls back
+        # cleanly without aborting the outer transaction.
+        sp = "submit_online_sale"
+        frappe.db.savepoint(sp)
+        try:
+            doc.insert()   # validate hook fires: FBR snapshot + accounting rows (idempotent)
+            doc.submit()   # before_submit hook fires: FBR API call
+            # ERPNext's POS Closing Entry attributes shift invoices by the `owner`
+            # metadata field (see build_invoice_query in pos_closing_entry.py), not
+            # by any cashier-specific business field.  The invoice was inserted
+            # under the terminal's own authenticated session, so owner defaults to
+            # the terminal — reattribute it to the actual cashier so end-of-shift
+            # closing/reconciliation finds this invoice under the right shift.
+            frappe.db.set_value("POS Invoice", doc.name, "owner", cashier_user, update_modified=False)
+            doc.owner = cashier_user
+
+            if gift_voucher_doc and gift_voucher_amount > 0:
+                # Lock the voucher row and re-check it's still Active before marking
+                # it Redeemed, so a concurrent redemption of the same code loses this
+                # race cleanly (raises here, rolling back the whole submission)
+                # rather than double-spending the voucher.
+                frappe.db.sql(
+                    "SELECT name FROM `tabGift Voucher` WHERE name = %s FOR UPDATE",
+                    (gift_voucher_doc.name,),
+                )
+                current_status = frappe.db.get_value("Gift Voucher", gift_voucher_doc.name, "status")
+                if current_status != "Active":
+                    frappe.throw(_("This gift voucher is no longer available for redemption"))
+                frappe.db.set_value(
+                    "Gift Voucher",
+                    gift_voucher_doc.name,
+                    {
+                        "status": "Redeemed",
+                        "redeemed_against_invoice": doc.name,
+                        "redeemed_on": now_datetime(),
+                    },
+                )
+
+            frappe.db.release_savepoint(sp)
+        except frappe.UniqueValidationError:
+            frappe.db.rollback(save_point=sp)
+            # Race condition: a concurrent request created the same invoice first
+            existing_name = _find_existing_invoice(terminal_invoice_id)
+            if existing_name:
+                return frappe.get_doc("POS Invoice", existing_name)
+            raise
+        except Exception:
+            frappe.db.rollback(save_point=sp)
+            raise
+
+        return doc
+
+    for attempt in range(_LOCK_WAIT_MAX_ATTEMPTS):
+        try:
+            doc = _build_and_submit_invoice()
+            break
+        except Exception as e:
+            if _is_lock_wait_timeout(e) and attempt < _LOCK_WAIT_MAX_ATTEMPTS - 1:
+                frappe.logger().warning(
+                    f"submit_online_sale: retrying after MySQL lock wait timeout "
+                    f"(attempt {attempt + 1}/{_LOCK_WAIT_MAX_ATTEMPTS}, "
+                    f"terminal_invoice_id={terminal_invoice_id})"
+                )
+                time.sleep(_lock_wait_retry_backoff(attempt))
+                continue
+            raise
 
     return _build_submission_response(doc)
 
@@ -3520,87 +3564,109 @@ def submit_pos_refund(
     # Standard ERPNext return mapper (copies original rates/accounts; accounts for prior returns).
     from erpnext.controllers.sales_and_purchase_return import make_return_doc
 
-    return_doc = make_return_doc("POS Invoice", original.name)
-    return_doc.pos_profile = pos.name
-    return_doc.set_posting_time = 1
-    return_doc.posting_date = nowdate()
-    return_doc.posting_time = nowtime()
-    # Refund posts under the refunding terminal's profile/branch, which may
-    # differ from the original sale (same-company cross-branch refunds).
-    _apply_pos_profile_accounting_context(return_doc, pos)
+    def _build_and_submit_return():
+        # Rebuilt fresh on every retry attempt below — same reasoning as
+        # submit_online_sale's _build_and_submit_invoice: no DB writes happen
+        # until the savepoint block, so redoing this is cheap and avoids
+        # reusing a return_doc a prior failed insert()/submit() already mutated.
+        return_doc = make_return_doc("POS Invoice", original.name)
+        return_doc.pos_profile = pos.name
+        return_doc.set_posting_time = 1
+        return_doc.posting_date = nowdate()
+        return_doc.posting_time = nowtime()
+        # Refund posts under the refunding terminal's profile/branch, which may
+        # differ from the original sale (same-company cross-branch refunds).
+        _apply_pos_profile_accounting_context(return_doc, pos)
 
-    # Restrict to requested rows and quantities (return quantities are negative).
-    original_by_name = {r.name: r for r in original.items}
-    kept = []
-    for row in return_doc.items:
-        original_row = getattr(row, "pos_invoice_item", None)
-        if original_row in requested:
-            row.qty = -abs(flt(requested[original_row], 3))
-            _preserve_original_return_row_values(
-                row,
-                original_by_name[original_row],
-                requested[original_row],
-                pos.warehouse,
-            )
-            kept.append(row)
-    if not kept:
-        frappe.throw(_("No matching original rows for the requested return"))
-    return_doc.set("items", kept)
-    _validate_return_doc_against_original(return_doc, original)
+        # Restrict to requested rows and quantities (return quantities are negative).
+        original_by_name = {r.name: r for r in original.items}
+        kept = []
+        for row in return_doc.items:
+            original_row = getattr(row, "pos_invoice_item", None)
+            if original_row in requested:
+                row.qty = -abs(flt(requested[original_row], 3))
+                _preserve_original_return_row_values(
+                    row,
+                    original_by_name[original_row],
+                    requested[original_row],
+                    pos.warehouse,
+                )
+                kept.append(row)
+        if not kept:
+            frappe.throw(_("No matching original rows for the requested return"))
+        return_doc.set("items", kept)
+        _validate_return_doc_against_original(return_doc, original)
 
-    if return_doc.meta.has_field("custom_terminal_refund_id"):
-        return_doc.custom_terminal_refund_id = terminal_refund_id
-    if return_doc.meta.has_field("custom_terminal_id"):
-        # The refunding terminal, not the original sale's — they can now differ.
-        return_doc.custom_terminal_id = pos.get("custom_terminal_id") or ""
-    if return_doc.meta.has_field("custom_hardware_id"):
-        return_doc.custom_hardware_id = hardware_id or ""
-    if reason and return_doc.meta.has_field("remarks"):
-        return_doc.remarks = reason
+        if return_doc.meta.has_field("custom_terminal_refund_id"):
+            return_doc.custom_terminal_refund_id = terminal_refund_id
+        if return_doc.meta.has_field("custom_terminal_id"):
+            # The refunding terminal, not the original sale's — they can now differ.
+            return_doc.custom_terminal_id = pos.get("custom_terminal_id") or ""
+        if return_doc.meta.has_field("custom_hardware_id"):
+            return_doc.custom_hardware_id = hardware_id or ""
+        if reason and return_doc.meta.has_field("remarks"):
+            return_doc.remarks = reason
 
-    _set_cashier_offline_fields(
-        return_doc,
-        cashier_user,
-        cashier_full_name,
-        offline_authenticated,
-        offline_auth_method,
-        local_offline_session_id,
-    )
-
-    # Apply FBR snapshot + accounting (negative sales tax, no service fee) so the
-    # negative grand_total is known before computing refund payments. The validate
-    # hook re-applies these idempotently on insert.
-    from aimatic.fbr_pos.accounting import apply_fbr_accounting_rows
-    from aimatic.fbr_pos.payload_builder import build_pos_payload
-
-    return_doc.run_method("calculate_taxes_and_totals")
-    build_pos_payload(return_doc)
-    apply_fbr_accounting_rows(return_doc)
-    _validate_return_doc_against_original(return_doc, original)
-
-    _set_refund_payments(return_doc, pos, payments)
-
-    sp = "submit_pos_refund"
-    frappe.db.savepoint(sp)
-    try:
-        # Re-validate remaining quantities inside the transaction to defeat races.
-        _validate_refund_quantities(original, requested)
-        return_doc.insert()   # validate hook: clears copied FBR fields, builds InvoiceType=2 payload, accounting rows
-        return_doc.submit()   # before_submit hook: single FBR refund submission
-        # Reattribute from the terminal's session to the cashier — see docstring.
-        frappe.db.set_value(
-            "POS Invoice", return_doc.name, "owner", cashier_user, update_modified=False
+        _set_cashier_offline_fields(
+            return_doc,
+            cashier_user,
+            cashier_full_name,
+            offline_authenticated,
+            offline_auth_method,
+            local_offline_session_id,
         )
-        return_doc.owner = cashier_user
-        frappe.db.release_savepoint(sp)
-    except frappe.UniqueValidationError:
-        frappe.db.rollback(save_point=sp)
-        existing_name = _find_existing_return(terminal_refund_id)
-        if existing_name:
-            return _build_refund_response(frappe.get_doc("POS Invoice", existing_name), duplicate=True)
-        raise
-    except Exception:
-        frappe.db.rollback(save_point=sp)
-        raise
+
+        # Apply FBR snapshot + accounting (negative sales tax, no service fee) so the
+        # negative grand_total is known before computing refund payments. The validate
+        # hook re-applies these idempotently on insert.
+        from aimatic.fbr_pos.accounting import apply_fbr_accounting_rows
+        from aimatic.fbr_pos.payload_builder import build_pos_payload
+
+        return_doc.run_method("calculate_taxes_and_totals")
+        build_pos_payload(return_doc)
+        apply_fbr_accounting_rows(return_doc)
+        _validate_return_doc_against_original(return_doc, original)
+
+        _set_refund_payments(return_doc, pos, payments)
+
+        sp = "submit_pos_refund"
+        frappe.db.savepoint(sp)
+        try:
+            # Re-validate remaining quantities inside the transaction to defeat races.
+            _validate_refund_quantities(original, requested)
+            return_doc.insert()   # validate hook: clears copied FBR fields, builds InvoiceType=2 payload, accounting rows
+            return_doc.submit()   # before_submit hook: single FBR refund submission
+            # Reattribute from the terminal's session to the cashier — see docstring.
+            frappe.db.set_value(
+                "POS Invoice", return_doc.name, "owner", cashier_user, update_modified=False
+            )
+            return_doc.owner = cashier_user
+            frappe.db.release_savepoint(sp)
+        except frappe.UniqueValidationError:
+            frappe.db.rollback(save_point=sp)
+            existing_name = _find_existing_return(terminal_refund_id)
+            if existing_name:
+                return frappe.get_doc("POS Invoice", existing_name)
+            raise
+        except Exception:
+            frappe.db.rollback(save_point=sp)
+            raise
+
+        return return_doc
+
+    for attempt in range(_LOCK_WAIT_MAX_ATTEMPTS):
+        try:
+            return_doc = _build_and_submit_return()
+            break
+        except Exception as e:
+            if _is_lock_wait_timeout(e) and attempt < _LOCK_WAIT_MAX_ATTEMPTS - 1:
+                frappe.logger().warning(
+                    f"submit_pos_refund: retrying after MySQL lock wait timeout "
+                    f"(attempt {attempt + 1}/{_LOCK_WAIT_MAX_ATTEMPTS}, "
+                    f"terminal_refund_id={terminal_refund_id})"
+                )
+                time.sleep(_lock_wait_retry_backoff(attempt))
+                continue
+            raise
 
     return _build_refund_response(return_doc, duplicate=False)

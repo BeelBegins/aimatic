@@ -76,28 +76,117 @@
 		return lines.join("<br>");
 	}
 
+	// Fields that must never be copied out of a get_item_details response onto
+	// a child row (mirrors frappe.ui.form.Form.call's own child-update guard).
+	function std_field_list() {
+		return ["doctype"]
+			.concat(frappe.model.std_fields_list)
+			.concat(frappe.model.child_table_field_list);
+	}
+
+	function build_get_item_details_ctx(frm, row, item_code, barcode) {
+		return {
+			item_code: item_code,
+			barcode: barcode,
+			serial_no: row.serial_no,
+			batch_no: row.batch_no,
+			set_warehouse: frm.doc.set_warehouse,
+			warehouse: row.warehouse,
+			customer: frm.doc.customer || frm.doc.party_name,
+			quotation_to: frm.doc.quotation_to,
+			supplier: frm.doc.supplier,
+			currency: frm.doc.currency,
+			is_internal_supplier: frm.doc.is_internal_supplier,
+			is_internal_customer: frm.doc.is_internal_customer,
+			update_stock: cint(frm.doc.update_stock),
+			conversion_rate: frm.doc.conversion_rate,
+			price_list: frm.doc.selling_price_list || frm.doc.buying_price_list,
+			price_list_currency: frm.doc.price_list_currency,
+			plc_conversion_rate: frm.doc.plc_conversion_rate,
+			company: frm.doc.company,
+			order_type: frm.doc.order_type,
+			is_pos: cint(frm.doc.is_pos),
+			is_return: cint(frm.doc.is_return),
+			is_subcontracted: frm.doc.is_subcontracted,
+			ignore_pricing_rule: frm.doc.ignore_pricing_rule,
+			doctype: frm.doc.doctype,
+			name: frm.doc.name,
+			project: row.project || frm.doc.project,
+			qty: row.qty || 1,
+			net_rate: row.rate,
+			base_net_rate: row.base_net_rate,
+			stock_qty: row.stock_qty,
+			conversion_factor: row.conversion_factor,
+			weight_per_unit: row.weight_per_unit,
+			uom: row.uom,
+			weight_uom: row.weight_uom,
+			manufacturer: row.manufacturer,
+			stock_uom: row.stock_uom,
+			pos_profile: cint(frm.doc.is_pos) ? frm.doc.pos_profile : "",
+			cost_center: row.cost_center,
+			tax_category: frm.doc.tax_category,
+			item_tax_template: row.item_tax_template,
+			child_doctype: row.doctype,
+			child_docname: row.name,
+			is_old_subcontracting_flow: frm.doc.is_old_subcontracting_flow,
+			use_serial_batch_fields: row.use_serial_batch_fields,
+			serial_and_batch_bundle: row.serial_and_batch_bundle,
+		};
+	}
+
+	// Populate one row using the same whitelisted endpoint ERPNext's item_code
+	// handler uses (erpnext.stock.get_item_details.get_item_details), but call
+	// it directly instead of going through frappe.model.set_value("item_code").
+	// That avoids the per-row frm.refresh_fields() (full-form redraw) ERPNext
+	// triggers on every item_code change — the O(n²) work that hangs large
+	// documents. Field values are copied onto the row locally; the grid and
+	// totals are refreshed once, after all rows are done.
 	async function apply_match(frm, row, item_code, barcode) {
-		const cdt = row.doctype;
-		const cdn = row.name;
-		const prior_qty = flt(row.qty);
+		row.weight_per_unit = 0;
+		row.weight_uom = "";
+		row.uom = null;
+		row.conversion_factor = 0;
+		row.pricing_rules = "";
 
-		await frappe.model.set_value(cdt, cdn, "item_code", item_code);
+		const r = await frappe.call({
+			method: "erpnext.stock.get_item_details.get_item_details",
+			args: {
+				doc: frm.doc,
+				ctx: build_get_item_details_ctx(frm, row, item_code, barcode),
+			},
+		});
 
-		// process_item_selection clears barcode; restore without re-triggering
-		// the single-scan barcode→item path (would force qty=1).
-		frappe.flags.trigger_from_barcode_scanner = true;
-		try {
-			await frappe.model.set_value(cdt, cdn, "barcode", barcode);
-		} finally {
-			frappe.flags.trigger_from_barcode_scanner = false;
+		const details = r.message;
+		if (!details) {
+			return false;
 		}
 
-		const current = locals[cdt] && locals[cdt][cdn];
-		if (current && !flt(current.qty) && !prior_qty) {
-			await frappe.model.set_value(cdt, cdn, "qty", 1);
-		} else if (current && prior_qty && flt(current.qty) !== prior_qty) {
-			await frappe.model.set_value(cdt, cdn, "qty", prior_qty);
+		const skip = std_field_list();
+		for (const key in details) {
+			if (skip.indexOf(key) === -1) {
+				row[key] = details[key];
+			}
 		}
+		row.item_code = item_code;
+		row.barcode = barcode;
+
+		if (details.has_batch_no || details.has_serial_no) {
+			return { needs_tracking: true };
+		}
+		return true;
+	}
+
+	async function run_with_concurrency(items, limit, worker) {
+		let cursor = 0;
+		async function lane() {
+			while (cursor < items.length) {
+				const current = items[cursor];
+				cursor += 1;
+				await worker(current);
+			}
+		}
+		const lanes = Array.from({ length: Math.min(limit, items.length) }, lane);
+		await Promise.all(lanes);
 	}
 
 	async function resolve_from_barcode_column(frm) {
@@ -123,20 +212,47 @@
 		const result = r.message || {};
 		const matched = result.matched || {};
 		let applied = 0;
+		const needs_tracking = [];
 
-		for (const row of pending) {
-			const barcode = (row.barcode || "").toString().trim();
-			const item_code = matched[barcode];
-			if (!item_code) {
-				continue;
-			}
-			await apply_match(frm, row, item_code, barcode);
-			applied += 1;
+		frappe.dom.freeze(__("Applying resolved items…"));
+		try {
+			await run_with_concurrency(pending, 8, async (row) => {
+				const barcode = (row.barcode || "").toString().trim();
+				const item_code = matched[barcode];
+				if (!item_code) {
+					return;
+				}
+				const outcome = await apply_match(frm, row, item_code, barcode);
+				applied += 1;
+				if (outcome && outcome.needs_tracking) {
+					needs_tracking.push(item_code);
+				}
+				if (typeof frm.cscript.add_taxes_from_item_tax_template === "function") {
+					frm.cscript.add_taxes_from_item_tax_template(row.item_tax_rate);
+				}
+			});
+		} finally {
+			frappe.dom.unfreeze();
 		}
 
 		frm.refresh_field("items");
+		frm.refresh_field("taxes");
+		if (typeof frm.cscript.calculate_taxes_and_totals === "function") {
+			frm.cscript.calculate_taxes_and_totals();
+		}
+
+		let summary = format_summary(result, applied);
+		if (needs_tracking.length) {
+			summary +=
+				"<br>" +
+				__("Batch/Serial No required ({0}): {1}", [
+					needs_tracking.length,
+					needs_tracking.slice(0, 10).join(", ") + (needs_tracking.length > 10 ? "…" : ""),
+				]);
+		}
+
 		frappe.msgprint({
-			message: format_summary(result, applied),
+			message: summary,
 			title: button_label(),
 			indicator: applied ? "green" : "orange",
 		});

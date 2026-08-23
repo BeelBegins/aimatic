@@ -31,11 +31,32 @@ def get_settings():
 		frappe.throw(_("Foodpanda integration is not enabled"))
 	if not settings.api_host:
 		frappe.throw(_("Foodpanda Settings is missing the API Host"))
-	if not settings.chain_id:
-		frappe.throw(_("Foodpanda Settings is missing the Chain ID"))
 	if not settings.client_id:
 		frappe.throw(_("Foodpanda Settings is missing the Client ID"))
 	return settings
+
+
+def get_chain_id(outlet=None, settings=None):
+	"""Return the chain ID for this outlet, falling back to Settings default.
+
+	Each Foodpanda Outlet can belong to a different chain. Partner API paths
+	must use the outlet's chain, not a site-wide value.
+	"""
+	chain_id = ""
+	if outlet is not None:
+		raw = getattr(outlet, "chain_id", None)
+		if isinstance(raw, str):
+			chain_id = raw.strip()
+	if not chain_id:
+		settings = settings or get_settings()
+		raw = getattr(settings, "chain_id", None)
+		if isinstance(raw, str):
+			chain_id = raw.strip()
+	if not chain_id:
+		if outlet is not None:
+			frappe.throw(_("Foodpanda Outlet is missing the Chain ID"))
+		frappe.throw(_("Foodpanda Settings is missing the Default Chain ID"))
+	return chain_id
 
 
 def _token_cache_key(client_id):

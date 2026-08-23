@@ -1,0 +1,95 @@
+.foodpanda-catalog-console {
+	max-width: 720px;
+	margin: 0 auto;
+	padding: 12px 8px 40px;
+}
+
+.fp-title {
+	margin: 0 0 6px;
+	font-size: 1.35rem;
+}
+
+.fp-help {
+	margin: 0 0 16px;
+	color: var(--text-muted);
+	line-height: 1.45;
+}
+
+.fp-pills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.fp-pill {
+	border: 1px solid var(--border-color);
+	border-radius: 999px;
+	padding: 6px 12px;
+	background: var(--fg-color);
+	font-size: 13px;
+}
+
+.fp-pill-ok {
+	border-color: var(--green-300, #a9d18e);
+	background: var(--green-50, #f3faf0);
+}
+
+.fp-pill-warn {
+	border-color: var(--orange-300, #f5c18a);
+	background: var(--orange-50, #fff8f0);
+}
+
+.fp-summary-line {
+	margin: 0 0 18px;
+	font-size: 13px;
+}
+
+.fp-primary {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 20px;
+}
+
+.fp-main-btn {
+	width: 100%;
+	min-height: 48px;
+	font-size: 15px;
+}
+
+.fp-more {
+	border: 1px solid var(--border-color);
+	border-radius: 8px;
+	padding: 10px 14px;
+	background: var(--bg-color);
+}
+
+.fp-more > summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.fp-more-body {
+	margin-top: 12px;
+}
+
+.fp-secondary {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.fp-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px 16px;
+	margin-bottom: 10px;
+}
+
+.fp-meta {
+	color: var(--text-muted);
+	font-size: 12px;
+	line-height: 1.55;
+}

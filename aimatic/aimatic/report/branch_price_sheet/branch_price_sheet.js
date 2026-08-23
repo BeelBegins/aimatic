@@ -69,7 +69,7 @@ function aimatic_download_foodpanda_csv(report) {
 		}
 
 		const inactive_if_qty_lte = aimatic_inactive_if_qty_lte(report);
-		const output = [["barcode", "sku", "price", "active", "quantity"]];
+		const output = [["sku", "barcode", "price", "active", "quantity"]];
 		let skipped = 0;
 		(report.data || []).forEach((row) => {
 			const barcode = row.barcode1 || "";
@@ -78,10 +78,10 @@ function aimatic_download_foodpanda_csv(report) {
 				skipped += 1;
 				return;
 			}
-			const quantity = Math.max(flt(row.available_qty), 0);
+			const quantity = Math.max(Math.floor(flt(row.available_qty)), 0);
 			output.push([
-				barcode,
 				"",
+				barcode,
 				price,
 				aimatic_foodpanda_active(quantity, inactive_if_qty_lte),
 				quantity,

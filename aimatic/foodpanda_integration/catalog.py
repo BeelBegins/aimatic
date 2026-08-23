@@ -363,7 +363,7 @@ def sync_item(item_code, outlet_name):
 		job_id, api_response = _submit_catalog_job(
 			settings,
 			method,
-			settings.chain_id,
+			client.get_chain_id(outlet, settings=settings),
 			outlet.vendor_id,
 			payload,
 			outlet_name,
@@ -420,7 +420,12 @@ def sync_availability(item_code, branch):
 			item_code, outlet, foodpanda_sku=product.foodpanda_product_id
 		)
 		job_id = _submit_catalog_job(
-			settings, "PUT", settings.chain_id, outlet.vendor_id, payload, outlet_name
+			settings,
+			"PUT",
+			client.get_chain_id(outlet, settings=settings),
+			outlet.vendor_id,
+			payload,
+			outlet_name,
 		)
 		frappe.db.set_value(
 			"Foodpanda Product",
@@ -474,7 +479,9 @@ def _iter_remote_catalog_products_get(outlet_name, page_size=500):
 
 	outlet = frappe.get_doc("Foodpanda Outlet", outlet_name)
 	settings = client.get_settings()
-	path = _CATALOG_PATH.format(chain_id=settings.chain_id, vendor_id=outlet.vendor_id)
+	path = _CATALOG_PATH.format(
+		chain_id=client.get_chain_id(outlet, settings=settings), vendor_id=outlet.vendor_id
+	)
 	page_size = min(max(int(page_size or 500), 1), 500)
 	page = 1
 	seen_skus = set()
@@ -831,7 +838,9 @@ def get_remote_catalog(outlet_name):
 	settings = client.get_settings()
 	response = client.request(
 		"GET",
-		_CATALOG_PATH.format(chain_id=settings.chain_id, vendor_id=outlet.vendor_id),
+		_CATALOG_PATH.format(
+			chain_id=client.get_chain_id(outlet, settings=settings), vendor_id=outlet.vendor_id
+		),
 		settings=settings,
 	)
 	return response.json()
@@ -842,7 +851,9 @@ def get_remote_categories(outlet_name):
 	settings = client.get_settings()
 	response = client.request(
 		"GET",
-		_CATEGORIES_PATH.format(chain_id=settings.chain_id, vendor_id=outlet.vendor_id),
+		_CATEGORIES_PATH.format(
+			chain_id=client.get_chain_id(outlet, settings=settings), vendor_id=outlet.vendor_id
+		),
 		settings=settings,
 	)
 	return response.json()
@@ -853,7 +864,9 @@ def request_remote_export(outlet_name):
 	settings = client.get_settings()
 	response = client.request(
 		"POST",
-		_EXPORT_PATH.format(chain_id=settings.chain_id, vendor_id=outlet.vendor_id),
+		_EXPORT_PATH.format(
+			chain_id=client.get_chain_id(outlet, settings=settings), vendor_id=outlet.vendor_id
+		),
 		settings=settings,
 	)
 	response_data = response.json() or {}
@@ -877,8 +890,14 @@ def refresh_remote_job(job_id):
 	from aimatic.foodpanda_integration import catalog_jobs
 
 	settings = client.get_settings()
+	outlet_name = frappe.db.get_value("Foodpanda Catalog Job", {"job_id": job_id}, "outlet")
+	outlet = frappe.get_doc("Foodpanda Outlet", outlet_name) if outlet_name else None
 	response = client.request(
-		"GET", _JOB_STATUS_PATH.format(chain_id=settings.chain_id, job_id=job_id), settings=settings
+		"GET",
+		_JOB_STATUS_PATH.format(
+			chain_id=client.get_chain_id(outlet, settings=settings), job_id=job_id
+		),
+		settings=settings,
 	)
 	payload = response.json() or {}
 	payload.setdefault("job_id", job_id)
@@ -1026,7 +1045,7 @@ def run_bulk_export(export_job_id=None, outlet_name=None, job_id=None, item_code
 			fp_job_id = _submit_catalog_products(
 				settings,
 				"PUT",
-				settings.chain_id,
+				client.get_chain_id(outlet, settings=settings),
 				outlet.vendor_id,
 				payloads,
 				outlet_name,

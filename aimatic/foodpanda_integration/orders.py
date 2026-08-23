@@ -149,7 +149,9 @@ def reject_order(outlet, foodpanda_order_id, reason=None):
 	try:
 		client.request(
 			"PUT",
-			_ORDER_PATH.format(chain_id=settings.chain_id, order_id=foodpanda_order_id),
+			_ORDER_PATH.format(
+				chain_id=client.get_chain_id(outlet, settings=settings), order_id=foodpanda_order_id
+			),
 			settings=settings,
 			json=payload,
 		)
@@ -168,17 +170,21 @@ def push_status_update(sales_order, status):
 	order_log = frappe.db.get_value(
 		"Foodpanda Order Log",
 		{"sales_order": sales_order},
-		["name", "foodpanda_order_id"],
+		["name", "foodpanda_order_id", "outlet"],
 		as_dict=True,
 	)
 	if not order_log:
 		frappe.throw(_("Sales Order {0} is not linked to a Foodpanda order").format(sales_order))
 
 	settings = client.get_settings()
+	outlet = frappe.get_doc("Foodpanda Outlet", order_log.outlet) if order_log.outlet else None
 	try:
 		client.request(
 			"PUT",
-			_ORDER_PATH.format(chain_id=settings.chain_id, order_id=order_log.foodpanda_order_id),
+			_ORDER_PATH.format(
+				chain_id=client.get_chain_id(outlet, settings=settings),
+				order_id=order_log.foodpanda_order_id,
+			),
 			settings=settings,
 			json={"status": remote_status},
 		)
