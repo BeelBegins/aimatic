@@ -1594,7 +1594,18 @@ def preview_cart(
 			fbr_pos_service_fee = flt(getattr(t, "tax_amount", 0) or getattr(t, "amount", 0), 2)
 			break
 
-	payable_before_voucher = flt(flt(doc.grand_total, 2) - flt(getattr(doc, "loyalty_amount", 0) or 0, 2), 2)
+	# Unsaved POS Invoice preview often leaves doc.grand_total / rounded_total at 0
+	# after inclusive-tax + FBR accounting rows. Cashiers still need a collectable
+	# total — use FBR merchandise + service fee when the ERPNext doc total is empty.
+	fbr_invoice_total = flt(merchandise_total + fbr_pos_service_fee, 2)
+	doc_grand_total = flt(getattr(doc, "grand_total", 0) or 0, 2)
+	doc_rounded_total = flt(getattr(doc, "rounded_total", 0) or 0, 2)
+	effective_grand = (
+		doc_rounded_total
+		if doc_rounded_total > 0
+		else doc_grand_total if doc_grand_total > 0 else fbr_invoice_total
+	)
+	payable_before_voucher = flt(effective_grand - flt(getattr(doc, "loyalty_amount", 0) or 0, 2), 2)
 
 	gift_voucher_amount = 0.0
 	gift_voucher_error = None
@@ -1619,9 +1630,10 @@ def preview_cart(
 		"total": getattr(doc, "total", None),
 		"net_total": getattr(doc, "net_total", None),
 		"total_taxes_and_charges": getattr(doc, "total_taxes_and_charges", None),
-		"grand_total": getattr(doc, "grand_total", None),
+		# Prefer FBR-derived invoice total when ERPNext preview left grand/rounded at 0.
+		"grand_total": effective_grand if doc_grand_total <= 0 else getattr(doc, "grand_total", None),
 		"rounding_adjustment": getattr(doc, "rounding_adjustment", None),
-		"rounded_total": getattr(doc, "rounded_total", None),
+		"rounded_total": effective_grand if doc_rounded_total <= 0 else getattr(doc, "rounded_total", None),
 		"loyalty_amount": getattr(doc, "loyalty_amount", None),
 		"currency": getattr(doc, "currency", None) or getattr(doc, "company_currency", None),
 		# Authoritative FBR totals — Electron must use these, not its own calculations
