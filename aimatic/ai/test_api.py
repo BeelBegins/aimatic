@@ -16,7 +16,6 @@ from aimatic.ai.api import (
 )
 from aimatic.ai.nemotron_client import NemotronError, get_chat_completion
 
-
 FREE_AUDIO_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
 
 
@@ -33,23 +32,28 @@ class TestFreeAudioTranscription(FrappeTestCase):
 		get.return_value = SimpleNamespace(
 			status_code=200,
 			text="ok",
-			json=lambda: {"data": [
-				{
-					"id": "vendor/paid-audio",
-					"pricing": {"prompt": "0.001", "completion": "0.001"},
-					"architecture": {"input_modalities": ["audio"], "output_modalities": ["text"]},
-				},
-				{
-					"id": "vendor/free-text:free",
-					"pricing": {"prompt": "0", "completion": "0"},
-					"architecture": {"input_modalities": ["text"], "output_modalities": ["text"]},
-				},
-				{
-					"id": FREE_AUDIO_MODEL,
-					"pricing": {"prompt": "0", "completion": "0"},
-					"architecture": {"input_modalities": ["text", "audio"], "output_modalities": ["text"]},
-				},
-			]},
+			json=lambda: {
+				"data": [
+					{
+						"id": "vendor/paid-audio",
+						"pricing": {"prompt": "0.001", "completion": "0.001"},
+						"architecture": {"input_modalities": ["audio"], "output_modalities": ["text"]},
+					},
+					{
+						"id": "vendor/free-text:free",
+						"pricing": {"prompt": "0", "completion": "0"},
+						"architecture": {"input_modalities": ["text"], "output_modalities": ["text"]},
+					},
+					{
+						"id": FREE_AUDIO_MODEL,
+						"pricing": {"prompt": "0", "completion": "0"},
+						"architecture": {
+							"input_modalities": ["text", "audio"],
+							"output_modalities": ["text"],
+						},
+					},
+				]
+			},
 		)
 
 		self.assertEqual(_get_free_audio_model(force_refresh=True), FREE_AUDIO_MODEL)
@@ -62,11 +66,15 @@ class TestFreeAudioTranscription(FrappeTestCase):
 		get.return_value = SimpleNamespace(
 			status_code=200,
 			text="ok",
-			json=lambda: {"data": [{
-				"id": "vendor/paid-audio",
-				"pricing": {"prompt": "0.001", "completion": "0.001"},
-				"architecture": {"input_modalities": ["audio"], "output_modalities": ["text"]},
-			}]},
+			json=lambda: {
+				"data": [
+					{
+						"id": "vendor/paid-audio",
+						"pricing": {"prompt": "0.001", "completion": "0.001"},
+						"architecture": {"input_modalities": ["audio"], "output_modalities": ["text"]},
+					}
+				]
+			},
 		)
 		with self.assertRaises(NemotronError):
 			_get_free_audio_model(force_refresh=True)
@@ -161,7 +169,12 @@ class TestFreeAudioTranscription(FrappeTestCase):
 		)
 		get_doc.return_value = doc
 		invocations = [{"call_id": "new", "tool_name": "get_sales_overview", "sequence": 1}]
-		ask.return_value = {"kpis": [{"value": 2}], "charts": [], "tables": [], "tool_invocations": invocations}
+		ask.return_value = {
+			"kpis": [{"value": 2}],
+			"charts": [],
+			"tables": [],
+			"tool_invocations": invocations,
+		}
 		refresh_saved_report("AI-SAVED-1")
 		self.assertEqual(json.loads(doc.tool_results_snapshot), invocations)
 		doc.save.assert_called_once_with(ignore_permissions=True)

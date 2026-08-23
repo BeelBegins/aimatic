@@ -13,10 +13,10 @@ LAYOUTS_DIR = os.path.join(os.path.dirname(__file__), "print_layouts")
 
 
 def render_print_layout(name, doc, **context):
-    """Read print_layouts/<name>.html and render it against doc plus
-    whatever extra context a specific layout needs (e.g. ctx=<domain-specific
-    lookups>, layout=<Frappe's own page layout>, print_settings=...)."""
-    path = os.path.join(LAYOUTS_DIR, f"{name}.html")
-    with open(path, encoding="utf-8") as f:
-        source = f.read()
-    return frappe.render_template(source, {"doc": doc, **context})
+	"""Read print_layouts/<name>.html and render it against doc plus
+	whatever extra context a specific layout needs (e.g. ctx=<domain-specific
+	lookups>, layout=<Frappe's own page layout>, print_settings=...)."""
+	path = os.path.join(LAYOUTS_DIR, f"{name}.html")
+	with open(path, encoding="utf-8") as f:
+		source = f.read()
+	return frappe.render_template(source, {"doc": doc, **context})

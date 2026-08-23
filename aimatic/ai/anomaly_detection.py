@@ -149,7 +149,9 @@ def get_business_anomalies(
 		anomalies.extend(detect_series_anomalies(rows, metric, ("branch",), 7, z_threshold))
 	anomalies.extend(detect_series_anomalies(margin_rows, "gross_margin", ("branch",), 7, z_threshold))
 	anomalies.extend(detect_series_anomalies(expense_rows, "expense_amount", ("branch",), 7, z_threshold))
-	anomalies.extend(detect_series_anomalies(supplier_price_rows, "supplier_price", ("supplier",), 4, z_threshold))
+	anomalies.extend(
+		detect_series_anomalies(supplier_price_rows, "supplier_price", ("supplier",), 4, z_threshold)
+	)
 	negative_stock = frappe.db.sql(
 		"""
 		SELECT w.custom_branch AS branch, b.warehouse, b.item_code,
@@ -179,7 +181,9 @@ def get_business_anomalies(
 				"data_source": "Bin",
 			}
 		)
-	anomalies.sort(key=lambda row: (row["severity"] != "critical", -abs(flt(row.get("z_score") or row.get("variance")))))
+	anomalies.sort(
+		key=lambda row: (row["severity"] != "critical", -abs(flt(row.get("z_score") or row.get("variance"))))
+	)
 	return {
 		"company": company,
 		"branch": branch,
@@ -196,21 +200,23 @@ def get_business_anomalies(
 	}
 
 
-TOOL_SPECS = [{
-	"type": "function",
-	"function": {
-		"name": "get_business_anomalies",
-		"description": "Deterministic sales-drop, return-spike, discount-spike, transaction-pattern, branch-performance, and negative-stock anomalies with expected ranges, severity, sources, and drill-down.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"branch": {"type": "string"},
-				"lookback_days": {"type": "integer"},
-				"z_threshold": {"type": "number"},
-				"limit": {"type": "integer"},
+TOOL_SPECS = [
+	{
+		"type": "function",
+		"function": {
+			"name": "get_business_anomalies",
+			"description": "Deterministic sales-drop, return-spike, discount-spike, transaction-pattern, branch-performance, and negative-stock anomalies with expected ranges, severity, sources, and drill-down.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"branch": {"type": "string"},
+					"lookback_days": {"type": "integer"},
+					"z_threshold": {"type": "number"},
+					"limit": {"type": "integer"},
+				},
 			},
 		},
-	},
-}]
+	}
+]
 
 TOOL_DISPATCH = {"get_business_anomalies": get_business_anomalies}

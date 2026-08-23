@@ -17,6 +17,8 @@ def before_submit_sales_order(doc, method=None):
 		frappe.throw(_("Discount approval is still pending for Sales Order {0}").format(doc.name))
 	if approval.status == "Rejected" and flt(doc.additional_discount_percentage) > 0:
 		frappe.throw(_("The requested discount was rejected. Update the order before submitting it."))
-	if approval.status == "Approved" and flt(doc.additional_discount_percentage) > flt(approval.requested_percent) + 0.0001:
+	if (
+		approval.status == "Approved"
+		and flt(doc.additional_discount_percentage) > flt(approval.requested_percent) + 0.0001
+	):
 		frappe.throw(_("The Sales Order discount exceeds the manager-approved percentage"))
-

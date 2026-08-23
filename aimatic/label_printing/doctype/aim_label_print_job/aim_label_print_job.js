@@ -30,7 +30,10 @@ frappe.ui.form.on("AIM Label Print Job", {
 
 			frm.add_custom_button(__("Preview Labels"), () => print_job(frm, { preview: true }));
 
-			const print_label = frm.doc.label_type === "Shelf Label" ? __("Print Shelf Labels") : __("Print Barcode Labels");
+			const print_label =
+				frm.doc.label_type === "Shelf Label"
+					? __("Print Shelf Labels")
+					: __("Print Barcode Labels");
 			frm.add_custom_button(print_label, () => print_job(frm, { preview: false }));
 
 			frm.add_custom_button(__("Download PDF"), () => print_job(frm, { pdf: true }));
@@ -111,7 +114,10 @@ function populate_items_from_source(frm, source_type, source_name) {
 
 			render_totals(frm);
 			frappe.show_alert({
-				message: __("Fetched {0} item(s) from {1}", [(r.message.items || []).length, source_name]),
+				message: __("Fetched {0} item(s) from {1}", [
+					(r.message.items || []).length,
+					source_name,
+				]),
 				indicator: "green",
 			});
 		},
@@ -170,14 +176,17 @@ function render_totals(frm) {
 		label_count += frm.doc.label_type === "Shelf Label" ? 1 : cint(r.barcode_label_qty);
 	});
 
-	const label_word = frm.doc.label_type === "Shelf Label" ? __("shelf labels") : __("barcode labels");
+	const label_word =
+		frm.doc.label_type === "Shelf Label" ? __("shelf labels") : __("barcode labels");
 
 	let html = `<div class="text-muted small">
 		${__("Item rows")}: <b>${row_count}</b> &nbsp;|&nbsp;
 		${__("Total")} ${label_word}: <b>${label_count}</b>`;
 
 	if (missing_barcode) {
-		html += ` &nbsp;|&nbsp; <span class="text-danger">${__("Missing barcode")}: <b>${missing_barcode}</b></span>`;
+		html += ` &nbsp;|&nbsp; <span class="text-danger">${__(
+			"Missing barcode"
+		)}: <b>${missing_barcode}</b></span>`;
 	}
 
 	html += "</div>";
@@ -223,7 +232,10 @@ function open_add_item_dialog(frm) {
 			},
 			{
 				fieldname: "qty",
-				label: frm.doc.label_type === "Shelf Label" ? __("Shelf Labels (always 1)") : __("Barcode Label Qty"),
+				label:
+					frm.doc.label_type === "Shelf Label"
+						? __("Shelf Labels (always 1)")
+						: __("Barcode Label Qty"),
 				fieldtype: "Int",
 				default: 1,
 				read_only: frm.doc.label_type === "Shelf Label",
@@ -262,7 +274,9 @@ function render_item_results(dialog, frm, txt) {
 		callback: (r) => {
 			const items = r.message || [];
 			if (!items.length) {
-				dialog.fields_dict.item_results.$wrapper.html(`<div class="text-muted">${__("No items found")}</div>`);
+				dialog.fields_dict.item_results.$wrapper.html(
+					`<div class="text-muted">${__("No items found")}</div>`
+				);
 				return;
 			}
 
@@ -271,7 +285,9 @@ function render_item_results(dialog, frm, txt) {
 					(item) => `
 					<div class="label-search-row" data-item-code="${frappe.utils.escape_html(item.item_code)}"
 						style="padding:4px 8px; cursor:pointer; border-bottom:1px solid var(--border-color);">
-						<b>${frappe.utils.escape_html(item.item_code)}</b> - ${frappe.utils.escape_html(item.item_name || "")}
+						<b>${frappe.utils.escape_html(item.item_code)}</b> - ${frappe.utils.escape_html(
+						item.item_name || ""
+					)}
 						<span class="text-muted small"> (${frappe.utils.escape_html(item.item_group || "")})</span>
 					</div>`
 				)
@@ -281,12 +297,14 @@ function render_item_results(dialog, frm, txt) {
 				`<div style="max-height:200px; overflow-y:auto; border:1px solid var(--border-color);">${rows}</div>`
 			);
 
-			dialog.fields_dict.item_results.$wrapper.find(".label-search-row").on("click", function () {
-				const item_code = $(this).attr("data-item-code");
-				dialog.set_value("item_code", item_code);
-				dialog.fields_dict.item_results.$wrapper.html("");
-				dialog.set_value("item_search", item_code);
-			});
+			dialog.fields_dict.item_results.$wrapper
+				.find(".label-search-row")
+				.on("click", function () {
+					const item_code = $(this).attr("data-item-code");
+					dialog.set_value("item_code", item_code);
+					dialog.fields_dict.item_results.$wrapper.html("");
+					dialog.set_value("item_search", item_code);
+				});
 		},
 	});
 }
@@ -336,17 +354,24 @@ function do_print(frm, { preview, pdf }) {
 		callback: (r) => {
 			if (!r.message || !r.message.ok) return;
 
-			const format_name = frm.doc.label_type === "Shelf Label" ? "AIM Shelf Label A4" : "AIM Barcode Label";
+			const format_name =
+				frm.doc.label_type === "Shelf Label" ? "AIM Shelf Label A4" : "AIM Barcode Label";
 
 			if (pdf) {
 				const pdf_url = frappe.urllib.get_full_url(
-					`/api/method/frappe.utils.print_format.download_pdf?doctype=${encodeURIComponent(frm.doc.doctype)}` +
-						`&name=${encodeURIComponent(frm.doc.name)}&format=${encodeURIComponent(format_name)}&no_letterhead=1`
+					`/api/method/frappe.utils.print_format.download_pdf?doctype=${encodeURIComponent(
+						frm.doc.doctype
+					)}` +
+						`&name=${encodeURIComponent(frm.doc.name)}&format=${encodeURIComponent(
+							format_name
+						)}&no_letterhead=1`
 				);
 				window.open(pdf_url, "_blank");
 			} else if (preview) {
 				const preview_url = frappe.urllib.get_full_url(
-					`/printview?doctype=${encodeURIComponent(frm.doc.doctype)}&name=${encodeURIComponent(frm.doc.name)}` +
+					`/printview?doctype=${encodeURIComponent(
+						frm.doc.doctype
+					)}&name=${encodeURIComponent(frm.doc.name)}` +
 						`&format=${encodeURIComponent(format_name)}&no_letterhead=1`
 				);
 				window.open(preview_url, "_blank");

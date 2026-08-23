@@ -146,7 +146,9 @@ def _ensure_workspace():
 def _migrate_users():
 	"""Move dedicated price-check accounts onto the locked-down role."""
 	# Legacy role name -> Price Check
-	for row in frappe.get_all("Has Role", filters={"role": LEGACY_ROLE, "parenttype": "User"}, fields=["name", "parent"]):
+	for row in frappe.get_all(
+		"Has Role", filters={"role": LEGACY_ROLE, "parenttype": "User"}, fields=["name", "parent"]
+	):
 		user = row.parent
 		frappe.db.delete("Has Role", {"name": row.name})
 		if not frappe.db.exists("Has Role", {"parent": user, "role": ROLE}):

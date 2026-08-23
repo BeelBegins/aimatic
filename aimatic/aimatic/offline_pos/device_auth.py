@@ -20,14 +20,16 @@ def _audit_device_failure(user, hardware_id, pos_profile, status):
 	data from the requested operation."""
 	if user and not frappe.db.exists("User", user):
 		user = None
-	frappe.get_doc({
-		"doctype": "POS Device Audit Log",
-		"user": user,
-		"hardware_id": hardware_id,
-		"pos_profile": pos_profile,
-		"status": status,
-		"created_at": now_datetime(),
-	}).insert(ignore_permissions=True)
+	frappe.get_doc(
+		{
+			"doctype": "POS Device Audit Log",
+			"user": user,
+			"hardware_id": hardware_id,
+			"pos_profile": pos_profile,
+			"status": status,
+			"created_at": now_datetime(),
+		}
+	).insert(ignore_permissions=True)
 	frappe.db.commit()
 
 

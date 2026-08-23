@@ -10,9 +10,9 @@ class FoodpandaSettings(Document):
 		self.api_host = (self.api_host or OFFICIAL_API_HOST).rstrip("/")
 		if self.api_host != OFFICIAL_API_HOST:
 			frappe.throw(
-				_("Foodpanda API Host must be {0}; catalog testing uses a designated live test vendor, not a sandbox hostname.").format(
-					OFFICIAL_API_HOST
-				)
+				_(
+					"Foodpanda API Host must be {0}; catalog testing uses a designated live test vendor, not a sandbox hostname."
+				).format(OFFICIAL_API_HOST)
 			)
 		if self.enabled and not self.chain_id:
 			frappe.throw(_("Chain ID is required when Foodpanda is enabled"))

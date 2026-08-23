@@ -12,7 +12,6 @@ Branch restriction.
 
 import frappe
 
-
 TARGET_SITE = "szl"
 BRANCH = "S1 - Ghouri Town VIP"
 DRY_RUN = True
@@ -57,8 +56,7 @@ def _validate_scope():
 	)
 	if unexpected:
 		frappe.throw(
-			"Active System Users outside the locked assignment list: "
-			+ ", ".join(sorted(unexpected))
+			"Active System Users outside the locked assignment list: " + ", ".join(sorted(unexpected))
 		)
 
 

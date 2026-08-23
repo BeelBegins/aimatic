@@ -2,8 +2,13 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-
-TICKET_TRANSITIONS = {"Queued": {"Queued", "Preparing", "Cancelled"}, "Preparing": {"Preparing", "Ready", "Cancelled"}, "Ready": {"Ready", "Served"}, "Served": {"Served"}, "Cancelled": {"Cancelled"}}
+TICKET_TRANSITIONS = {
+	"Queued": {"Queued", "Preparing", "Cancelled"},
+	"Preparing": {"Preparing", "Ready", "Cancelled"},
+	"Ready": {"Ready", "Served"},
+	"Served": {"Served"},
+	"Cancelled": {"Cancelled"},
+}
 
 
 class RestaurantKitchenTicket(Document):

@@ -67,9 +67,7 @@ class TestPurchasePrincipal(unittest.TestCase):
 			return "FROM-PO"
 
 		get_value.side_effect = _side_effect
-		doc = SimpleNamespace(
-			items=[SimpleNamespace(purchase_receipt="PR-1", purchase_order="PO-1")]
-		)
+		doc = SimpleNamespace(items=[SimpleNamespace(purchase_receipt="PR-1", purchase_order="PO-1")])
 		self.assertEqual(resolve_principal_for_invoice(doc), "FROM-PR")
 
 	@patch("aimatic.purchase_principal.resolve_principal_for_receipt", return_value="UNILEVER")

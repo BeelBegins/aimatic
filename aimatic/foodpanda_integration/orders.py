@@ -4,8 +4,8 @@ from frappe.utils import flt, nowdate
 
 from aimatic.branch_management.utils import get_branch_defaults
 from aimatic.foodpanda_integration import client
-from aimatic.foodpanda_integration.client import FoodpandaAPIError
 from aimatic.foodpanda_integration.catalog import _barcode_variants
+from aimatic.foodpanda_integration.client import FoodpandaAPIError
 from aimatic.shelf_pricing.utils import get_or_create_branch_foodpanda_price_list
 
 _ORDER_PATH = "/v2/chains/{chain_id}/orders/{order_id}"
@@ -124,7 +124,10 @@ def make_order_from_webhook(payload, outlet):
 
 		bin_row = (
 			frappe.db.get_value(
-				"Bin", {"item_code": item_code, "warehouse": warehouse}, ["actual_qty", "reserved_qty"], as_dict=True
+				"Bin",
+				{"item_code": item_code, "warehouse": warehouse},
+				["actual_qty", "reserved_qty"],
+				as_dict=True,
 			)
 			or {}
 		)

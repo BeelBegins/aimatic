@@ -11,9 +11,9 @@ _MAX_ATTEMPTS = 5
 
 
 def generate_voucher_code():
-    for _attempt in range(_MAX_ATTEMPTS):
-        code = "".join(secrets.choice(_ALPHABET) for _ in range(_LENGTH))
-        if not frappe.db.exists("Gift Voucher", {"voucher_code": code}):
-            return code
+	for _attempt in range(_MAX_ATTEMPTS):
+		code = "".join(secrets.choice(_ALPHABET) for _ in range(_LENGTH))
+		if not frappe.db.exists("Gift Voucher", {"voucher_code": code}):
+			return code
 
-    frappe.throw(_("Could not generate a unique gift voucher code, please retry"))
+	frappe.throw(_("Could not generate a unique gift voucher code, please retry"))

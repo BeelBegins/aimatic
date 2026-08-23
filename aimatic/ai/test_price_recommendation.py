@@ -40,8 +40,7 @@ class TestElasticity(TestCase):
 
 	def test_promotional_history_is_not_used_as_reliable_elasticity(self):
 		observations = [
-			{"price": 80 + index, "quantity": 30 - index, "promotion": index < 8}
-			for index in range(12)
+			{"price": 80 + index, "quantity": 30 - index, "promotion": index < 8} for index in range(12)
 		]
 		result = estimate_elasticity(observations)
 		self.assertFalse(result["valid"])

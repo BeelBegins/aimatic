@@ -4,6 +4,7 @@ Tests for aimatic.storefront_api.api.
 Run with:
     bench --site <site> run-tests --app aimatic --module aimatic.storefront_api.test_api
 """
+
 import unittest
 from unittest.mock import patch
 

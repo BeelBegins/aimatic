@@ -3,7 +3,6 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
-
 ACTIVE_STATUSES = ("Open", "Sent to Kitchen", "Bill Requested")
 ALLOWED_TRANSITIONS = {
 	"Open": {"Open", "Sent to Kitchen", "Cancelled"},
@@ -53,7 +52,11 @@ class RestaurantOrder(Document):
 			return
 		duplicate = frappe.db.exists(
 			"Restaurant Order",
-			{"name": ["!=", self.name], "restaurant_table": self.restaurant_table, "status": ["in", ACTIVE_STATUSES]},
+			{
+				"name": ["!=", self.name],
+				"restaurant_table": self.restaurant_table,
+				"status": ["in", ACTIVE_STATUSES],
+			},
 		)
 		if duplicate:
 			frappe.throw(_("This table already has an active Restaurant Order"))

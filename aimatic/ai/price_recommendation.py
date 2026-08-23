@@ -44,11 +44,7 @@ def enforce_price_constraints(
 	cost = max(flt(cost), 0)
 	minimum_margin_pct = max(0, min(flt(minimum_margin_pct), 95))
 	maximum_price_change_pct = max(0, min(flt(maximum_price_change_pct), 50))
-	price_floor = (
-		cost / (1 - minimum_margin_pct / 100)
-		if cost > 0 and minimum_margin_pct < 100
-		else cost
-	)
+	price_floor = cost / (1 - minimum_margin_pct / 100) if cost > 0 and minimum_margin_pct < 100 else cost
 	movement_low = current_price * (1 - maximum_price_change_pct / 100)
 	movement_high = current_price * (1 + maximum_price_change_pct / 100)
 	hard_low = max(price_floor, 0)
@@ -110,11 +106,7 @@ def estimate_elasticity(observations: list[dict[str, Any]]) -> dict[str, Any]:
 	prices = [flt(row["price"]) for row in usable]
 	if len({round(value, 2) for value in prices}) < 3:
 		reasons.append("At least 3 distinct realized prices are required.")
-	price_variation = (
-		(max(prices) - min(prices)) / (sum(prices) / len(prices)) * 100
-		if prices
-		else 0
-	)
+	price_variation = (max(prices) - min(prices)) / (sum(prices) / len(prices)) * 100 if prices else 0
 	if price_variation < 3:
 		reasons.append("Realized selling-price variation is below 3%.")
 	if len(observations) - len(usable) > max(2, len(observations) * 0.40):
@@ -134,7 +126,12 @@ def estimate_elasticity(observations: list[dict[str, Any]]) -> dict[str, Any]:
 	x_mean, y_mean = sum(x) / len(x), sum(y) / len(y)
 	denominator = sum((value - x_mean) ** 2 for value in x)
 	if denominator <= 0:
-		return {"valid": False, "elasticity": None, "confidence": "low", "reasons": ["Price variation is zero."]}
+		return {
+			"valid": False,
+			"elasticity": None,
+			"confidence": "low",
+			"reasons": ["Price variation is zero."],
+		}
 	slope = sum((xv - x_mean) * (yv - y_mean) for xv, yv in zip(x, y)) / denominator
 	predicted = [y_mean + slope * (value - x_mean) for value in x]
 	total_variation = sum((value - y_mean) ** 2 for value in y)
@@ -245,14 +242,23 @@ def build_price_scenarios(
 				"main_risks": (
 					[]
 					if elasticity.get("valid")
-					else ["Expected volume is rule-based and should be reviewed after observing actual response."]
+					else [
+						"Expected volume is rule-based and should be reviewed after observing actual response."
+					]
 				),
 			}
 		)
 	return {
 		"scenarios": scenarios,
-		"price_floor": scenarios and enforce_price_constraints(
-			current_price, current_price, cost, mrp, minimum_margin_pct, maximum_price_change_pct, rounding_increment
+		"price_floor": scenarios
+		and enforce_price_constraints(
+			current_price,
+			current_price,
+			cost,
+			mrp,
+			minimum_margin_pct,
+			maximum_price_change_pct,
+			rounding_increment,
 		).get("price_floor"),
 		"constraint_warnings": list(dict.fromkeys(constraint_warnings)),
 	}
@@ -418,11 +424,13 @@ def get_price_recommendation(
 	item, price_row, stock, price_list, latest_purchase_cost = context
 	date_to = getdate()
 	date_from = add_months(date_to, -history_months)
-	history = _history(
-		item_code, company, branch, warehouses, customer_group, date_from, date_to
-	)
+	history = _history(item_code, company, branch, warehouses, customer_group, date_from, date_to)
 	realized_prices = [flt(row.realized_price) for row in history if flt(row.realized_price) > 0]
-	current_price = flt(price_row.price_list_rate) if price_row else (realized_prices[-1] if realized_prices else flt(item.custom_mrp))
+	current_price = (
+		flt(price_row.price_list_rate)
+		if price_row
+		else (realized_prices[-1] if realized_prices else flt(item.custom_mrp))
+	)
 	cost_candidates = [
 		flt(item.custom_latest_price_incl_taxes),
 		flt(latest_purchase_cost),
@@ -524,7 +532,9 @@ def get_price_recommendation(
 	if not elasticity.get("valid"):
 		warnings.extend(elasticity.get("reasons") or [])
 	if promotion_periods:
-		warnings.append(f"{promotion_periods} promotional period(s) were excluded from elasticity estimation.")
+		warnings.append(
+			f"{promotion_periods} promotional period(s) were excluded from elasticity estimation."
+		)
 	return {
 		"notice": NOTICE,
 		"automatic_update": False,
@@ -536,7 +546,9 @@ def get_price_recommendation(
 		"item_group": item.item_group,
 		"brand": item.brand,
 		"uom": price_row.uom if price_row else item.stock_uom,
-		"currency": price_row.currency if price_row else frappe.get_cached_value("Company", company, "default_currency"),
+		"currency": price_row.currency
+		if price_row
+		else frappe.get_cached_value("Company", company, "default_currency"),
 		"price_list": price_list,
 		"current_price": round(current_price, 2),
 		"cost": round(cost, 2),

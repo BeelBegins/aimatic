@@ -29,9 +29,7 @@ def require_catalog_sheet_permission():
 
 
 def _erpnext_barcodes(item_code):
-	return ", ".join(
-		frappe.get_all("Item Barcode", filters={"parent": item_code}, pluck="barcode") or []
-	)
+	return ", ".join(frappe.get_all("Item Barcode", filters={"parent": item_code}, pluck="barcode") or [])
 
 
 def _stock_map(item_codes, branch):
@@ -95,11 +93,7 @@ def get_foodpanda_catalog_sheet_rows(outlet_name):
 		filters={"outlet": outlet_name},
 		fields=product_fields,
 	)
-	by_sku = {
-		str(p.foodpanda_product_id).strip(): p
-		for p in products
-		if p.foodpanda_product_id
-	}
+	by_sku = {str(p.foodpanda_product_id).strip(): p for p in products if p.foodpanda_product_id}
 	by_item = {p.item_code: p for p in products if p.item_code}
 
 	item_codes = list({p.item_code for p in products if p.item_code})
@@ -173,8 +167,10 @@ def get_foodpanda_catalog_sheet_rows(outlet_name):
 		else:
 			portal_active = remote_active
 		# Match Ready / missing local price: show remote price so the grid is ready to save.
-		display_price = our_price if our_price is not None else (
-			flt(remote.get("price"), 2) if remote.get("price") is not None else None
+		display_price = (
+			our_price
+			if our_price is not None
+			else (flt(remote.get("price"), 2) if remote.get("price") is not None else None)
 		)
 		rows.append(
 			{
@@ -269,9 +265,10 @@ def link_match_ready_products(outlet_name, rows=None):
 			updates["foodpanda_product_id"] = sku
 			updates["sync_status"] = "Pending"
 			updates["last_error"] = ""
-		if frappe.db.has_column("Foodpanda Product", "portal_active") and getattr(
-			product, "portal_active", None
-		) is None:
+		if (
+			frappe.db.has_column("Foodpanda Product", "portal_active")
+			and getattr(product, "portal_active", None) is None
+		):
 			updates["portal_active"] = cint(
 				row.get("portal_active") if row.get("portal_active") != "" else row.get("remote_active") or 1
 			)
@@ -292,9 +289,7 @@ def apply_portal_active_updates(outlet_name, active_updates):
 		return {"updated": 0, "item_codes": []}
 	if not frappe.db.has_column("Foodpanda Product", "portal_active"):
 		frappe.throw(
-			frappe._(
-				"Portal Active field is not installed yet. Run bench migrate on this site, then retry."
-			)
+			frappe._("Portal Active field is not installed yet. Run bench migrate on this site, then retry.")
 		)
 
 	updated = 0

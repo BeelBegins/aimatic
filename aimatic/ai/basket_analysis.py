@@ -117,7 +117,9 @@ def get_market_basket_analysis(
 		"transaction_count": len(transactions),
 		"row_count": len(pairs),
 		"data_quality_warnings": (
-			[f"At least {minimum_transactions} transactions are required; only {len(transactions)} were available."]
+			[
+				f"At least {minimum_transactions} transactions are required; only {len(transactions)} were available."
+			]
 			if quality["insufficient_data"]
 			else []
 		),
@@ -125,23 +127,25 @@ def get_market_basket_analysis(
 	}
 
 
-TOOL_SPECS = [{
-	"type": "function",
-	"function": {
-		"name": "get_market_basket_analysis",
-		"description": "Certified bounded item-pair analysis with minimum transaction, support, and confidence guards; returns support, confidence, lift, branch, and review-only cross-sell combinations.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"branch": {"type": "string"},
-				"history_days": {"type": "integer"},
-				"minimum_transactions": {"type": "integer"},
-				"minimum_support": {"type": "number"},
-				"minimum_confidence": {"type": "number"},
-				"limit": {"type": "integer"},
+TOOL_SPECS = [
+	{
+		"type": "function",
+		"function": {
+			"name": "get_market_basket_analysis",
+			"description": "Certified bounded item-pair analysis with minimum transaction, support, and confidence guards; returns support, confidence, lift, branch, and review-only cross-sell combinations.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"branch": {"type": "string"},
+					"history_days": {"type": "integer"},
+					"minimum_transactions": {"type": "integer"},
+					"minimum_support": {"type": "number"},
+					"minimum_confidence": {"type": "number"},
+					"limit": {"type": "integer"},
+				},
 			},
 		},
-	},
-}]
+	}
+]
 
 TOOL_DISPATCH = {"get_market_basket_analysis": get_market_basket_analysis}

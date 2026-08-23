@@ -46,11 +46,7 @@ NEW_REFRESH_FN = """    function refreshItemsAfterCalculation(frm) {
 def _fixture_scripts() -> dict[str, str]:
 	path = Path(__file__).resolve().parents[1] / "fixtures" / "client_script.json"
 	rows = json.loads(path.read_text(encoding="utf-8"))
-	return {
-		row["name"]: row.get("script") or ""
-		for row in rows
-		if row.get("name") in TARGETS
-	}
+	return {row["name"]: row.get("script") or "" for row in rows if row.get("name") in TARGETS}
 
 
 def patch_refresh_fn(script: str) -> str:
@@ -236,9 +232,7 @@ def resolve_script(name: str, live: str, fixtures: dict[str, str]) -> str | None
 	if live and "function refreshItemsAfterCalculation" in live:
 		return apply_surgical(live)
 
-	raise RuntimeError(
-		f"{name}: no flicker-fix fixture script and live script is not surgically patchable"
-	)
+	raise RuntimeError(f"{name}: no flicker-fix fixture script and live script is not surgically patchable")
 
 
 def execute():

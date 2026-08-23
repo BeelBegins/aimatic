@@ -20,9 +20,7 @@ def _infer_stock_entry_branch(doc):
 	surface as a GL-entry error at submit time."""
 
 	for row in doc.get("items") or []:
-		branch = get_warehouse_branch(row.get("s_warehouse")) or get_warehouse_branch(
-			row.get("t_warehouse")
-		)
+		branch = get_warehouse_branch(row.get("s_warehouse")) or get_warehouse_branch(row.get("t_warehouse"))
 		if branch:
 			return branch
 	return None

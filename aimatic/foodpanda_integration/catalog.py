@@ -39,9 +39,15 @@ def _get_stock(item_code, branch):
 	warehouse = get_branch_defaults(branch).get("finished_goods_warehouse")
 	if not warehouse:
 		return 0, False
-	bin_row = frappe.db.get_value(
-		"Bin", {"item_code": item_code, "warehouse": warehouse}, ["actual_qty", "reserved_qty"], as_dict=True
-	) or {}
+	bin_row = (
+		frappe.db.get_value(
+			"Bin",
+			{"item_code": item_code, "warehouse": warehouse},
+			["actual_qty", "reserved_qty"],
+			as_dict=True,
+		)
+		or {}
+	)
 	quantity = max(flt(bin_row.get("actual_qty")) - flt(bin_row.get("reserved_qty")), 0)
 	return quantity, quantity > 0
 
@@ -58,14 +64,11 @@ def _is_foodpanda_barcode(barcode):
 
 def _get_foodpanda_barcode(item_code):
 	"""Prefer a digit-only barcode Foodpanda will accept; else None."""
-	barcodes = frappe.get_all(
-		"Item Barcode", filters={"parent": item_code}, pluck="barcode"
-	)
+	barcodes = frappe.get_all("Item Barcode", filters={"parent": item_code}, pluck="barcode")
 	for barcode in barcodes:
 		if _is_foodpanda_barcode(barcode):
 			return str(barcode).strip()
 	return None
-
 
 
 def _barcode_variants(barcode):
@@ -144,11 +147,7 @@ def _catalog_sku(item_code, foodpanda_sku=None, barcode=None):
 	barcode = barcode if barcode is not None else _get_barcode(item_code)
 	if barcode:
 		return str(barcode).strip()
-	frappe.throw(
-		_("Item {0} has no barcode; Foodpanda sync uses barcodes, not Item Codes").format(
-			item_code
-		)
-	)
+	frappe.throw(_("Item {0} has no barcode; Foodpanda sync uses barcodes, not Item Codes").format(item_code))
 
 
 def _maximum_sales_quantity(quantity):
@@ -170,9 +169,7 @@ def _get_public_product_name(item_code, fallback):
 def build_update_payload(item_code, outlet, foodpanda_sku=None):
 	"""Steady-state payload for an existing Foodpanda product - limited to
 	the fields the docs' update example actually shows."""
-	item = frappe.db.get_value(
-		"Item", item_code, ["disabled", "is_sales_item"], as_dict=True
-	)
+	item = frappe.db.get_value("Item", item_code, ["disabled", "is_sales_item"], as_dict=True)
 	if not item:
 		frappe.throw(_("Item {0} does not exist").format(item_code))
 
@@ -210,7 +207,10 @@ def build_update_payload(item_code, outlet, foodpanda_sku=None):
 def build_create_payload(item_code, outlet):
 	"""Documented Add Products payload with localized and array fields."""
 	item = frappe.db.get_value(
-		"Item", item_code, ["item_name", "description", "item_group", "disabled", "is_sales_item"], as_dict=True
+		"Item",
+		item_code,
+		["item_name", "description", "item_group", "disabled", "is_sales_item"],
+		as_dict=True,
 	)
 	if not item:
 		frappe.throw(_("Item {0} does not exist").format(item_code))
@@ -222,9 +222,9 @@ def build_create_payload(item_code, outlet):
 	barcode = _get_foodpanda_barcode(item_code)
 	if not barcode:
 		frappe.throw(
-			_(
-				"Item {0} needs a digit-only barcode (max 14 digits) to create a Foodpanda product"
-			).format(item_code)
+			_("Item {0} needs a digit-only barcode (max 14 digits) to create a Foodpanda product").format(
+				item_code
+			)
 		)
 
 	settings = client.get_settings()
@@ -281,8 +281,10 @@ def _submit_catalog_products(
 		raise FoodpandaAPIError("Foodpanda catalog submit called with no products")
 
 	is_add = method == "POST"
-	path = _ADD_PRODUCTS_PATH.format(chain_id=chain_id) if is_add else _UPDATE_PRODUCTS_PATH.format(
-		chain_id=chain_id, vendor_id=vendor_id
+	path = (
+		_ADD_PRODUCTS_PATH.format(chain_id=chain_id)
+		if is_add
+		else _UPDATE_PRODUCTS_PATH.format(chain_id=chain_id, vendor_id=vendor_id)
 	)
 	body = {"vendors": [vendor_id], "products": payloads} if is_add else {"products": payloads}
 	response = client.request(
@@ -318,8 +320,6 @@ def _submit_catalog_products(
 	return job_id
 
 
-
-
 def sync_item(item_code, outlet_name):
 	outlet = frappe.get_doc("Foodpanda Outlet", outlet_name)
 	if not outlet.catalog_sync_enabled:
@@ -344,9 +344,7 @@ def sync_item(item_code, outlet_name):
 		payload = (
 			build_create_payload(item_code, outlet)
 			if is_new_product
-			else build_update_payload(
-				item_code, outlet, foodpanda_sku=product.foodpanda_product_id
-			)
+			else build_update_payload(item_code, outlet, foodpanda_sku=product.foodpanda_product_id)
 		)
 	except frappe.ValidationError as error:
 		product.db_set({"sync_status": "Failed", "last_error": str(error)})
@@ -370,12 +368,15 @@ def sync_item(item_code, outlet_name):
 			include_api_response=True,
 		)
 		product.db_set(
-			{"sync_status": "Pending", "last_job_id": job_id, "pending_content_hash": content_hash, "last_error": ""}
+			{
+				"sync_status": "Pending",
+				"last_job_id": job_id,
+				"pending_content_hash": content_hash,
+				"last_error": "",
+			}
 		)
 	except FoodpandaAPIError as error:
-		client.log_api_failure(
-			f"Foodpanda catalog sync failed: {item_code}", f"Outlet: {outlet_name}", error
-		)
+		client.log_api_failure(f"Foodpanda catalog sync failed: {item_code}", f"Outlet: {outlet_name}", error)
 		product.db_set({"sync_status": "Failed", "last_error": str(error)})
 		result = {"status": "Failed", "error": str(error), "source": "Foodpanda API"}
 		if error.status_code is not None or error.response_body is not None:
@@ -416,9 +417,7 @@ def sync_availability(item_code, branch):
 	settings = client.get_settings()
 
 	try:
-		payload = build_update_payload(
-			item_code, outlet, foodpanda_sku=product.foodpanda_product_id
-		)
+		payload = build_update_payload(item_code, outlet, foodpanda_sku=product.foodpanda_product_id)
 		job_id = _submit_catalog_job(
 			settings, "PUT", settings.chain_id, outlet.vendor_id, payload, outlet_name
 		)
@@ -436,9 +435,13 @@ def sync_availability(item_code, branch):
 		client.log_api_failure(
 			f"Foodpanda availability sync failed: {item_code}", f"Outlet: {outlet_name}", error
 		)
-		frappe.db.set_value("Foodpanda Product", product.name, {"sync_status": "Failed", "last_error": str(error)})
+		frappe.db.set_value(
+			"Foodpanda Product", product.name, {"sync_status": "Failed", "last_error": str(error)}
+		)
 	except frappe.ValidationError as error:
-		frappe.db.set_value("Foodpanda Product", product.name, {"sync_status": "Failed", "last_error": str(error)})
+		frappe.db.set_value(
+			"Foodpanda Product", product.name, {"sync_status": "Failed", "last_error": str(error)}
+		)
 
 
 def iter_remote_catalog_products(outlet_name, page_size=500, source="auto"):
@@ -533,9 +536,7 @@ def map_remote_catalog_by_barcode(outlet_name, source="auto"):
 	if source in ("auto", "export") and not catalog_export.cached_export_product_count(outlet_name):
 		if source == "export":
 			frappe.throw(
-				_(
-					"No completed catalog export for this outlet. Use Import Catalog from Foodpanda first."
-				)
+				_("No completed catalog export for this outlet. Use Import Catalog from Foodpanda first.")
 			)
 		source = "get"
 
@@ -547,7 +548,9 @@ def map_remote_catalog_by_barcode(outlet_name, source="auto"):
 	skipped_unmatched = 0
 	skipped_ambiguous = 0
 	remote_total = 0
-	resolved_source = "export" if source == "auto" and catalog_export.cached_export_product_count(outlet_name) else source
+	resolved_source = (
+		"export" if source == "auto" and catalog_export.cached_export_product_count(outlet_name) else source
+	)
 
 	for remote in iter_remote_catalog_products(outlet_name, source=resolved_source):
 		remote_total += 1
@@ -576,38 +579,46 @@ def map_remote_catalog_by_barcode(outlet_name, source="auto"):
 
 		if not remote_sku:
 			skipped_unmatched += 1
-			report_rows.append({**base_row, "status": "Missing SKU", "notes": "Remote catalog row has no SKU"})
+			report_rows.append(
+				{**base_row, "status": "Missing SKU", "notes": "Remote catalog row has no SKU"}
+			)
 			continue
 		if not barcodes:
 			skipped_no_barcode += 1
-			report_rows.append({
-				**base_row,
-				"status": "No Barcode",
-				"notes": "Partner API returned no barcodes for this Foodpanda product; cannot match to ERPNext",
-			})
+			report_rows.append(
+				{
+					**base_row,
+					"status": "No Barcode",
+					"notes": "Partner API returned no barcodes for this Foodpanda product; cannot match to ERPNext",
+				}
+			)
 			continue
 
 		unique_items, matched_variant = _resolve_items_for_remote_barcodes(barcodes, barcode_index)
 		if not unique_items:
 			skipped_unmatched += 1
-			report_rows.append({
-				**base_row,
-				"status": "Unmatched",
-				"notes": "No ERPNext Item Barcode matched these variants",
-			})
+			report_rows.append(
+				{
+					**base_row,
+					"status": "Unmatched",
+					"notes": "No ERPNext Item Barcode matched these variants",
+				}
+			)
 			continue
 		if len(unique_items) > 1:
 			skipped_ambiguous += 1
-			report_rows.append({
-				**base_row,
-				"status": "Ambiguous",
-				"item_code": ", ".join(unique_items),
-				"matched_barcode": matched_variant or "",
-				"erpnext_barcodes": "; ".join(
-					f"{code}: {_erpnext_barcodes_for_item(code)}" for code in unique_items
-				),
-				"notes": "Multiple Items share this barcode",
-			})
+			report_rows.append(
+				{
+					**base_row,
+					"status": "Ambiguous",
+					"item_code": ", ".join(unique_items),
+					"matched_barcode": matched_variant or "",
+					"erpnext_barcodes": "; ".join(
+						f"{code}: {_erpnext_barcodes_for_item(code)}" for code in unique_items
+					),
+					"notes": "Multiple Items share this barcode",
+				}
+			)
 			continue
 
 		item_code = unique_items[0]
@@ -616,15 +627,17 @@ def map_remote_catalog_by_barcode(outlet_name, source="auto"):
 		product = get_or_create_foodpanda_product(item_code, outlet_name)
 		if product.foodpanda_product_id == remote_sku:
 			mapped += 1
-			report_rows.append({
-				**base_row,
-				"status": "Mapped",
-				"item_code": item_code,
-				"item_name": item_name,
-				"matched_barcode": matched_variant or "",
-				"erpnext_barcodes": erpnext_barcodes,
-				"notes": "Already mapped",
-			})
+			report_rows.append(
+				{
+					**base_row,
+					"status": "Mapped",
+					"item_code": item_code,
+					"item_name": item_name,
+					"matched_barcode": matched_variant or "",
+					"erpnext_barcodes": erpnext_barcodes,
+					"notes": "Already mapped",
+				}
+			)
 			continue
 		product.db_set(
 			{
@@ -635,15 +648,17 @@ def map_remote_catalog_by_barcode(outlet_name, source="auto"):
 		)
 		mapped += 1
 		updated += 1
-		report_rows.append({
-			**base_row,
-			"status": "Updated",
-			"item_code": item_code,
-			"item_name": item_name,
-			"matched_barcode": matched_variant or "",
-			"erpnext_barcodes": erpnext_barcodes,
-			"notes": "Foodpanda Product ID set from remote SKU",
-		})
+		report_rows.append(
+			{
+				**base_row,
+				"status": "Updated",
+				"item_code": item_code,
+				"item_name": item_name,
+				"matched_barcode": matched_variant or "",
+				"erpnext_barcodes": erpnext_barcodes,
+				"notes": "Foodpanda Product ID set from remote SKU",
+			}
+		)
 
 	local_rows = _local_barcode_report_rows()
 	mapped_count = frappe.db.count(
@@ -752,20 +767,25 @@ def _matching_report_bytes(rows, local_barcode_rows=None, summary=None):
 	]
 	sheet.append(headers)
 	for row in rows:
-		sheet.append([row.get(key) for key in [
-			"status",
-			"foodpanda_sku",
-			"foodpanda_barcodes",
-			"variants_tried",
-			"foodpanda_title",
-			"foodpanda_price",
-			"foodpanda_active",
-			"item_code",
-			"item_name",
-			"matched_barcode",
-			"erpnext_barcodes",
-			"notes",
-		]])
+		sheet.append(
+			[
+				row.get(key)
+				for key in [
+					"status",
+					"foodpanda_sku",
+					"foodpanda_barcodes",
+					"variants_tried",
+					"foodpanda_title",
+					"foodpanda_price",
+					"foodpanda_active",
+					"item_code",
+					"item_name",
+					"matched_barcode",
+					"erpnext_barcodes",
+					"notes",
+				]
+			]
+		)
 
 	local_sheet = workbook.create_sheet("ERPNext Barcodes")
 	local_sheet.append(["ERPNext Barcode", "Item Code", "Item Name"])
@@ -797,9 +817,7 @@ def _local_barcode_report_rows():
 
 
 def _erpnext_barcodes_for_item(item_code):
-	return ", ".join(
-		frappe.get_all("Item Barcode", filters={"parent": item_code}, pluck="barcode") or []
-	)
+	return ", ".join(frappe.get_all("Item Barcode", filters={"parent": item_code}, pluck="barcode") or [])
 
 
 def _variants_tried_for_barcodes(barcodes):
@@ -859,17 +877,21 @@ def request_remote_export(outlet_name):
 	response_data = response.json() or {}
 	job_id = response_data.get("job_id")
 	if not job_id:
-		raise FoodpandaAPIError("Foodpanda catalog export response had no job_id", response_body=response_data)
-	frappe.get_doc({
-		"doctype": "Foodpanda Catalog Job",
-		"job_id": job_id,
-		"operation": "Export",
-		"outlet": outlet_name,
-		"vendor_id": outlet.vendor_id,
-		"status": "Pending",
-		"raw_response": json.dumps(response_data, ensure_ascii=False, default=str),
-		"submitted_at": now_datetime(),
-	}).insert(ignore_permissions=True)
+		raise FoodpandaAPIError(
+			"Foodpanda catalog export response had no job_id", response_body=response_data
+		)
+	frappe.get_doc(
+		{
+			"doctype": "Foodpanda Catalog Job",
+			"job_id": job_id,
+			"operation": "Export",
+			"outlet": outlet_name,
+			"vendor_id": outlet.vendor_id,
+			"status": "Pending",
+			"raw_response": json.dumps(response_data, ensure_ascii=False, default=str),
+			"submitted_at": now_datetime(),
+		}
+	).insert(ignore_permissions=True)
 	return {"job_id": job_id, "status": "Pending"}
 
 
@@ -902,7 +924,6 @@ def _get_job_status(job_id):
 	if isinstance(raw, bytes):
 		raw = raw.decode()
 	return json.loads(raw)
-
 
 
 def start_bulk_export(outlet_name, item_codes=None):
@@ -1075,9 +1096,7 @@ def run_bulk_export(export_job_id=None, outlet_name=None, job_id=None, item_code
 
 	for row in rows:
 		try:
-			payload = build_update_payload(
-				row.item_code, outlet, foodpanda_sku=row.foodpanda_product_id
-			)
+			payload = build_update_payload(row.item_code, outlet, foodpanda_sku=row.foodpanda_product_id)
 			content_hash = hash_payload(payload)
 			if row.sync_status == "Synced" and row.content_hash == content_hash:
 				synced += 1

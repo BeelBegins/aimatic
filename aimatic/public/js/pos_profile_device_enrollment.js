@@ -42,7 +42,7 @@ function show_device_enrollment_dialog(payload) {
 					qr_code
 						? `<div style="display:flex;justify-content:center;padding:12px"><img src="${qr_code}" alt="${__(
 								"Device enrollment QR code"
-							)}" style="width:min(320px,100%);height:auto;background:#fff;padding:12px;border:1px solid var(--border-color);border-radius:8px"></div>`
+						  )}" style="width:min(320px,100%);height:auto;background:#fff;padding:12px;border:1px solid var(--border-color);border-radius:8px"></div>`
 						: ""
 				}`,
 			},

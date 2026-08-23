@@ -56,9 +56,7 @@ def parse_export_payload(raw):
 	first_lower = first_line.lower().replace('"', "")
 	looks_like_json = first_line.startswith("{") or first_line.startswith("[")
 	if not looks_like_json and (
-		first_lower.startswith("sku,")
-		or first_lower.startswith("sku;")
-		or first_lower.split(",")[0] == "sku"
+		first_lower.startswith("sku,") or first_lower.startswith("sku;") or first_lower.split(",")[0] == "sku"
 	):
 		return _parse_export_csv(text)
 
@@ -102,7 +100,9 @@ def _parse_export_csv(text):
 		if not isinstance(row, dict):
 			continue
 		# Normalize CSV keys (strip BOM/spaces/quotes leftovers).
-		cleaned = {(k or "").strip().lower(): (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
+		cleaned = {
+			(k or "").strip().lower(): (v.strip() if isinstance(v, str) else v) for k, v in row.items()
+		}
 		sku = cleaned.get("sku") or cleaned.get("product_sku") or cleaned.get("item_sku")
 		barcode = cleaned.get("barcode") or cleaned.get("barcodes")
 		barcodes = []
@@ -212,10 +212,7 @@ def attach_export_file(job_name, content, outlet_name):
 	from frappe.utils.file_manager import save_file
 
 	safe_outlet = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in outlet_name)[:40]
-	filename = (
-		f"foodpanda-catalog-export-{safe_outlet}-"
-		f"{now_datetime().strftime('%Y%m%d-%H%M%S')}.json"
-	)
+	filename = f"foodpanda-catalog-export-{safe_outlet}-{now_datetime().strftime('%Y%m%d-%H%M%S')}.json"
 	saved = save_file(
 		filename,
 		content,

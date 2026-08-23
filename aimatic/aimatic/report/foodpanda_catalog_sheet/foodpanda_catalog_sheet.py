@@ -8,7 +8,6 @@ from aimatic.foodpanda_integration.catalog_sheet import (
 	require_catalog_sheet_permission,
 )
 
-
 COLUMNS = [
 	{
 		"label": "Match Status",

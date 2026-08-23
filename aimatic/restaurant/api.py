@@ -6,7 +6,6 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, flt, now_datetime, strip_html_tags
 
-
 _OAUTH_APP = "Aimatic Restaurant Android"
 _STAFF_ROLES = {"Restaurant Waiter", "Restaurant Manager", "Kitchen User", "System Manager"}
 _WAITER_ROLES = {"Restaurant Waiter", "Restaurant Manager", "System Manager"}
@@ -52,7 +51,16 @@ def _permitted_profiles(branch=None):
 	rows = frappe.get_all(
 		"Restaurant Profile",
 		filters=filters,
-		fields=["name", "profile_name", "branch", "company", "pos_profile", "default_customer", "menu_price_list", "warehouse"],
+		fields=[
+			"name",
+			"profile_name",
+			"branch",
+			"company",
+			"pos_profile",
+			"default_customer",
+			"menu_price_list",
+			"warehouse",
+		],
 		order_by="profile_name",
 		limit_page_length=200,
 	)
@@ -75,8 +83,15 @@ def _context(branch=None, restaurant_profile=None):
 	price_list = profile.menu_price_list or pos.selling_price_list
 	if not warehouse or not price_list:
 		frappe.throw(_("Restaurant Profile requires a Warehouse and selling Price List"))
-	warehouse_row = frappe.db.get_value("Warehouse", warehouse, ["company", "disabled", "is_group"], as_dict=True)
-	if not warehouse_row or warehouse_row.company != profile.company or warehouse_row.disabled or warehouse_row.is_group:
+	warehouse_row = frappe.db.get_value(
+		"Warehouse", warehouse, ["company", "disabled", "is_group"], as_dict=True
+	)
+	if (
+		not warehouse_row
+		or warehouse_row.company != profile.company
+		or warehouse_row.disabled
+		or warehouse_row.is_group
+	):
 		frappe.throw(_("Restaurant Warehouse is not an active stock warehouse for this Company"))
 	return frappe._dict(
 		profile=profile.name,
@@ -99,7 +114,10 @@ def _load_order(name, write=False):
 	if doc.restaurant_profile not in profiles:
 		frappe.throw(_("You are not permitted to access this Restaurant Order"), frappe.PermissionError)
 	if write and doc.waiter != user and not roles.intersection(_MANAGER_ROLES):
-		frappe.throw(_("Only the assigned waiter or a Restaurant Manager may change this order"), frappe.PermissionError)
+		frappe.throw(
+			_("Only the assigned waiter or a Restaurant Manager may change this order"),
+			frappe.PermissionError,
+		)
 	return doc
 
 
@@ -131,21 +149,27 @@ def _modifier_configuration(item_code):
 		doc = frappe.get_cached_doc("Restaurant Modifier Group", name)
 		if doc.disabled:
 			continue
-		result.append({
-			"code": doc.name,
-			"title": doc.group_name,
-			"required": bool(doc.required),
-			"multiple": bool(doc.allow_multiple),
-			"minimum": cint(doc.minimum_selections),
-			"maximum": cint(doc.maximum_selections),
-			"options": [{
-				"code": f"{doc.name}:{row.option_code}",
-				"option_code": row.option_code,
-				"label": row.label,
-				"price": flt(row.price_adjustment, 2),
-				"linked_item": row.linked_item,
-			} for row in doc.options if not row.disabled],
-		})
+		result.append(
+			{
+				"code": doc.name,
+				"title": doc.group_name,
+				"required": bool(doc.required),
+				"multiple": bool(doc.allow_multiple),
+				"minimum": cint(doc.minimum_selections),
+				"maximum": cint(doc.maximum_selections),
+				"options": [
+					{
+						"code": f"{doc.name}:{row.option_code}",
+						"option_code": row.option_code,
+						"label": row.label,
+						"price": flt(row.price_adjustment, 2),
+						"linked_item": row.linked_item,
+					}
+					for row in doc.options
+					if not row.disabled
+				],
+			}
+		)
 	return result
 
 
@@ -173,8 +197,19 @@ def _validate_modifiers(item_code, requested):
 
 
 def _stock_and_prices(item_codes, context):
-	bins = frappe.get_all("Bin", filters={"warehouse": context.warehouse, "item_code": ["in", item_codes or [""]]}, fields=["item_code", "actual_qty", "reserved_qty"], limit_page_length=max(len(item_codes), 1))
-	prices = frappe.get_all("Item Price", filters={"price_list": context.price_list, "selling": 1, "item_code": ["in", item_codes or [""]]}, fields=["item_code", "price_list_rate"], order_by="modified desc", limit_page_length=max(len(item_codes) * 3, 100))
+	bins = frappe.get_all(
+		"Bin",
+		filters={"warehouse": context.warehouse, "item_code": ["in", item_codes or [""]]},
+		fields=["item_code", "actual_qty", "reserved_qty"],
+		limit_page_length=max(len(item_codes), 1),
+	)
+	prices = frappe.get_all(
+		"Item Price",
+		filters={"price_list": context.price_list, "selling": 1, "item_code": ["in", item_codes or [""]]},
+		fields=["item_code", "price_list_rate"],
+		order_by="modified desc",
+		limit_page_length=max(len(item_codes) * 3, 100),
+	)
 	stock = {row.item_code: max(flt(row.actual_qty) - flt(row.reserved_qty), 0) for row in bins}
 	rates = {}
 	for row in prices:
@@ -184,17 +219,39 @@ def _stock_and_prices(item_codes, context):
 
 def _order_response(doc):
 	return {
-		"name": doc.name, "branch": doc.branch, "floor": doc.floor, "table": doc.restaurant_table,
+		"name": doc.name,
+		"branch": doc.branch,
+		"floor": doc.floor,
+		"table": doc.restaurant_table,
 		"table_title": frappe.db.get_value("Restaurant Table", doc.restaurant_table, "title"),
-		"waiter": doc.waiter, "guest_count": doc.guest_count, "status": doc.status,
-		"currency": doc.currency, "net_total": flt(doc.net_total, 2), "taxes": flt(doc.total_taxes_and_charges, 2),
-		"grand_total": flt(doc.grand_total, 2), "pos_invoice": doc.pos_invoice, "opened_at": doc.opened_at,
-		"modified": str(doc.modified), "items": [{
-			"id": row.name, "item_code": row.item, "item_name": row.item_name, "uom": row.uom,
-			"quantity": flt(row.qty), "sent_quantity": flt(row.sent_qty), "rate": flt(row.rate, 2),
-			"amount": flt(row.amount, 2), "notes": row.notes or "", "modifiers": json.loads(row.modifiers_json or "[]"),
-			"kitchen_station": row.kitchen_station, "kitchen_status": row.kitchen_status, "added_at": row.added_at,
-		} for row in doc.items],
+		"waiter": doc.waiter,
+		"guest_count": doc.guest_count,
+		"status": doc.status,
+		"currency": doc.currency,
+		"net_total": flt(doc.net_total, 2),
+		"taxes": flt(doc.total_taxes_and_charges, 2),
+		"grand_total": flt(doc.grand_total, 2),
+		"pos_invoice": doc.pos_invoice,
+		"opened_at": doc.opened_at,
+		"modified": str(doc.modified),
+		"items": [
+			{
+				"id": row.name,
+				"item_code": row.item,
+				"item_name": row.item_name,
+				"uom": row.uom,
+				"quantity": flt(row.qty),
+				"sent_quantity": flt(row.sent_qty),
+				"rate": flt(row.rate, 2),
+				"amount": flt(row.amount, 2),
+				"notes": row.notes or "",
+				"modifiers": json.loads(row.modifiers_json or "[]"),
+				"kitchen_station": row.kitchen_station,
+				"kitchen_status": row.kitchen_status,
+				"added_at": row.added_at,
+			}
+			for row in doc.items
+		],
 	}
 
 
@@ -215,10 +272,16 @@ def _table_status(order):
 
 @frappe.whitelist(allow_guest=True)
 def get_public_config():
-	client = frappe.db.get_value("OAuth Client", {"app_name": _OAUTH_APP}, ["name", "default_redirect_uri"], as_dict=True)
+	client = frappe.db.get_value(
+		"OAuth Client", {"app_name": _OAUTH_APP}, ["name", "default_redirect_uri"], as_dict=True
+	)
 	if not client:
 		frappe.throw(_("Ai Matic Restaurant OAuth is not configured"))
-	return {"oauth_client_id": client.name, "redirect_uri": client.default_redirect_uri, "scope": "restaurant-waiter"}
+	return {
+		"oauth_client_id": client.name,
+		"redirect_uri": client.default_redirect_uri,
+		"scope": "restaurant-waiter",
+	}
 
 
 @frappe.whitelist()
@@ -230,15 +293,65 @@ def get_restaurant_bootstrap(branch=None, restaurant_profile=None):
 		frappe.throw(_("No permitted Restaurant Profiles are configured"), frappe.PermissionError)
 	selected = restaurant_profile or (profiles[0].name if len(profiles) == 1 else None)
 	if not selected:
-		return {"user": user, "full_name": frappe.utils.get_fullname(user), "profiles": profiles, "requires_profile_selection": True}
+		return {
+			"user": user,
+			"full_name": frappe.utils.get_fullname(user),
+			"profiles": profiles,
+			"requires_profile_selection": True,
+		}
 	context = _context(branch, selected)
-	floor_rows = frappe.get_all("Restaurant Floor", filters={"branch": context.branch, "disabled": 0}, fields=["name", "title", "branch", "display_order"], order_by="display_order, title", limit_page_length=200)
-	table_rows = frappe.get_all("Restaurant Table", filters={"branch": context.branch, "disabled": 0}, fields=["name", "title", "branch", "floor", "capacity", "display_order"], order_by="display_order, title", limit_page_length=500)
-	active_names = frappe.get_all("Restaurant Order", filters={"branch": context.branch, "status": ["in", _ACTIVE_ORDER_STATUSES]}, pluck="name", limit_page_length=500)
-	active = {doc.restaurant_table: doc for doc in (frappe.get_doc("Restaurant Order", name) for name in active_names)}
-	menu_rows = frappe.get_all("Restaurant Menu Item", filters={"enabled": 1}, fields=["item", "menu_name", "description", "image", "category", "kitchen_station", "preparation_minutes", "vegetarian", "spicy", "popular"], order_by="category, modified desc", limit_page_length=1000)
+	floor_rows = frappe.get_all(
+		"Restaurant Floor",
+		filters={"branch": context.branch, "disabled": 0},
+		fields=["name", "title", "branch", "display_order"],
+		order_by="display_order, title",
+		limit_page_length=200,
+	)
+	table_rows = frappe.get_all(
+		"Restaurant Table",
+		filters={"branch": context.branch, "disabled": 0},
+		fields=["name", "title", "branch", "floor", "capacity", "display_order"],
+		order_by="display_order, title",
+		limit_page_length=500,
+	)
+	active_names = frappe.get_all(
+		"Restaurant Order",
+		filters={"branch": context.branch, "status": ["in", _ACTIVE_ORDER_STATUSES]},
+		pluck="name",
+		limit_page_length=500,
+	)
+	active = {
+		doc.restaurant_table: doc
+		for doc in (frappe.get_doc("Restaurant Order", name) for name in active_names)
+	}
+	menu_rows = frappe.get_all(
+		"Restaurant Menu Item",
+		filters={"enabled": 1},
+		fields=[
+			"item",
+			"menu_name",
+			"description",
+			"image",
+			"category",
+			"kitchen_station",
+			"preparation_minutes",
+			"vegetarian",
+			"spicy",
+			"popular",
+		],
+		order_by="category, modified desc",
+		limit_page_length=1000,
+	)
 	item_codes = [row.item for row in menu_rows]
-	items = {row.name: row for row in frappe.get_all("Item", filters={"name": ["in", item_codes or [""]], "disabled": 0, "is_sales_item": 1}, fields=["name", "item_name", "stock_uom", "is_stock_item", "image"], limit_page_length=max(len(item_codes), 1))}
+	items = {
+		row.name: row
+		for row in frappe.get_all(
+			"Item",
+			filters={"name": ["in", item_codes or [""]], "disabled": 0, "is_sales_item": 1},
+			fields=["name", "item_name", "stock_uom", "is_stock_item", "image"],
+			limit_page_length=max(len(item_codes), 1),
+		)
+	}
 	stock, rates = _stock_and_prices(item_codes, context)
 	allow_negative = cint(frappe.db.get_single_value("Stock Settings", "allow_negative_stock"))
 	menu_result = []
@@ -247,18 +360,61 @@ def get_restaurant_bootstrap(branch=None, restaurant_profile=None):
 		if not item or row.item not in rates:
 			continue
 		available_qty = stock.get(row.item, 0)
-		menu_result.append({"item_code": row.item, "item_name": row.menu_name or item.item_name, "description": row.description or "", "image": row.image or item.image or "", "category": row.category, "uom": item.stock_uom, "rate": rates[row.item], "currency": context.currency, "available_qty": available_qty, "available": bool(not item.is_stock_item or allow_negative or available_qty > 0), "preparation_minutes": row.preparation_minutes, "vegetarian": bool(row.vegetarian), "spicy": bool(row.spicy), "popular": bool(row.popular), "kitchen_station": row.kitchen_station, "modifier_groups": _modifier_configuration(row.item)})
+		menu_result.append(
+			{
+				"item_code": row.item,
+				"item_name": row.menu_name or item.item_name,
+				"description": row.description or "",
+				"image": row.image or item.image or "",
+				"category": row.category,
+				"uom": item.stock_uom,
+				"rate": rates[row.item],
+				"currency": context.currency,
+				"available_qty": available_qty,
+				"available": bool(not item.is_stock_item or allow_negative or available_qty > 0),
+				"preparation_minutes": row.preparation_minutes,
+				"vegetarian": bool(row.vegetarian),
+				"spicy": bool(row.spicy),
+				"popular": bool(row.popular),
+				"kitchen_station": row.kitchen_station,
+				"modifier_groups": _modifier_configuration(row.item),
+			}
+		)
 	tables = []
 	for row in table_rows:
 		order = active.get(row.name)
-		tables.append({**row, "status": _table_status(order), "guests": order.guest_count if order else 0, "waiter": order.waiter if order else None, "order": order.name if order else None, "amount": flt(order.grand_total, 2) if order else 0, "opened_at": order.opened_at if order else None})
-	return {"user": user, "full_name": frappe.utils.get_fullname(user), "profile": context, "profiles": profiles, "branches": sorted({row.branch for row in profiles if row.branch}), "floors": floor_rows, "tables": tables, "categories": sorted({row.category for row in menu_rows}), "items": menu_result, "online": True, "server_time": now_datetime()}
+		tables.append(
+			{
+				**row,
+				"status": _table_status(order),
+				"guests": order.guest_count if order else 0,
+				"waiter": order.waiter if order else None,
+				"order": order.name if order else None,
+				"amount": flt(order.grand_total, 2) if order else 0,
+				"opened_at": order.opened_at if order else None,
+			}
+		)
+	return {
+		"user": user,
+		"full_name": frappe.utils.get_fullname(user),
+		"profile": context,
+		"profiles": profiles,
+		"branches": sorted({row.branch for row in profiles if row.branch}),
+		"floors": floor_rows,
+		"tables": tables,
+		"categories": sorted({row.category for row in menu_rows}),
+		"items": menu_result,
+		"online": True,
+		"server_time": now_datetime(),
+	}
 
 
 @frappe.whitelist()
 def get_table_order(table):
 	_require_roles(_WAITER_ROLES)
-	row = frappe.db.get_value("Restaurant Order", {"restaurant_table": table, "status": ["in", _ACTIVE_ORDER_STATUSES]}, "name")
+	row = frappe.db.get_value(
+		"Restaurant Order", {"restaurant_table": table, "status": ["in", _ACTIVE_ORDER_STATUSES]}, "name"
+	)
 	if not row:
 		return {"order": None}
 	return {"order": _order_response(_load_order(row))}
@@ -275,10 +431,30 @@ def open_order(branch, floor, table, guest_count, restaurant_profile=None):
 	table_doc = frappe.get_doc("Restaurant Table", table)
 	if table_doc.disabled or table_doc.branch != context.branch or table_doc.floor != floor:
 		frappe.throw(_("Restaurant Table is not available in this Floor"))
-	existing = frappe.db.get_value("Restaurant Order", {"restaurant_table": table, "status": ["in", _ACTIVE_ORDER_STATUSES]}, "name")
+	existing = frappe.db.get_value(
+		"Restaurant Order", {"restaurant_table": table, "status": ["in", _ACTIVE_ORDER_STATUSES]}, "name"
+	)
 	if existing:
 		return {"order": _order_response(_load_order(existing)), "existing": True}
-	doc = frappe.get_doc({"doctype":"Restaurant Order", "restaurant_profile":context.profile, "branch":context.branch, "company":context.company, "floor":floor, "restaurant_table":table, "waiter":user, "guest_count":cint(guest_count), "status":"Open", "opened_at":now_datetime(), "pos_profile":context.pos_profile, "customer":context.customer, "warehouse":context.warehouse, "price_list":context.price_list, "currency":context.currency})
+	doc = frappe.get_doc(
+		{
+			"doctype": "Restaurant Order",
+			"restaurant_profile": context.profile,
+			"branch": context.branch,
+			"company": context.company,
+			"floor": floor,
+			"restaurant_table": table,
+			"waiter": user,
+			"guest_count": cint(guest_count),
+			"status": "Open",
+			"opened_at": now_datetime(),
+			"pos_profile": context.pos_profile,
+			"customer": context.customer,
+			"warehouse": context.warehouse,
+			"price_list": context.price_list,
+			"currency": context.currency,
+		}
+	)
 	doc.insert(ignore_permissions=True)
 	return {"order": _order_response(doc), "existing": False}
 
@@ -293,7 +469,18 @@ def save_order(order, items):
 	rows = _parse_json_list(items, "items")
 	if not rows:
 		frappe.throw(_("Add at least one item"))
-	menu_items = {row.item: row for row in frappe.get_all("Restaurant Menu Item", filters={"enabled": 1, "item": ["in", [x.get("item_code") for x in rows if isinstance(x, dict)] or [""]]}, fields=["item", "kitchen_station"], limit_page_length=len(rows))}
+	menu_items = {
+		row.item: row
+		for row in frappe.get_all(
+			"Restaurant Menu Item",
+			filters={
+				"enabled": 1,
+				"item": ["in", [x.get("item_code") for x in rows if isinstance(x, dict)] or [""]],
+			},
+			fields=["item", "kitchen_station"],
+			limit_page_length=len(rows),
+		)
+	}
 	stock, rates = _stock_and_prices(list(menu_items), context)
 	for value in rows:
 		if not isinstance(value, dict) or not value.get("item_code") or flt(value.get("qty")) <= 0:
@@ -303,16 +490,45 @@ def save_order(order, items):
 		if not menu_item or item_code not in rates:
 			frappe.throw(_("Item {0} is unavailable on this Restaurant menu").format(item_code))
 		item = frappe.get_cached_doc("Item", item_code)
-		if item.is_stock_item and not cint(frappe.db.get_single_value("Stock Settings", "allow_negative_stock")) and stock.get(item_code, 0) + 0.0001 < flt(value["qty"]):
+		if (
+			item.is_stock_item
+			and not cint(frappe.db.get_single_value("Stock Settings", "allow_negative_stock"))
+			and stock.get(item_code, 0) + 0.0001 < flt(value["qty"])
+		):
 			frappe.throw(_("Requested quantity for {0} is unavailable").format(item_code))
 		modifiers, adjustment = _validate_modifiers(item_code, value.get("modifiers"))
 		notes = strip_html_tags(str(value.get("notes") or "").strip())[:500]
 		signature = json.dumps(modifiers, separators=(",", ":"), sort_keys=True)
-		existing = next((row for row in doc.items if not row.sent_qty and row.item == item_code and (row.modifiers_json or "[]") == signature and (row.notes or "") == notes), None)
+		existing = next(
+			(
+				row
+				for row in doc.items
+				if not row.sent_qty
+				and row.item == item_code
+				and (row.modifiers_json or "[]") == signature
+				and (row.notes or "") == notes
+			),
+			None,
+		)
 		if existing:
 			existing.qty = flt(existing.qty) + flt(value["qty"])
 		else:
-			doc.append("items", {"item":item_code, "item_name":item.item_name, "uom":value.get("uom") or item.stock_uom, "qty":flt(value["qty"]), "sent_qty":0, "rate":flt(rates[item_code] + adjustment, 2), "notes":notes, "modifiers_json":signature, "kitchen_station":menu_item.kitchen_station, "kitchen_status":"Not Sent", "added_at":now_datetime()})
+			doc.append(
+				"items",
+				{
+					"item": item_code,
+					"item_name": item.item_name,
+					"uom": value.get("uom") or item.stock_uom,
+					"qty": flt(value["qty"]),
+					"sent_qty": 0,
+					"rate": flt(rates[item_code] + adjustment, 2),
+					"notes": notes,
+					"modifiers_json": signature,
+					"kitchen_station": menu_item.kitchen_station,
+					"kitchen_status": "Not Sent",
+					"added_at": now_datetime(),
+				},
+			)
 	doc.save(ignore_permissions=True)
 	return {"order": _order_response(doc)}
 
@@ -340,7 +556,9 @@ def update_unsent_item(order, row_id, quantity, notes=None):
 def send_to_kitchen(order, request_id):
 	if not request_id or len(request_id) > 140:
 		frappe.throw(_("A valid kitchen request ID is required"))
-	existing = frappe.db.get_value("Restaurant Kitchen Ticket", {"request_id": request_id}, ["name", "restaurant_order"], as_dict=True)
+	existing = frappe.db.get_value(
+		"Restaurant Kitchen Ticket", {"request_id": request_id}, ["name", "restaurant_order"], as_dict=True
+	)
 	if existing:
 		if existing.restaurant_order != order:
 			frappe.throw(_("This kitchen request ID belongs to another order"), frappe.PermissionError)
@@ -350,7 +568,9 @@ def send_to_kitchen(order, request_id):
 	# Recheck while the order row is locked. The unique request_id protects the
 	# database too, while this check produces a deterministic idempotent result
 	# for two near-simultaneous mobile retries.
-	existing = frappe.db.get_value("Restaurant Kitchen Ticket", {"request_id": request_id}, ["name", "restaurant_order"], as_dict=True)
+	existing = frappe.db.get_value(
+		"Restaurant Kitchen Ticket", {"request_id": request_id}, ["name", "restaurant_order"], as_dict=True
+	)
 	if existing:
 		if existing.restaurant_order != order:
 			frappe.throw(_("This kitchen request ID belongs to another order"), frappe.PermissionError)
@@ -360,10 +580,33 @@ def send_to_kitchen(order, request_id):
 	pending = [row for row in doc.items if flt(row.qty) > flt(row.sent_qty)]
 	if not pending:
 		frappe.throw(_("There are no new quantities to send"))
-	ticket = frappe.get_doc({"doctype":"Restaurant Kitchen Ticket", "request_id":request_id, "restaurant_order":doc.name, "status":"Queued", "branch":doc.branch, "floor":doc.floor, "restaurant_table":doc.restaurant_table, "waiter":doc.waiter, "sent_at":now_datetime()})
+	ticket = frappe.get_doc(
+		{
+			"doctype": "Restaurant Kitchen Ticket",
+			"request_id": request_id,
+			"restaurant_order": doc.name,
+			"status": "Queued",
+			"branch": doc.branch,
+			"floor": doc.floor,
+			"restaurant_table": doc.restaurant_table,
+			"waiter": doc.waiter,
+			"sent_at": now_datetime(),
+		}
+	)
 	for row in pending:
 		qty = flt(row.qty) - flt(row.sent_qty)
-		ticket.append("items", {"order_item_row":row.name, "item":row.item, "item_name":row.item_name, "qty":qty, "notes":row.notes, "modifiers_json":row.modifiers_json or "[]", "kitchen_station":row.kitchen_station})
+		ticket.append(
+			"items",
+			{
+				"order_item_row": row.name,
+				"item": row.item,
+				"item_name": row.item_name,
+				"qty": qty,
+				"notes": row.notes,
+				"modifiers_json": row.modifiers_json or "[]",
+				"kitchen_station": row.kitchen_station,
+			},
+		)
 		row.sent_qty = row.qty
 		row.kitchen_status = "Queued"
 	doc.status = "Sent to Kitchen"
@@ -419,7 +662,7 @@ def close_table(order, pos_invoice):
 		frappe.throw(_("POS Invoice Customer does not match this Restaurant Order"))
 	if doc.branch and invoice.get("branch") and invoice.branch != doc.branch:
 		frappe.throw(_("POS Invoice Branch does not match this Restaurant Order"))
-	if frappe.db.exists("Restaurant Order", {"name":["!=", doc.name], "pos_invoice":invoice.name}):
+	if frappe.db.exists("Restaurant Order", {"name": ["!=", doc.name], "pos_invoice": invoice.name}):
 		frappe.throw(_("This POS Invoice already closed another Restaurant Order"))
 	ordered = defaultdict(float)
 	invoiced = defaultdict(float)
@@ -445,7 +688,14 @@ def get_orders(branch=None, restaurant_profile=None, status=None, offset=0, limi
 	filters = {"restaurant_profile": ["in", profile_names or [""]]}
 	if status:
 		filters["status"] = status
-	rows = frappe.get_all("Restaurant Order", filters=filters, pluck="name", order_by="modified desc", limit_start=cint(offset), limit_page_length=min(max(cint(limit) or 50, 1), 100))
+	rows = frappe.get_all(
+		"Restaurant Order",
+		filters=filters,
+		pluck="name",
+		order_by="modified desc",
+		limit_start=cint(offset),
+		limit_page_length=min(max(cint(limit) or 50, 1), 100),
+	)
 	return {"orders": [_order_response(frappe.get_doc("Restaurant Order", name)) for name in rows]}
 
 
@@ -455,5 +705,23 @@ def get_activity(branch=None, restaurant_profile=None, limit=50):
 	profile_names = [row.name for row in profiles]
 	if restaurant_profile:
 		profile_names = [name for name in profile_names if name == restaurant_profile]
-	orders = frappe.get_all("Restaurant Order", filters={"restaurant_profile":["in", profile_names or [""]]}, fields=["name", "restaurant_table", "waiter", "status", "modified"], order_by="modified desc", limit_page_length=min(max(cint(limit) or 50, 1), 100))
-	return {"activity": [{"type":"Order", "order":row.name, "table":row.restaurant_table, "waiter":row.waiter, "status":row.status, "at":row.modified} for row in orders]}
+	orders = frappe.get_all(
+		"Restaurant Order",
+		filters={"restaurant_profile": ["in", profile_names or [""]]},
+		fields=["name", "restaurant_table", "waiter", "status", "modified"],
+		order_by="modified desc",
+		limit_page_length=min(max(cint(limit) or 50, 1), 100),
+	)
+	return {
+		"activity": [
+			{
+				"type": "Order",
+				"order": row.name,
+				"table": row.restaurant_table,
+				"waiter": row.waiter,
+				"status": row.status,
+				"at": row.modified,
+			}
+			for row in orders
+		]
+	}

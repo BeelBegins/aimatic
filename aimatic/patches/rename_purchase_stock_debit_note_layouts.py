@@ -9,13 +9,13 @@ import frappe
 # has already been created fresh from its file - this just deletes the
 # now-orphaned old-named record left behind by the earlier rename.
 OLD_NAMES = (
-    "AIM Stock Debit Note - Purchase Invoice",
-    "AIM Stock Debit Note - Purchase Receipt",
+	"AIM Stock Debit Note - Purchase Invoice",
+	"AIM Stock Debit Note - Purchase Receipt",
 )
 
 
 def execute():
-    for old_name in OLD_NAMES:
-        if frappe.db.exists("Print Format", old_name):
-            frappe.delete_doc("Print Format", old_name, force=True, ignore_permissions=True)
-    frappe.db.commit()
+	for old_name in OLD_NAMES:
+		if frappe.db.exists("Print Format", old_name):
+			frappe.delete_doc("Print Format", old_name, force=True, ignore_permissions=True)
+	frappe.db.commit()

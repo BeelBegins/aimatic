@@ -16,7 +16,9 @@ frappe.ui.form.on("Foodpanda Settings", {
 				__("Foodpanda Settings — README")
 			)
 		);
-		frm.add_custom_button(__("Show webhook URLs"), () => aimatic_show_foodpanda_webhook_urls());
+		frm.add_custom_button(__("Show webhook URLs"), () =>
+			aimatic_show_foodpanda_webhook_urls()
+		);
 		frm.add_custom_button(__("Full sync guide"), () =>
 			aimatic_show_foodpanda_markdown_help(
 				"aimatic.foodpanda_integration.api.get_foodpanda_sync_guide",
@@ -68,8 +70,12 @@ function aimatic_show_foodpanda_webhook_urls() {
 				indicator: "blue",
 				message:
 					`<p>${__("Register these URLs in the Foodpanda Vendor Portal.")}</p>` +
-					`<p><b>${__("Order webhook")}</b><br><code style="word-break:break-all">${order}</code></p>` +
-					`<p><b>${__("Assortment / catalog job webhook")}</b><br><code style="word-break:break-all">${assortment}</code></p>` +
+					`<p><b>${__(
+						"Order webhook"
+					)}</b><br><code style="word-break:break-all">${order}</code></p>` +
+					`<p><b>${__(
+						"Assortment / catalog job webhook"
+					)}</b><br><code style="word-break:break-all">${assortment}</code></p>` +
 					`<p><b>${__("Authorization")}</b><br>${auth}</p>`,
 			});
 		},

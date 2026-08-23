@@ -19,9 +19,7 @@ class TestSupplierInvoicePrefill(unittest.TestCase):
 		)
 
 		self.assertEqual(resolve_supplier_invoice_no_for_receipt(doc), "INV-100")
-		get_value.assert_called_with(
-			"Purchase Order", "PO-1", "custom_supplier_invoice_no"
-		)
+		get_value.assert_called_with("Purchase Order", "PO-1", "custom_supplier_invoice_no")
 
 	@patch("aimatic.purchase_supplier_invoice.frappe.db.get_value")
 	def test_invoice_prefers_receipt_over_order(self, get_value):

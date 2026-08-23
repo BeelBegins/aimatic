@@ -9,9 +9,9 @@ identifier from the model is accepted or forwarded.
 from __future__ import annotations
 
 import json
-from datetime import date
 import re
 from dataclasses import asdict, dataclass, field
+from datetime import date
 from typing import Any
 
 from frappe.utils import add_days, get_first_day, get_last_day, getdate, today
@@ -81,7 +81,18 @@ _DOMAIN_HINTS = {
 	"sales": {"sale", "sales", "revenue", "basket", "transaction", "return", "discount", "hourly"},
 	"profitability": {"margin", "profit", "profitable", "cost", "cogs", "below"},
 	"purchasing": {"purchase", "purchasing", "receipt", "supplier", "vendor", "po"},
-	"inventory": {"stock", "inventory", "warehouse", "reorder", "restock", "dead", "aging", "transfer", "abc", "xyz"},
+	"inventory": {
+		"stock",
+		"inventory",
+		"warehouse",
+		"reorder",
+		"restock",
+		"dead",
+		"aging",
+		"transfer",
+		"abc",
+		"xyz",
+	},
 	"customers": {"customer", "receivable", "rfm", "churn", "segment"},
 	"finance": {"payable", "cash", "bank", "expense", "tax", "trial", "balance", "payment", "account"},
 	"operations": {"shift", "open", "document", "operational"},
@@ -133,7 +144,10 @@ ANALYSIS_PLAN_TOOL_SPEC = {
 				"intent": {"type": "string", "enum": sorted(_ALLOWED_INTENTS)},
 				"business_domain": {"type": "string", "enum": sorted(_ALLOWED_DOMAINS)},
 				"metric": {"type": "string"},
-				"dimensions": {"type": "array", "items": {"type": "string", "enum": sorted(_ALLOWED_DIMENSIONS)}},
+				"dimensions": {
+					"type": "array",
+					"items": {"type": "string", "enum": sorted(_ALLOWED_DIMENSIONS)},
+				},
 				"branch": {"type": "string"},
 				"item": {"type": "string"},
 				"supplier": {"type": "string"},
@@ -207,7 +221,12 @@ def _infer_dates(question: str) -> tuple[str, str, str | None, str | None]:
 		span = (date_to - date_from).days
 		compare_to = add_days(date_from, -1)
 		compare_from = add_days(compare_to, -span)
-	return str(date_from), str(date_to), str(compare_from) if compare_from else None, str(compare_to) if compare_to else None
+	return (
+		str(date_from),
+		str(date_to),
+		str(compare_from) if compare_from else None,
+		str(compare_to) if compare_to else None,
+	)
 
 
 def fallback_plan(question: str, company: str | None = None) -> AnalysisPlan:
@@ -237,7 +256,9 @@ def fallback_plan(question: str, company: str | None = None) -> AnalysisPlan:
 	else:
 		intent = "lookup"
 
-	dimensions = [dimension for dimension in _ALLOWED_DIMENSIONS if dimension.replace("_", " ") in question.lower()]
+	dimensions = [
+		dimension for dimension in _ALLOWED_DIMENSIONS if dimension.replace("_", " ") in question.lower()
+	]
 	date_from, date_to, comparison_from, comparison_to = _infer_dates(question)
 	return AnalysisPlan(
 		intent=intent,
@@ -257,7 +278,11 @@ def validate_plan(raw: dict[str, Any] | None, question: str, company: str) -> An
 	raw = dict(raw or {})
 	fallback = fallback_plan(question, company)
 	intent = raw.get("intent") if raw.get("intent") in _ALLOWED_INTENTS else fallback.intent
-	domain = raw.get("business_domain") if raw.get("business_domain") in _ALLOWED_DOMAINS else fallback.business_domain
+	domain = (
+		raw.get("business_domain")
+		if raw.get("business_domain") in _ALLOWED_DOMAINS
+		else fallback.business_domain
+	)
 	dimensions = [d for d in (raw.get("dimensions") or []) if d in _ALLOWED_DIMENSIONS][:6]
 	date_from = _clean_date(raw.get("date_from")) or fallback.date_from
 	date_to = _clean_date(raw.get("date_to")) or fallback.date_to
@@ -270,7 +295,10 @@ def validate_plan(raw: dict[str, Any] | None, question: str, company: str) -> An
 	if isinstance(ranking, dict):
 		direction = ranking.get("direction")
 		limit = max(1, min(int(ranking.get("limit") or 10), 100))
-		ranking = {"direction": direction if direction in {"top", "bottom", "best", "worst"} else "top", "limit": limit}
+		ranking = {
+			"direction": direction if direction in {"top", "bottom", "best", "worst"} else "top",
+			"limit": limit,
+		}
 	else:
 		ranking = None
 
@@ -304,7 +332,9 @@ def validate_plan(raw: dict[str, Any] | None, question: str, company: str) -> An
 		comparison_to=comparison_to,
 		requested_ranking=ranking,
 		forecast_horizon=horizon,
-		required_confidence=raw.get("required_confidence") if raw.get("required_confidence") in {"low", "medium", "high"} else "medium",
+		required_confidence=raw.get("required_confidence")
+		if raw.get("required_confidence") in {"low", "medium", "high"}
+		else "medium",
 		preferred_route=preferred,
 		fallback_route=fallback_route,
 	)
@@ -359,11 +389,16 @@ def _score_source(question_tokens: set[str], plan: AnalysisPlan, tool_name: str,
 		("supplier", plan.supplier),
 		("customer", plan.customer),
 	):
-		if value and any(f == entity_name or f.startswith(f"{entity_name}_") for f in source.supported_filters):
+		if value and any(
+			f == entity_name or f.startswith(f"{entity_name}_") for f in source.supported_filters
+		):
 			score += 3
 	if plan.intent == "forecast" and "forecast" in source_tokens:
 		score += 20
-	if plan.intent == "recommendation" and {"recommendation", "recommendations", "reorder", "transfer", "price"} & source_tokens:
+	if (
+		plan.intent == "recommendation"
+		and {"recommendation", "recommendations", "reorder", "transfer", "price"} & source_tokens
+	):
 		score += 12
 	if plan.intent == "segmentation" and {"segment", "segmentation", "abc", "xyz", "rfm"} & source_tokens:
 		score += 14

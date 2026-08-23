@@ -30,15 +30,15 @@ def calculate_promotion_effect(
 	margin_available = baseline.get("margin") is not None and promotion.get("margin") is not None
 	baseline_margin = flt(baseline.get("margin")) if margin_available else None
 	promo_margin = flt(promotion.get("margin")) if margin_available else None
-	discount_cost = max(
-		flt(promotion.get("gross_before_discount")) - promo_revenue, 0
-	)
+	discount_cost = max(flt(promotion.get("gross_before_discount")) - promo_revenue, 0)
 	incremental_margin = (
-		promo_margin - baseline_margin / baseline_days * promotion_days
-		if margin_available
+		promo_margin - baseline_margin / baseline_days * promotion_days if margin_available else None
+	)
+	roi = (
+		incremental_margin / discount_cost * 100
+		if discount_cost > 0 and incremental_margin is not None
 		else None
 	)
-	roi = incremental_margin / discount_cost * 100 if discount_cost > 0 and incremental_margin is not None else None
 	post_daily = flt(post.get("quantity")) / post_days
 	baseline_daily = flt(baseline.get("quantity")) / baseline_days
 	post_drop = (post_daily - baseline_daily) / baseline_daily * 100 if baseline_daily else None
@@ -152,16 +152,22 @@ def get_promotion_effectiveness(
 		GROUP BY period_role
 		""",
 		{
-			"company": company, "item_code": item_code,
-			"baseline_from": baseline_from, "baseline_to": baseline_to,
-			"promotion_from": promotion_from, "promotion_to": promotion_to,
-			"post_from": post_from, "post_to": post_to,
+			"company": company,
+			"item_code": item_code,
+			"baseline_from": baseline_from,
+			"baseline_to": baseline_to,
+			"promotion_from": promotion_from,
+			"promotion_to": promotion_to,
+			"post_from": post_from,
+			"post_to": post_to,
 		},
 		as_dict=True,
 	)
 	for cogs_row in cogs_rows:
 		if cogs_row.period_role in periods:
-			periods[cogs_row.period_role]["margin"] = flt(periods[cogs_row.period_role].get("revenue")) - flt(cogs_row.cogs)
+			periods[cogs_row.period_role]["margin"] = flt(periods[cogs_row.period_role].get("revenue")) - flt(
+				cogs_row.cogs
+			)
 	baseline = periods.get("baseline", {})
 	baseline["days"] = baseline_days
 	promotion = periods.get("promotion", {})
@@ -172,7 +178,9 @@ def get_promotion_effectiveness(
 	if cint(baseline.get("transaction_count")) < 10:
 		warnings.append("Baseline has fewer than 10 transactions.")
 	if baseline.get("margin") is None or promotion.get("margin") is None:
-		warnings.append("Certified Stock Ledger cost is unavailable for one or more periods; margin and ROI are not shown.")
+		warnings.append(
+			"Certified Stock Ledger cost is unavailable for one or more periods; margin and ROI are not shown."
+		)
 	if flt(promotion.get("gross_before_discount")) <= flt(promotion.get("revenue")):
 		warnings.append("No measurable item-level discount was found in the promotion window.")
 	return {
@@ -190,24 +198,26 @@ def get_promotion_effectiveness(
 	}
 
 
-TOOL_SPECS = [{
-	"type": "function",
-	"function": {
-		"name": "get_promotion_effectiveness",
-		"description": "Certified baseline-versus-promotion analysis with incremental units, revenue, margin, cannibalization, post-promotion drop, ROI, and source periods.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"item_code": {"type": "string"},
-				"promotion_from": {"type": "string"},
-				"promotion_to": {"type": "string"},
-				"branch": {"type": "string"},
-				"baseline_days": {"type": "integer"},
-				"post_days": {"type": "integer"},
+TOOL_SPECS = [
+	{
+		"type": "function",
+		"function": {
+			"name": "get_promotion_effectiveness",
+			"description": "Certified baseline-versus-promotion analysis with incremental units, revenue, margin, cannibalization, post-promotion drop, ROI, and source periods.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"item_code": {"type": "string"},
+					"promotion_from": {"type": "string"},
+					"promotion_to": {"type": "string"},
+					"branch": {"type": "string"},
+					"baseline_days": {"type": "integer"},
+					"post_days": {"type": "integer"},
+				},
+				"required": ["item_code", "promotion_from", "promotion_to"],
 			},
-			"required": ["item_code", "promotion_from", "promotion_to"],
 		},
-	},
-}]
+	}
+]
 
 TOOL_DISPATCH = {"get_promotion_effectiveness": get_promotion_effectiveness}

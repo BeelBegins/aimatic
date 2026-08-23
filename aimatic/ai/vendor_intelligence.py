@@ -114,21 +114,23 @@ def get_vendor_reliability(
 	}
 
 
-TOOL_SPECS = [{
-	"type": "function",
-	"function": {
-		"name": "get_vendor_reliability",
-		"description": "Certified vendor purchase volume, price trend, lead-time consistency, PO-versus-receipt variance, short supply, late delivery, rejection rate, concentration risk, and reliability score.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"supplier": {"type": "string"},
-				"history_days": {"type": "integer"},
-				"minimum_orders": {"type": "integer"},
-				"limit": {"type": "integer"},
+TOOL_SPECS = [
+	{
+		"type": "function",
+		"function": {
+			"name": "get_vendor_reliability",
+			"description": "Certified vendor purchase volume, price trend, lead-time consistency, PO-versus-receipt variance, short supply, late delivery, rejection rate, concentration risk, and reliability score.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"supplier": {"type": "string"},
+					"history_days": {"type": "integer"},
+					"minimum_orders": {"type": "integer"},
+					"limit": {"type": "integer"},
+				},
 			},
 		},
-	},
-}]
+	}
+]
 
 TOOL_DISPATCH = {"get_vendor_reliability": get_vendor_reliability}

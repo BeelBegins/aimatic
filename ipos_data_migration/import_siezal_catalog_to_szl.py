@@ -43,110 +43,112 @@ import MySQLdb
 SIEZAL_DB = "_5024a81034978647"
 SZL_DB = "_2b4dd7884d505f7f"
 
-def _database_password():
-    password = frappe.conf.get("root_password") or frappe.conf.get("mariadb_root_password")
-    if not password:
-        frappe.throw(
-            "Database root password is not configured in sites/common_site_config.json"
-        )
-    return password
 
+def _database_password():
+	password = frappe.conf.get("root_password") or frappe.conf.get("mariadb_root_password")
+	if not password:
+		frappe.throw("Database root password is not configured in sites/common_site_config.json")
+	return password
 
 
 def import_item_groups():
-    # frappe.db here is szl's own connection (this script runs inside a szl
-    # bench console session) -- read siezal's tree via a raw cross-database
-    # query instead, since we can't frappe.init() a second site mid-process.
-    conn = MySQLdb.connect(host="127.0.0.1", user="root", password=_database_password(), database=SIEZAL_DB)
-    try:
-        with conn.cursor(MySQLdb.cursors.DictCursor) as cur:
-            cur.execute(
-                """
+	# frappe.db here is szl's own connection (this script runs inside a szl
+	# bench console session) -- read siezal's tree via a raw cross-database
+	# query instead, since we can't frappe.init() a second site mid-process.
+	conn = MySQLdb.connect(host="127.0.0.1", user="root", password=_database_password(), database=SIEZAL_DB)
+	try:
+		with conn.cursor(MySQLdb.cursors.DictCursor) as cur:
+			cur.execute(
+				"""
                 select name, item_group_name, parent_item_group, is_group
                 from `tabItem Group`
                 where name != 'All Item Groups'
                 order by lft
                 """
-            )
-            siezal_groups = cur.fetchall()
-    finally:
-        conn.close()
+			)
+			siezal_groups = cur.fetchall()
+	finally:
+		conn.close()
 
-    created = 0
-    skipped = 0
-    for row in siezal_groups:
-        if frappe.db.exists("Item Group", row["item_group_name"]):
-            skipped += 1
-            continue
-        doc = frappe.new_doc("Item Group")
-        doc.item_group_name = row["item_group_name"]
-        doc.parent_item_group = row["parent_item_group"]
-        doc.is_group = row["is_group"]
-        doc.insert(ignore_permissions=True)
-        created += 1
-    frappe.db.commit()
-    print(f"Item Group: {created} created, {skipped} already present")
+	created = 0
+	skipped = 0
+	for row in siezal_groups:
+		if frappe.db.exists("Item Group", row["item_group_name"]):
+			skipped += 1
+			continue
+		doc = frappe.new_doc("Item Group")
+		doc.item_group_name = row["item_group_name"]
+		doc.parent_item_group = row["parent_item_group"]
+		doc.is_group = row["is_group"]
+		doc.insert(ignore_permissions=True)
+		created += 1
+	frappe.db.commit()
+	print(f"Item Group: {created} created, {skipped} already present")
 
 
 def import_brands():
-    conn = MySQLdb.connect(host="127.0.0.1", user="root", password=_database_password(), database=SIEZAL_DB)
-    try:
-        with conn.cursor(MySQLdb.cursors.DictCursor) as cur:
-            cur.execute("select distinct brand from tabItem where brand is not null and brand != ''")
-            siezal_brands = [r["brand"] for r in cur.fetchall()]
-    finally:
-        conn.close()
+	conn = MySQLdb.connect(host="127.0.0.1", user="root", password=_database_password(), database=SIEZAL_DB)
+	try:
+		with conn.cursor(MySQLdb.cursors.DictCursor) as cur:
+			cur.execute("select distinct brand from tabItem where brand is not null and brand != ''")
+			siezal_brands = [r["brand"] for r in cur.fetchall()]
+	finally:
+		conn.close()
 
-    created = 0
-    skipped = 0
-    for brand in siezal_brands:
-        if frappe.db.exists("Brand", brand):
-            skipped += 1
-            continue
-        doc = frappe.new_doc("Brand")
-        doc.brand = brand
-        doc.insert(ignore_permissions=True)
-        created += 1
-    frappe.db.commit()
-    print(f"Brand: {created} created, {skipped} already present")
+	created = 0
+	skipped = 0
+	for brand in siezal_brands:
+		if frappe.db.exists("Brand", brand):
+			skipped += 1
+			continue
+		doc = frappe.new_doc("Brand")
+		doc.brand = brand
+		doc.insert(ignore_permissions=True)
+		created += 1
+	frappe.db.commit()
+	print(f"Brand: {created} created, {skipped} already present")
 
 
 def _shared_columns(cur, table):
-    cur.execute(
-        """
+	cur.execute(
+		"""
         select column_name from information_schema.columns
         where table_schema=%s and table_name=%s
         """,
-        (SIEZAL_DB, table),
-    )
-    siezal_cols = {r[0] for r in cur.fetchall()}
-    cur.execute(
-        """
+		(SIEZAL_DB, table),
+	)
+	siezal_cols = {r[0] for r in cur.fetchall()}
+	cur.execute(
+		"""
         select column_name from information_schema.columns
         where table_schema=%s and table_name=%s
         """,
-        (SZL_DB, table),
-    )
-    szl_cols = {r[0] for r in cur.fetchall()}
-    shared = sorted(siezal_cols & szl_cols)
-    only_siezal = siezal_cols - szl_cols
-    only_szl = szl_cols - siezal_cols
-    if only_siezal or only_szl:
-        print(f"WARNING [{table}]: siezal-only columns {only_siezal}, szl-only columns {only_szl} -- these are skipped, not copied")
-    return shared
+		(SZL_DB, table),
+	)
+	szl_cols = {r[0] for r in cur.fetchall()}
+	shared = sorted(siezal_cols & szl_cols)
+	only_siezal = siezal_cols - szl_cols
+	only_szl = szl_cols - siezal_cols
+	if only_siezal or only_szl:
+		print(
+			f"WARNING [{table}]: siezal-only columns {only_siezal}, szl-only columns {only_szl} -- these are skipped, not copied"
+		)
+	return shared
 
 
 def bulk_copy_table(table, id_column="name"):
-    """Cross-database INSERT ... SELECT with an explicit, name-matched
-    column list (never SELECT * -- confirmed tabItem has identical columns
-    on both sites but in a different physical order). Idempotent: only
-    copies rows whose id_column isn't already present on szl."""
-    conn = MySQLdb.connect(host="127.0.0.1", user="root", password=_database_password(), database=SIEZAL_DB, autocommit=True)
-    try:
-        with conn.cursor() as cur:
-            columns = _shared_columns(cur, table)
-            col_list = ", ".join(f"`{c}`" for c in columns)
-            query = f"""
+	"""Cross-database INSERT ... SELECT with an explicit, name-matched
+	column list (never SELECT * -- confirmed tabItem has identical columns
+	on both sites but in a different physical order). Idempotent: only
+	copies rows whose id_column isn't already present on szl."""
+	conn = MySQLdb.connect(
+		host="127.0.0.1", user="root", password=_database_password(), database=SIEZAL_DB, autocommit=True
+	)
+	try:
+		with conn.cursor() as cur:
+			columns = _shared_columns(cur, table)
+			col_list = ", ".join(f"`{c}`" for c in columns)
+			query = f"""
                 INSERT INTO `{SZL_DB}`.`{table}` ({col_list})
                 SELECT {col_list} FROM `{SIEZAL_DB}`.`{table}` src
                 WHERE NOT EXISTS (
@@ -154,27 +156,27 @@ def bulk_copy_table(table, id_column="name"):
                     WHERE dst.`{id_column}` = src.`{id_column}`
                 )
             """
-            cur.execute(query)
-            print(f"{table}: {cur.rowcount} rows copied")
-    finally:
-        conn.close()
+			cur.execute(query)
+			print(f"{table}: {cur.rowcount} rows copied")
+	finally:
+		conn.close()
 
 
 def main():
-    previous_in_patch = frappe.flags.in_patch
-    frappe.flags.in_patch = True
-    try:
-        import_item_groups()
-        import_brands()
-    finally:
-        frappe.flags.in_patch = previous_in_patch
-    bulk_copy_table("tabItem", id_column="name")
-    bulk_copy_table("tabItem Barcode", id_column="name")
-    # Every item's own stock_uom self-conversion row ("Pcs = 1 Pcs" on every
-    # item, the only UOM used site-wide -- no real alternate-UOM data exists
-    # to lose here). Missing entirely after the raw-SQL Item copy above,
-    # since that bypasses the Item controller logic that normally
-    # auto-creates it on insert().
-    bulk_copy_table("tabUOM Conversion Detail", id_column="name")
-    frappe.clear_cache()
-    print("Catalog replication complete.")
+	previous_in_patch = frappe.flags.in_patch
+	frappe.flags.in_patch = True
+	try:
+		import_item_groups()
+		import_brands()
+	finally:
+		frappe.flags.in_patch = previous_in_patch
+	bulk_copy_table("tabItem", id_column="name")
+	bulk_copy_table("tabItem Barcode", id_column="name")
+	# Every item's own stock_uom self-conversion row ("Pcs = 1 Pcs" on every
+	# item, the only UOM used site-wide -- no real alternate-UOM data exists
+	# to lose here). Missing entirely after the raw-SQL Item copy above,
+	# since that bypasses the Item controller logic that normally
+	# auto-creates it on insert().
+	bulk_copy_table("tabUOM Conversion Detail", id_column="name")
+	frappe.clear_cache()
+	print("Catalog replication complete.")

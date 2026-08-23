@@ -3,11 +3,11 @@
 from frappe.utils import flt
 
 from aimatic.ai.response_schema import (
+	KPI,
 	Chart,
 	ChartData,
 	ChartOptions,
 	DrillDown,
-	KPI,
 	Pagination,
 	Table,
 	TableColumn,
@@ -17,7 +17,11 @@ from aimatic.ai.response_schema import (
 def _forecast_rows(result: dict) -> list[dict]:
 	rows = []
 	for forecast in result.get("forecasts") or []:
-		row = {key: value for key, value in forecast.items() if key not in {"history", "forecast", "stock_plan", "candidate_model_scores"}}
+		row = {
+			key: value
+			for key, value in forecast.items()
+			if key not in {"history", "forecast", "stock_plan", "candidate_model_scores"}
+		}
 		row.update(forecast.get("stock_plan") or {})
 		rows.append(row)
 	return rows
@@ -28,8 +32,7 @@ def forecast_kpis(result: dict) -> list[KPI]:
 	if not rows:
 		return []
 	reorder_quantity = sum(
-		flt((row.get("stock_plan") or {}).get("suggested_reorder_quantity"))
-		for row in rows
+		flt((row.get("stock_plan") or {}).get("suggested_reorder_quantity")) for row in rows
 	)
 	return [
 		KPI(
@@ -120,9 +123,11 @@ def forecast_charts(result: dict) -> list[Chart]:
 		historical_values = [flt(entry["quantity"]) for entry in history] + [None] * len(forecast)
 		if history and forecast:
 			bridge = flt(history[-1]["quantity"])
-			forecast_values = [None] * (len(history) - 1) + [bridge] + [
-				flt(entry["forecast_quantity"]) for entry in forecast
-			]
+			forecast_values = (
+				[None] * (len(history) - 1)
+				+ [bridge]
+				+ [flt(entry["forecast_quantity"]) for entry in forecast]
+			)
 			lower_values = [None] * len(history) + [
 				flt(entry["lower_confidence_bound"]) for entry in forecast
 			]

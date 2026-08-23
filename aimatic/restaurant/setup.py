@@ -1,6 +1,5 @@
 import frappe
 
-
 RESTAURANT_ROLES = (
 	("Restaurant Waiter", 0),
 	("Restaurant Manager", 1),

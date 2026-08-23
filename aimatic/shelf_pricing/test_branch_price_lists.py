@@ -53,8 +53,14 @@ class TestBranchPriceListInitialization(unittest.TestCase):
 		self.assertEqual(values[0][fields.index("price_list")], "Branch One Selling Price List")
 		self.assertEqual(values[0][fields.index("buying")], 0)
 		self.assertEqual(values[0][fields.index("selling")], 1)
-		self.assertIn(call("Branch", "Branch One", "default_selling_price_list", "Branch One Selling Price List"), frappe.db.set_value.call_args_list)
-		self.assertIn(call("POS Profile", "POS-1", "selling_price_list", "Branch One Selling Price List"), frappe.db.set_value.call_args_list)
+		self.assertIn(
+			call("Branch", "Branch One", "default_selling_price_list", "Branch One Selling Price List"),
+			frappe.db.set_value.call_args_list,
+		)
+		self.assertIn(
+			call("POS Profile", "POS-1", "selling_price_list", "Branch One Selling Price List"),
+			frappe.db.set_value.call_args_list,
+		)
 
 	@patch("aimatic.shelf_pricing.utils.frappe")
 	def test_creates_branch_foodpanda_price_list_without_baseline_copy(self, frappe):
@@ -109,7 +115,10 @@ class TestBranchPriceListInitialization(unittest.TestCase):
 		"aimatic.shelf_pricing.utils.get_or_create_branch_foodpanda_price_list",
 		return_value="Branch One Foodpanda Price List",
 	)
-	@patch("aimatic.shelf_pricing.utils.get_or_create_branch_price_list", return_value="Branch One Selling Price List")
+	@patch(
+		"aimatic.shelf_pricing.utils.get_or_create_branch_price_list",
+		return_value="Branch One Selling Price List",
+	)
 	def test_new_branch_event_initializes_price_list(self, initialize, initialize_foodpanda):
 		from aimatic.branch_management.events import initialize_branch_selling_price_list
 
@@ -122,7 +131,10 @@ class TestBranchPriceListInitialization(unittest.TestCase):
 		self.assertEqual(doc.default_selling_price_list, "Branch One Selling Price List")
 		self.assertEqual(doc.default_foodpanda_price_list, "Branch One Foodpanda Price List")
 
-	@patch("aimatic.shelf_pricing.utils.get_or_create_branch_price_list", return_value="Branch One Selling Price List")
+	@patch(
+		"aimatic.shelf_pricing.utils.get_or_create_branch_price_list",
+		return_value="Branch One Selling Price List",
+	)
 	def test_pos_profile_always_uses_its_branch_price_list(self, initialize):
 		from aimatic.branch_management.events import apply_pos_profile_branch_price_list
 

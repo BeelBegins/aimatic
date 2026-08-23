@@ -9,7 +9,6 @@ from frappe import _
 
 from aimatic.shelf_pricing.utils import get_or_create_branch_foodpanda_price_list
 
-
 _COMMIT_BATCH_SIZE = 100
 
 
@@ -151,7 +150,9 @@ def apply_initial_pim_catalog(outlet_name, file_url):
 		_title = next(iter(matches))[1]
 		if product.public_name != _title:
 			try:
-				frappe.db.set_value("Shopping Product", product.name, "public_name", _title, update_modified=True)
+				frappe.db.set_value(
+					"Shopping Product", product.name, "public_name", _title, update_modified=True
+				)
 			except frappe.QueryTimeoutError:
 				frappe.db.rollback()
 				updated_names -= pending_name_updates

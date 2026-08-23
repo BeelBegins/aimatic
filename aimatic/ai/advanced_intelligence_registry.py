@@ -22,8 +22,21 @@ ADVANCED_DATA_SOURCES = {
 	"get_branch_transfer_recommendations": _source(
 		"get_branch_transfer_recommendations",
 		"Read-only branch stock transfers from measured surplus to measured deficit with confidence and impact.",
-		["item_code", "item_group", "brand", "history_days", "target_cover_days", "minimum_transfer_qty", "limit"],
-		["recommendations", "transfer_qty", "expected_avoided_stockout_days", "expected_dead_stock_reduction"],
+		[
+			"item_code",
+			"item_group",
+			"brand",
+			"history_days",
+			"target_cover_days",
+			"minimum_transfer_qty",
+			"limit",
+		],
+		[
+			"recommendations",
+			"transfer_qty",
+			"expected_avoided_stockout_days",
+			"expected_dead_stock_reduction",
+		],
 		["Which branch can transfer this stock?", "Recommend stock transfers between branches"],
 		"high",
 	),
@@ -31,7 +44,13 @@ ADVANCED_DATA_SOURCES = {
 		"get_promotion_effectiveness",
 		"Certified baseline, promotion, and post-period effectiveness with margin, cannibalization, and ROI.",
 		["item_code", "promotion_from", "promotion_to", "branch", "baseline_days", "post_days"],
-		["incremental_units", "incremental_revenue", "incremental_margin", "cannibalization", "promotion_roi_pct"],
+		[
+			"incremental_units",
+			"incremental_revenue",
+			"incremental_margin",
+			"cannibalization",
+			"promotion_roi_pct",
+		],
 		["Was this promotion effective?", "Calculate promotion ROI and cannibalization"],
 	),
 	"get_customer_rfm_segments": _source(
@@ -62,6 +81,10 @@ ADVANCED_DATA_SOURCES = {
 		"Deterministic sales, return, discount, transaction, branch, and negative-stock anomalies with ranges and drill-down.",
 		["branch", "lookback_days", "z_threshold", "limit"],
 		["anomalies", "actual_value", "expected_low", "expected_high", "variance", "severity", "data_source"],
-		["Detect unusual business activity", "Why did sales drop unexpectedly?", "Show negative stock anomalies"],
+		[
+			"Detect unusual business activity",
+			"Why did sales drop unexpectedly?",
+			"Show negative stock anomalies",
+		],
 	),
 }

@@ -114,17 +114,27 @@ aimatic.FoodpandaCatalogConsole = class FoodpandaCatalogConsole {
 		this.$summary.html(`
 			<div class="fp-pills">
 				<span class="fp-pill fp-pill-ok"><strong>${fmt(d.mapped_sku_count)}</strong> ${__("ready")}</span>
-				<span class="fp-pill fp-pill-warn"><strong>${fmt(d.failed_count)}</strong> ${__("need attention")}</span>
-				<span class="fp-pill"><strong>${fmt(d.unmapped_remote_count)}</strong> ${__("not in ERPNext")}</span>
+				<span class="fp-pill fp-pill-warn"><strong>${fmt(d.failed_count)}</strong> ${__(
+			"need attention"
+		)}</span>
+				<span class="fp-pill"><strong>${fmt(d.unmapped_remote_count)}</strong> ${__(
+			"not in ERPNext"
+		)}</span>
 			</div>
 			<p class="text-muted fp-summary-line">${frappe.utils.escape_html(d.summary_line || "")}</p>
 		`);
 
 		this.$primary.empty();
 		if (d.next_action === "enable") {
-			this.add_button(this.$primary, d.next_label || __("Open outlet"), "primary", () => {
-				frappe.set_route("Form", "Foodpanda Outlet", d.outlet);
-			}, true);
+			this.add_button(
+				this.$primary,
+				d.next_label || __("Open outlet"),
+				"primary",
+				() => {
+					frappe.set_route("Form", "Foodpanda Outlet", d.outlet);
+				},
+				true
+			);
 		} else if (d.next_action === "refresh_links") {
 			this.add_button(
 				this.$primary,
@@ -149,7 +159,13 @@ aimatic.FoodpandaCatalogConsole = class FoodpandaCatalogConsole {
 				false
 			);
 		}
-		this.add_button(this.$primary, __("Refresh status"), "default", () => this.load_dashboard(), false);
+		this.add_button(
+			this.$primary,
+			__("Refresh status"),
+			"default",
+			() => this.load_dashboard(),
+			false
+		);
 
 		this.$secondary.empty();
 		this.add_button(this.$secondary, __("Open Catalog Sheet"), "default", () => {
@@ -176,7 +192,9 @@ aimatic.FoodpandaCatalogConsole = class FoodpandaCatalogConsole {
 		}
 
 		this.$links.empty();
-		this.add_link(__("Outlet settings"), () => frappe.set_route("Form", "Foodpanda Outlet", d.outlet));
+		this.add_link(__("Outlet settings"), () =>
+			frappe.set_route("Form", "Foodpanda Outlet", d.outlet)
+		);
 		this.add_link(__("Catalog jobs"), () =>
 			frappe.set_route("List", "Foodpanda Catalog Job", { outlet: d.outlet })
 		);
@@ -184,20 +202,20 @@ aimatic.FoodpandaCatalogConsole = class FoodpandaCatalogConsole {
 		const exportJob = d.latest_export_job || {};
 		this.$meta.html(`
 			<div>${__("Last Foodpanda list import")}: ${frappe.utils.escape_html(
-				String(d.last_catalog_import_at || "—")
-			)}
-			${
-				exportJob.product_count
-					? ` · ${fmt(exportJob.product_count)} ${__("products")}`
-					: ""
-			}</div>
+			String(d.last_catalog_import_at || "—")
+		)}
+			${exportJob.product_count ? ` · ${fmt(exportJob.product_count)} ${__("products")}` : ""}</div>
 			<div>${__("Synced")}: ${fmt(d.synced_count)} · ${__("Pending")}: ${fmt(d.pending_count)}</div>
 		`);
 	}
 
 	add_button($parent, label, style, on_click, large) {
-		const cls = large ? "btn btn-primary btn-lg fp-main-btn" : `btn btn-sm btn-${style === "primary" ? "primary" : "default"}`;
-		const $btn = $(`<button type="button" class="${cls}">${frappe.utils.escape_html(label)}</button>`);
+		const cls = large
+			? "btn btn-primary btn-lg fp-main-btn"
+			: `btn btn-sm btn-${style === "primary" ? "primary" : "default"}`;
+		const $btn = $(
+			`<button type="button" class="${cls}">${frappe.utils.escape_html(label)}</button>`
+		);
 		$btn.on("click", on_click);
 		$parent.append($btn);
 	}

@@ -2,7 +2,7 @@
 
 from frappe.utils import flt
 
-from aimatic.ai.response_schema import Chart, ChartData, ChartOptions, KPI, Table, TableColumn
+from aimatic.ai.response_schema import KPI, Chart, ChartData, ChartOptions, Table, TableColumn
 
 
 def price_kpis(result: dict) -> list[KPI]:
@@ -68,7 +68,9 @@ def price_table(result: dict) -> Table | None:
 			TableColumn(key="price_change_pct", label="Price Change %", type="percent"),
 			TableColumn(key="expected_quantity", label="Expected Qty", type="qty"),
 			TableColumn(key="expected_revenue", label="Expected Revenue", type="currency", currency=currency),
-			TableColumn(key="expected_gross_profit", label="Expected Gross Profit", type="currency", currency=currency),
+			TableColumn(
+				key="expected_gross_profit", label="Expected Gross Profit", type="currency", currency=currency
+			),
 			TableColumn(key="expected_gross_margin_pct", label="Expected Margin %", type="percent"),
 			TableColumn(key="expected_sell_through", label="Expected Sell-Through %", type="percent"),
 			TableColumn(key="stock_cover_impact", label="Stock Cover", type="float"),
@@ -97,9 +99,22 @@ def price_charts(result: dict) -> list[Chart]:
 			data=ChartData(
 				labels=[row.get("name") for row in rows],
 				datasets=(
-					[{"label": "Expected Revenue", "data": [flt(row.get("expected_revenue")) for row in rows]}]
-					+ ([{"label": "Expected Gross Profit", "data": [flt(row.get("expected_gross_profit")) for row in rows]}]
-					   if any(row.get("expected_gross_profit") is not None for row in rows) else [])
+					[
+						{
+							"label": "Expected Revenue",
+							"data": [flt(row.get("expected_revenue")) for row in rows],
+						}
+					]
+					+ (
+						[
+							{
+								"label": "Expected Gross Profit",
+								"data": [flt(row.get("expected_gross_profit")) for row in rows],
+							}
+						]
+						if any(row.get("expected_gross_profit") is not None for row in rows)
+						else []
+					)
 				),
 			),
 			options=ChartOptions(yAxis={"format": "currency", "currency": currency}),

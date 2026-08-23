@@ -101,9 +101,7 @@ class TestFoodpandaSftpUpload(unittest.TestCase):
 	@patch("aimatic.price_export.foodpanda_sftp._update_branch_status")
 	@patch("aimatic.price_export.foodpanda_sftp._load_sftp_settings")
 	@patch("aimatic.price_export.foodpanda_sftp.build_foodpanda_csv_rows")
-	def test_success_updates_status_and_log(
-		self, mock_rows, mock_settings, mock_status, mock_log, mock_put
-	):
+	def test_success_updates_status_and_log(self, mock_rows, mock_settings, mock_status, mock_log, mock_put):
 		mock_settings.return_value = self._settings()
 		mock_rows.return_value = (
 			[{"barcode": "111", "sku": "", "price": 10, "active": 1, "quantity": 2}],
@@ -112,7 +110,9 @@ class TestFoodpandaSftpUpload(unittest.TestCase):
 		mock_put.return_value = "/inbox/foodpanda-s1-2026-08-05.csv"
 		mock_log.return_value = SimpleNamespace(name="LOG-1")
 
-		with patch("aimatic.price_export.foodpanda_sftp._csv_filename", return_value="foodpanda-s1-2026-08-05.csv"):
+		with patch(
+			"aimatic.price_export.foodpanda_sftp._csv_filename", return_value="foodpanda-s1-2026-08-05.csv"
+		):
 			result = upload_foodpanda_csv("S1", trigger="Branch")
 
 		self.assertEqual(result["status"], "Success")
@@ -127,9 +127,7 @@ class TestFoodpandaSftpUpload(unittest.TestCase):
 	@patch("aimatic.price_export.foodpanda_sftp._update_branch_status")
 	@patch("aimatic.price_export.foodpanda_sftp._load_sftp_settings")
 	@patch("aimatic.price_export.foodpanda_sftp.build_foodpanda_csv_rows")
-	def test_failure_sanitizes_and_logs(
-		self, mock_rows, mock_settings, mock_status, mock_log, mock_put
-	):
+	def test_failure_sanitizes_and_logs(self, mock_rows, mock_settings, mock_status, mock_log, mock_put):
 		mock_settings.return_value = self._settings()
 		mock_rows.return_value = ([], 0)
 		mock_put.side_effect = Exception("login failed with secret")
@@ -217,13 +215,12 @@ class TestFoodpandaSftpUpload(unittest.TestCase):
 
 		self.assertEqual(results[0], {"branch": "S1", "status": "Skipped"})
 		self.assertEqual(results[1]["status"], "Success")
-		mock_upload.assert_called_once_with(
-			"S2", rows=None, trigger="Scheduler", require_enabled=True
-		)
+		mock_upload.assert_called_once_with("S2", rows=None, trigger="Scheduler", require_enabled=True)
 
 	@patch("aimatic.price_export.foodpanda_sftp.frappe")
 	def test_branch_due_requires_schedule_time_and_not_uploaded_today(self, mock_frappe):
 		from datetime import datetime, time
+
 		from aimatic.price_export.foodpanda_sftp import _is_branch_due_for_scheduled_upload
 
 		now = datetime(2026, 8, 5, 10, 0, 0)
@@ -236,7 +233,10 @@ class TestFoodpandaSftpUpload(unittest.TestCase):
 
 		with (
 			patch("aimatic.price_export.foodpanda_sftp.now_datetime", return_value=now),
-			patch("aimatic.price_export.foodpanda_sftp.getdate", side_effect=lambda d: d.date() if hasattr(d, "date") else d),
+			patch(
+				"aimatic.price_export.foodpanda_sftp.getdate",
+				side_effect=lambda d: d.date() if hasattr(d, "date") else d,
+			),
 			patch("aimatic.price_export.foodpanda_sftp.get_time", return_value=time(9, 30)),
 			patch(
 				"aimatic.price_export.foodpanda_sftp.get_datetime",

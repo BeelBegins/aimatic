@@ -82,9 +82,7 @@ def lookup_price_by_barcode(barcode: str, branch: str):
 
 	items = []
 	for item_code in item_codes:
-		item = frappe.db.get_value(
-			"Item", item_code, ["item_name", "disabled", "custom_mrp"], as_dict=True
-		)
+		item = frappe.db.get_value("Item", item_code, ["item_name", "disabled", "custom_mrp"], as_dict=True)
 		if not item or item.disabled:
 			continue
 

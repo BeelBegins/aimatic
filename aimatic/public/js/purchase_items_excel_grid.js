@@ -4,54 +4,54 @@
  */
 
 function excel_grid_debounce(fn, wait) {
-    let timer = null;
-    return function (...args) {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => {
-            timer = null;
-            fn.apply(this, args);
-        }, wait);
-    };
+	let timer = null;
+	return function (...args) {
+		if (timer) clearTimeout(timer);
+		timer = setTimeout(() => {
+			timer = null;
+			fn.apply(this, args);
+		}, wait);
+	};
 }
 
 const AIMATIC_PURCHASE_EXCEL_GRID_DOCTYPES = [
-    "Purchase Order",
-    "Purchase Receipt",
-    "Purchase Invoice",
+	"Purchase Order",
+	"Purchase Receipt",
+	"Purchase Invoice",
 ];
 
 function aimatic_register_purchase_excel_grid(doctype) {
-    frappe.ui.form.on(doctype, {
-        onload_post_render(frm) {
-            setTimeout(() => setup_items_excel_grid(frm), 200);
-        },
+	frappe.ui.form.on(doctype, {
+		onload_post_render(frm) {
+			setTimeout(() => setup_items_excel_grid(frm), 200);
+		},
 
-        refresh(frm) {
-            setTimeout(() => setup_items_excel_grid(frm), 200);
-        },
-    });
+		refresh(frm) {
+			setTimeout(() => setup_items_excel_grid(frm), 200);
+		},
+	});
 }
 
 AIMATIC_PURCHASE_EXCEL_GRID_DOCTYPES.forEach(aimatic_register_purchase_excel_grid);
 
 function setup_items_excel_grid(frm) {
-    const grid = frm.fields_dict.items?.grid;
+	const grid = frm.fields_dict.items?.grid;
 
-    if (!grid || !grid.wrapper) {
-        return;
-    }
+	if (!grid || !grid.wrapper) {
+		return;
+	}
 
-    inject_items_excel_css();
-    inject_items_grid_overlap_fix_css();
+	inject_items_excel_css();
+	inject_items_grid_overlap_fix_css();
 
-    const $wrapper = $(grid.wrapper);
-    $wrapper.addClass("excel-items-grid");
+	const $wrapper = $(grid.wrapper);
+	$wrapper.addClass("excel-items-grid");
 
-    const $customButtons = $wrapper.find(".grid-custom-buttons").first();
+	const $customButtons = $wrapper.find(".grid-custom-buttons").first();
 
-    // Mount beside Configure Columns / grid actions (not above the Items label).
-    if (!$wrapper.find(".excel-grid-toolbar").length) {
-        const $toolbar = $(`
+	// Mount beside Configure Columns / grid actions (not above the Items label).
+	if (!$wrapper.find(".excel-grid-toolbar").length) {
+		const $toolbar = $(`
             <div class="excel-grid-toolbar">
                 <div class="excel-grid-toolbar-left">
                     <strong>Items Spreadsheet</strong>
@@ -69,177 +69,166 @@ function setup_items_excel_grid(frm) {
             </div>
         `);
 
-        if ($customButtons.length) {
-            $customButtons.prepend($toolbar);
-        } else {
-            $wrapper.prepend($toolbar);
-        }
-    }
+		if ($customButtons.length) {
+			$customButtons.prepend($toolbar);
+		} else {
+			$wrapper.prepend($toolbar);
+		}
+	}
 
-    update_items_grid_count(frm, $wrapper);
-    mark_items_grid_sticky_columns($wrapper);
-    queue_items_grid_header_sync($wrapper);
+	update_items_grid_count(frm, $wrapper);
+	mark_items_grid_sticky_columns($wrapper);
+	queue_items_grid_header_sync($wrapper);
 
-    const $toggle_button = $wrapper.find(".excel-grid-toolbar .excel-grid-toggle");
+	const $toggle_button = $wrapper.find(".excel-grid-toolbar .excel-grid-toggle");
 
-    $toggle_button
-        .off("click.excelItemsGrid")
-        .on("click.excelItemsGrid", function (event) {
-            event.preventDefault();
-            event.stopPropagation();
+	$toggle_button.off("click.excelItemsGrid").on("click.excelItemsGrid", function (event) {
+		event.preventDefault();
+		event.stopPropagation();
 
-            const enable = !$wrapper.hasClass("excel-items-grid-fullscreen");
-            set_items_grid_fullscreen($wrapper, enable);
-        });
+		const enable = !$wrapper.hasClass("excel-items-grid-fullscreen");
+		set_items_grid_fullscreen($wrapper, enable);
+	});
 
-    // FIXED: Allow edit buttons to work by using stopPropagation properly
-    $wrapper
-        .off("change.excelItemsGrid")
-        .on("change.excelItemsGrid", function () {
-            requestAnimationFrame(() => {
-                mark_items_grid_sticky_columns($wrapper);
-                update_items_grid_count(frm, $wrapper);
-            });
-            
-            excel_grid_debounce(() => {
-                queue_items_grid_header_sync($wrapper);
-            }, 180)();
-        });
+	// FIXED: Allow edit buttons to work by using stopPropagation properly
+	$wrapper.off("change.excelItemsGrid").on("change.excelItemsGrid", function () {
+		requestAnimationFrame(() => {
+			mark_items_grid_sticky_columns($wrapper);
+			update_items_grid_count(frm, $wrapper);
+		});
 
-    // FIXED: Ensure edit buttons don't get blocked
-    $wrapper
-        .off("click.excelGridEditBtn")
-        .on("click.excelGridEditBtn", ".btn-open-row", function (e) {
-            // Let Frappe handle the grid row opening
-            e.stopPropagation();
-            return true;
-        });
+		excel_grid_debounce(() => {
+			queue_items_grid_header_sync($wrapper);
+		}, 180)();
+	});
 
-    $wrapper.find(".form-grid-container").attr("tabindex", "0");
+	// FIXED: Ensure edit buttons don't get blocked
+	$wrapper
+		.off("click.excelGridEditBtn")
+		.on("click.excelGridEditBtn", ".btn-open-row", function (e) {
+			// Let Frappe handle the grid row opening
+			e.stopPropagation();
+			return true;
+		});
 
-    // Drop any leftover viewport-pin overlays from earlier experiments.
-    $(".excel-grid-viewport-header-pin, .excel-grid-viewport-hbar-pin").remove();
+	$wrapper.find(".form-grid-container").attr("tabindex", "0");
 
-    $(document)
-        .off("keydown.excelItemsGrid")
-        .on("keydown.excelItemsGrid", function (event) {
-            if (
-                event.key === "Escape" &&
-                $(".excel-items-grid-fullscreen").length &&
-                !$(".modal.show").length
-            ) {
-                event.preventDefault();
-                const $open_grid = $(".excel-items-grid-fullscreen").first();
-                set_items_grid_fullscreen($open_grid, false);
-            }
-        });
+	// Drop any leftover viewport-pin overlays from earlier experiments.
+	$(".excel-grid-viewport-header-pin, .excel-grid-viewport-hbar-pin").remove();
+
+	$(document)
+		.off("keydown.excelItemsGrid")
+		.on("keydown.excelItemsGrid", function (event) {
+			if (
+				event.key === "Escape" &&
+				$(".excel-items-grid-fullscreen").length &&
+				!$(".modal.show").length
+			) {
+				event.preventDefault();
+				const $open_grid = $(".excel-items-grid-fullscreen").first();
+				set_items_grid_fullscreen($open_grid, false);
+			}
+		});
 }
 
 function update_items_grid_count(frm, $wrapper) {
-    const row_count = Array.isArray(frm.doc.items) ? frm.doc.items.length : 0;
-    $wrapper
-        .find(".excel-grid-toolbar .excel-grid-row-count")
-        .text(`${row_count} ${row_count === 1 ? "row" : "rows"}`);
+	const row_count = Array.isArray(frm.doc.items) ? frm.doc.items.length : 0;
+	$wrapper
+		.find(".excel-grid-toolbar .excel-grid-row-count")
+		.text(`${row_count} ${row_count === 1 ? "row" : "rows"}`);
 }
 
 function mark_items_grid_sticky_columns($wrapper) {
-    $wrapper
-        .find(
-            ".excel-sticky-check, " +
-            ".excel-sticky-index, " +
-            ".excel-sticky-item, " +
-            ".excel-sticky-right"
-        )
-        .removeClass(
-            "excel-sticky-check excel-sticky-index excel-sticky-item excel-sticky-right"
-        );
+	$wrapper
+		.find(
+			".excel-sticky-check, " +
+				".excel-sticky-index, " +
+				".excel-sticky-item, " +
+				".excel-sticky-right"
+		)
+		.removeClass("excel-sticky-check excel-sticky-index excel-sticky-item excel-sticky-right");
 
-    $wrapper.find(".data-row > .row-check").addClass("excel-sticky-check");
-    $wrapper.find(".data-row > .row-index").addClass("excel-sticky-index");
-    $wrapper.find('.data-row > [data-fieldname="item_code"]').addClass("excel-sticky-item");
+	$wrapper.find(".data-row > .row-check").addClass("excel-sticky-check");
+	$wrapper.find(".data-row > .row-index").addClass("excel-sticky-index");
+	$wrapper.find('.data-row > [data-fieldname="item_code"]').addClass("excel-sticky-item");
 
-    // FIXED: Don't apply sticky-right to edit buttons directly
-    // Instead, apply it to their parent column for better z-index handling
-    $wrapper.find(".btn-open-row").each(function () {
-        $(this).closest(".col").addClass("excel-sticky-right");
-    });
+	// FIXED: Don't apply sticky-right to edit buttons directly
+	// Instead, apply it to their parent column for better z-index handling
+	$wrapper.find(".btn-open-row").each(function () {
+		$(this).closest(".col").addClass("excel-sticky-right");
+	});
 
-    $wrapper.find(".grid-heading-row .data-row").each(function () {
-        $(this).children(".col").last().addClass("excel-sticky-right");
-    });
+	$wrapper.find(".grid-heading-row .data-row").each(function () {
+		$(this).children(".col").last().addClass("excel-sticky-right");
+	});
 }
 
 function set_items_grid_fullscreen($wrapper, enable) {
-    $(".excel-items-grid-fullscreen").not($wrapper).removeClass("excel-items-grid-fullscreen");
+	$(".excel-items-grid-fullscreen").not($wrapper).removeClass("excel-items-grid-fullscreen");
 
-    $wrapper.toggleClass("excel-items-grid-fullscreen", enable);
-    $("body").toggleClass("excel-items-grid-body-lock", enable);
+	$wrapper.toggleClass("excel-items-grid-fullscreen", enable);
+	$("body").toggleClass("excel-items-grid-body-lock", enable);
 
-    const $button = $wrapper.find(".excel-grid-toolbar .excel-grid-toggle");
+	const $button = $wrapper.find(".excel-grid-toolbar .excel-grid-toggle");
 
-    $button
-        .attr("aria-pressed", enable ? "true" : "false")
-        .text(enable ? "× Close Full Screen" : "⛶ Full Screen");
+	$button
+		.attr("aria-pressed", enable ? "true" : "false")
+		.text(enable ? "× Close Full Screen" : "⛶ Full Screen");
 
-    setTimeout(() => {
-        mark_items_grid_sticky_columns($wrapper);
-        queue_items_grid_header_sync($wrapper);
+	setTimeout(() => {
+		mark_items_grid_sticky_columns($wrapper);
+		queue_items_grid_header_sync($wrapper);
 
-        if (enable) {
-            $wrapper.find(".form-grid-container").trigger("focus");
-        }
-    }, 100);
+		if (enable) {
+			$wrapper.find(".form-grid-container").trigger("focus");
+		}
+	}, 100);
 }
 
 function queue_items_grid_header_sync($wrapper) {
-    const old_timer = $wrapper.data("excel-grid-header-sync-timer");
-    if (old_timer) clearTimeout(old_timer);
+	const old_timer = $wrapper.data("excel-grid-header-sync-timer");
+	if (old_timer) clearTimeout(old_timer);
 
-    const timer = setTimeout(() => {
-        const heading =
-            $wrapper.find(".form-grid-container > .grid-heading-row").get(0) ||
-            $wrapper.find(".grid-heading-row").get(0);
+	const timer = setTimeout(() => {
+		const heading =
+			$wrapper.find(".form-grid-container > .grid-heading-row").get(0) ||
+			$wrapper.find(".grid-heading-row").get(0);
 
-        if (!heading) return;
+		if (!heading) return;
 
-        heading.style.setProperty("height", "auto", "important");
-        heading.style.setProperty("min-height", "0", "important");
-        heading.style.setProperty("overflow", "visible", "important");
+		heading.style.setProperty("height", "auto", "important");
+		heading.style.setProperty("min-height", "0", "important");
+		heading.style.setProperty("overflow", "visible", "important");
 
-        requestAnimationFrame(() => {
-            const visible_rows = Array.from(heading.children).filter((element) => {
-                return (
-                    element.classList.contains("grid-row") &&
-                    element.offsetParent !== null
-                );
-            });
+		requestAnimationFrame(() => {
+			const visible_rows = Array.from(heading.children).filter((element) => {
+				return element.classList.contains("grid-row") && element.offsetParent !== null;
+			});
 
-            const measured_height = visible_rows.reduce((total, element) => {
-                return total + element.getBoundingClientRect().height;
-            }, 0);
+			const measured_height = visible_rows.reduce((total, element) => {
+				return total + element.getBoundingClientRect().height;
+			}, 0);
 
-            const fallback_height = 46;
-            const final_height = Math.max(Math.ceil(measured_height), fallback_height);
+			const fallback_height = 46;
+			const final_height = Math.max(Math.ceil(measured_height), fallback_height);
 
-            heading.style.setProperty("height", `${final_height}px`, "important");
-            heading.style.setProperty("min-height", `${final_height}px`, "important");
+			heading.style.setProperty("height", `${final_height}px`, "important");
+			heading.style.setProperty("min-height", `${final_height}px`, "important");
 
-            $wrapper
-                .get(0)
-                ?.style.setProperty("--excel-heading-height", `${final_height}px`);
-        });
-    }, 50);
+			$wrapper.get(0)?.style.setProperty("--excel-heading-height", `${final_height}px`);
+		});
+	}, 50);
 
-    $wrapper.data("excel-grid-header-sync-timer", timer);
+	$wrapper.data("excel-grid-header-sync-timer", timer);
 }
 
 function inject_items_excel_css() {
-    if (document.getElementById("items-excel-grid-css-v2")) {
-        return;
-    }
-    $("#items-excel-grid-css").remove();
+	if (document.getElementById("items-excel-grid-css-v2")) {
+		return;
+	}
+	$("#items-excel-grid-css").remove();
 
-    const css = `
+	const css = `
         body.excel-items-grid-body-lock {
             overflow: hidden !important;
         }
@@ -659,19 +648,19 @@ function inject_items_excel_css() {
         }
     `;
 
-    $("<style>", {
-        id: "items-excel-grid-css-v2",
-        text: css,
-    }).appendTo("head");
+	$("<style>", {
+		id: "items-excel-grid-css-v2",
+		text: css,
+	}).appendTo("head");
 }
 
 function inject_items_grid_overlap_fix_css() {
-    if (document.getElementById("items-excel-grid-overlap-fix-css-v2")) {
-        return;
-    }
-    $("#items-excel-grid-overlap-fix-css").remove();
+	if (document.getElementById("items-excel-grid-overlap-fix-css-v2")) {
+		return;
+	}
+	$("#items-excel-grid-overlap-fix-css").remove();
 
-    const css = `
+	const css = `
         .excel-items-grid .form-grid-container {
             position: relative !important;
             isolation: isolate !important;
@@ -790,8 +779,8 @@ function inject_items_grid_overlap_fix_css() {
         }
     `;
 
-    $("<style>", {
-        id: "items-excel-grid-overlap-fix-css-v2",
-        text: css,
-    }).appendTo("head");
+	$("<style>", {
+		id: "items-excel-grid-overlap-fix-css-v2",
+		text: css,
+	}).appendTo("head");
 }

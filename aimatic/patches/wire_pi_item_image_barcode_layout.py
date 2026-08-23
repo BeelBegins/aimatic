@@ -6,11 +6,7 @@ from pathlib import Path
 
 import frappe
 
-LAYOUT = (
-	Path(__file__).resolve().parents[1]
-	/ "print_layouts"
-	/ "purchase_invoice_with_item_image.html"
-)
+LAYOUT = Path(__file__).resolve().parents[1] / "print_layouts" / "purchase_invoice_with_item_image.html"
 
 FMT = "Purchase Invoice with Item Image"
 PS = "Purchase Invoice-main-default_print_format"

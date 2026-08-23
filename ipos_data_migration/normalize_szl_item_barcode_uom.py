@@ -2,7 +2,6 @@
 
 import frappe
 
-
 TARGET_SITE = "szl"
 STOCK_UOM = "Pcs"
 DRY_RUN = True
@@ -30,9 +29,7 @@ def run():
 		return
 
 	if item_exceptions or blank_item_uom:
-		frappe.throw(
-			"Item Stock UOM exceptions exist. Review them before changing stock metadata."
-		)
+		frappe.throw("Item Stock UOM exceptions exist. Review them before changing stock metadata.")
 
 	frappe.db.sql(
 		"""update `tabItem Barcode`

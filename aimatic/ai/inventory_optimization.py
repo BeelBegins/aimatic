@@ -152,9 +152,7 @@ def get_branch_transfer_recommendations(
 		params,
 		as_dict=True,
 	)
-	recommendations = calculate_transfers(
-		positions, target_cover_days, minimum_transfer_qty, limit
-	)
+	recommendations = calculate_transfers(positions, target_cover_days, minimum_transfer_qty, limit)
 	return {
 		"company": company,
 		"date_from": str(date_from),
@@ -179,28 +177,30 @@ def get_branch_transfer_recommendations(
 	}
 
 
-TOOL_SPECS = [{
-	"type": "function",
-	"function": {
-		"name": "get_branch_transfer_recommendations",
-		"description": (
-			"Read-only branch stock-transfer recommendations matching measured item "
-			"surplus to measured deficit. Returns transfer quantity, avoided stockout, "
-			"dead-stock reduction, confidence, and source/destination drill-down."
-		),
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"item_code": {"type": "string"},
-				"item_group": {"type": "string"},
-				"brand": {"type": "string"},
-				"history_days": {"type": "integer"},
-				"target_cover_days": {"type": "integer"},
-				"minimum_transfer_qty": {"type": "number"},
-				"limit": {"type": "integer"},
+TOOL_SPECS = [
+	{
+		"type": "function",
+		"function": {
+			"name": "get_branch_transfer_recommendations",
+			"description": (
+				"Read-only branch stock-transfer recommendations matching measured item "
+				"surplus to measured deficit. Returns transfer quantity, avoided stockout, "
+				"dead-stock reduction, confidence, and source/destination drill-down."
+			),
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"item_code": {"type": "string"},
+					"item_group": {"type": "string"},
+					"brand": {"type": "string"},
+					"history_days": {"type": "integer"},
+					"target_cover_days": {"type": "integer"},
+					"minimum_transfer_qty": {"type": "number"},
+					"limit": {"type": "integer"},
+				},
 			},
 		},
-	},
-}]
+	}
+]
 
 TOOL_DISPATCH = {"get_branch_transfer_recommendations": get_branch_transfer_recommendations}

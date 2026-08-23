@@ -75,7 +75,9 @@ def process_callback(payload):
 			)
 	else:
 		vendor_id = payload.get("platform_vendor_id") or payload.get("vendor_id")
-		outlet_name = frappe.db.get_value("Foodpanda Outlet", {"vendor_id": vendor_id}, "name") if vendor_id else None
+		outlet_name = (
+			frappe.db.get_value("Foodpanda Outlet", {"vendor_id": vendor_id}, "name") if vendor_id else None
+		)
 		frappe.get_doc(
 			{
 				"doctype": "Foodpanda Catalog Job",
@@ -94,9 +96,7 @@ def process_callback(payload):
 		fields=["name", "item_code", "foodpanda_product_id", "pending_content_hash"],
 	)
 	for product in products:
-		product_error = _feedback_for_sku(
-			payload, product.foodpanda_product_id or product.item_code
-		)
+		product_error = _feedback_for_sku(payload, product.foodpanda_product_id or product.item_code)
 		if status == "Completed" and not product_error:
 			product_values = {
 				"sync_status": "Synced",

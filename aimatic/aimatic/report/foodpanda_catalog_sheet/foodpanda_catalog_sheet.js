@@ -12,7 +12,10 @@ function aimatic_fp_save_prices(report) {
 	return aimatic_fp_flush_grid(report).then(() => {
 		const updates = Array.from(aimatic_fp_catalog_pending_prices.values());
 		if (!updates.length) {
-			frappe.show_alert({ message: __("No Foodpanda price changes to save"), indicator: "blue" });
+			frappe.show_alert({
+				message: __("No Foodpanda price changes to save"),
+				indicator: "blue",
+			});
 			return;
 		}
 		const outlet = report.get_filter_value("outlet");
@@ -23,7 +26,9 @@ function aimatic_fp_save_prices(report) {
 				return;
 			}
 			frappe.confirm(
-				__("Save {0} changed Foodpanda price(s) to this branch price list?", [updates.length]),
+				__("Save {0} changed Foodpanda price(s) to this branch price list?", [
+					updates.length,
+				]),
 				() => {
 					frappe.call({
 						method: "aimatic.price_export.api.save_foodpanda_grid_prices",
@@ -33,13 +38,16 @@ function aimatic_fp_save_prices(report) {
 						callback(res) {
 							const result = res.message || {};
 							aimatic_fp_catalog_pending_prices.clear();
-							frappe.show_alert({
-								message: __("Saved: {0} updated, {1} created", [
-									result.updated || 0,
-									result.created || 0,
-								]),
-								indicator: "green",
-							}, 7);
+							frappe.show_alert(
+								{
+									message: __("Saved: {0} updated, {1} created", [
+										result.updated || 0,
+										result.created || 0,
+									]),
+									indicator: "green",
+								},
+								7
+							);
 							report.refresh();
 						},
 					});
@@ -82,19 +90,22 @@ function aimatic_fp_apply_and_push(report) {
 						aimatic_fp_catalog_pending_prices.clear();
 						aimatic_fp_catalog_pending_active.clear();
 						const prices = result.prices || {};
-						frappe.show_alert({
-							message: __(
-								"Linked {0}; prices +{1}/~{2}; active {3}; pushing {4} item(s)",
-								[
-									result.linked || 0,
-									prices.created || 0,
-									prices.updated || 0,
-									result.active_updated || 0,
-									result.push_item_count || 0,
-								]
-							),
-							indicator: "green",
-						}, 10);
+						frappe.show_alert(
+							{
+								message: __(
+									"Linked {0}; prices +{1}/~{2}; active {3}; pushing {4} item(s)",
+									[
+										result.linked || 0,
+										prices.created || 0,
+										prices.updated || 0,
+										result.active_updated || 0,
+										result.push_item_count || 0,
+									]
+								),
+								indicator: "green",
+							},
+							10
+						);
 						const job = result.job || {};
 						if (job.job_id) {
 							aimatic_fp_poll_push(job.job_id, report);
@@ -123,7 +134,10 @@ function aimatic_fp_push_prices_stock(report) {
 			callback(r) {
 				const status = r.message || {};
 				if (!status.job_id) {
-					frappe.show_alert({ message: __("Could not start the push"), indicator: "red" });
+					frappe.show_alert({
+						message: __("Could not start the push"),
+						indicator: "red",
+					});
 					return;
 				}
 				aimatic_fp_poll_push(status.job_id, report);
@@ -154,7 +168,9 @@ function aimatic_fp_poll_push(job_id, report) {
 					`<p>${__("Status")}: ${frappe.utils.escape_html(status.status || "")}</p>` +
 						`<p>${__("Done")}: ${status.synced || 0} / ${status.total || 0}</p>` +
 						(status.failed
-							? `<p style="color:var(--red-500)">${__("Failed")}: ${status.failed}</p>`
+							? `<p style="color:var(--red-500)">${__("Failed")}: ${
+									status.failed
+							  }</p>`
 							: "")
 				);
 				if (status.status === "done") {
@@ -182,28 +198,25 @@ function aimatic_fp_refresh_links(report) {
 		frappe.msgprint(__("Select a Foodpanda Outlet first."));
 		return;
 	}
-	frappe.confirm(
-		__("Download the latest Foodpanda list and refresh barcode links?"),
-		() => {
-			frappe.call({
-				method: "aimatic.foodpanda_integration.api.start_import_and_map",
-				args: { outlet },
-				freeze: true,
-				freeze_message: __("Starting catalog refresh..."),
-				callback(r) {
-					const job = (r.message || {}).job_id || "";
-					frappe.msgprint({
-						title: __("Refresh started"),
-						indicator: "blue",
-						message: __(
-							"Job {0} is running in the background. Refresh this report in a few minutes.",
-							[job]
-						),
-					});
-				},
-			});
-		}
-	);
+	frappe.confirm(__("Download the latest Foodpanda list and refresh barcode links?"), () => {
+		frappe.call({
+			method: "aimatic.foodpanda_integration.api.start_import_and_map",
+			args: { outlet },
+			freeze: true,
+			freeze_message: __("Starting catalog refresh..."),
+			callback(r) {
+				const job = (r.message || {}).job_id || "";
+				frappe.msgprint({
+					title: __("Refresh started"),
+					indicator: "blue",
+					message: __(
+						"Job {0} is running in the background. Refresh this report in a few minutes.",
+						[job]
+					),
+				});
+			},
+		});
+	});
 }
 
 frappe.query_reports["Foodpanda Catalog Sheet"] = {
@@ -245,7 +258,9 @@ frappe.query_reports["Foodpanda Catalog Sheet"] = {
 		},
 	],
 	onload(report) {
-		report.page.add_inner_button(__("Save Foodpanda Prices"), () => aimatic_fp_save_prices(report));
+		report.page.add_inner_button(__("Save Foodpanda Prices"), () =>
+			aimatic_fp_save_prices(report)
+		);
 		report.page.add_inner_button(__("Apply & push to Foodpanda"), () =>
 			aimatic_fp_apply_and_push(report)
 		);
@@ -269,15 +284,23 @@ frappe.query_reports["Foodpanda Catalog Sheet"] = {
 		if (column.fieldname === "match_status" && data) {
 			const status = data.match_status || "";
 			if (status.startsWith("Linked") || status === "Match Ready") {
-				value = `<span style="color:var(--green-600)">${frappe.utils.escape_html(status)}</span>`;
+				value = `<span style="color:var(--green-600)">${frappe.utils.escape_html(
+					status
+				)}</span>`;
 			} else if (status === "Failed" || status === "Ambiguous") {
-				value = `<span style="color:var(--orange-600)">${frappe.utils.escape_html(status)}</span>`;
+				value = `<span style="color:var(--orange-600)">${frappe.utils.escape_html(
+					status
+				)}</span>`;
 			} else if (status === "Not Linked" || status === "No Barcode") {
-				value = `<span style="color:var(--text-muted)">${frappe.utils.escape_html(status)}</span>`;
+				value = `<span style="color:var(--text-muted)">${frappe.utils.escape_html(
+					status
+				)}</span>`;
 			}
 		}
 		if (column.fieldname === "sync_status" && data && data.sync_status === "Failed") {
-			value = `<span style="color:var(--red-600)">${frappe.utils.escape_html(data.sync_status)}</span>`;
+			value = `<span style="color:var(--red-600)">${frappe.utils.escape_html(
+				data.sync_status
+			)}</span>`;
 		}
 		return value;
 	},
@@ -339,11 +362,14 @@ frappe.query_reports["Foodpanda Catalog Sheet"] = {
 					setValue(active) {
 						active = cint(active) ? 1 : 0;
 						data.portal_active = active;
-						aimatic_fp_catalog_pending_active.set(data.foodpanda_sku || data.item_code, {
-							item_code: data.item_code,
-							foodpanda_sku: data.foodpanda_sku,
-							portal_active: active,
-						});
+						aimatic_fp_catalog_pending_active.set(
+							data.foodpanda_sku || data.item_code,
+							{
+								item_code: data.item_code,
+								foodpanda_sku: data.foodpanda_sku,
+								portal_active: active,
+							}
+						);
 					},
 				};
 			}

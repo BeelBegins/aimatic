@@ -23,4 +23,3 @@ class MobileSalesDeliveryLocation(Document):
 			{"customer": self.customer, "is_default": 1, "enabled": 1, "name": ["!=", self.name]},
 		):
 			frappe.throw(_("Only one enabled default delivery location is allowed per customer"))
-

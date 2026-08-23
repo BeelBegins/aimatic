@@ -5,10 +5,19 @@ import math
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, add_months, cint, flt, get_first_day, get_last_day, getdate, now_datetime, nowdate
+from frappe.utils import (
+	add_days,
+	add_months,
+	cint,
+	flt,
+	get_first_day,
+	get_last_day,
+	getdate,
+	now_datetime,
+	nowdate,
+)
 
 from aimatic.branch_management.utils import get_branch_defaults, get_user_default_branch, user_can_override
-
 
 _OAUTH_APP = "Aimatic Sales Android"
 _ALLOWED_ROLES = {"Sales User", "Sales Manager", "System Manager"}
@@ -59,7 +68,9 @@ def _warehouse_doc(warehouse, company=None, required=False):
 		return None
 	if cint(doc.disabled) or cint(doc.is_group) or (company and doc.company != company):
 		if required:
-			frappe.throw(_("Warehouse {0} is not an active stock warehouse for Company {1}").format(warehouse, company))
+			frappe.throw(
+				_("Warehouse {0} is not an active stock warehouse for Company {1}").format(warehouse, company)
+			)
 		return None
 	return doc
 
@@ -69,7 +80,9 @@ def _default_company(branch_doc=None, warehouse_doc=None, fallback_branch_doc=No
 		return warehouse_doc.company
 	if branch_doc:
 		return branch_doc.company
-	company = frappe.defaults.get_user_default("Company") or frappe.defaults.get_global_default("default_company")
+	company = frappe.defaults.get_user_default("Company") or frappe.defaults.get_global_default(
+		"default_company"
+	)
 	if company:
 		return company
 	if fallback_branch_doc:
@@ -148,9 +161,11 @@ def _customer_doc(customer):
 
 
 def _customer_price_list(customer, branch_price_list):
-	return customer.default_price_list or frappe.db.get_value(
-		"Customer Group", customer.customer_group, "default_price_list"
-	) or branch_price_list
+	return (
+		customer.default_price_list
+		or frappe.db.get_value("Customer Group", customer.customer_group, "default_price_list")
+		or branch_price_list
+	)
 
 
 def _item_stock_and_rates(item_codes, warehouse, price_list):
@@ -316,12 +331,14 @@ def _parse_items(items):
 		uom = value.get("uom")
 		if uom and uom not in _valid_item_uoms(item_code):
 			frappe.throw(_("{0} is not a valid unit of measure for item {1}").format(uom, item_code))
-		result.append({
-			"item_code": item_code,
-			"qty": flt(value["qty"]),
-			"uom": uom,
-			"delivery_date": value.get("delivery_date"),
-		})
+		result.append(
+			{
+				"item_code": item_code,
+				"qty": flt(value["qty"]),
+				"uom": uom,
+				"delivery_date": value.get("delivery_date"),
+			}
+		)
 	return result
 
 
@@ -363,13 +380,16 @@ def _make_order(
 		values["branch"] = context.branch
 	doc = frappe.get_doc(values)
 	for item in _parse_items(items):
-		doc.append("items", {
-			"item_code": item["item_code"],
-			"qty": item["qty"],
-			"uom": item["uom"],
-			"delivery_date": item["delivery_date"] or delivery_date,
-			"warehouse": context.warehouse,
-		})
+		doc.append(
+			"items",
+			{
+				"item_code": item["item_code"],
+				"qty": item["qty"],
+				"uom": item["uom"],
+				"delivery_date": item["delivery_date"] or delivery_date,
+				"warehouse": context.warehouse,
+			},
+		)
 	doc.run_method("set_missing_values")
 	doc.run_method("calculate_taxes_and_totals")
 	discount["original_grand_total"] = flt(doc.grand_total, 2)
@@ -383,7 +403,18 @@ def _approval_for_order(order):
 	return frappe.db.get_value(
 		"Mobile Sales Discount Approval",
 		{"sales_order": order},
-		["name", "status", "requested_by", "requested_percent", "authority_percent", "reason", "requested_at", "decided_by", "decided_at", "decision_comment"],
+		[
+			"name",
+			"status",
+			"requested_by",
+			"requested_percent",
+			"authority_percent",
+			"reason",
+			"requested_at",
+			"decided_by",
+			"decided_at",
+			"decision_comment",
+		],
 		as_dict=True,
 	)
 
@@ -460,33 +491,46 @@ def _order_response(doc, credit=None, duplicate=False, delivery_rule=None, disco
 		"delivery_warning": delivery_warning,
 		"discount_percent": flt(doc.get("additional_discount_percentage"), 3),
 		"discount_authority_percent": discount["discount_authority_percent"],
-		"discount_requires_approval": bool(approval and approval.status == "Pending") or discount["discount_requires_approval"],
+		"discount_requires_approval": bool(approval and approval.status == "Pending")
+		or discount["discount_requires_approval"],
 		"approval_status": approval.status if approval else None,
 		"approval_reason": approval.reason if approval else None,
 		"approval_comment": approval.decision_comment if approval else None,
 		"outstanding_balance": credit["outstanding_balance"],
 		"credit_limit": credit["credit_limit"],
-		"credit_warning": bool(credit["credit_limit"] and credit["outstanding_balance"] + flt(doc.grand_total) > credit["credit_limit"]),
+		"credit_warning": bool(
+			credit["credit_limit"]
+			and credit["outstanding_balance"] + flt(doc.grand_total) > credit["credit_limit"]
+		),
 		"duplicate": duplicate,
 		**_order_action_permissions(doc),
-		"items": [{
-			"item_code": row.item_code,
-			"item_name": row.item_name,
-			"qty": flt(row.qty),
-			"uom": row.uom,
-			"rate": flt(row.rate, 2),
-			"amount": flt(row.amount, 2),
-			"warehouse": row.warehouse,
-		} for row in doc.items],
+		"items": [
+			{
+				"item_code": row.item_code,
+				"item_name": row.item_name,
+				"qty": flt(row.qty),
+				"uom": row.uom,
+				"rate": flt(row.rate, 2),
+				"amount": flt(row.amount, 2),
+				"warehouse": row.warehouse,
+			}
+			for row in doc.items
+		],
 	}
 
 
 @frappe.whitelist(allow_guest=True)
 def get_public_config():
-	client = frappe.db.get_value("OAuth Client", {"app_name": _OAUTH_APP}, ["name", "default_redirect_uri"], as_dict=True)
+	client = frappe.db.get_value(
+		"OAuth Client", {"app_name": _OAUTH_APP}, ["name", "default_redirect_uri"], as_dict=True
+	)
 	if not client:
 		frappe.throw(_("Ai Matic Sales OAuth is not configured"))
-	return {"oauth_client_id": client.name, "redirect_uri": client.default_redirect_uri, "scope": "sales-ordering"}
+	return {
+		"oauth_client_id": client.name,
+		"redirect_uri": client.default_redirect_uri,
+		"scope": "sales-ordering",
+	}
 
 
 @frappe.whitelist()
@@ -496,10 +540,22 @@ def get_context(branch=None, warehouse=None):
 	# several warehouses and no default. Transaction endpoints stay strict.
 	context = _sales_context(branch, warehouse, require_warehouse=False)
 	default_branch = get_user_default_branch()
-	branches = frappe.get_list("Branch", fields=["name", "company"], order_by="name", limit_page_length=500) if user_can_override() else (
-		[{"name": default_branch, "company": frappe.db.get_value("Branch", default_branch, "company")}] if default_branch else []
+	branches = (
+		frappe.get_list("Branch", fields=["name", "company"], order_by="name", limit_page_length=500)
+		if user_can_override()
+		else (
+			[{"name": default_branch, "company": frappe.db.get_value("Branch", default_branch, "company")}]
+			if default_branch
+			else []
+		)
 	)
-	warehouses = frappe.get_list("Warehouse", filters={"company": context.company, "disabled": 0, "is_group": 0}, fields=["name", "company"], order_by="name", limit_page_length=500)
+	warehouses = frappe.get_list(
+		"Warehouse",
+		filters={"company": context.company, "disabled": 0, "is_group": 0},
+		fields=["name", "company"],
+		order_by="name",
+		limit_page_length=500,
+	)
 	return {
 		"user": user,
 		"full_name": frappe.utils.get_fullname(user),
@@ -521,7 +577,9 @@ def validate_discount(customer, discount_percent, order_total=None):
 def _discount_manager_users():
 	users = set()
 	for role in ("Sales Manager", "System Manager"):
-		users.update(frappe.get_all("Has Role", filters={"role": role}, pluck="parent", limit_page_length=500))
+		users.update(
+			frappe.get_all("Has Role", filters={"role": role}, pluck="parent", limit_page_length=500)
+		)
 	if not users:
 		return []
 	return frappe.get_all(
@@ -534,16 +592,18 @@ def _discount_manager_users():
 
 def _create_discount_notification(for_user, subject, order, from_user):
 	try:
-		frappe.get_doc({
-			"doctype": "Notification Log",
-			"subject": subject,
-			"email_content": subject,
-			"for_user": for_user,
-			"from_user": from_user,
-			"type": "Alert",
-			"document_type": "Sales Order",
-			"document_name": order,
-		}).insert(ignore_permissions=True)
+		frappe.get_doc(
+			{
+				"doctype": "Notification Log",
+				"subject": subject,
+				"email_content": subject,
+				"for_user": for_user,
+				"from_user": from_user,
+				"type": "Alert",
+				"document_type": "Sales Order",
+				"document_name": order,
+			}
+		).insert(ignore_permissions=True)
 		frappe.publish_realtime(
 			"mobile_sales_discount_approval",
 			{"sales_order": order, "subject": subject},
@@ -567,14 +627,23 @@ def _sync_discount_approval(doc, discount, reason=None):
 			frappe.db.set_value(
 				"Mobile Sales Discount Approval",
 				existing.name,
-				{"status": "Withdrawn", "decided_by": frappe.session.user, "decided_at": now_datetime(), "decision_comment": _("Discount reduced within user authority")},
+				{
+					"status": "Withdrawn",
+					"decided_by": frappe.session.user,
+					"decided_at": now_datetime(),
+					"decision_comment": _("Discount reduced within user authority"),
+				},
 			)
 		return _approval_for_order(doc.name)
 	reason = str(reason or "").strip()
 	if not reason:
 		frappe.throw(_("A reason is required when requesting discount approval"))
 	requested = discount["discount_percent"]
-	if existing and existing.status == "Approved" and abs(flt(existing.requested_percent) - requested) < 0.0001:
+	if (
+		existing
+		and existing.status == "Approved"
+		and abs(flt(existing.requested_percent) - requested) < 0.0001
+	):
 		return existing
 	values = {
 		"status": "Pending",
@@ -583,7 +652,9 @@ def _sync_discount_approval(doc, discount, reason=None):
 		"authority_percent": discount["discount_authority_percent"],
 		"reason": reason,
 		"requested_at": now_datetime(),
-		"original_grand_total": flt(discount.get("original_grand_total") or flt(doc.grand_total) + flt(doc.discount_amount), 2),
+		"original_grand_total": flt(
+			discount.get("original_grand_total") or flt(doc.grand_total) + flt(doc.discount_amount), 2
+		),
 		"requested_grand_total": flt(doc.grand_total, 2),
 		"decided_by": None,
 		"decided_at": None,
@@ -592,11 +663,13 @@ def _sync_discount_approval(doc, discount, reason=None):
 	if existing:
 		frappe.db.set_value("Mobile Sales Discount Approval", existing.name, values)
 	else:
-		frappe.get_doc({
-			"doctype": "Mobile Sales Discount Approval",
-			"sales_order": doc.name,
-			**values,
-		}).insert(ignore_permissions=True)
+		frappe.get_doc(
+			{
+				"doctype": "Mobile Sales Discount Approval",
+				"sales_order": doc.name,
+				**values,
+			}
+		).insert(ignore_permissions=True)
 	_notify_discount_managers(doc.name, requested, frappe.session.user)
 	return _approval_for_order(doc.name)
 
@@ -608,8 +681,31 @@ def search_customers(search=None, offset=0, limit=20):
 	or_filters = None
 	if search:
 		like = f"%{search}%"
-		or_filters = {"name": ["like", like], "customer_name": ["like", like], "mobile_no": ["like", like], "email_id": ["like", like]}
-	return {"customers": frappe.get_list("Customer", filters=filters, or_filters=or_filters, fields=["name", "customer_name", "customer_group", "territory", "mobile_no", "email_id", "default_price_list"], start=cint(offset), page_length=_page_length(limit), order_by="customer_name")}
+		or_filters = {
+			"name": ["like", like],
+			"customer_name": ["like", like],
+			"mobile_no": ["like", like],
+			"email_id": ["like", like],
+		}
+	return {
+		"customers": frappe.get_list(
+			"Customer",
+			filters=filters,
+			or_filters=or_filters,
+			fields=[
+				"name",
+				"customer_name",
+				"customer_group",
+				"territory",
+				"mobile_no",
+				"email_id",
+				"default_price_list",
+			],
+			start=cint(offset),
+			page_length=_page_length(limit),
+			order_by="customer_name",
+		)
+	}
 
 
 @frappe.whitelist()
@@ -618,7 +714,16 @@ def get_customer_context(customer, branch=None, warehouse=None):
 	context = _sales_context(branch, warehouse)
 	doc = _customer_doc(customer)
 	credit = _credit_context(doc.name, context.company)
-	return {"name": doc.name, "customer_name": doc.customer_name, "mobile_no": doc.mobile_no, "email_id": doc.email_id, "territory": doc.territory, "customer_group": doc.customer_group, "price_list": _customer_price_list(doc, context.price_list), **credit}
+	return {
+		"name": doc.name,
+		"customer_name": doc.customer_name,
+		"mobile_no": doc.mobile_no,
+		"email_id": doc.email_id,
+		"territory": doc.territory,
+		"customer_group": doc.customer_group,
+		"price_list": _customer_price_list(doc, context.price_list),
+		**credit,
+	}
 
 
 def _pricing_rule_party_matches(rule, customer_doc):
@@ -630,7 +735,10 @@ def _pricing_rule_party_matches(rule, customer_doc):
 	if applicable_for == "Customer Group":
 		from frappe.utils.nestedset import get_ancestors_of
 
-		groups = {customer_doc.customer_group, *get_ancestors_of("Customer Group", customer_doc.customer_group)}
+		groups = {
+			customer_doc.customer_group,
+			*get_ancestors_of("Customer Group", customer_doc.customer_group),
+		}
 		return rule.get("customer_group") in groups
 	if applicable_for == "Territory":
 		from frappe.utils.nestedset import get_ancestors_of
@@ -673,7 +781,9 @@ def _promotion_offer(rule):
 	if rule.rate_or_discount == "Discount Percentage":
 		return _("{0}{1}% off").format(threshold, flt(rule.discount_percentage, 3))
 	if rule.rate_or_discount == "Discount Amount":
-		return _("{0}{1} {2} off").format(threshold, rule.currency or "", flt(rule.discount_amount, 2)).strip()
+		return (
+			_("{0}{1} {2} off").format(threshold, rule.currency or "", flt(rule.discount_amount, 2)).strip()
+		)
 	if rule.rate_or_discount == "Rate":
 		return _("{0}Special rate {1} {2}").format(threshold, rule.currency or "", flt(rule.rate, 2)).strip()
 	return rule.rule_description or rule.title
@@ -690,12 +800,36 @@ def get_active_promotions(customer, date=None, branch=None, warehouse=None):
 		"Pricing Rule",
 		filters={"selling": 1, "disable": 0},
 		fields=[
-			"name", "title", "apply_on", "price_or_product_discount", "warehouse",
-			"applicable_for", "customer", "customer_group", "territory", "coupon_code_based",
-			"min_qty", "max_qty", "min_amt", "max_amt", "same_item", "free_item", "free_qty",
-			"free_item_uom", "valid_from", "valid_upto", "company", "currency",
-			"rate_or_discount", "rate", "discount_amount", "discount_percentage",
-			"rule_description", "condition", "priority", "promotional_scheme",
+			"name",
+			"title",
+			"apply_on",
+			"price_or_product_discount",
+			"warehouse",
+			"applicable_for",
+			"customer",
+			"customer_group",
+			"territory",
+			"coupon_code_based",
+			"min_qty",
+			"max_qty",
+			"min_amt",
+			"max_amt",
+			"same_item",
+			"free_item",
+			"free_qty",
+			"free_item_uom",
+			"valid_from",
+			"valid_upto",
+			"company",
+			"currency",
+			"rate_or_discount",
+			"rate",
+			"discount_amount",
+			"discount_percentage",
+			"rule_description",
+			"condition",
+			"priority",
+			"promotional_scheme",
 		],
 		order_by="priority desc, valid_upto asc, modified desc",
 		limit_page_length=200,
@@ -730,29 +864,31 @@ def get_active_promotions(customer, date=None, branch=None, warehouse=None):
 			group = entry["value"]
 			expanded_groups.update([group, *get_descendants_of("Item Group", group)])
 		offer = _promotion_offer(rule)
-		promotions.append({
-			"name": rule.name,
-			"title": rule.title,
-			"description": rule.rule_description or offer,
-			"offer": offer,
-			"apply_on": rule.apply_on,
-			**target,
-			"expanded_item_groups": sorted(expanded_groups),
-			"discount_type": rule.price_or_product_discount,
-			"rate_or_discount": rule.rate_or_discount,
-			"discount_value": flt(rule.discount_percentage or rule.discount_amount or rule.rate, 3),
-			"free_item": rule.free_item,
-			"free_qty": flt(rule.free_qty, 3),
-			"free_item_uom": rule.free_item_uom,
-			"min_qty": flt(rule.min_qty, 3),
-			"max_qty": flt(rule.max_qty, 3),
-			"min_amount": flt(rule.min_amt, 2),
-			"max_amount": flt(rule.max_amt, 2),
-			"valid_from": str(rule.valid_from) if rule.valid_from else None,
-			"valid_until": str(rule.valid_upto) if rule.valid_upto else None,
-			"conditional": bool(rule.condition),
-			"promotional_scheme": rule.promotional_scheme,
-		})
+		promotions.append(
+			{
+				"name": rule.name,
+				"title": rule.title,
+				"description": rule.rule_description or offer,
+				"offer": offer,
+				"apply_on": rule.apply_on,
+				**target,
+				"expanded_item_groups": sorted(expanded_groups),
+				"discount_type": rule.price_or_product_discount,
+				"rate_or_discount": rule.rate_or_discount,
+				"discount_value": flt(rule.discount_percentage or rule.discount_amount or rule.rate, 3),
+				"free_item": rule.free_item,
+				"free_qty": flt(rule.free_qty, 3),
+				"free_item_uom": rule.free_item_uom,
+				"min_qty": flt(rule.min_qty, 3),
+				"max_qty": flt(rule.max_qty, 3),
+				"min_amount": flt(rule.min_amt, 2),
+				"max_amount": flt(rule.max_amt, 2),
+				"valid_from": str(rule.valid_from) if rule.valid_from else None,
+				"valid_until": str(rule.valid_upto) if rule.valid_upto else None,
+				"conditional": bool(rule.condition),
+				"promotional_scheme": rule.promotional_scheme,
+			}
+		)
 	return {"promotions": promotions, "date": str(on_date), "currency": context.currency}
 
 
@@ -786,7 +922,9 @@ def _visit_coordinates(data):
 
 def _visit_access(doc):
 	user = frappe.session.user
-	if doc.assigned_to != user and not {"Sales Manager", "System Manager"}.intersection(frappe.get_roles(user)):
+	if doc.assigned_to != user and not {"Sales Manager", "System Manager"}.intersection(
+		frappe.get_roles(user)
+	):
 		frappe.throw(_("This visit is assigned to another Sales User"), frappe.PermissionError)
 
 
@@ -802,7 +940,11 @@ def _visit_address(address_name):
 	if not row:
 		return None
 	parts = [row.address_line1, row.address_line2, row.city, row.state, row.pincode]
-	return {"name": row.name, "title": row.address_title, "display": ", ".join(str(part) for part in parts if part)}
+	return {
+		"name": row.name,
+		"title": row.address_title,
+		"display": ", ".join(str(part) for part in parts if part),
+	}
 
 
 def _visit_response(doc, duplicate=False):
@@ -827,10 +969,14 @@ def _visit_response(doc, duplicate=False):
 		"check_in_accuracy": flt(doc.check_in_accuracy, 2),
 		"check_out_at": str(doc.check_out_at) if doc.check_out_at else None,
 		"check_out_latitude": flt(doc.check_out_latitude, 7) if doc.check_out_latitude is not None else None,
-		"check_out_longitude": flt(doc.check_out_longitude, 7) if doc.check_out_longitude is not None else None,
+		"check_out_longitude": flt(doc.check_out_longitude, 7)
+		if doc.check_out_longitude is not None
+		else None,
 		"check_out_accuracy": flt(doc.check_out_accuracy, 2),
 		"notes": doc.notes,
-		"photo_count": frappe.db.count("File", {"attached_to_doctype": doc.doctype, "attached_to_name": doc.name}),
+		"photo_count": frappe.db.count(
+			"File", {"attached_to_doctype": doc.doctype, "attached_to_name": doc.name}
+		),
 		"duplicate": duplicate,
 	}
 
@@ -884,7 +1030,10 @@ def _distance_between(latitude, longitude, row):
 	lat1, lat2 = math.radians(latitude), math.radians(flt(row_latitude))
 	delta_latitude = lat2 - lat1
 	delta_longitude = math.radians(flt(row_longitude) - longitude)
-	value = math.sin(delta_latitude / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(delta_longitude / 2) ** 2
+	value = (
+		math.sin(delta_latitude / 2) ** 2
+		+ math.cos(lat1) * math.cos(lat2) * math.sin(delta_longitude / 2) ** 2
+	)
 	return 6371 * 2 * math.atan2(math.sqrt(value), math.sqrt(max(1 - value, 0)))
 
 
@@ -913,7 +1062,9 @@ def get_visit_schedule(date=None, current_latitude=None, current_longitude=None)
 	)
 	optimized = current_latitude not in (None, "") and current_longitude not in (None, "")
 	if optimized:
-		latitude, longitude, _accuracy = _visit_coordinates({"latitude": current_latitude, "longitude": current_longitude})
+		latitude, longitude, _accuracy = _visit_coordinates(
+			{"latitude": current_latitude, "longitude": current_longitude}
+		)
 		route_rows = [frappe.get_doc("Mobile Sales Visit", row.name) for row in rows]
 		route_rows = _optimize_visit_route(route_rows, latitude, longitude)
 	else:
@@ -924,7 +1075,12 @@ def get_visit_schedule(date=None, current_latitude=None, current_longitude=None)
 		value["route_position"] = position
 		last_visit = frappe.db.get_value(
 			"Mobile Sales Visit",
-			{"company": doc.company, "customer": doc.customer, "status": "Completed", "check_out_at": ["<", doc.check_out_at or now_datetime()]},
+			{
+				"company": doc.company,
+				"customer": doc.customer,
+				"status": "Completed",
+				"check_out_at": ["<", doc.check_out_at or now_datetime()],
+			},
 			"check_out_at",
 			order_by="check_out_at desc",
 		)
@@ -955,16 +1111,18 @@ def log_visit(data):
 			return _visit_response(doc, duplicate=True)
 		customer = _customer_doc(data.customer)
 		context = _sales_context(data.get("branch"), data.get("warehouse"), require_warehouse=False)
-		doc = frappe.get_doc({
-			"doctype": "Mobile Sales Visit",
-			"company": context.company,
-			"warehouse": context.warehouse,
-			"customer": customer.name,
-			"assigned_to": user,
-			"scheduled_date": data.get("scheduled_date") or nowdate(),
-			"request_id": request_id,
-			"status": "Planned",
-		})
+		doc = frappe.get_doc(
+			{
+				"doctype": "Mobile Sales Visit",
+				"company": context.company,
+				"warehouse": context.warehouse,
+				"customer": customer.name,
+				"assigned_to": user,
+				"scheduled_date": data.get("scheduled_date") or nowdate(),
+				"request_id": request_id,
+				"status": "Planned",
+			}
+		)
 		doc.insert(ignore_permissions=True)
 	if frappe.db.exists("Mobile Sales Visit", {"check_in_request_id": request_id, "name": ["!=", doc.name]}):
 		frappe.throw(_("This visit check-in request ID is already in use"))
@@ -1011,30 +1169,52 @@ def _customer_delivery_locations(customer):
 	rows = frappe.get_all(
 		"Mobile Sales Delivery Location",
 		filters={"customer": customer, "enabled": 1},
-		fields=["name", "location_name", "address", "is_default", "instructions", "minimum_order_value", *_DELIVERY_DAY_FIELDS],
+		fields=[
+			"name",
+			"location_name",
+			"address",
+			"is_default",
+			"instructions",
+			"minimum_order_value",
+			*_DELIVERY_DAY_FIELDS,
+		],
 		order_by="is_default desc, location_name, name",
 		limit_page_length=100,
 	)
 	if not rows:
 		return []
 	address_names = [row.address for row in rows if row.address]
-	linked = set(frappe.get_all(
-		"Dynamic Link",
-		filters={
-			"parenttype": "Address",
-			"parent": ["in", address_names],
-			"link_doctype": "Customer",
-			"link_name": customer,
-		},
-		pluck="parent",
-		limit_page_length=max(len(address_names), 1),
-	))
+	linked = set(
+		frappe.get_all(
+			"Dynamic Link",
+			filters={
+				"parenttype": "Address",
+				"parent": ["in", address_names],
+				"link_doctype": "Customer",
+				"link_name": customer,
+			},
+			pluck="parent",
+			limit_page_length=max(len(address_names), 1),
+		)
+	)
 	addresses = {
 		row.name: row
 		for row in frappe.get_all(
 			"Address",
 			filters={"name": ["in", list(linked) or [""]], "disabled": 0},
-			fields=["name", "address_title", "address_line1", "address_line2", "city", "county", "state", "pincode", "country", "phone", "email_id"],
+			fields=[
+				"name",
+				"address_title",
+				"address_line1",
+				"address_line2",
+				"city",
+				"county",
+				"state",
+				"pincode",
+				"country",
+				"phone",
+				"email_id",
+			],
 			limit_page_length=max(len(linked), 1),
 		)
 	}
@@ -1056,18 +1236,20 @@ def _customer_delivery_locations(customer):
 			)
 			if value
 		)
-		result.append({
-			"name": row.name,
-			"location_name": row.location_name or address.address_title or row.address,
-			"address_name": row.address,
-			"address": address_display,
-			"phone": address.phone,
-			"email_id": address.email_id,
-			"is_default": bool(row.is_default),
-			"delivery_days": [field.title() for field in _DELIVERY_DAY_FIELDS if cint(row.get(field))],
-			"instructions": row.instructions,
-			"minimum_order_value": flt(row.minimum_order_value, 2),
-		})
+		result.append(
+			{
+				"name": row.name,
+				"location_name": row.location_name or address.address_title or row.address,
+				"address_name": row.address,
+				"address": address_display,
+				"phone": address.phone,
+				"email_id": address.email_id,
+				"is_default": bool(row.is_default),
+				"delivery_days": [field.title() for field in _DELIVERY_DAY_FIELDS if cint(row.get(field))],
+				"instructions": row.instructions,
+				"minimum_order_value": flt(row.minimum_order_value, 2),
+			}
+		)
 	return result
 
 
@@ -1075,13 +1257,19 @@ def _delivery_location_rule(customer, delivery_location=None):
 	locations = _customer_delivery_locations(customer)
 	if not locations:
 		if delivery_location:
-			frappe.throw(_("Delivery location {0} is not available for customer {1}").format(delivery_location, customer))
+			frappe.throw(
+				_("Delivery location {0} is not available for customer {1}").format(
+					delivery_location, customer
+				)
+			)
 		return None
 	if delivery_location:
 		for location in locations:
 			if location["name"] == delivery_location:
 				return location
-		frappe.throw(_("Delivery location {0} is not available for customer {1}").format(delivery_location, customer))
+		frappe.throw(
+			_("Delivery location {0} is not available for customer {1}").format(delivery_location, customer)
+		)
 	return next((location for location in locations if location["is_default"]), locations[0])
 
 
@@ -1130,12 +1318,14 @@ def _expanded_item_groups(item_groups):
 		bounds = frappe.db.get_value("Item Group", item_group, ["lft", "rgt"], as_dict=True)
 		if not bounds:
 			continue
-		result.update(frappe.get_all(
-			"Item Group",
-			filters={"lft": [">=", bounds.lft], "rgt": ["<=", bounds.rgt]},
-			pluck="name",
-			limit_page_length=5000,
-		))
+		result.update(
+			frappe.get_all(
+				"Item Group",
+				filters={"lft": [">=", bounds.lft], "rgt": ["<=", bounds.rgt]},
+				pluck="name",
+				limit_page_length=5000,
+			)
+		)
 	return sorted(result)
 
 
@@ -1190,7 +1380,11 @@ def _customer_item_history_by_item(customer, item_codes, months=3):
 	order_dates = {row.name: row.transaction_date for row in orders}
 	lines = frappe.get_all(
 		"Sales Order Item",
-		filters={"parenttype": "Sales Order", "parent": ["in", list(order_dates)], "item_code": ["in", item_codes]},
+		filters={
+			"parenttype": "Sales Order",
+			"parent": ["in", list(order_dates)],
+			"item_code": ["in", item_codes],
+		},
 		fields=["parent", "item_code", "stock_qty", "stock_uom"],
 		limit_page_length=5000,
 	)
@@ -1212,7 +1406,9 @@ def _customer_item_history_by_item(customer, item_codes, months=3):
 			continue
 		last_qty = entries[0][1]
 		previous_qty = entries[1][1]
-		trend = "flat" if abs(last_qty - previous_qty) < 0.001 else ("up" if last_qty > previous_qty else "down")
+		trend = (
+			"flat" if abs(last_qty - previous_qty) < 0.001 else ("up" if last_qty > previous_qty else "down")
+		)
 		average = sum(quantity for _date, quantity in entries) / len(entries)
 		result[item_code] = {
 			"stock_uom": stock_uom_by_item.get(item_code),
@@ -1234,13 +1430,26 @@ def get_customer_item_history(customer, item_code, months=3):
 
 
 @frappe.whitelist()
-def search_items(branch=None, warehouse=None, customer=None, search=None, barcode=None, assortment_only=0, offset=0, limit=30):
+def search_items(
+	branch=None,
+	warehouse=None,
+	customer=None,
+	search=None,
+	barcode=None,
+	assortment_only=0,
+	offset=0,
+	limit=30,
+):
 	_require_sales_user()
 	context = _sales_context(branch, warehouse)
 	customer_doc = _customer_doc(customer) if customer else None
-	price_list = _customer_price_list(customer_doc, context.price_list) if customer_doc else context.price_list
+	price_list = (
+		_customer_price_list(customer_doc, context.price_list) if customer_doc else context.price_list
+	)
 	if barcode:
-		codes = frappe.get_list("Item Barcode", filters={"barcode": barcode}, pluck="parent", limit_page_length=10)
+		codes = frappe.get_list(
+			"Item Barcode", filters={"barcode": barcode}, pluck="parent", limit_page_length=10
+		)
 		filters = {"name": ["in", codes or [""]], "disabled": 0, "is_sales_item": 1}
 	else:
 		filters = {"disabled": 0, "is_sales_item": 1}
@@ -1261,31 +1470,64 @@ def search_items(branch=None, warehouse=None, customer=None, search=None, barcod
 			"item_group": ["like", like],
 			"brand": ["like", like],
 		}
-	rows = frappe.get_list("Item", filters=filters, or_filters=or_filters, fields=["name", "item_name", "item_group", "brand", "stock_uom", "image"], start=cint(offset), page_length=_page_length(limit), order_by="item_name")
+	rows = frappe.get_list(
+		"Item",
+		filters=filters,
+		or_filters=or_filters,
+		fields=["name", "item_name", "item_group", "brand", "stock_uom", "image"],
+		start=cint(offset),
+		page_length=_page_length(limit),
+		order_by="item_name",
+	)
 	item_codes = [row.name for row in rows]
-	stock_by_item, rate_by_item, uom_by_item = _item_stock_and_rates(item_codes, context.warehouse, price_list)
+	stock_by_item, rate_by_item, uom_by_item = _item_stock_and_rates(
+		item_codes, context.warehouse, price_list
+	)
 	history_by_item = _customer_item_history_by_item(customer_doc.name, item_codes) if customer_doc else {}
 	for row in rows:
 		stock = stock_by_item.get(row.name) or {}
 		available_qty = flt(stock.get("actual_qty")) - flt(stock.get("reserved_qty"))
-		uom_info = uom_by_item.get(row.name) or {"default_uom": row.stock_uom, "uoms": [{"uom": row.stock_uom, "conversion_factor": 1.0, "rate": rate_by_item.get(row.name, 0)}]}
+		uom_info = uom_by_item.get(row.name) or {
+			"default_uom": row.stock_uom,
+			"uoms": [{"uom": row.stock_uom, "conversion_factor": 1.0, "rate": rate_by_item.get(row.name, 0)}],
+		}
 		for entry in uom_info["uoms"]:
-			entry["available_qty"] = flt(available_qty / entry["conversion_factor"]) if entry["conversion_factor"] else 0
-		row.update({
-			"warehouse": context.warehouse,
-			"actual_qty": flt(stock.get("actual_qty")),
-			"available_qty": available_qty,
-			"price_list": price_list,
-			"rate": rate_by_item.get(row.name, 0),
-			"default_uom": uom_info["default_uom"],
-			"uoms": uom_info["uoms"],
-			"customer_history": history_by_item.get(row.name),
-		})
-	return {"items": rows, "price_list": price_list, "warehouse": context.warehouse, "currency": context.currency}
+			entry["available_qty"] = (
+				flt(available_qty / entry["conversion_factor"]) if entry["conversion_factor"] else 0
+			)
+		row.update(
+			{
+				"warehouse": context.warehouse,
+				"actual_qty": flt(stock.get("actual_qty")),
+				"available_qty": available_qty,
+				"price_list": price_list,
+				"rate": rate_by_item.get(row.name, 0),
+				"default_uom": uom_info["default_uom"],
+				"uoms": uom_info["uoms"],
+				"customer_history": history_by_item.get(row.name),
+			}
+		)
+	return {
+		"items": rows,
+		"price_list": price_list,
+		"warehouse": context.warehouse,
+		"currency": context.currency,
+	}
 
 
 @frappe.whitelist()
-def preview_order(customer, items, branch=None, warehouse=None, delivery_date=None, po_no=None, remarks=None, delivery_location=None, discount_percent=None, discount_reason=None):
+def preview_order(
+	customer,
+	items,
+	branch=None,
+	warehouse=None,
+	delivery_date=None,
+	po_no=None,
+	remarks=None,
+	delivery_location=None,
+	discount_percent=None,
+	discount_reason=None,
+):
 	_require_sales_user()
 	doc, _context, credit, delivery_rule, discount = _make_order(
 		branch,
@@ -1322,7 +1564,7 @@ def _signature_bytes(signature_base64):
 	if not value.startswith(prefix):
 		frappe.throw(_("Customer signature must be a PNG image"))
 	try:
-		content = base64.b64decode(value[len(prefix):], validate=True)
+		content = base64.b64decode(value[len(prefix) :], validate=True)
 	except (binascii.Error, ValueError):
 		frappe.throw(_("Customer signature data is invalid"))
 	if not content.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -1359,16 +1601,18 @@ def _save_order_proof(order, signature_base64, latitude, longitude, accuracy=Non
 		order_doc.name,
 		is_private=1,
 	)
-	proof = frappe.get_doc({
-		"doctype": "Mobile Sales Order Proof",
-		"sales_order": order_doc.name,
-		"captured_by": frappe.session.user,
-		"captured_at": now_datetime(),
-		"latitude": latitude,
-		"longitude": longitude,
-		"accuracy": accuracy,
-		"signature_file": file_doc.file_url,
-	})
+	proof = frappe.get_doc(
+		{
+			"doctype": "Mobile Sales Order Proof",
+			"sales_order": order_doc.name,
+			"captured_by": frappe.session.user,
+			"captured_at": now_datetime(),
+			"latitude": latitude,
+			"longitude": longitude,
+			"accuracy": accuracy,
+			"signature_file": file_doc.file_url,
+		}
+	)
 	proof.insert(ignore_permissions=True)
 	return proof
 
@@ -1412,13 +1656,31 @@ def record_geolocation(order_name, latitude, longitude, accuracy=None):
 
 
 @frappe.whitelist()
-def create_order(request_id, customer, items, branch=None, warehouse=None, delivery_date=None, po_no=None, remarks=None, delivery_location=None, discount_percent=None, discount_reason=None, signature_base64=None, proof_latitude=None, proof_longitude=None, proof_accuracy=None):
+def create_order(
+	request_id,
+	customer,
+	items,
+	branch=None,
+	warehouse=None,
+	delivery_date=None,
+	po_no=None,
+	remarks=None,
+	delivery_location=None,
+	discount_percent=None,
+	discount_reason=None,
+	signature_base64=None,
+	proof_latitude=None,
+	proof_longitude=None,
+	proof_accuracy=None,
+):
 	user = _require_sales_user()
 	if not request_id or len(request_id) > 140:
 		frappe.throw(_("A valid request_id is required"))
 	if not frappe.has_permission("Sales Order", "create"):
 		frappe.throw(_("Not permitted to create Sales Orders"), frappe.PermissionError)
-	existing = frappe.db.get_value("Mobile Sales Order Request", request_id, ["user", "sales_order"], as_dict=True)
+	existing = frappe.db.get_value(
+		"Mobile Sales Order Request", request_id, ["user", "sales_order"], as_dict=True
+	)
 	if existing:
 		if existing.user != user:
 			frappe.throw(_("This request ID belongs to another user"), frappe.PermissionError)
@@ -1427,7 +1689,15 @@ def create_order(request_id, customer, items, branch=None, warehouse=None, deliv
 			doc.check_permission("read")
 			return _order_response(doc, duplicate=True)
 		frappe.throw(_("This request is already being processed"))
-	frappe.get_doc({"doctype": "Mobile Sales Order Request", "request_id": request_id, "user": user, "status": "Processing", "created_at": now_datetime()}).insert(ignore_permissions=True)
+	frappe.get_doc(
+		{
+			"doctype": "Mobile Sales Order Request",
+			"request_id": request_id,
+			"user": user,
+			"status": "Processing",
+			"created_at": now_datetime(),
+		}
+	).insert(ignore_permissions=True)
 	doc, _context, credit, delivery_rule, discount = _make_order(
 		branch,
 		warehouse,
@@ -1447,14 +1717,25 @@ def create_order(request_id, customer, items, branch=None, warehouse=None, deliv
 			frappe.throw(_("Customer signature is required when order proof location is supplied"))
 		proof = _save_order_proof(doc.name, signature_base64, proof_latitude, proof_longitude, proof_accuracy)
 	_sync_discount_approval(doc, discount, discount_reason)
-	frappe.db.set_value("Mobile Sales Order Request", request_id, {"sales_order": doc.name, "status": "Created"})
+	frappe.db.set_value(
+		"Mobile Sales Order Request", request_id, {"sales_order": doc.name, "status": "Created"}
+	)
 	result = _order_response(doc, credit, delivery_rule=delivery_rule, discount=discount)
 	result["proof"] = _proof_response(proof) if proof else None
 	return result
 
 
 @frappe.whitelist()
-def update_order(order, items, delivery_date=None, po_no=None, remarks=None, delivery_location=None, discount_percent=None, discount_reason=None):
+def update_order(
+	order,
+	items,
+	delivery_date=None,
+	po_no=None,
+	remarks=None,
+	delivery_location=None,
+	discount_percent=None,
+	discount_reason=None,
+):
 	"""Edits an existing Sales Order still sitting as a Draft (docstatus=0).
 	Only reachable for Draft orders - once submitted/cancelled, ERP's own
 	docstatus immutability is the guard, not anything here. Recomputes items/
@@ -1467,7 +1748,9 @@ def update_order(order, items, delivery_date=None, po_no=None, remarks=None, del
 	doc = frappe.get_doc("Sales Order", order)
 	doc.check_permission("write")
 	if doc.docstatus != 0:
-		frappe.throw(_("Only Draft orders can be edited - {0} has already been submitted or cancelled").format(order))
+		frappe.throw(
+			_("Only Draft orders can be edited - {0} has already been submitted or cancelled").format(order)
+		)
 
 	existing_approval = _approval_for_order(doc.name)
 	requested_discount = doc.additional_discount_percentage if discount_percent is None else discount_percent
@@ -1486,13 +1769,16 @@ def update_order(order, items, delivery_date=None, po_no=None, remarks=None, del
 	_validate_delivery_date(delivery_rule, delivery_date or doc.delivery_date)
 	doc.set("items", [])
 	for item in _parse_items(items):
-		doc.append("items", {
-			"item_code": item["item_code"],
-			"qty": item["qty"],
-			"uom": item["uom"],
-			"delivery_date": item["delivery_date"] or delivery_date or doc.delivery_date,
-			"warehouse": warehouse,
-		})
+		doc.append(
+			"items",
+			{
+				"item_code": item["item_code"],
+				"qty": item["qty"],
+				"uom": item["uom"],
+				"delivery_date": item["delivery_date"] or delivery_date or doc.delivery_date,
+				"warehouse": warehouse,
+			},
+		)
 	if delivery_date:
 		doc.delivery_date = delivery_date
 	if delivery_rule:
@@ -1597,7 +1883,21 @@ def get_discount_approvals(status="Pending", limit=50):
 	approvals = frappe.get_all(
 		"Mobile Sales Discount Approval",
 		filters=filters,
-		fields=["name", "sales_order", "status", "requested_by", "requested_percent", "authority_percent", "reason", "requested_at", "original_grand_total", "requested_grand_total", "decided_by", "decided_at", "decision_comment"],
+		fields=[
+			"name",
+			"sales_order",
+			"status",
+			"requested_by",
+			"requested_percent",
+			"authority_percent",
+			"reason",
+			"requested_at",
+			"original_grand_total",
+			"requested_grand_total",
+			"decided_by",
+			"decided_at",
+			"decision_comment",
+		],
 		order_by="requested_at desc",
 		limit_page_length=min(max(cint(limit) or 50, 1), 100),
 	)
@@ -1608,7 +1908,17 @@ def get_discount_approvals(status="Pending", limit=50):
 		for row in frappe.get_list(
 			"Sales Order",
 			filters={"name": ["in", [approval.sales_order for approval in approvals]]},
-			fields=["name", "customer", "customer_name", "company", "currency", "grand_total", "status", "docstatus", "modified"],
+			fields=[
+				"name",
+				"customer",
+				"customer_name",
+				"company",
+				"currency",
+				"grand_total",
+				"status",
+				"docstatus",
+				"modified",
+			],
 			page_length=len(approvals),
 		)
 	}
@@ -1617,15 +1927,17 @@ def get_discount_approvals(status="Pending", limit=50):
 		order = orders.get(approval.sales_order)
 		if not order:
 			continue
-		approval.update({
-			"customer": order.customer,
-			"customer_name": order.customer_name,
-			"company": order.company,
-			"currency": order.currency,
-			"grand_total": flt(order.grand_total, 2),
-			"order_status": order.status,
-			"docstatus": order.docstatus,
-		})
+		approval.update(
+			{
+				"customer": order.customer,
+				"customer_name": order.customer_name,
+				"company": order.company,
+				"currency": order.currency,
+				"grand_total": flt(order.grand_total, 2),
+				"order_status": order.status,
+				"docstatus": order.docstatus,
+			}
+		)
 		result.append(approval)
 	return {"approvals": result}
 
@@ -1684,7 +1996,22 @@ def get_orders(customer=None, offset=0, limit=20):
 	orders = frappe.get_list(
 		"Sales Order",
 		filters=filters,
-		fields=["name", "customer", "customer_name", "transaction_date", "delivery_date", "status", "docstatus", "per_delivered", "currency", "grand_total", "additional_discount_percentage", "branch", "set_warehouse", "modified"],
+		fields=[
+			"name",
+			"customer",
+			"customer_name",
+			"transaction_date",
+			"delivery_date",
+			"status",
+			"docstatus",
+			"per_delivered",
+			"currency",
+			"grand_total",
+			"additional_discount_percentage",
+			"branch",
+			"set_warehouse",
+			"modified",
+		],
 		start=cint(offset),
 		page_length=_page_length(limit),
 		order_by="modified desc",
@@ -1701,13 +2028,15 @@ def get_orders(customer=None, offset=0, limit=20):
 		}
 		for order in orders:
 			approval = approvals.get(order.name)
-			order.update({
-				"mobile_status": _mobile_order_status(order),
-				"approval_status": approval.status if approval else None,
-				"approval_reason": approval.reason if approval else None,
-				"approval_comment": approval.decision_comment if approval else None,
-				"requested_discount_percent": flt(approval.requested_percent, 3) if approval else None,
-			})
+			order.update(
+				{
+					"mobile_status": _mobile_order_status(order),
+					"approval_status": approval.status if approval else None,
+					"approval_reason": approval.reason if approval else None,
+					"approval_comment": approval.decision_comment if approval else None,
+					"requested_discount_percent": flt(approval.requested_percent, 3) if approval else None,
+				}
+			)
 	return {"orders": orders}
 
 
@@ -1729,7 +2058,7 @@ def _manager_order_metrics(company, start_date, end_date, warehouse=None):
 		f"""
 			select count(*) as orders, coalesce(sum(base_grand_total), 0) as revenue
 			from `tabSales Order`
-			where {' and '.join(conditions)}
+			where {" and ".join(conditions)}
 		""",
 		values,
 		as_dict=True,
@@ -1749,7 +2078,7 @@ def _manager_team_metrics(company, start_date, end_date, warehouse=None):
 		f"""
 			select owner as user, count(*) as orders, coalesce(sum(base_grand_total), 0) as revenue
 			from `tabSales Order`
-			where {' and '.join(conditions)}
+			where {" and ".join(conditions)}
 			group by owner
 			order by revenue desc
 			limit 20
@@ -1768,7 +2097,12 @@ def _manager_team_metrics(company, start_date, end_date, warehouse=None):
 		)
 	}
 	return [
-		{"user": row.user, "name": names.get(row.user) or row.user, "orders": cint(row.orders), "revenue": flt(row.revenue, 2)}
+		{
+			"user": row.user,
+			"name": names.get(row.user) or row.user,
+			"orders": cint(row.orders),
+			"revenue": flt(row.revenue, 2),
+		}
 		for row in rows
 	]
 
@@ -1793,20 +2127,29 @@ def get_manager_dashboard(period="month", branch=None, warehouse=None):
 		frappe.throw(_("Manager dashboard period must be week or month"))
 	current = _manager_order_metrics(context.company, start_date, end_date, context.warehouse)
 	previous = _manager_order_metrics(context.company, previous_start, previous_end, context.warehouse)
-	current["revenue_change_percent"] = flt(
-		((current["revenue"] - previous["revenue"]) / previous["revenue"]) * 100,
-		1,
-	) if previous["revenue"] else None
-	current["orders_change_percent"] = flt(
-		((current["orders"] - previous["orders"]) / previous["orders"]) * 100,
-		1,
-	) if previous["orders"] else None
+	current["revenue_change_percent"] = (
+		flt(
+			((current["revenue"] - previous["revenue"]) / previous["revenue"]) * 100,
+			1,
+		)
+		if previous["revenue"]
+		else None
+	)
+	current["orders_change_percent"] = (
+		flt(
+			((current["orders"] - previous["orders"]) / previous["orders"]) * 100,
+			1,
+		)
+		if previous["orders"]
+		else None
+	)
 	stock_values = {"company": context.company}
 	stock_condition = " and bin.warehouse = %(warehouse)s" if context.warehouse else ""
 	if context.warehouse:
 		stock_values["warehouse"] = context.warehouse
-	low_stock_items = cint(frappe.db.sql(
-		f"""
+	low_stock_items = cint(
+		frappe.db.sql(
+			f"""
 			select count(distinct bin.item_code)
 			from `tabBin` bin
 			inner join `tabItem` item on item.name = bin.item_code
@@ -1814,20 +2157,24 @@ def get_manager_dashboard(period="month", branch=None, warehouse=None):
 			where warehouse.company = %(company)s and item.disabled = 0 and item.is_sales_item = 1
 				and bin.actual_qty <= 0 {stock_condition}
 		""",
-		stock_values,
-	)[0][0])
-	pending_approvals = cint(frappe.db.sql(
-		"""
+			stock_values,
+		)[0][0]
+	)
+	pending_approvals = cint(
+		frappe.db.sql(
+			"""
 			select count(*)
 			from `tabMobile Sales Discount Approval` approval
 			inner join `tabSales Order` sales_order on sales_order.name = approval.sales_order
 			where approval.status = 'Pending' and sales_order.company = %(company)s
 		""",
-		{"company": context.company},
-	)[0][0])
+			{"company": context.company},
+		)[0][0]
+	)
 	visit_values = {"cutoff": add_days(today, -30), "company": context.company}
-	customers_needing_visit = cint(frappe.db.sql(
-		"""
+	customers_needing_visit = cint(
+		frappe.db.sql(
+			"""
 			select count(*) from (
 				select customer
 				from `tabMobile Sales Visit`
@@ -1837,12 +2184,19 @@ def get_manager_dashboard(period="month", branch=None, warehouse=None):
 					or max(case when status = 'Completed' then date(check_out_at) end) < %(cutoff)s
 			) stale_visits
 		""",
-		visit_values,
-	)[0][0])
-	completed_visits = cint(frappe.db.count(
-		"Mobile Sales Visit",
-		{"company": context.company, "status": "Completed", "check_out_at": ["between", [start_date, add_days(end_date, 1)]]},
-	))
+			visit_values,
+		)[0][0]
+	)
+	completed_visits = cint(
+		frappe.db.count(
+			"Mobile Sales Visit",
+			{
+				"company": context.company,
+				"status": "Completed",
+				"check_out_at": ["between", [start_date, add_days(end_date, 1)]],
+			},
+		)
+	)
 	alerts = [
 		{"key": "low_stock", "count": low_stock_items, "label": _("items out of stock")},
 		{"key": "stale_visits", "count": customers_needing_visit, "label": _("customers need a visit")},

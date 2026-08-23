@@ -18,7 +18,9 @@ class RestaurantProfile(Document):
 		if self.default_customer and frappe.db.get_value("Customer", self.default_customer, "disabled"):
 			frappe.throw(_("Default Customer is disabled"))
 		if self.warehouse:
-			warehouse = frappe.db.get_value("Warehouse", self.warehouse, ["company", "disabled", "is_group"], as_dict=True)
+			warehouse = frappe.db.get_value(
+				"Warehouse", self.warehouse, ["company", "disabled", "is_group"], as_dict=True
+			)
 			if not warehouse or warehouse.company != self.company or warehouse.disabled or warehouse.is_group:
 				frappe.throw(_("Restaurant Warehouse must be an active stock warehouse for this Company"))
 		if self.menu_price_list and not frappe.db.get_value("Price List", self.menu_price_list, "selling"):

@@ -22,7 +22,9 @@ class TestMobileSalesCataloguePerformance(FrappeTestCase):
 				frappe._dict(item_code="ITEM-1", uom="Box", price_list_rate=1400),
 			],
 		]
-		stock, rates, uoms = api._item_stock_and_rates(["ITEM-1", "ITEM-2"], "Stores - TC", "Standard Selling")
+		stock, rates, uoms = api._item_stock_and_rates(
+			["ITEM-1", "ITEM-2"], "Stores - TC", "Standard Selling"
+		)
 
 		self.assertEqual(get_all.call_count, 4)
 		self.assertEqual(stock["ITEM-1"].actual_qty, 8)
@@ -46,8 +48,24 @@ class TestMobileSalesReorderFeed(FrappeTestCase):
 			frappe._dict(name="SO-3", customer="CUST-2"),
 		]
 		docs = {
-			"SO-1": SimpleNamespace(name="SO-1", customer="CUST-1", customer_name="One", transaction_date="2026-07-20", currency="PKR", grand_total=1200, items=[frappe._dict(item_code="ITEM-1", item_name="Item One", uom="Box", qty=2)]),
-			"SO-3": SimpleNamespace(name="SO-3", customer="CUST-2", customer_name="Two", transaction_date="2026-07-19", currency="PKR", grand_total=900, items=[frappe._dict(item_code="ITEM-2", item_name="Item Two", uom="Nos", qty=3)]),
+			"SO-1": SimpleNamespace(
+				name="SO-1",
+				customer="CUST-1",
+				customer_name="One",
+				transaction_date="2026-07-20",
+				currency="PKR",
+				grand_total=1200,
+				items=[frappe._dict(item_code="ITEM-1", item_name="Item One", uom="Box", qty=2)],
+			),
+			"SO-3": SimpleNamespace(
+				name="SO-3",
+				customer="CUST-2",
+				customer_name="Two",
+				transaction_date="2026-07-19",
+				currency="PKR",
+				grand_total=900,
+				items=[frappe._dict(item_code="ITEM-2", item_name="Item Two", uom="Nos", qty=3)],
+			),
 		}
 		for doc in docs.values():
 			doc.check_permission = lambda permission: self.assertEqual(permission, "read")
@@ -56,7 +74,10 @@ class TestMobileSalesReorderFeed(FrappeTestCase):
 		result = api.get_recent_reorder_candidates(limit=3)
 
 		self.assertEqual([row["customer"] for row in result["orders"]], ["CUST-1", "CUST-2"])
-		self.assertEqual(result["orders"][0]["items"][0], {"item_code": "ITEM-1", "item_name": "Item One", "uom": "Box", "qty": 2.0})
+		self.assertEqual(
+			result["orders"][0]["items"][0],
+			{"item_code": "ITEM-1", "item_name": "Item One", "uom": "Box", "qty": 2.0},
+		)
 		rows.assert_called_once_with(limit=9)
 
 	@patch("aimatic.mobile_sales.api._require_sales_user")
@@ -94,7 +115,9 @@ class TestMobileSalesCustomerHistory(FrappeTestCase):
 	@patch("aimatic.mobile_sales.api.frappe.get_list")
 	def test_single_order_does_not_claim_a_usual_quantity(self, get_list, get_all):
 		get_list.return_value = [frappe._dict(name="SO-1", transaction_date="2026-07-20")]
-		get_all.return_value = [frappe._dict(parent="SO-1", item_code="ITEM-1", stock_qty=12, stock_uom="Nos")]
+		get_all.return_value = [
+			frappe._dict(parent="SO-1", item_code="ITEM-1", stock_qty=12, stock_uom="Nos")
+		]
 		self.assertEqual(api._customer_item_history_by_item("CUST-1", ["ITEM-1"]), {})
 
 
@@ -107,23 +130,34 @@ class TestMobileSalesAssortments(FrappeTestCase):
 			frappe._dict(item="ITEM-1", item_group=None),
 			frappe._dict(item=None, item_group="Tools"),
 		]
-		self.assertEqual(api._customer_assortment_rules("CUST-1"), {
-			"configured": True,
-			"items": ["ITEM-1"],
-			"item_groups": ["Tools"],
-			"expanded_item_groups": ["Tools", "Power Tools"],
-		})
+		self.assertEqual(
+			api._customer_assortment_rules("CUST-1"),
+			{
+				"configured": True,
+				"items": ["ITEM-1"],
+				"item_groups": ["Tools"],
+				"expanded_item_groups": ["Tools", "Power Tools"],
+			},
+		)
 
 	@patch("aimatic.mobile_sales.api.frappe.get_list")
 	@patch("aimatic.mobile_sales.api._expanded_item_groups", return_value=["Tools", "Power Tools"])
 	def test_item_codes_resolve_explicit_items_and_group_descendants(self, _groups, get_list):
 		get_list.return_value = ["ITEM-1", "ITEM-2"]
-		rules = {"configured": True, "items": ["ITEM-1"], "item_groups": ["Tools"], "expanded_item_groups": ["Tools", "Power Tools"]}
+		rules = {
+			"configured": True,
+			"items": ["ITEM-1"],
+			"item_groups": ["Tools"],
+			"expanded_item_groups": ["Tools", "Power Tools"],
+		}
 		self.assertEqual(api._assortment_item_codes(rules), ["ITEM-1", "ITEM-2"])
-		self.assertEqual(get_list.call_args.kwargs["or_filters"], {
-			"name": ["in", ["ITEM-1"]],
-			"item_group": ["in", ["Tools", "Power Tools"]],
-		})
+		self.assertEqual(
+			get_list.call_args.kwargs["or_filters"],
+			{
+				"name": ["in", ["ITEM-1"]],
+				"item_group": ["in", ["Tools", "Power Tools"]],
+			},
+		)
 
 	def test_unconfigured_customer_keeps_full_catalogue(self):
 		self.assertIsNone(api._assortment_item_codes({"configured": False, "items": [], "item_groups": []}))
@@ -224,10 +258,25 @@ class TestMobileSalesDiscountApprovals(FrappeTestCase):
 
 class TestMobileSalesOrderActions(FrappeTestCase):
 	def test_mobile_status_is_stable_across_erpnext_workflow_labels(self):
-		self.assertEqual(api._mobile_order_status(frappe._dict(docstatus=0, status="Draft", per_delivered=0)), "Draft")
-		self.assertEqual(api._mobile_order_status(frappe._dict(docstatus=1, status="To Deliver and Bill", per_delivered=0)), "Submitted")
-		self.assertEqual(api._mobile_order_status(frappe._dict(docstatus=1, status="To Deliver and Bill", per_delivered=25)), "Partially Delivered")
-		self.assertEqual(api._mobile_order_status(frappe._dict(docstatus=2, status="Cancelled", per_delivered=0)), "Cancelled")
+		self.assertEqual(
+			api._mobile_order_status(frappe._dict(docstatus=0, status="Draft", per_delivered=0)), "Draft"
+		)
+		self.assertEqual(
+			api._mobile_order_status(
+				frappe._dict(docstatus=1, status="To Deliver and Bill", per_delivered=0)
+			),
+			"Submitted",
+		)
+		self.assertEqual(
+			api._mobile_order_status(
+				frappe._dict(docstatus=1, status="To Deliver and Bill", per_delivered=25)
+			),
+			"Partially Delivered",
+		)
+		self.assertEqual(
+			api._mobile_order_status(frappe._dict(docstatus=2, status="Cancelled", per_delivered=0)),
+			"Cancelled",
+		)
 
 	@patch("aimatic.mobile_sales.api.frappe.get_roles", return_value=["Sales Manager"])
 	@patch("aimatic.mobile_sales.api.frappe.db.get_value", return_value=5)
@@ -266,7 +315,9 @@ class TestMobileSalesPhaseThree(FrappeTestCase):
 			frappe._dict(name="far", planned_latitude=33.9, planned_longitude=73.2),
 			frappe._dict(name="near", planned_latitude=33.69, planned_longitude=73.05),
 		]
-		self.assertEqual([row.name for row in api._optimize_visit_route(rows, 33.6844, 73.0479)], ["near", "far"])
+		self.assertEqual(
+			[row.name for row in api._optimize_visit_route(rows, 33.6844, 73.0479)], ["near", "far"]
+		)
 
 	@patch("aimatic.mobile_sales.api.frappe.db.sql")
 	def test_manager_metrics_only_count_submitted_company_orders(self, sql):

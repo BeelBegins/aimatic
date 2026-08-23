@@ -23,12 +23,20 @@ frappe.ui.form.on("Foodpanda Outlet", {
 
 		aimatic_render_foodpanda_outlet_dashboard(frm);
 
-		frm.add_custom_button(__("Update prices & stock"), () => {
-			aimatic_start_foodpanda_bulk_push(frm);
-		}, __("Catalog"));
-		frm.add_custom_button(__("Refresh product links"), () => {
-			aimatic_start_foodpanda_import_and_map(frm);
-		}, __("Catalog"));
+		frm.add_custom_button(
+			__("Update prices & stock"),
+			() => {
+				aimatic_start_foodpanda_bulk_push(frm);
+			},
+			__("Catalog")
+		);
+		frm.add_custom_button(
+			__("Refresh product links"),
+			() => {
+				aimatic_start_foodpanda_import_and_map(frm);
+			},
+			__("Catalog")
+		);
 	},
 });
 
@@ -41,10 +49,11 @@ function aimatic_render_foodpanda_outlet_dashboard(frm) {
 			frm.dashboard.clear_headline();
 			frm.dashboard.set_headline(
 				d.summary_line ||
-					__(
-						"{0} ready · {1} need attention · {2} not linked",
-						[d.mapped_sku_count || 0, d.failed_count || 0, d.unmapped_remote_count || 0]
-					)
+					__("{0} ready · {1} need attention · {2} not linked", [
+						d.mapped_sku_count || 0,
+						d.failed_count || 0,
+						d.unmapped_remote_count || 0,
+					])
 			);
 		},
 	});
@@ -85,7 +94,9 @@ function aimatic_start_foodpanda_bulk_push(frm) {
 		callback(r) {
 			const mapped = (r.message && r.message.mapped_sku_count) || 0;
 			frappe.confirm(
-				__("Send current prices and stock to Foodpanda for {0} linked products?", [mapped]),
+				__("Send current prices and stock to Foodpanda for {0} linked products?", [
+					mapped,
+				]),
 				() => {
 					frappe.call({
 						method: "aimatic.foodpanda_integration.api.start_catalog_bulk_push",

@@ -33,11 +33,7 @@ def validate_purchase_principal(doc, method=None):
 
 	if allowed:
 		if not principal:
-			frappe.throw(
-				_("Principal is required for supplier {0}.").format(
-					frappe.bold(doc.supplier)
-				)
-			)
+			frappe.throw(_("Principal is required for supplier {0}.").format(frappe.bold(doc.supplier)))
 		if principal not in allowed:
 			frappe.throw(
 				_("Principal {0} is not allowed for supplier {1}.").format(
@@ -58,11 +54,7 @@ def validate_purchase_principal(doc, method=None):
 def _first_linked_principal(doc, link_field: str, parent_doctype: str):
 	seen = set()
 	for row in getattr(doc, "items", None) or []:
-		parent_name = (
-			row.get(link_field)
-			if hasattr(row, "get")
-			else getattr(row, link_field, None)
-		)
+		parent_name = row.get(link_field) if hasattr(row, "get") else getattr(row, link_field, None)
 		if not parent_name or parent_name in seen:
 			continue
 		seen.add(parent_name)

@@ -11,12 +11,17 @@ function aimatic_save_foodpanda_prices(report) {
 	return aimatic_flush_grid_editor(report).then(() => {
 		const updates = Array.from(aimatic_pending_foodpanda_prices.values());
 		if (!updates.length) {
-			frappe.show_alert({ message: __("No Foodpanda price changes to save"), indicator: "blue" });
+			frappe.show_alert({
+				message: __("No Foodpanda price changes to save"),
+				indicator: "blue",
+			});
 			return;
 		}
 
 		frappe.confirm(
-			__("Save {0} changed Foodpanda price(s) to this branch's Foodpanda Price List?", [updates.length]),
+			__("Save {0} changed Foodpanda price(s) to this branch's Foodpanda Price List?", [
+				updates.length,
+			]),
 			() => {
 				frappe.call({
 					method: "aimatic.price_export.api.save_foodpanda_grid_prices",
@@ -29,13 +34,16 @@ function aimatic_save_foodpanda_prices(report) {
 					callback(r) {
 						const result = r.message || {};
 						aimatic_pending_foodpanda_prices.clear();
-						frappe.show_alert({
-							message: __("Foodpanda prices saved: {0} updated, {1} created", [
-								result.updated || 0,
-								result.created || 0,
-							]),
-							indicator: "green",
-						}, 7);
+						frappe.show_alert(
+							{
+								message: __("Foodpanda prices saved: {0} updated, {1} created", [
+									result.updated || 0,
+									result.created || 0,
+								]),
+								indicator: "green",
+							},
+							7
+						);
 						report.refresh();
 					},
 				});
@@ -55,7 +63,11 @@ function aimatic_inactive_if_qty_lte(report) {
 
 function aimatic_foodpanda_active(quantity, inactive_if_qty_lte) {
 	quantity = Math.max(flt(quantity), 0);
-	if (inactive_if_qty_lte === null || inactive_if_qty_lte === undefined || inactive_if_qty_lte === "") {
+	if (
+		inactive_if_qty_lte === null ||
+		inactive_if_qty_lte === undefined ||
+		inactive_if_qty_lte === ""
+	) {
 		return quantity > 0 ? 1 : 0;
 	}
 	return quantity <= flt(inactive_if_qty_lte) ? 0 : 1;
@@ -64,7 +76,9 @@ function aimatic_foodpanda_active(quantity, inactive_if_qty_lte) {
 function aimatic_download_foodpanda_csv(report) {
 	return aimatic_flush_grid_editor(report).then(() => {
 		if (aimatic_pending_foodpanda_prices.size) {
-			frappe.msgprint(__("Save the pending Foodpanda price changes before downloading the CSV."));
+			frappe.msgprint(
+				__("Save the pending Foodpanda price changes before downloading the CSV.")
+			);
 			return;
 		}
 
@@ -91,13 +105,16 @@ function aimatic_download_foodpanda_csv(report) {
 		const branch = report.get_filter_value("branch") || "branch";
 		const filename = `foodpanda-${frappe.scrub(branch)}-${frappe.datetime.get_today()}`;
 		frappe.tools.downloadify(output, null, filename);
-		frappe.show_alert({
-			message: __("Foodpanda CSV prepared: {0} rows; {1} rows skipped for missing barcode/price", [
-				output.length - 1,
-				skipped,
-			]),
-			indicator: skipped ? "orange" : "green",
-		}, 8);
+		frappe.show_alert(
+			{
+				message: __(
+					"Foodpanda CSV prepared: {0} rows; {1} rows skipped for missing barcode/price",
+					[output.length - 1, skipped]
+				),
+				indicator: skipped ? "orange" : "green",
+			},
+			8
+		);
 	});
 }
 
@@ -117,9 +134,9 @@ function aimatic_show_sftp_upload_result(result) {
 	}
 	if (result.log) {
 		lines.push(
-			`<a href="/app/foodpanda-sftp-upload-log/${encodeURIComponent(result.log)}" target="_blank">${__(
-				"View SFTP upload log"
-			)}</a>`
+			`<a href="/app/foodpanda-sftp-upload-log/${encodeURIComponent(
+				result.log
+			)}" target="_blank">${__("View SFTP upload log")}</a>`
 		);
 	}
 	frappe.msgprint({
@@ -132,7 +149,9 @@ function aimatic_show_sftp_upload_result(result) {
 function aimatic_upload_foodpanda_csv_sftp(report) {
 	return aimatic_flush_grid_editor(report).then(() => {
 		if (aimatic_pending_foodpanda_prices.size) {
-			frappe.msgprint(__("Save the pending Foodpanda price changes before uploading via SFTP."));
+			frappe.msgprint(
+				__("Save the pending Foodpanda price changes before uploading via SFTP.")
+			);
 			return;
 		}
 
@@ -144,7 +163,10 @@ function aimatic_upload_foodpanda_csv_sftp(report) {
 
 		const item_codes = (report.data || []).map((row) => row.item_code).filter(Boolean);
 		frappe.confirm(
-			__("Upload Foodpanda CSV for {0} ({1} filtered rows) via SFTP?", [branch, item_codes.length]),
+			__("Upload Foodpanda CSV for {0} ({1} filtered rows) via SFTP?", [
+				branch,
+				item_codes.length,
+			]),
 			() => {
 				frappe.call({
 					method: "aimatic.price_export.foodpanda_sftp.upload_branch_price_sheet_foodpanda_csv",
@@ -177,9 +199,9 @@ function aimatic_show_excel_import_result(result) {
 	];
 	if (result.log) {
 		lines.push(
-			`<a href="/app/foodpanda-price-import-log/${encodeURIComponent(result.log)}" target="_blank">${__(
-				"View import log"
-			)}</a>`
+			`<a href="/app/foodpanda-price-import-log/${encodeURIComponent(
+				result.log
+			)}" target="_blank">${__("View import log")}</a>`
 		);
 	}
 	frappe.msgprint({
@@ -192,7 +214,9 @@ function aimatic_show_excel_import_result(result) {
 function aimatic_import_updated_excel(report) {
 	return aimatic_flush_grid_editor(report).then(() => {
 		if (aimatic_pending_foodpanda_prices.size) {
-			frappe.msgprint(__("Save the pending grid price changes before importing an Excel file."));
+			frappe.msgprint(
+				__("Save the pending grid price changes before importing an Excel file.")
+			);
 			return;
 		}
 

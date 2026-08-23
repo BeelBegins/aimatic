@@ -128,22 +128,24 @@ def get_customer_rfm_segments(
 	}
 
 
-TOOL_SPECS = [{
-	"type": "function",
-	"function": {
-		"name": "get_customer_rfm_segments",
-		"description": "Certified customer recency, frequency, and monetary segmentation with churn risk, high-value and dormant groups, and deterministic engagement categories.",
-		"parameters": {
-			"type": "object",
-			"properties": {
-				"branch": {"type": "string"},
-				"customer_group": {"type": "string"},
-				"history_days": {"type": "integer"},
-				"minimum_transactions": {"type": "integer"},
-				"limit": {"type": "integer"},
+TOOL_SPECS = [
+	{
+		"type": "function",
+		"function": {
+			"name": "get_customer_rfm_segments",
+			"description": "Certified customer recency, frequency, and monetary segmentation with churn risk, high-value and dormant groups, and deterministic engagement categories.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"branch": {"type": "string"},
+					"customer_group": {"type": "string"},
+					"history_days": {"type": "integer"},
+					"minimum_transactions": {"type": "integer"},
+					"limit": {"type": "integer"},
+				},
 			},
 		},
-	},
-}]
+	}
+]
 
 TOOL_DISPATCH = {"get_customer_rfm_segments": get_customer_rfm_segments}

@@ -7,7 +7,9 @@ from frappe.utils import flt
 class MobileSalesVisit(Document):
 	def validate(self):
 		if self.warehouse:
-			warehouse = frappe.db.get_value("Warehouse", self.warehouse, ["company", "disabled", "is_group"], as_dict=True)
+			warehouse = frappe.db.get_value(
+				"Warehouse", self.warehouse, ["company", "disabled", "is_group"], as_dict=True
+			)
 			if not warehouse or warehouse.company != self.company or warehouse.disabled or warehouse.is_group:
 				frappe.throw(_("Visit Warehouse must be an active stock warehouse for the selected Company"))
 		user = frappe.db.get_value("User", self.assigned_to, ["enabled", "user_type"], as_dict=True)
@@ -36,10 +38,14 @@ class MobileSalesVisit(Document):
 			if not -90 <= flt(latitude) <= 90 or not -180 <= flt(longitude) <= 180:
 				frappe.throw(_("Visit coordinates are outside the valid latitude/longitude range"))
 		if self.status in {"Checked In", "Completed"} and (
-			not self.check_in_at or self.check_in_latitude in (None, "") or self.check_in_longitude in (None, "")
+			not self.check_in_at
+			or self.check_in_latitude in (None, "")
+			or self.check_in_longitude in (None, "")
 		):
 			frappe.throw(_("Checked-in visits require a check-in time and GPS location"))
 		if self.status == "Completed" and (
-			not self.check_out_at or self.check_out_latitude in (None, "") or self.check_out_longitude in (None, "")
+			not self.check_out_at
+			or self.check_out_latitude in (None, "")
+			or self.check_out_longitude in (None, "")
 		):
 			frappe.throw(_("Completed visits require a check-out time and GPS location"))

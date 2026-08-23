@@ -13,7 +13,6 @@ import collections
 import frappe
 import openpyxl
 
-
 TARGET_SITE = "siezal"
 FILE_PATH = "/home/nabeel/frappe-bench/sites/szl/public/files/itemmastersto.xlsx"
 SHEET_NAME = "Query1"
@@ -40,7 +39,7 @@ def iter_rows():
 			header = values
 			continue
 		if any(values):
-			yield dict(zip(header, values))
+			yield dict(zip(header, values, strict=False))
 	workbook.close()
 
 
@@ -113,10 +112,7 @@ def collect_assignments(barcode_to_items, counts):
 		)
 		winner_key, winner_count = ordered[0]
 		if len(ordered) > 1:
-			conflicts[item_name] = [
-				(canonical_spelling[brand_key], count)
-				for brand_key, count in ordered
-			]
+			conflicts[item_name] = [(canonical_spelling[brand_key], count) for brand_key, count in ordered]
 			if winner_count == ordered[1][1]:
 				counts["skipped_tied_brand_conflict"] += 1
 				continue
@@ -129,10 +125,7 @@ def collect_assignments(barcode_to_items, counts):
 
 
 def canonicalize_brands(assignments, counts):
-	existing = {
-		str(name).casefold(): name
-		for name in frappe.get_all("Brand", pluck="name")
-	}
+	existing = {str(name).casefold(): name for name in frappe.get_all("Brand", pluck="name")}
 	canonical = {}
 	for source_brand in sorted(set(assignments.values()), key=str.casefold):
 		key = source_brand.casefold()
@@ -150,7 +143,9 @@ def canonicalize_brands(assignments, counts):
 def apply_assignments(assignments, canonical, counts):
 	current = {
 		row.name: (row.brand or "")
-		for row in frappe.get_all("Item", filters={"name": ["in", list(assignments)]}, fields=["name", "brand"])
+		for row in frappe.get_all(
+			"Item", filters={"name": ["in", list(assignments)]}, fields=["name", "brand"]
+		)
 	}
 	writes_since_commit = 0
 	for item_name, source_brand in assignments.items():

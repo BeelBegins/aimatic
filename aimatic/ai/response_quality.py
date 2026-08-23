@@ -102,7 +102,13 @@ def calculate_quality(invocations: list[ToolInvocation]) -> dict[str, Any]:
 		return {
 			"score": 0,
 			"grade": "poor",
-			"factors": {"tool_success": 0, "data_volume": 0, "coverage": 0, "completeness": 0, "reconciliation": 0},
+			"factors": {
+				"tool_success": 0,
+				"data_volume": 0,
+				"coverage": 0,
+				"completeness": 0,
+				"reconciliation": 0,
+			},
 			"calculation_version": CALCULATION_VERSION,
 		}
 
@@ -130,7 +136,10 @@ def calculate_quality(invocations: list[ToolInvocation]) -> dict[str, Any]:
 		if isinstance(reconciliation, dict):
 			reconciliation_values.append(1.0 if reconciliation.get("passed") else 0.0)
 
-	if any(invocation.tool_name == "get_demand_forecast" for invocation in successful) and not forecast_values:
+	if (
+		any(invocation.tool_name == "get_demand_forecast" for invocation in successful)
+		and not forecast_values
+	):
 		forecast_values.append(0.25)
 
 	scalars = []
@@ -139,7 +148,9 @@ def calculate_quality(invocations: list[ToolInvocation]) -> dict[str, Any]:
 	missing = sum(value is None or value == "" for value in scalars)
 	completeness = 1.0 - missing / max(len(scalars), 1)
 
-	coverage = sum(coverage_values) / len(coverage_values) if coverage_values else min(1.0, 0.5 + total_rows / 60)
+	coverage = (
+		sum(coverage_values) / len(coverage_values) if coverage_values else min(1.0, 0.5 + total_rows / 60)
+	)
 	reconciliation = (
 		sum(reconciliation_values) / len(reconciliation_values) if reconciliation_values else 0.85
 	)
@@ -240,7 +251,9 @@ def deterministic_recommendations(invocations: list[ToolInvocation], limit: int 
 		result = invocation.result
 		for row in _rows(result):
 			stock_plan = row.get("stock_plan") or {}
-			reorder_quantity = flt(row.get("suggested_order_qty") or stock_plan.get("suggested_reorder_quantity"))
+			reorder_quantity = flt(
+				row.get("suggested_order_qty") or stock_plan.get("suggested_reorder_quantity")
+			)
 			if reorder_quantity > 0:
 				recommendations.append(
 					{
@@ -329,11 +342,17 @@ def result_follow_ups(
 	follow_ups = []
 	tool_names = {invocation.tool_name for invocation in _successful(invocations)}
 	if "get_abc_xyz_analysis" in tool_names:
-		follow_ups.extend(["Show A-class items at stockout risk", "Forecast the AX items for the next four weeks"])
+		follow_ups.extend(
+			["Show A-class items at stockout risk", "Forecast the AX items for the next four weeks"]
+		)
 	if "get_demand_forecast" in tool_names:
-		follow_ups.extend(["Show source sales periods for this forecast", "Which branch can transfer this stock?"])
+		follow_ups.extend(
+			["Show source sales periods for this forecast", "Which branch can transfer this stock?"]
+		)
 	if "get_price_recommendation" in tool_names:
-		follow_ups.extend(["Compare the recommended price scenarios", "Show transactions behind the elasticity estimate"])
+		follow_ups.extend(
+			["Compare the recommended price scenarios", "Show transactions behind the elasticity estimate"]
+		)
 	if drivers:
 		follow_ups.append(f"Show source transactions behind {drivers[0]['label']}")
 	if recommendations:

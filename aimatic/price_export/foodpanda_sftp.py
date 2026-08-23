@@ -19,9 +19,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, get_datetime, get_time, getdate, now_datetime
 
-
 from aimatic.price_export.api import get_branch_price_sheet_rows, require_export_permission
-
 
 TRIGGER_BRANCH = "Branch"
 TRIGGER_REPORT = "Report"
@@ -166,9 +164,7 @@ def _load_sftp_settings(branch, require_enabled=False):
 		missing.append(_("password"))
 	if missing:
 		frappe.throw(
-			_("Foodpanda SFTP is missing {0} on branch {1}").format(
-				frappe.utils.comma_and(missing), branch
-			)
+			_("Foodpanda SFTP is missing {0} on branch {1}").format(frappe.utils.comma_and(missing), branch)
 		)
 
 	return {
@@ -255,7 +251,9 @@ def _write_upload_log(
 	log.insert(ignore_permissions=True)
 	if csv_bytes is not None:
 		file_url = _attach_csv(log.name, filename, csv_bytes)
-		frappe.db.set_value("Foodpanda SFTP Upload Log", log.name, "csv_file", file_url, update_modified=False)
+		frappe.db.set_value(
+			"Foodpanda SFTP Upload Log", log.name, "csv_file", file_url, update_modified=False
+		)
 		log.csv_file = file_url
 	return log
 
@@ -289,9 +287,7 @@ def upload_foodpanda_csv(
 	errors before connecting; connection failures are logged then re-raised.
 	"""
 	settings = _load_sftp_settings(branch, require_enabled=require_enabled)
-	csv_rows, skipped = build_foodpanda_csv_rows(
-		branch, rows=rows, inactive_if_qty_lte=inactive_if_qty_lte
-	)
+	csv_rows, skipped = build_foodpanda_csv_rows(branch, rows=rows, inactive_if_qty_lte=inactive_if_qty_lte)
 	filename = _csv_filename(branch)
 	csv_bytes = build_foodpanda_csv_bytes(csv_rows)
 
@@ -418,12 +414,15 @@ def run_scheduled_foodpanda_sftp_uploads():
 			results.append({"branch": branch, "status": "Skipped"})
 			continue
 		try:
-			result = upload_foodpanda_csv(
-				branch, rows=None, trigger=TRIGGER_SCHEDULER, require_enabled=True
-			)
+			result = upload_foodpanda_csv(branch, rows=None, trigger=TRIGGER_SCHEDULER, require_enabled=True)
 			if result.get("status") == "Failed":
 				results.append(
-					{"branch": branch, "status": "Failed", "log": result.get("log"), "error": result.get("error")}
+					{
+						"branch": branch,
+						"status": "Failed",
+						"log": result.get("log"),
+						"error": result.get("error"),
+					}
 				)
 			else:
 				results.append({"branch": branch, "status": "Success", "log": result["log"]})

@@ -13,21 +13,34 @@ SETUP_ROLES = {"Accounts Manager", "System Manager"}
 
 def _require_access():
 	if not ALLOWED_ROLES.intersection(frappe.get_roles()):
-		frappe.throw(_("You need an Accounts or System Manager role to view finance readiness."), frappe.PermissionError)
+		frappe.throw(
+			_("You need an Accounts or System Manager role to view finance readiness."),
+			frappe.PermissionError,
+		)
 
 
 def _require_setup_access():
 	if not SETUP_ROLES.intersection(frappe.get_roles()):
-		frappe.throw(_("You need an Accounts Manager or System Manager role to initialize branch price lists."), frappe.PermissionError)
+		frappe.throw(
+			_("You need an Accounts Manager or System Manager role to initialize branch price lists."),
+			frappe.PermissionError,
+		)
 
 
 def _resolve_company(company=None):
 	if company:
-		if not frappe.db.exists("Company", company) or not frappe.has_permission("Company", doc=company, ptype="read"):
-			frappe.throw(_("Company {0} is unavailable or not permitted.").format(frappe.bold(company)), frappe.PermissionError)
+		if not frappe.db.exists("Company", company) or not frappe.has_permission(
+			"Company", doc=company, ptype="read"
+		):
+			frappe.throw(
+				_("Company {0} is unavailable or not permitted.").format(frappe.bold(company)),
+				frappe.PermissionError,
+			)
 		return company
 
-	company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+	company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value(
+		"Global Defaults", "default_company"
+	)
 	if company and frappe.has_permission("Company", doc=company, ptype="read"):
 		return company
 	companies = frappe.get_list("Company", fields=["name"], limit=1)
@@ -57,7 +70,9 @@ def get_readiness(company=None):
 			capability["readiness_message"] = "Tracked as separate implementation work."
 		elif capability["implementation_status"] == "partial" and (not check or check["status"] == "pass"):
 			capability["readiness_status"] = "partial"
-			capability["readiness_message"] = "The available foundation passes, but this capability remains explicitly partial."
+			capability["readiness_message"] = (
+				"The available foundation passes, but this capability remains explicitly partial."
+			)
 			if check:
 				capability["check_details"] = check["details"]
 		elif check:
@@ -66,10 +81,16 @@ def get_readiness(company=None):
 			capability["check_details"] = check["details"]
 		else:
 			capability["readiness_status"] = "info"
-			capability["readiness_message"] = "Capability is registered; no automated readiness check is defined."
+			capability["readiness_message"] = (
+				"Capability is registered; no automated readiness check is defined."
+			)
 		counts[capability["readiness_status"]] = counts.get(capability["readiness_status"], 0) + 1
 
-	critical_blocks = [capability["id"] for capability in capabilities if capability["critical"] and capability["readiness_status"] == "blocked"]
+	critical_blocks = [
+		capability["id"]
+		for capability in capabilities
+		if capability["critical"] and capability["readiness_status"] == "blocked"
+	]
 	return {
 		"registry_version": REGISTRY_VERSION,
 		"generated_at": now_datetime(),
@@ -90,7 +111,9 @@ def initialize_branch_selling_price_lists(company=None):
 
 	_require_setup_access()
 	company = _resolve_company(company)
-	branches = frappe.get_all("Branch", filters={"company": company}, fields=["name", "default_selling_price_list"])
+	branches = frappe.get_all(
+		"Branch", filters={"company": company}, fields=["name", "default_selling_price_list"]
+	)
 	results = []
 	initialized = 0
 	for branch in branches:

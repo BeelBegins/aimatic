@@ -28,7 +28,10 @@ frappe.ui.form.on("Foodpanda Product", {
 				freeze: true,
 				freeze_message: __("Syncing with Foodpanda..."),
 				callback(r) {
-					const result = r.message || { status: "Unknown", error: __("No response returned") };
+					const result = r.message || {
+						status: "Unknown",
+						error: __("No response returned"),
+					};
 					frm.reload_doc().then(() => show_foodpanda_sync_response(result));
 				},
 				error(r) {

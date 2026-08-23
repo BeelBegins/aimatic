@@ -130,13 +130,15 @@ class TestResponseQuality(TestCase):
 			tool_name="get_demand_forecast",
 			arguments={},
 			result={
-				"forecasts": [{
-					"item_code": "ITEM-1",
-					"stock_plan": {
-						"suggested_reorder_quantity": 12,
-						"expected_demand_during_lead_time": 20,
-					},
-				}],
+				"forecasts": [
+					{
+						"item_code": "ITEM-1",
+						"stock_plan": {
+							"suggested_reorder_quantity": 12,
+							"expected_demand_during_lead_time": 20,
+						},
+					}
+				],
 			},
 			sequence=1,
 			status="success",

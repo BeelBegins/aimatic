@@ -173,7 +173,11 @@ def _base_params(
 
 
 def _sales_rows(params, branch_filter, warehouse_filter, item_group, brand, supplier):
-	branch_clause = "AND COALESCE(pi.branch, pp.branch, w.custom_branch) IN %(branch_names)s" if branch_filter is not None else ""
+	branch_clause = (
+		"AND COALESCE(pi.branch, pp.branch, w.custom_branch) IN %(branch_names)s"
+		if branch_filter is not None
+		else ""
+	)
 	warehouse_clause = "AND pii.warehouse IN %(warehouse_names)s" if warehouse_filter is not None else ""
 	item_group_clause = "AND i.item_group = %(item_group)s" if item_group else ""
 	brand_clause = "AND i.brand = %(brand)s" if brand else ""
@@ -215,7 +219,11 @@ def _sales_rows(params, branch_filter, warehouse_filter, item_group, brand, supp
 
 
 def _period_rows(params, branch_filter, warehouse_filter, item_group, brand, supplier):
-	branch_clause = "AND COALESCE(pi.branch, pp.branch, w.custom_branch) IN %(branch_names)s" if branch_filter is not None else ""
+	branch_clause = (
+		"AND COALESCE(pi.branch, pp.branch, w.custom_branch) IN %(branch_names)s"
+		if branch_filter is not None
+		else ""
+	)
 	warehouse_clause = "AND pii.warehouse IN %(warehouse_names)s" if warehouse_filter is not None else ""
 	item_group_clause = "AND i.item_group = %(item_group)s" if item_group else ""
 	brand_clause = "AND i.brand = %(brand)s" if brand else ""
@@ -459,12 +467,9 @@ def get_abc_xyz_analysis(
 		row["days_of_stock"] = round(flt(row["stock_quantity"]) / daily_rate, 1) if daily_rate > 0 else None
 		last_sale = getdate(row["last_sale_date"]) if row.get("last_sale_date") else None
 		row["is_dead_stock"] = bool(
-			flt(row["stock_quantity"]) > 0
-			and (last_sale is None or date_diff(dead_cutoff, last_sale) >= 90)
+			flt(row["stock_quantity"]) > 0 and (last_sale is None or date_diff(dead_cutoff, last_sale) >= 90)
 		)
-		row["confidence"] = round(
-			min(row["confidence"], 100.0 if flt(row["stock_value"]) >= 0 else 70.0), 2
-		)
+		row["confidence"] = round(min(row["confidence"], 100.0 if flt(row["stock_value"]) >= 0 else 70.0), 2)
 
 	item_level_total = round(sum(flt(row["net_sales"]) for row in rows), 6)
 	filtered = bool(warehouse or item_group or brand or supplier)
@@ -507,15 +512,8 @@ def get_abc_xyz_analysis(
 	a_stockout_risk = [
 		row
 		for row in rows
-		if (
-			row["abc_class"] == "A"
-			and flt(row["stock_quantity"]) <= 0
-		)
-		or (
-			row["abc_class"] == "A"
-			and row["days_of_stock"] is not None
-			and flt(row["days_of_stock"]) < 14
-		)
+		if (row["abc_class"] == "A" and flt(row["stock_quantity"]) <= 0)
+		or (row["abc_class"] == "A" and row["days_of_stock"] is not None and flt(row["days_of_stock"]) < 14)
 	][:20]
 
 	return {
@@ -538,11 +536,7 @@ def get_abc_xyz_analysis(
 		"c_items_with_excess_stock": c_excess_stock,
 		"a_items_at_stockout_risk": a_stockout_risk,
 		"reconciliation": reconciliation,
-		"data_coverage": round(
-			sum(flt(row["data_coverage"]) for row in rows) / len(rows), 2
-		)
-		if rows
-		else 0,
+		"data_coverage": round(sum(flt(row["data_coverage"]) for row in rows) / len(rows), 2) if rows else 0,
 		"assumptions": [
 			"XYZ demand periods are calendar months and include zero-demand months.",
 			"X requires at least 6 periods, demand frequency of 75%, and coefficient of variation no more than 0.30.",

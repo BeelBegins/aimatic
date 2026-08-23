@@ -8,9 +8,11 @@ from aimatic.foodpanda_integration import (
 	catalog,
 	catalog_jobs,
 	orders,
-	outlet as outlet_module,
 	pim_catalog,
 	webhooks,
+)
+from aimatic.foodpanda_integration import (
+	outlet as outlet_module,
 )
 from aimatic.foodpanda_integration.client import FoodpandaAPIError
 
@@ -32,11 +34,7 @@ _ORDER_TERMINAL_STATUSES = frozenset({"CANCELLED", "DELIVERED"})
 
 
 def _normalize_foodpanda_order_status(payload):
-	status = (
-		payload.get("status")
-		or (payload.get("order") or {}).get("status")
-		or "RECEIVED"
-	)
+	status = payload.get("status") or (payload.get("order") or {}).get("status") or "RECEIVED"
 	status = str(status).upper().replace(" ", "_")
 	if status == "CANCELED":
 		return "CANCELLED"
@@ -75,7 +73,9 @@ def foodpanda_order_webhook():
 		frappe.throw(_("Webhook payload is missing order_id"))
 
 	remote_status = _normalize_foodpanda_order_status(payload)
-	raw_text = raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else str(raw or "")
+	raw_text = (
+		raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, bytearray)) else str(raw or "")
+	)
 	existing = frappe.db.get_value(
 		"Foodpanda Order Log",
 		{"foodpanda_order_id": foodpanda_order_id},
@@ -83,9 +83,7 @@ def foodpanda_order_webhook():
 		as_dict=True,
 	)
 	if existing:
-		local_status = {"CANCELLED": "Rejected", "DELIVERED": "Fulfilled"}.get(
-			remote_status, existing.status
-		)
+		local_status = {"CANCELLED": "Rejected", "DELIVERED": "Fulfilled"}.get(remote_status, existing.status)
 		frappe.db.set_value(
 			"Foodpanda Order Log",
 			existing.name,
@@ -161,7 +159,6 @@ def foodpanda_order_webhook():
 	return {"status": "Accepted", "sales_order": sales_order.name, "order_log": log.name}
 
 
-
 @frappe.whitelist(allow_guest=True)
 def foodpanda_catalog_webhook():
 	"""Assortment/catalog completion callback configured in Vendor Portal."""
@@ -211,11 +208,7 @@ def _read_aimatic_doc_file(*parts):
 def get_foodpanda_settings_readme():
 	"""English README shown on the Foodpanda Settings Desk form."""
 	_require_permission()
-	return {
-		"markdown": _read_aimatic_doc_file(
-			"aimatic", "doctype", "foodpanda_settings", "README.md"
-		)
-	}
+	return {"markdown": _read_aimatic_doc_file("aimatic", "doctype", "foodpanda_settings", "README.md")}
 
 
 @frappe.whitelist()
@@ -410,9 +403,9 @@ def get_outlet_catalog_dashboard(outlet):
 		"next_action": next_action,
 		"next_label": next_label,
 		"next_help": next_help,
-		"summary_line": _(
-			"{0} ready to update · {1} need attention · {2} not linked to ERPNext"
-		).format(mapped, failed, gap),
+		"summary_line": _("{0} ready to update · {1} need attention · {2} not linked to ERPNext").format(
+			mapped, failed, gap
+		),
 	}
 
 

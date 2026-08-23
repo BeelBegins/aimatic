@@ -5,10 +5,10 @@ from __future__ import annotations
 from frappe.utils import flt
 
 from aimatic.ai.response_schema import (
+	KPI,
 	Chart,
 	ChartData,
 	ChartOptions,
-	KPI,
 	Pagination,
 	Table,
 	TableColumn,
@@ -107,11 +107,9 @@ def _charts_abc_xyz(result: dict) -> list[Chart]:
 		return []
 	currency = result.get("currency")
 	top = rows[:_MAX_CHART_ITEMS]
-	class_summary = ((result.get("summaries") or {}).get("class_summary") or {})
-	matrix = ((result.get("summaries") or {}).get("abc_xyz_matrix") or {})
-	variable = [
-		row for row in rows if row.get("coefficient_of_variation") is not None
-	][:_MAX_CHART_ITEMS]
+	class_summary = (result.get("summaries") or {}).get("class_summary") or {}
+	matrix = (result.get("summaries") or {}).get("abc_xyz_matrix") or {}
+	variable = [row for row in rows if row.get("coefficient_of_variation") is not None][:_MAX_CHART_ITEMS]
 	scatter_rows = sorted(rows, key=lambda row: flt(row.get("stock_value")), reverse=True)[:_MAX_CHART_ITEMS]
 	return [
 		Chart(
@@ -121,8 +119,14 @@ def _charts_abc_xyz(result: dict) -> list[Chart]:
 			data=ChartData(
 				labels=[row.get("item_name") or row.get("item_code") for row in top],
 				datasets=[
-					{"label": "Contribution %", "data": [flt(row.get("sales_contribution_pct")) for row in top]},
-					{"label": "Cumulative %", "data": [flt(row.get("cumulative_contribution_pct")) for row in top]},
+					{
+						"label": "Contribution %",
+						"data": [flt(row.get("sales_contribution_pct")) for row in top],
+					},
+					{
+						"label": "Cumulative %",
+						"data": [flt(row.get("cumulative_contribution_pct")) for row in top],
+					},
 				],
 			),
 			options=ChartOptions(yAxis={"format": "percent"}),
@@ -137,7 +141,9 @@ def _charts_abc_xyz(result: dict) -> list[Chart]:
 				datasets=[
 					{
 						"label": "Net Sales",
-						"data": [flt((class_summary.get(key) or {}).get("net_sales")) for key in ("A", "B", "C")],
+						"data": [
+							flt((class_summary.get(key) or {}).get("net_sales")) for key in ("A", "B", "C")
+						],
 					}
 				],
 			),
@@ -151,7 +157,10 @@ def _charts_abc_xyz(result: dict) -> list[Chart]:
 			data=ChartData(
 				labels=[row.get("item_name") or row.get("item_code") for row in variable],
 				datasets=[
-					{"label": "Coefficient of Variation", "data": [flt(row.get("coefficient_of_variation")) for row in variable]}
+					{
+						"label": "Coefficient of Variation",
+						"data": [flt(row.get("coefficient_of_variation")) for row in variable],
+					}
 				],
 			),
 			options=ChartOptions(yAxis={"format": "number"}),
@@ -181,7 +190,10 @@ def _charts_abc_xyz(result: dict) -> list[Chart]:
 				labels=[row.get("item_name") or row.get("item_code") for row in scatter_rows],
 				datasets=[
 					{"label": "Stock Value", "data": [flt(row.get("stock_value")) for row in scatter_rows]},
-					{"label": "Sales Contribution %", "data": [flt(row.get("sales_contribution_pct")) for row in scatter_rows]},
+					{
+						"label": "Sales Contribution %",
+						"data": [flt(row.get("sales_contribution_pct")) for row in scatter_rows],
+					},
 				],
 			),
 			options=ChartOptions(

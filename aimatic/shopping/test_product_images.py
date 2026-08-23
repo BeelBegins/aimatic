@@ -26,12 +26,15 @@ class TestShoppingProductImages(FrappeTestCase):
 	@patch("aimatic.shopping.product_images.frappe.get_doc")
 	def test_approval_rejects_an_attachment_for_another_product(self, get_doc):
 		job_id = frappe.generate_hash(length=20)
-		product_images._set_status(job_id, {
-			"owner": "Administrator",
-			"product": "ITEM-1",
-			"result_file": "FILE-1",
-			"status": "ready",
-		})
+		product_images._set_status(
+			job_id,
+			{
+				"owner": "Administrator",
+				"product": "ITEM-1",
+				"result_file": "FILE-1",
+				"status": "ready",
+			},
+		)
 		product = MagicMock(name="product")
 		product.name = "ITEM-1"
 		file_doc = MagicMock(name="file")

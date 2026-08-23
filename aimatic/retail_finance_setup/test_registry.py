@@ -11,8 +11,21 @@ class TestRetailFinanceCapabilityRegistry(unittest.TestCase):
 		self.assertGreaterEqual(len(ids), 30)
 		self.assertRegex(REGISTRY_VERSION, r"^\d+\.\d+\.\d+$")
 		for row in capabilities:
-			self.assertTrue({"id", "label", "version", "category", "phase", "implementation_status", "description", "guidance"}.issubset(row))
-			self.assertIn(row["implementation_status"], {"implemented", "standard", "partial", "missing", "separate"})
+			self.assertTrue(
+				{
+					"id",
+					"label",
+					"version",
+					"category",
+					"phase",
+					"implementation_status",
+					"description",
+					"guidance",
+				}.issubset(row)
+			)
+			self.assertIn(
+				row["implementation_status"], {"implemented", "standard", "partial", "missing", "separate"}
+			)
 
 	def test_critical_finance_controls_cannot_disappear(self):
 		by_id = {row["id"]: row for row in get_capabilities()}

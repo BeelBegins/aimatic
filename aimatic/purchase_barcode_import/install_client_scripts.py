@@ -4,10 +4,7 @@ from pathlib import Path
 
 import frappe
 
-
-_SCRIPT_PATH = (
-	Path(__file__).resolve().parents[1] / "public" / "js" / "purchase_barcode_import.js"
-)
+_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "public" / "js" / "purchase_barcode_import.js"
 
 _SCRIPTS = (
 	("Purchase Order", "Resolve Items from Barcodes (PO)"),

@@ -14,4 +14,3 @@ class MobileSalesDiscountApproval(Document):
 			{"sales_order": self.sales_order, "name": ["!=", self.name]},
 		):
 			frappe.throw(_("A discount approval audit record already exists for this Sales Order"))
-

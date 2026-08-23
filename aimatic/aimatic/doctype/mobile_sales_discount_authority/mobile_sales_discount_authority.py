@@ -14,4 +14,3 @@ class MobileSalesDiscountAuthority(Document):
 			{"user": self.user, "name": ["!=", self.name]},
 		):
 			frappe.throw(_("Discount authority is already configured for this user"))
-

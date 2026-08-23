@@ -10,9 +10,10 @@ import hashlib
 import json
 import math
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import timedelta
 from statistics import fmean
-from typing import Any, Callable
+from typing import Any
 
 import frappe
 from frappe import _
@@ -65,26 +66,19 @@ def _forecast_exponential_smoothing(
 	return [max(level, 0)] * horizon
 
 
-def _forecast_seasonal_naive(
-	history: list[float], horizon: int, season_length: int, **_
-) -> list[float]:
+def _forecast_seasonal_naive(history: list[float], horizon: int, season_length: int, **_) -> list[float]:
 	if len(history) < season_length:
 		return _forecast_naive(history, horizon)
 	cycle = list(history[-season_length:])
 	return [max(cycle[index % season_length], 0) for index in range(horizon)]
 
 
-def _forecast_seasonal_average(
-	history: list[float], horizon: int, season_length: int, **_
-) -> list[float]:
+def _forecast_seasonal_average(history: list[float], horizon: int, season_length: int, **_) -> list[float]:
 	if len(history) < season_length * 2:
 		return _forecast_seasonal_naive(history, horizon, season_length)
 	seasonal = []
 	for position in range(season_length):
-		values = [
-			max(history[index], 0)
-			for index in range(position, len(history), season_length)
-		]
+		values = [max(history[index], 0) for index in range(position, len(history), season_length)]
 		seasonal.append(_mean(values))
 	start = len(history) % season_length
 	return [seasonal[(start + index) % season_length] for index in range(horizon)]
@@ -173,9 +167,7 @@ def select_forecast_model(
 			training = history[:index]
 			if not training:
 				continue
-			estimate = _FORECASTERS[method](
-				training, 1, season_length=season_length
-			)[0]
+			estimate = _FORECASTERS[method](training, 1, season_length=season_length)[0]
 			actual.append(history[index])
 			predicted.append(max(estimate, 0))
 		if actual:
@@ -218,8 +210,7 @@ def build_forecast(
 		for index, value in enumerate(forecast)
 	]
 	upper = [
-		round(value + 1.96 * residual_sigma * math.sqrt(index + 1), 4)
-		for index, value in enumerate(forecast)
+		round(value + 1.96 * residual_sigma * math.sqrt(index + 1), 4) for index, value in enumerate(forecast)
 	]
 	return {
 		**selection,
@@ -242,7 +233,12 @@ def forecast_confidence(
 	zero_penalty = (zero_periods / period_count) * 0.20 if period_count else 0.20
 	outlier_penalty = min(outlier_percentage / 100, 1) * 0.15
 	stockout_penalty = min(stockout_periods / max(period_count, 1), 1) * 0.15
-	score = max(0.05, min(0.98, 0.45 * coverage + 0.45 * accuracy + 0.10 - zero_penalty - outlier_penalty - stockout_penalty))
+	score = max(
+		0.05,
+		min(
+			0.98, 0.45 * coverage + 0.45 * accuracy + 0.10 - zero_penalty - outlier_penalty - stockout_penalty
+		),
+	)
 	label = "high" if score >= 0.80 else "medium" if score >= 0.55 else "low"
 	return {
 		"score": round(score * 100, 2),
@@ -349,7 +345,9 @@ def _query_history(
 	brand,
 	limit,
 ):
-	branch_clause = "AND COALESCE(pi.branch, pp.branch, w.custom_branch) IN %(branches)s" if branches is not None else ""
+	branch_clause = (
+		"AND COALESCE(pi.branch, pp.branch, w.custom_branch) IN %(branches)s" if branches is not None else ""
+	)
 	warehouse_clause = "AND pii.warehouse IN %(warehouses)s" if warehouses is not None else ""
 	item_clause = "AND pii.item_code = %(item_code)s" if item_code else ""
 	group_clause = "AND i.item_group = %(item_group)s" if item_group else ""
@@ -382,7 +380,7 @@ def _query_history(
 	params["item_codes"] = tuple({pair[0] for pair in pairs})
 	params["selected_warehouses"] = tuple({pair[1] for pair in pairs if pair[1]})
 	history = frappe.db.sql(
-		f"""
+		"""
 		SELECT pii.item_code, pii.warehouse, pi.posting_date,
 		       SUM(pii.stock_qty) AS net_quantity,
 		       SUM(CASE WHEN pi.is_return = 1 THEN ABS(pii.stock_qty) ELSE 0 END) AS return_quantity,
@@ -463,9 +461,7 @@ def _inventory_plan(
 	stockout_periods = available_stock / average_period_demand if average_period_demand > 0 else None
 	stockout_days = stockout_periods * period_days if stockout_periods is not None else None
 	stockout_date = (
-		str(getdate() + timedelta(days=math.ceil(stockout_days)))
-		if stockout_days is not None
-		else None
+		str(getdate() + timedelta(days=math.ceil(stockout_days))) if stockout_days is not None else None
 	)
 	return {
 		"current_stock": round(current_stock, 4),
@@ -478,9 +474,7 @@ def _inventory_plan(
 		"stockout_risk_days": round(stockout_days, 1) if stockout_days is not None else None,
 		"stockout_risk_date": stockout_date,
 		"suggested_reorder_quantity": round(suggested, 4),
-		"expected_ending_stock": round(
-			current_stock + incoming_stock - sum(forecast), 4
-		),
+		"expected_ending_stock": round(current_stock + incoming_stock - sum(forecast), 4),
 	}
 
 
@@ -500,9 +494,7 @@ def get_demand_forecast(
 	if granularity not in _SEASON_LENGTH:
 		return {"error": "Granularity must be Daily, Weekly, or Monthly."}
 	history_months = max(1, min(cint(history_months or 12), _MAX_HISTORY_MONTHS))
-	forecast_horizon = max(
-		1, min(cint(forecast_horizon or 4), _MAX_HORIZON[granularity])
-	)
+	forecast_horizon = max(1, min(cint(forecast_horizon or 4), _MAX_HORIZON[granularity]))
 	limit = max(1, min(cint(limit or 10), _MAX_ITEMS))
 	company = _resolve_company()
 	branches = _resolve_branch_filter(company, branch)
@@ -561,7 +553,9 @@ def get_demand_forecast(
 		return result
 
 	keys = _period_keys(date_from, date_to, granularity)
-	series = defaultdict(lambda: defaultdict(lambda: {"quantity": 0.0, "returns": 0.0, "discount": [], "transactions": 0}))
+	series = defaultdict(
+		lambda: defaultdict(lambda: {"quantity": 0.0, "returns": 0.0, "discount": [], "transactions": 0})
+	)
 	for row in history_rows:
 		period = _period_key(row.posting_date, granularity)
 		cell = series[(row.item_code, row.warehouse)][period]
@@ -573,10 +567,7 @@ def get_demand_forecast(
 	stock_map = {}
 	stockout_map = {}
 	if params.get("selected_warehouses"):
-		stock_map = {
-			(row.item_code, row.warehouse): row
-			for row in _stock_positions(params)
-		}
+		stock_map = {(row.item_code, row.warehouse): row for row in _stock_positions(params)}
 		stockout_map = _stockout_periods(params, granularity)
 
 	results = []
@@ -584,24 +575,13 @@ def get_demand_forecast(
 	for candidate in candidates:
 		pair = (candidate.item_code, candidate.warehouse)
 		first_active_index = next(
-			(
-				index
-				for index, period in enumerate(keys)
-				if series[pair][period]["transactions"] > 0
-			),
+			(index for index, period in enumerate(keys) if series[pair][period]["transactions"] > 0),
 			len(keys) - 1,
 		)
 		item_keys = keys[first_active_index:]
-		raw_history = [
-			max(series[pair][period]["quantity"], 0)
-			for period in item_keys
-		]
+		raw_history = [max(series[pair][period]["quantity"], 0) for period in item_keys]
 		returns = sum(series[pair][period]["returns"] for period in item_keys)
-		discount_periods = sum(
-			1
-			for period in item_keys
-			if _mean(series[pair][period]["discount"]) >= 10
-		)
+		discount_periods = sum(1 for period in item_keys if _mean(series[pair][period]["discount"]) >= 10)
 		observed_stockouts = stockout_map.get(pair, set())
 		# A zero caused by an observable stockout is treated as missing and
 		# conservatively imputed from nearby non-zero demand for model fitting.
@@ -665,9 +645,7 @@ def get_demand_forecast(
 			"lower_confidence_bound": round(sum(built["lower_bound"]), 4),
 			"upper_confidence_bound": round(sum(built["upper_bound"]), 4),
 			"historical_average": round(_mean(raw_history), 4),
-			"recent_trend": round(
-				_mean(raw_history[-3:]) - _mean(raw_history[-6:-3]), 4
-			)
+			"recent_trend": round(_mean(raw_history[-3:]) - _mean(raw_history[-6:-3]), 4)
 			if len(raw_history) >= 6
 			else None,
 			"seasonality_status": (
@@ -727,9 +705,7 @@ def get_demand_forecast(
 		"source": "Submitted POS Invoice and POS Invoice Item",
 		"calculation_version": CALCULATION_VERSION,
 	}
-	frappe.cache().set_value(
-		cache_key, json.dumps(response, default=str), expires_in_sec=_CACHE_TTL_SECONDS
-	)
+	frappe.cache().set_value(cache_key, json.dumps(response, default=str), expires_in_sec=_CACHE_TTL_SECONDS)
 	return response
 
 

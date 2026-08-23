@@ -2,7 +2,12 @@
 
 Dry-run by default. Live write from ``bench --site szl console``::
 
-    exec(open("/home/nabeel/frappe-bench/apps/aimatic/ipos_data_migration/seed_szl_supplier_principals.py").read(), globals())
+    exec(
+        open(
+            "/home/nabeel/frappe-bench/apps/aimatic/ipos_data_migration/seed_szl_supplier_principals.py"
+        ).read(),
+        globals(),
+    )
     main(dry_run=False)
 
 Principal label = text inside parentheses on each legacy SupplierName.
@@ -13,8 +18,8 @@ are skipped. Match Supplier by tax_id == StandardNTN.
 from __future__ import annotations
 
 import re
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 from collections import defaultdict
 
 import frappe
@@ -53,9 +58,7 @@ def parse_first_sheet_rows(path):
 
 		first_sheet = workbook.find("a:sheets/a:sheet", NS)
 		target = rel_map[
-			first_sheet.attrib[
-				"{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
-			]
+			first_sheet.attrib["{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"]
 		]
 		if not target.startswith("xl/"):
 			target = f"xl/{target}"
@@ -86,10 +89,7 @@ def parse_first_sheet_rows(path):
 			if header is None:
 				header = [str(v).strip() for v in values]
 				continue
-			row_dict = {
-				header[i]: (values[i] if i < len(values) else "")
-				for i in range(len(header))
-			}
+			row_dict = {header[i]: (values[i] if i < len(values) else "") for i in range(len(header))}
 			rows.append(row_dict)
 		return rows
 

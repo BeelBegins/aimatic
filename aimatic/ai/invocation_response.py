@@ -15,6 +15,8 @@ from frappe.utils import flt
 from aimatic.ai.answer_builder import (
 	_KPI_DISPATCH,
 	_TABLE_DISPATCH,
+)
+from aimatic.ai.answer_builder import (
 	build_response as build_legacy_response,
 )
 from aimatic.ai.chart_recommender import recommend_charts
@@ -28,9 +30,9 @@ from aimatic.ai.response_quality import (
 	result_follow_ups,
 )
 from aimatic.ai.response_schema import (
+	KPI,
 	ComparisonPeriod,
 	DateRange,
-	KPI,
 	Source,
 	StructuredResponse,
 	Table,
@@ -55,7 +57,11 @@ def _period_role(arguments: dict[str, Any], plan: dict[str, Any], prior_same_too
 		and arg_to == str(plan.get("comparison_to"))
 	):
 		return "previous"
-	if plan.get("date_from") and arg_from == str(plan.get("date_from")) and arg_to == str(plan.get("date_to")):
+	if (
+		plan.get("date_from")
+		and arg_from == str(plan.get("date_from"))
+		and arg_to == str(plan.get("date_to"))
+	):
 		return "current"
 	if arguments.get("scenario"):
 		return "scenario"
@@ -101,7 +107,9 @@ def normalize_invocations(
 				arguments=arguments,
 				result=dict(item.get("result") or {}),
 				sequence=int(item.get("sequence") or sequence),
-				status="error" if item.get("status") == "error" or "error" in (item.get("result") or {}) else "success",
+				status="error"
+				if item.get("status") == "error" or "error" in (item.get("result") or {})
+				else "success",
 				route=item.get("route") or route_for_tool(name),
 				period_role=item.get("period_role") or _period_role(arguments, plan_dict, prior),
 				scenario=item.get("scenario") or arguments.get("scenario"),
@@ -297,9 +305,7 @@ def build_invocation_response(
 			date_range=DateRange(from_=str(plan["date_from"]), to=str(plan["date_to"])),
 			comparison_period=comparison,
 			filters={
-				key: plan.get(key)
-				for key in ("item", "supplier", "customer", "warehouse")
-				if plan.get(key)
+				key: plan.get(key) for key in ("item", "supplier", "customer", "warehouse") if plan.get(key)
 			},
 		)
 
@@ -314,47 +320,59 @@ def build_invocation_response(
 	warnings = list(response.warnings)
 	for invocation in invocations:
 		if invocation.status == "error":
-			warnings.append(Warning(
-				code="TOOL_EXECUTION_FAILED",
-				message=f"{invocation.tool_name} could not be used: {invocation.result.get('error')}",
-				affected_metrics=[],
-				severity="warning",
-				details={"invocation_id": invocation.call_id},
-			))
+			warnings.append(
+				Warning(
+					code="TOOL_EXECUTION_FAILED",
+					message=f"{invocation.tool_name} could not be used: {invocation.result.get('error')}",
+					affected_metrics=[],
+					severity="warning",
+					details={"invocation_id": invocation.call_id},
+				)
+			)
 		quality_messages = list(invocation.result.get("data_quality_warnings") or [])
 		for result_row in invocation.result.get("forecasts") or []:
 			quality_messages.extend(result_row.get("data_quality_warnings") or [])
 		for warning_index, message in enumerate(dict.fromkeys(str(value) for value in quality_messages)):
-			warnings.append(Warning(
-				code=f"DATA_QUALITY_{invocation.sequence}_{warning_index + 1}",
-				message=message,
-				affected_metrics=[],
-				severity="warning",
-				details={"invocation_id": invocation.call_id},
-			))
+			warnings.append(
+				Warning(
+					code=f"DATA_QUALITY_{invocation.sequence}_{warning_index + 1}",
+					message=message,
+					affected_metrics=[],
+					severity="warning",
+					details={"invocation_id": invocation.call_id},
+				)
+			)
 		if invocation.result.get("total_row_count", 0) > invocation.result.get("row_count", 0):
-			warnings.append(Warning(
-				code="PARTIAL_RESULT",
-				message="The displayed result is capped; totals may cover more rows than the table shows.",
-				affected_metrics=[],
-				severity="info",
-				details={"invocation_id": invocation.call_id},
-			))
+			warnings.append(
+				Warning(
+					code="PARTIAL_RESULT",
+					message="The displayed result is capped; totals may cover more rows than the table shows.",
+					affected_metrics=[],
+					severity="info",
+					details={"invocation_id": invocation.call_id},
+				)
+			)
 	if quality["grade"] in {"fair", "poor"}:
-		warnings.append(Warning(
-			code="LOW_DATA_QUALITY",
-			message="Use this result with caution; coverage or data quality is limited.",
-			affected_metrics=[kpi.key for kpi in kpis],
-			severity="warning",
-			details=quality,
-		))
+		warnings.append(
+			Warning(
+				code="LOW_DATA_QUALITY",
+				message="Use this result with caution; coverage or data quality is limited.",
+				affected_metrics=[kpi.key for kpi in kpis],
+				severity="warning",
+				details=quality,
+			)
+		)
 
 	answer = replace(
 		response.answer,
 		confidence=round(quality["score"] / 100, 3),
 		data_quality=quality["grade"],
 		intent=plan.get("intent") or response.answer.intent,
-		entities={key: plan.get(key) for key in ("branch", "item", "supplier", "customer", "warehouse") if plan.get(key)},
+		entities={
+			key: plan.get(key)
+			for key in ("branch", "item", "supplier", "customer", "warehouse")
+			if plan.get(key)
+		},
 		direct_answer=direct_answer(kpis),
 		executive_summary=reply_text,
 		confidence_details=quality,

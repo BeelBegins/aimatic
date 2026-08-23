@@ -25,7 +25,9 @@
 		if (fieldtype === "Check") {
 			return value === undefined || value === null || value === "";
 		}
-		return value === undefined || value === null || value === "" || value === 0 || value === 0.0;
+		return (
+			value === undefined || value === null || value === "" || value === 0 || value === 0.0
+		);
 	}
 
 	function trigger_row_recalc(frm, cdt, cdn) {

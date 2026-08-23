@@ -27,71 +27,73 @@ MODE_OF_PAYMENT = "Food Panda Credit"
 
 
 def run():
-    if frappe.local.site != TARGET_SITE:
-        frappe.throw(f"This script is locked to site '{TARGET_SITE}', but current site is '{frappe.local.site}'.")
+	if frappe.local.site != TARGET_SITE:
+		frappe.throw(
+			f"This script is locked to site '{TARGET_SITE}', but current site is '{frappe.local.site}'."
+		)
 
-    ce = frappe.get_doc("POS Closing Entry", CLOSING_ENTRY)
-    invs = frappe.get_all(
-        "POS Invoice",
-        filters={
-            "pos_profile": POS_PROFILE,
-            "docstatus": 1,
-            "posting_date": ["between", [ce.period_start_date.date(), ce.period_end_date.date()]],
-        },
-        fields=["name", "grand_total"],
-        order_by="creation asc",
-    )
-    print(f"Found {len(invs)} POS Invoices in window")
+	ce = frappe.get_doc("POS Closing Entry", CLOSING_ENTRY)
+	invs = frappe.get_all(
+		"POS Invoice",
+		filters={
+			"pos_profile": POS_PROFILE,
+			"docstatus": 1,
+			"posting_date": ["between", [ce.period_start_date.date(), ce.period_end_date.date()]],
+		},
+		fields=["name", "grand_total"],
+		order_by="creation asc",
+	)
+	print(f"Found {len(invs)} POS Invoices in window")
 
-    fixed = 0
-    skipped = 0
-    for inv in invs:
-        pay_rows = frappe.get_all(
-            "Sales Invoice Payment",
-            filters={"parent": inv.name, "parenttype": "POS Invoice", "mode_of_payment": MODE_OF_PAYMENT},
-            fields=["name", "amount"],
-        )
-        if not pay_rows:
-            print("SKIP (no Food Panda Credit row):", inv.name)
-            skipped += 1
-            continue
+	fixed = 0
+	skipped = 0
+	for inv in invs:
+		pay_rows = frappe.get_all(
+			"Sales Invoice Payment",
+			filters={"parent": inv.name, "parenttype": "POS Invoice", "mode_of_payment": MODE_OF_PAYMENT},
+			fields=["name", "amount"],
+		)
+		if not pay_rows:
+			print("SKIP (no Food Panda Credit row):", inv.name)
+			skipped += 1
+			continue
 
-        row = pay_rows[0]
-        if flt(row.amount) == 0:
-            print("already correct (amount=0), skipping:", inv.name)
-            skipped += 1
-            continue
+		row = pay_rows[0]
+		if flt(row.amount) == 0:
+			print("already correct (amount=0), skipping:", inv.name)
+			skipped += 1
+			continue
 
-        frappe.db.set_value(
-            "Sales Invoice Payment", row.name, {"amount": 0, "base_amount": 0}, update_modified=False
-        )
-        frappe.db.set_value(
-            "POS Invoice",
-            inv.name,
-            {"paid_amount": 0, "base_paid_amount": 0, "outstanding_amount": flt(inv.grand_total, 2)},
-            update_modified=False,
-        )
-        doc = frappe.get_doc("POS Invoice", inv.name)
-        doc.set_status(update=True)
-        fixed += 1
+		frappe.db.set_value(
+			"Sales Invoice Payment", row.name, {"amount": 0, "base_amount": 0}, update_modified=False
+		)
+		frappe.db.set_value(
+			"POS Invoice",
+			inv.name,
+			{"paid_amount": 0, "base_paid_amount": 0, "outstanding_amount": flt(inv.grand_total, 2)},
+			update_modified=False,
+		)
+		doc = frappe.get_doc("POS Invoice", inv.name)
+		doc.set_status(update=True)
+		fixed += 1
 
-    frappe.db.commit()
-    print(f"Fixed: {fixed}, Skipped: {skipped}")
+	frappe.db.commit()
+	print(f"Fixed: {fixed}, Skipped: {skipped}")
 
-    check = frappe.get_all(
-        "POS Invoice",
-        filters={"name": ["in", [i.name for i in invs]]},
-        fields=["name", "paid_amount", "outstanding_amount", "status"],
-        order_by="creation asc",
-    )
-    for c in check:
-        print(c)
+	check = frappe.get_all(
+		"POS Invoice",
+		filters={"name": ["in", [i.name for i in invs]]},
+		fields=["name", "paid_amount", "outstanding_amount", "status"],
+		order_by="creation asc",
+	)
+	for c in check:
+		print(c)
 
-    print(
-        "\nNext step: open POS Closing Entry POS-CLO-2026-00005 in Desk and click "
-        "'Retry' (or run frappe.get_doc('POS Closing Entry', 'POS-CLO-2026-00005').retry() "
-        "in console)."
-    )
+	print(
+		"\nNext step: open POS Closing Entry POS-CLO-2026-00005 in Desk and click "
+		"'Retry' (or run frappe.get_doc('POS Closing Entry', 'POS-CLO-2026-00005').retry() "
+		"in console)."
+	)
 
 
 run()

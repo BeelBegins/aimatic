@@ -39,9 +39,7 @@ class TestDemandForecasting(TestCase):
 
 	def test_confidence_intervals_are_ordered(self):
 		result = build_forecast([5, 8, 6, 9, 7, 8, 6, 10], 5, 7)
-		for lower, point, upper in zip(
-			result["lower_bound"], result["forecast"], result["upper_bound"]
-		):
+		for lower, point, upper in zip(result["lower_bound"], result["forecast"], result["upper_bound"]):
 			self.assertLessEqual(lower, point)
 			self.assertLessEqual(point, upper)
 

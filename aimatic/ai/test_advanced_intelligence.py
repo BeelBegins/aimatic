@@ -10,7 +10,13 @@ class TestPromotionAnalysis(TestCase):
 	def test_incremental_sales_and_roi_are_deterministic(self):
 		result = calculate_promotion_effect(
 			{"days": 10, "quantity": 100, "revenue": 1000, "margin": 300, "category_other_revenue": 500},
-			{"quantity": 150, "revenue": 1350, "margin": 360, "gross_before_discount": 1500, "category_other_revenue": 400},
+			{
+				"quantity": 150,
+				"revenue": 1350,
+				"margin": 360,
+				"gross_before_discount": 1500,
+				"category_other_revenue": 400,
+			},
 			{"days": 5, "quantity": 40},
 			10,
 		)
@@ -24,9 +30,24 @@ class TestCustomerRfm(TestCase):
 	def test_high_recent_frequent_customer_is_champion(self):
 		rows = score_rfm(
 			[
-				{"customer": "Best", "last_purchase_date": "2026-07-25", "frequency": 20, "monetary_value": 5000},
-				{"customer": "Mid", "last_purchase_date": "2026-06-01", "frequency": 5, "monetary_value": 1000},
-				{"customer": "Dormant", "last_purchase_date": "2025-01-01", "frequency": 1, "monetary_value": 50},
+				{
+					"customer": "Best",
+					"last_purchase_date": "2026-07-25",
+					"frequency": 20,
+					"monetary_value": 5000,
+				},
+				{
+					"customer": "Mid",
+					"last_purchase_date": "2026-06-01",
+					"frequency": 5,
+					"monetary_value": 1000,
+				},
+				{
+					"customer": "Dormant",
+					"last_purchase_date": "2025-01-01",
+					"frequency": 1,
+					"monetary_value": 50,
+				},
 			],
 			"2026-07-26",
 		)

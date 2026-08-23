@@ -9,7 +9,6 @@ import frappe
 from frappe import _
 from frappe.utils.file_manager import save_file
 
-
 _CACHE_PREFIX = "aimatic:shopping:bgremove:"
 _MAX_IMAGE_BYTES = 12 * 1024 * 1024
 _ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -68,7 +67,9 @@ def list_products(search=None):
 	)
 	if search:
 		query = search.strip().lower()
-		rows = [row for row in rows if query in f"{row.item} {row.public_name or ''} {row.category or ''}".lower()]
+		rows = [
+			row for row in rows if query in f"{row.item} {row.public_name or ''} {row.category or ''}".lower()
+		]
 	return {"products": rows}
 
 
@@ -79,15 +80,18 @@ def start_background_removal(product, file_name):
 		frappe.throw(_("Shopping Product does not exist"))
 	file_doc, _path = _source_file(file_name, product)
 	job_id = uuid.uuid4().hex
-	_set_status(job_id, {
-		"job_id": job_id,
-		"owner": frappe.session.user,
-		"product": product,
-		"source_file": file_doc.name,
-		"source_url": file_doc.file_url,
-		"status": "queued",
-		"message": _("Waiting for the image processor"),
-	})
+	_set_status(
+		job_id,
+		{
+			"job_id": job_id,
+			"owner": frappe.session.user,
+			"product": product,
+			"source_file": file_doc.name,
+			"source_url": file_doc.file_url,
+			"status": "queued",
+			"message": _("Waiting for the image processor"),
+		},
+	)
 	frappe.enqueue(
 		"aimatic.shopping.product_images.process_background_removal",
 		queue="long",
@@ -119,7 +123,9 @@ def approve_background_removal(job_id):
 		frappe.throw(_("Processed image attachment does not match this product"), frappe.PermissionError)
 	product.image = result.file_url
 	product.save()
-	_set_status(job_id, {"status": "approved", "message": _("Product image updated"), "result_url": result.file_url})
+	_set_status(
+		job_id, {"status": "approved", "message": _("Product image updated"), "result_url": result.file_url}
+	)
 	return {"product": product.name, "image": result.file_url, "status": "approved"}
 
 
@@ -143,7 +149,11 @@ def process_background_removal(job_id):
 			capture_output=True,
 			text=True,
 			timeout=180,
-			env={**os.environ, "U2NET_HOME": "/home/nabeel/.local/share/aimatic-bgremove/models", "OMP_NUM_THREADS": "4"},
+			env={
+				**os.environ,
+				"U2NET_HOME": "/home/nabeel/.local/share/aimatic-bgremove/models",
+				"OMP_NUM_THREADS": "4",
+			},
 		)
 		with open(output_path, "rb") as handle:
 			content = handle.read()
@@ -154,15 +164,24 @@ def process_background_removal(job_id):
 			status["product"],
 			is_private=0,
 		)
-		_set_status(job_id, {
-			"status": "ready",
-			"message": _("Background removed. Review the result before saving."),
-			"result_file": result.name,
-			"result_url": result.file_url,
-		})
+		_set_status(
+			job_id,
+			{
+				"status": "ready",
+				"message": _("Background removed. Review the result before saving."),
+				"result_file": result.name,
+				"result_url": result.file_url,
+			},
+		)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Shopping background removal failed")
-		_set_status(job_id, {"status": "failed", "message": _("Background removal failed. Try another image or contact the administrator.")})
+		_set_status(
+			job_id,
+			{
+				"status": "failed",
+				"message": _("Background removal failed. Try another image or contact the administrator."),
+			},
+		)
 		raise
 	finally:
 		if output_path:

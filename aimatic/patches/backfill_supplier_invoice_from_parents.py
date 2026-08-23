@@ -90,6 +90,4 @@ def backfill_supplier_invoice_numbers() -> dict:
 
 def execute():
 	counts = backfill_supplier_invoice_numbers()
-	frappe.logger("aimatic").info(
-		f"backfill_supplier_invoice_from_parents: {counts}"
-	)
+	frappe.logger("aimatic").info(f"backfill_supplier_invoice_from_parents: {counts}")

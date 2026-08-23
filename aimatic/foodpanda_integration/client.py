@@ -45,7 +45,9 @@ def _token_cache_key(client_id):
 def _redact_sensitive(value):
 	if isinstance(value, dict):
 		return {
-			key: "[redacted]" if key.lower() in {"access_token", "client_secret", "token"} else _redact_sensitive(item)
+			key: "[redacted]"
+			if key.lower() in {"access_token", "client_secret", "token"}
+			else _redact_sensitive(item)
 			for key, item in value.items()
 		}
 	if isinstance(value, list):
@@ -190,9 +192,7 @@ def log_api_failure(title, context, error):
 	that may roll back, and a plain frappe.log_error here would vanish with
 	it."""
 	body = getattr(error, "response_body", None)
-	response_json = (
-		json.dumps(body, indent=2, ensure_ascii=False, default=str) if body else "n/a"
-	)
+	response_json = json.dumps(body, indent=2, ensure_ascii=False, default=str) if body else "n/a"
 	frappe.log_error(
 		title=title,
 		message=f"{context}\n\nError: {error}\n\nResponse:\n{response_json}",

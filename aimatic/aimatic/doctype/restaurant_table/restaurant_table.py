@@ -14,6 +14,8 @@ class RestaurantTable(Document):
 		if cint(self.capacity) < 1:
 			frappe.throw(_("Table capacity must be at least one"))
 		self.title = (self.title or "").strip()
-		duplicate = frappe.db.exists("Restaurant Table", {"name": ["!=", self.name], "floor": self.floor, "title": self.title})
+		duplicate = frappe.db.exists(
+			"Restaurant Table", {"name": ["!=", self.name], "floor": self.floor, "title": self.title}
+		)
 		if duplicate:
 			frappe.throw(_("Table {0} already exists on this Floor").format(self.title))

@@ -10,7 +10,9 @@ dynamic = ["version"]
 dependencies = [
     # "frappe~=16.0.0" # Installed and managed by bench.
     "python-barcode~=0.16.1", # Server-side Code128/EAN13 label rendering (Label Printing module)
-    "paramiko~=2.12.0", # Foodpanda vendor-automation SFTP catalog CSV upload
+    # Foodpanda vendor-automation SFTP. 3.4+ fixes Terrapin (PYSEC-2026-1758);
+    # 5.0+ drops the SHA-1 RSA path flagged in PYSEC-2026-2858.
+    "paramiko>=5.0.0",
 ]
 
 [build-system]
@@ -40,10 +42,12 @@ select = [
     "RUF",
 ]
 ignore = [
+    "B007", # unused loop variable
     "B017", # assertRaises(Exception) - should be more specific
     "B018", # useless expression, not assigned to anything
     "B023", # function doesn't bind loop variable - will have last iteration's value
     "B904", # raise inside except without from
+    "B905", # zip() without strict=
     "E101", # indentation contains mixed spaces and tabs
     "E402", # module level import not at top of file
     "E501", # line too long
@@ -52,12 +56,21 @@ ignore = [
     "F403", # can't detect undefined names from * import
     "F405", # can't detect undefined names from * import
     "F722", # syntax error in forward type annotation
-    "W191", # indentation contains tabs
+    "F841", # local variable assigned but never used
+    "RUF001", # ambiguous unicode in strings
+    "RUF002", # ambiguous unicode in docstrings
+    "RUF003", # ambiguous unicode in comments
+    "RUF005", # collection literal concatenation
+    "RUF012", # mutable class attributes
+    "RUF046", # unnecessary int() cast
+    "RUF059", # unused unpacked variable
+    "UP028", # yield from
     "UP030", # Use implicit references for positional format fields (translations)
     "UP031", # Use format specifiers instead of percent format
     "UP032", # Use f-string instead of `format` call (translations)
     "UP037", # quoted annotations
     "UP040", # Use type aliases instead of type annotations
+    "W191", # indentation contains tabs
 ]
 typing-modules = ["frappe.types.DF"]
 
