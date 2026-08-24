@@ -79,6 +79,8 @@ doc_events = {
 			"aimatic.purchase_history_autofill.events.autofill_purchase_invoice_item_fields",
 			"aimatic.purchase_supplier_invoice.prefill_purchase_invoice_supplier_invoice",
 			"aimatic.purchase_principal.prefill_purchase_invoice_principal",
+			# PI returns must update stock (Bin); normal PIs use PR for stock.
+			"aimatic.purchase_return_stock.ensure_purchase_invoice_return_updates_stock",
 		],
 		"validate": "aimatic.purchase_principal.validate_purchase_principal",
 		"on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
@@ -220,6 +222,7 @@ doctype_js = {
 		"public/js/purchase_history_autofill.js",
 		"public/js/foodpanda_price_prefill.js",
 		"public/js/purchase_principal.js",
+		"public/js/purchase_return_stock.js",
 	],
 	"Delivery Note": "public/js/label_printing_source_buttons.js",
 	"Stock Entry": "public/js/label_printing_source_buttons.js",
