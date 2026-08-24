@@ -50,3 +50,7 @@ aimatic.patches.backfill_supplier_invoice_from_parents
 aimatic.patches.wire_pi_item_image_barcode_layout
 aimatic.patches.create_supplier_principal_fields
 aimatic.patches.create_pos_profile_allow_held_sales_field
+aimatic.patches.seed_help_topics
+aimatic.patches.move_foodpanda_sftp_to_settings
+aimatic.patches.unlock_purchase_receipt_gm_percent
+aimatic.patches.clear_pricecheck_role_home_page

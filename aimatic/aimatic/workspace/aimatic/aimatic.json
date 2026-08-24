@@ -1,7 +1,7 @@
 {
  "app": "aimatic",
  "charts": [],
- "content": "[{\"id\": \"aimHeader1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Aimatic</b></span>\", \"col\": 12}}, {\"id\": \"aimShortcut1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Vendor Performance\", \"col\": 4}}, {\"id\": \"aimShortcut2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Label Printing\", \"col\": 4}}, {\"id\": \"aimShortcut3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimShortcut4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sales Dashboard\", \"col\": 4}}, {\"id\": \"aimShortcut5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"AI Assistant\", \"col\": 4}}, {\"id\": \"aimShortcut6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Finance Setup\", \"col\": 4}}, {\"id\": \"aimShortcut7\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Price Check\", \"col\": 4}}, {\"id\": \"aimShortcutFoodpanda\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Foodpanda Catalog\", \"col\": 4}}, {\"id\": \"aimSpacer1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"aimHeader2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Modules</b></span>\", \"col\": 12}}, {\"id\": \"aimCard1\", \"type\": \"card\", \"data\": {\"card_name\": \"POS & Devices\", \"col\": 4}}, {\"id\": \"aimCard2\", \"type\": \"card\", \"data\": {\"card_name\": \"Loyalty & Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimCard3\", \"type\": \"card\", \"data\": {\"card_name\": \"FBR / Tax\", \"col\": 4}}, {\"id\": \"aimCard4\", \"type\": \"card\", \"data\": {\"card_name\": \"Pricing\", \"col\": 4}}, {\"id\": \"aimCard8\", \"type\": \"card\", \"data\": {\"card_name\": \"Foodpanda\", \"col\": 4}}, {\"id\": \"aimCard5\", \"type\": \"card\", \"data\": {\"card_name\": \"Restaurant\", \"col\": 4}}, {\"id\": \"aimCard6\", \"type\": \"card\", \"data\": {\"card_name\": \"Shopping\", \"col\": 4}}, {\"id\": \"aimCard7\", \"type\": \"card\", \"data\": {\"card_name\": \"Mobile Sales\", \"col\": 4}}]",
+ "content": "[{\"id\": \"aimHeader1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Aimatic</b></span>\", \"col\": 12}}, {\"id\": \"aimShortcut1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Vendor Performance\", \"col\": 4}}, {\"id\": \"aimShortcutStock\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Vendor Stock Positions\", \"col\": 4}}, {\"id\": \"aimShortcut2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Label Printing\", \"col\": 4}}, {\"id\": \"aimShortcut3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimShortcut4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sales Dashboard\", \"col\": 4}}, {\"id\": \"aimShortcut5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"AI Assistant\", \"col\": 4}}, {\"id\": \"aimShortcutHelp\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Help\", \"col\": 4}}, {\"id\": \"aimShortcut6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Finance Setup\", \"col\": 4}}, {\"id\": \"aimShortcut7\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Price Check\", \"col\": 4}}, {\"id\": \"aimShortcutFoodpanda\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Foodpanda Catalog\", \"col\": 4}}, {\"id\": \"aimSpacer1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"aimHeader2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Modules</b></span>\", \"col\": 12}}, {\"id\": \"aimCard1\", \"type\": \"card\", \"data\": {\"card_name\": \"POS & Devices\", \"col\": 4}}, {\"id\": \"aimCard2\", \"type\": \"card\", \"data\": {\"card_name\": \"Loyalty & Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimCard3\", \"type\": \"card\", \"data\": {\"card_name\": \"FBR / Tax\", \"col\": 4}}, {\"id\": \"aimCard4\", \"type\": \"card\", \"data\": {\"card_name\": \"Pricing\", \"col\": 4}}, {\"id\": \"aimCard8\", \"type\": \"card\", \"data\": {\"card_name\": \"Foodpanda\", \"col\": 4}}, {\"id\": \"aimCard5\", \"type\": \"card\", \"data\": {\"card_name\": \"Restaurant\", \"col\": 4}}, {\"id\": \"aimCard6\", \"type\": \"card\", \"data\": {\"card_name\": \"Shopping\", \"col\": 4}}, {\"id\": \"aimCard7\", \"type\": \"card\", \"data\": {\"card_name\": \"Mobile Sales\", \"col\": 4}}]",
  "creation": "2026-07-16 00:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -523,6 +523,12 @@
    "url": "/app/ai-assistant-console"
   },
   {
+   "color": "Teal",
+   "label": "Help",
+   "type": "URL",
+   "url": "/app/help-console"
+  },
+  {
    "color": "Red",
    "label": "Finance Setup",
    "type": "URL",
@@ -539,6 +545,12 @@
    "label": "Foodpanda Catalog",
    "type": "URL",
    "url": "/app/foodpanda-catalog-console"
+  },
+  {
+   "color": "Orange",
+   "label": "Vendor Stock Positions",
+   "type": "URL",
+   "url": "/app/vendor-stock-positions-console"
   }
  ],
  "title": "Aimatic",

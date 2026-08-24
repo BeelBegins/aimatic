@@ -107,6 +107,31 @@ def _get_receipt_branch_context(doc):
 	}
 
 
+def _loyalty_points_balance(doc):
+	"""Post-sale remaining loyalty points for an enrolled customer.
+
+	Receipt printing runs after submit, so Loyalty Point Entry rows for this
+	invoice are already in the ledger; ERPNext's helper sums that ledger.
+	Returns None when the customer is not enrolled (receipt hides the block).
+	"""
+	customer = doc.get("customer")
+	if not customer:
+		return None
+
+	loyalty_program = frappe.db.get_value("Customer", customer, "loyalty_program")
+	if not loyalty_program:
+		return None
+
+	from erpnext.accounts.doctype.loyalty_program.loyalty_program import (
+		get_loyalty_program_details_with_points,
+	)
+
+	details = get_loyalty_program_details_with_points(
+		customer, loyalty_program, company=doc.company
+	)
+	return int(details.get("loyalty_points") or 0)
+
+
 def get_pos_receipt_context(doc):
 	"""Everything the POS receipt print formats need beyond the invoice's
 	own fields: the FBR sales-tax/service-fee amounts (matched by Sales
@@ -169,6 +194,7 @@ def get_pos_receipt_context(doc):
 			["loyalty_points", "purchase_amount"],
 			as_dict=True,
 		),
+		"loyalty_balance": _loyalty_points_balance(doc),
 		"gift_voucher_redeemed": None
 		if is_duplicate_print
 		else frappe.db.get_value(

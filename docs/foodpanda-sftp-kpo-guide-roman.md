@@ -11,39 +11,46 @@ Yeh simple guide hai un logon ke liye jo roz Foodpanda prices dekhte / update ka
 
 ## 1) Pehle yeh 4 baatein yaad rakhain
 
-1. **Har store / Branch ka setup alag hai** — host, port, username, password, time usi Branch form pe likhe jate hain.
-2. **Ghouri Town** aur **Misrial** ka **username same** ho sakta hai. Farq aksar **port** mein hota hai.
-3. **Port blank** chhorna theek hai → system **22** use karta hai. Kabhi blank save hone ke baad `0` dikhe to tension nahi (matlab 22).
-4. Pehli dafa: pehle **manual upload** Success karo, phir auto schedule **Enabled** karo.
+1. **SFTP host / username / password ek dafa Foodpanda Settings pe** — har branch ka alag password Branch pe nahi.
+2. **Har store ka Chain ID aur Vendor ID Foodpanda Outlet pe** alag ho sakta hai. File ka naam `{prefix}_{vendor_id}.csv` hota hai (date/branch naam nahi).
+3. **Port hamesha 22** hai (Foodpanda). Remote Path aksar `Catalog`.
+4. Pehli dafa: pehle **manual upload** Success karo, phir Outlet pe auto schedule **Enabled** karo.
 
 ---
 
-## 2) Administrator — pehli dafa setup (sirf ek dafa per branch)
+## 2) Administrator — pehli dafa setup
 
 ### Aap kahan jaain
-1. Desk kholo: https://szl.aimatic.tech  
-2. Search mein **Branch** likho → apni branch kholo  
-   Example: **S1 - Ghouri Town VIP**
+1. Desk kholo.
+2. **Foodpanda Settings** kholo — Host, Port `22`, Username, Password, Remote Path `Catalog`, Filename Prefix (Vendor Portal Integrations wala prefix).
+3. **Foodpanda Outlet** kholo (har branch) — **Chain ID**, **Vendor ID**, optional filename prefix override, **Schedule Time**, phir test ke baad **SFTP Enabled**.
 
-### Form pe kya bharein (Foodpanda SFTP section)
+### Settings pe kya bharein
 
 | Field | Aap kya karein |
 |---|---|
-| **Host** | Foodpanda ka SFTP host paste karo |
-| **Port** | Alag port diya ho to likho; warna **khali chhor do** |
-| **Username** | `FP_PK_...` wala username |
-| **Password** | Password yahan type / paste karo |
-| **Remote Path** | Folder diya ho to likho; warna khali |
-| **Schedule Time** | Rozana auto upload ka time (jaise `06:30:00`) — site time |
-| **Enabled** | Abhi **tick mat karo** — pehle test upload |
+| **SFTP Host** | `vendor-automation-sftp-live-ap.prod.aws.qcommerce.live` |
+| **SFTP Port** | **22** |
+| **SFTP Username** | `FP_PK_...` |
+| **SFTP Password** | Password yahan |
+| **SFTP Remote Path** | `Catalog` (catalog-only file) |
+| **SFTP Filename Prefix** | Vendor Portal Integrations wala prefix; file `prefix_vendorid.csv` banegi |
+
+### Outlet pe kya bharein
+
+| Field | Aap kya karein |
+|---|---|
+| **Chain ID** | Is branch ka Foodpanda chain (har branch alag ho sakta hai) |
+| **Vendor ID** | Is store ka vendor code (filename ke end mein yahi jata hai) |
+| **Schedule Time** | Rozana auto upload (jaise `06:30:00`) — site time |
+| **SFTP Enabled** | Abhi **tick mat karo** — pehle test upload |
 
 ### Phir
 1. **Save** dabao.  
-2. Neeche **Section 3** wala manual upload ek dafa chalao.  
-3. Jab **Success** aa jaye, tab **Enabled** tick karke **Save** karo.
+2. Outlet (ya Branch Price Sheet) se **Upload Catalog via SFTP** ek dafa chalao.  
+3. Jab **Success** aa jaye, tab **SFTP Enabled** tick karke **Save** karo.
 
-**Do stores, same username:**  
-Har Branch pe username same rakh sakte ho; **port** us store ka alag set karo (Misrial pe jo port Foodpanda ne diya).
+**Do stores:** username/password Settings pe same; har Outlet ka **Vendor ID** (aur zarurat ho to Chain ID) alag.
 
 ---
 
@@ -55,12 +62,11 @@ Do tareeqe hain. Jo situation ho, woh choose karo.
 
 **Kab:** saari Foodpanda items update karni hon.
 
-1. Apni **Branch** form kholo.  
-2. Upar buttons mein **Foodpanda** pe click karo.  
-3. **Upload Catalog via SFTP** choose karo.  
-4. Confirm pe **Yes** dabao.  
-5. Screen pe result aayega:
-   - **Success** → file Foodpanda ko mil gayi  
+1. **Foodpanda Outlet** kholo (ya Branch form).  
+2. **SFTP → Upload Catalog via SFTP** choose karo.  
+3. Confirm pe **Yes** dabao.  
+4. Screen pe result aayega:
+   - **Success** → file Foodpanda ko mil gayi (`prefix_vendorid.csv`)  
    - **Failed** → error padho; **Foodpanda SFTP Upload Log** khol ke detail dekho  
 
 ### Tareeqa B — Sirf kuch items / filters wale rows
@@ -85,9 +91,9 @@ Do tareeqe hain. Jo situation ho, woh choose karo.
 
 **Kab:** roz same time pe automatically bhejni ho.
 
-1. Branch form → **Schedule Time** set karo (example: `06:30:00`).  
+1. Foodpanda Outlet → **Schedule Time** set karo (example: `06:30:00`).  
 2. Ek dafa **manual upload Success** confirm karo (Section 3).  
-3. **Foodpanda SFTP Enabled** tick karo → **Save**.
+3. **SFTP Enabled** tick karo → **Save**.
 
 Uske baad system bar-baar check karta hai (lagbhag har 15 minute). Jab aapka time ho chuka ho aur aaj abhi Success na hua ho, tab upload khud chalega.
 
@@ -98,10 +104,10 @@ Uske baad system bar-baar check karta hai (lagbhag har 15 minute). Jab aapka tim
 
 ## 5) Success ya fail — aap kahan dekhein
 
-Branch form pe:
+Foodpanda Outlet form pe:
 
-- **Last Foodpanda SFTP Upload** → last successful time  
-- **Last Foodpanda SFTP Error** → agar fail hua to short error  
+- **Last SFTP Upload** → last successful time  
+- **Last SFTP Error** → agar fail hua to short error  
 
 Poori history ke liye Desk pe **Foodpanda SFTP Upload Log** kholo — status, filename, kitni rows gayi / skip hui.
 
@@ -109,10 +115,10 @@ Poori history ke liye Desk pe **Foodpanda SFTP Upload Log** kholo — status, fi
 
 | Aapko kya dikha | Aap kya karein |
 |---|---|
-| Missing host / username / password | Branch pe SFTP fields complete karke Save, phir dubara try |
-| Port `0` dikh raha hai | Normal hai agar blank chhora tha — system 22 use karta hai |
-| `[Errno 2] /foodpanda-....csv` | Remote Path khali rakho (ya sahi folder), dubara upload |
-| `No module named 'paramiko'` | IT / admin ko bolo — server pe package chahiye |
+| Missing host / username / password | **Foodpanda Settings** pe SFTP fields complete karke Save, phir dubara try |
+| Port `0` dikh raha hai | Settings pe **22** set karo |
+| `[Errno 2] /catalog_....csv` | Remote Path `Catalog` (leading slash nahi), dubara upload |
+| File ignore / no vendor | Filename `{prefix}_{vendor_id}.csv` hona chahiye — prefix Vendor Portal se match kare, vendor_id Outlet pe |
 
 ---
 

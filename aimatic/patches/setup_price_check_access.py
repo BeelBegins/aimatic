@@ -125,6 +125,10 @@ def _ensure_workspace():
 		ws.sequence_id = 5
 
 	ws.title = WORKSPACE
+	# Frappe v16 requires every Workspace record to declare its document type.
+	# Older copies of this workspace predate that requirement, so set it even
+	# when reusing an existing record.
+	ws.type = "Workspace"
 	ws.content = content
 	ws.parent_page = ""
 	ws.is_hidden = 0
@@ -145,17 +149,27 @@ def _ensure_workspace():
 
 def _migrate_users():
 	"""Move dedicated price-check accounts onto the locked-down role."""
-	# Legacy role name -> Price Check
+	# Legacy Role.home_page redirected ANY user who still held ``pricecheck``
+	# (including Administrator) straight to the kiosk on login. Clear it and
+	# never set home_page on the new Price Check role — kiosk landing is
+	# User.default_workspace only.
+	if frappe.db.exists("Role", LEGACY_ROLE):
+		frappe.db.set_value("Role", LEGACY_ROLE, "home_page", None)
+	if frappe.db.exists("Role", ROLE):
+		frappe.db.set_value("Role", ROLE, "home_page", None)
+
+	# Legacy role name -> Price Check only for the dedicated kiosk account.
+	# Do not promote Administrator / System Manager onto Price Check.
+	kiosk = "price@aimatic.tech"
 	for row in frappe.get_all(
 		"Has Role", filters={"role": LEGACY_ROLE, "parenttype": "User"}, fields=["name", "parent"]
 	):
-		user = row.parent
 		frappe.db.delete("Has Role", {"name": row.name})
-		if not frappe.db.exists("Has Role", {"parent": user, "role": ROLE}):
+		if row.parent == kiosk and not frappe.db.exists("Has Role", {"parent": kiosk, "role": ROLE}):
 			frappe.get_doc(
 				{
 					"doctype": "Has Role",
-					"parent": user,
+					"parent": kiosk,
 					"parenttype": "User",
 					"parentfield": "roles",
 					"role": ROLE,
@@ -163,7 +177,6 @@ def _migrate_users():
 			).insert(ignore_permissions=True)
 
 	# Dedicated kiosk account that was wrongly given POS User
-	kiosk = "price@aimatic.tech"
 	if frappe.db.exists("User", kiosk):
 		user = frappe.get_doc("User", kiosk)
 		user.set("roles", [])

@@ -71,10 +71,12 @@ flowchart TB
 
 ### 2.1 Configuration
 
-1. **Foodpanda Settings** (site-wide): OAuth client, chain ID, API host,
-   webhook secret, optional `allow_product_creation`.
-2. **Foodpanda Outlet** (per branch): `vendor_id`, `catalog_sync_enabled`,
-   `order_ingestion_enabled`, optional auto-map on catalog import.
+1. **Foodpanda Settings** (site-wide): OAuth client, default chain ID, API host,
+   webhook secret, optional `allow_product_creation`, shared SFTP
+   host/user/password/prefix.
+2. **Foodpanda Outlet** (per branch): `chain_id` (each branch can be a separate
+   Foodpanda chain), `vendor_id`, `catalog_sync_enabled`,
+   `order_ingestion_enabled`, SFTP enable/schedule, optional auto-map on catalog import.
 3. **Foodpanda Category Map**: Item Group → Foodpanda category (needed only to
    **create** new portal products; not required for update-only sync of an
    existing catalog).
@@ -125,7 +127,7 @@ independent of catalog mapping.
 |---|---|
 | Partner API, webhooks, catalog jobs, orders | `foodpanda-integration` |
 | Branch Foodpanda Price List create/update from PR / Branch Price Sheet | `shelf-pricing` |
-| SFTP CSV upload to Foodpanda | Branch / price-export SFTP path (see SFTP guide) |
+| SFTP CSV upload to Foodpanda | Foodpanda Settings (host/user/password) + Outlet (enable/filename vendor_id); `price_export.foodpanda_sftp` |
 
 ---
 
@@ -148,7 +150,7 @@ independent of catalog mapping.
       Portal Active, Save prices, Apply & push, bulk push, refresh links
 - [x] Local Foodpanda prices via shelf-pricing + Branch Price Sheet (+ SFTP guide)
 
-### Proven on siezal (Ghouri Town VIP, vendor `od2m`) — snapshot Aug 2026
+### Proven on siezal (Ghouri Town VIP, vendor `rg26`) — snapshot Aug 2026
 
 - [x] Partner credentials and catalog sync enabled
 - [x] Catalog export webhook 200; ~**18,495** remote SKUs imported

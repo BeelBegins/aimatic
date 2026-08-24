@@ -100,7 +100,10 @@ frappe.ui.form.on("Branch", {
 			__("Upload Catalog via SFTP"),
 			() => {
 				frappe.confirm(
-					__("Upload {0} Foodpanda catalog CSV via SFTP?", [frm.doc.name]),
+					__(
+						"Upload {0} Foodpanda catalog CSV via SFTP? Host and password are on Foodpanda Settings.",
+						[frm.doc.name]
+					),
 					() => {
 						frappe.call({
 							method: "aimatic.price_export.foodpanda_sftp.upload_branch_foodpanda_csv",

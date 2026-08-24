@@ -1,0 +1,210 @@
+/* Aimatic Desk Help float — lean, independent of AI Assistant Console BI UI */
+:root {
+	--ah-ink: #0f172a;
+	--ah-panel: #ffffff;
+	--ah-line: #e2e8f0;
+	--ah-mute: #64748b;
+	--ah-accent: #0f766e;
+	--ah-accent-2: #115e59;
+	--ah-user-bg: #ecfdf5;
+	--ah-bot-bg: #f8fafc;
+	--ah-safe-b: env(safe-area-inset-bottom, 0px);
+	--ah-safe-r: env(safe-area-inset-right, 0px);
+}
+
+.aimatic-help-launcher {
+	position: fixed;
+	right: max(16px, var(--ah-safe-r));
+	bottom: calc(20px + var(--ah-safe-b));
+	z-index: 1020;
+	width: 52px;
+	height: 52px;
+	border-radius: 14px;
+	border: 1px solid rgba(15, 118, 110, 0.35);
+	background: var(--ah-accent);
+	color: #fff;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 10px 24px rgba(15, 118, 110, 0.28);
+	transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.aimatic-help-launcher:hover {
+	background: var(--ah-accent-2);
+	transform: translateY(-1px);
+}
+
+.aimatic-help-launcher:focus-visible {
+	outline: 3px solid rgba(15, 118, 110, 0.35);
+	outline-offset: 2px;
+}
+
+.aimatic-help-launcher svg {
+	width: 22px;
+	height: 22px;
+}
+
+.aimatic-help-panel {
+	position: fixed;
+	right: max(16px, var(--ah-safe-r));
+	bottom: calc(84px + var(--ah-safe-b));
+	z-index: 1021;
+	width: min(380px, calc(100vw - 24px));
+	height: min(520px, calc(100dvh - 120px));
+	background: var(--ah-panel);
+	border: 1px solid var(--ah-line);
+	border-radius: 14px;
+	box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+	display: none;
+	flex-direction: column;
+	overflow: hidden;
+	font-family: var(--font-stack);
+	color: var(--ah-ink);
+}
+
+.aimatic-help-panel.aimatic-help-open {
+	display: flex;
+}
+
+.aimatic-help-head {
+	padding: 12px 14px;
+	border-bottom: 1px solid var(--ah-line);
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 8px;
+	background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%);
+}
+
+.aimatic-help-head-title {
+	font-weight: 600;
+	font-size: 14px;
+}
+
+.aimatic-help-head-sub,
+.aimatic-help-context {
+	font-size: 12px;
+	color: var(--ah-mute);
+	margin-top: 2px;
+}
+
+.aimatic-help-context strong {
+	color: var(--ah-accent-2);
+	font-weight: 600;
+}
+
+.aimatic-help-close {
+	border: none;
+	background: transparent;
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+	color: var(--ah-mute);
+	padding: 0 4px;
+}
+
+.aimatic-help-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	background: #fafafa;
+}
+
+.aimatic-help-msg {
+	max-width: 92%;
+	padding: 8px 10px;
+	border-radius: 10px;
+	font-size: 13px;
+	line-height: 1.45;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.aimatic-help-msg a {
+	color: var(--ah-accent);
+	text-decoration: underline;
+}
+
+.aimatic-help-msg-user {
+	align-self: flex-end;
+	background: var(--ah-user-bg);
+	border: 1px solid #a7f3d0;
+}
+
+.aimatic-help-msg-bot {
+	align-self: flex-start;
+	background: var(--ah-bot-bg);
+	border: 1px solid var(--ah-line);
+}
+
+.aimatic-help-suggestions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 0 12px 8px;
+}
+
+.aimatic-help-chip {
+	border: 1px solid var(--ah-line);
+	background: #fff;
+	border-radius: 999px;
+	padding: 5px 10px;
+	font-size: 12px;
+	cursor: pointer;
+	color: var(--ah-ink);
+}
+
+.aimatic-help-chip:hover {
+	border-color: var(--ah-accent);
+	color: var(--ah-accent-2);
+}
+
+.aimatic-help-foot {
+	border-top: 1px solid var(--ah-line);
+	padding: 10px;
+	display: flex;
+	gap: 8px;
+	background: #fff;
+}
+
+.aimatic-help-input {
+	flex: 1;
+	min-height: 38px;
+	max-height: 90px;
+	resize: none;
+	border: 1px solid var(--ah-line);
+	border-radius: 8px;
+	padding: 8px 10px;
+	font-size: 13px;
+	font-family: inherit;
+}
+
+.aimatic-help-send {
+	border: none;
+	border-radius: 8px;
+	background: var(--ah-accent);
+	color: #fff;
+	padding: 0 14px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.aimatic-help-send:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+	.aimatic-help-panel {
+		right: 8px;
+		left: 8px;
+		width: auto;
+		bottom: calc(76px + var(--ah-safe-b));
+	}
+}

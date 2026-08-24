@@ -13,31 +13,36 @@ Full status (done / left / how sync works):
 
 ## What this page is for
 
-Fill credentials and switches once per site. Per-branch work (vendor ID, catalog
-sync, mapping, push) lives on **Foodpanda Outlet**, **Foodpanda Catalog Sheet**,
-and the **Catalog Console**.
+Fill Partner API credentials once per site. Shared SFTP host/user/password
+also live here. Per-branch work (chain ID, vendor ID, catalog sync, mapping,
+push, SFTP enable/schedule) lives on **Foodpanda Outlet**, **Foodpanda Catalog
+Sheet**, and the **Catalog Console**.
 
 | Field | Purpose |
 |---|---|
 | **Enabled** | Master switch for Partner API calls from this site |
 | **API Host** | Partner API origin (live Partner host; no separate catalog sandbox host) |
-| **Chain ID** | Path `{chain_id}` on catalog / order / outlet APIs |
+| **Default Chain ID** | Fallback `{chain_id}` when a Foodpanda Outlet has none. Each branch can have its own chain — set Chain ID on the outlet |
 | **Client ID / Client Secret** | OAuth2 client-credentials (secret is never exported as a fixture) |
 | **Webhook Secret** | Exact `Authorization` value Foodpanda sends on order and assortment callbacks |
 | **Catalog Locale** | Locale key for localized catalog text (e.g. `en_PK`) |
 | **Allow Product Creation** | Beta POST “add product”. Keep off unless Foodpanda has enabled creation for your test/live vendor. Steady-state sync maps existing portal SKUs by barcode and PUTs price/stock |
 | **Request Timeout / Retries / Verify SSL** | HTTP client behaviour |
+| **SFTP Host / Port / Username / Password** | Shared Foodpanda vendor-automation SFTP. Port is always 22 |
+| **SFTP Remote Path** | Usually `Catalog` for catalog-only (double-file) uploads |
+| **SFTP Filename Prefix** | Must match Vendor Portal → Integrations. File is `{prefix}_{vendor_id}.csv` |
 
 ---
 
 ## Setup checklist
 
-1. Enable **Foodpanda Settings** and save Chain ID + OAuth credentials from Foodpanda.
-2. Set **Webhook Secret** to the same static Authorization value configured in the Foodpanda Vendor Portal.
-3. On this form use **Show webhook URLs** and register both URLs in the Vendor Portal (order + assortment / catalog job callbacks).
-4. Create a **Foodpanda Outlet** per branch (`vendor_id`, catalog sync, optional order ingestion).
+1. Enable **Foodpanda Settings** and save OAuth credentials from Foodpanda.
+2. Create a **Foodpanda Outlet** per branch (`chain_id`, `vendor_id`, catalog sync, optional order ingestion). Default Chain ID on Settings is only a fallback.
+3. Set **Webhook Secret** to the same static Authorization value configured in the Foodpanda Vendor Portal.
+4. On this form use **Show webhook URLs** and register both URLs in the Vendor Portal (order + assortment / catalog job callbacks).
 5. Import catalog → map by barcode → push prices/stock from **Catalog Sheet** or Console.
-6. Prefer Partner sync over Branch Price Sheet CSV/SFTP once mapping is healthy.
+6. For SFTP fallback: fill SFTP host/user/password here, set prefix to match Vendor Portal, enable schedule on each Outlet. Filename is `{prefix}_{vendor_id}.csv`.
+7. Prefer Partner sync over Branch Price Sheet CSV/SFTP once mapping is healthy.
 
 ---
 

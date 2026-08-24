@@ -1,12 +1,14 @@
 # Copyright (c) 2026, Ai Matic and contributors
 # For license information, please see license.txt
 
-"""Branch-owned Foodpanda vendor-automation SFTP CSV upload.
+"""Foodpanda vendor-automation SFTP CSV upload.
 
-Builds the same `barcode,sku,price,active,quantity` shape as Branch Price
-Sheet's Download Foodpanda CSV, then puts the file via per-branch SFTP
-credentials on Branch. This is the portal CSV path — not Partner API catalog
-sync (`Foodpanda Outlet`).
+Builds the same `sku,barcode,price,active,quantity` shape as Branch Price
+Sheet's Download Foodpanda CSV, then puts the file via site-wide SFTP
+credentials on Foodpanda Settings. Filename is `{prefix}_{vendor_id}.csv`
+as required by Foodpanda Catalog-SFTP. Per-outlet enable/schedule lives on
+Foodpanda Outlet. This is the portal CSV path — not Partner API catalog
+sync.
 """
 
 from __future__ import annotations
@@ -24,12 +26,13 @@ from aimatic.price_export.api import get_branch_price_sheet_rows, require_export
 TRIGGER_BRANCH = "Branch"
 TRIGGER_REPORT = "Report"
 TRIGGER_SCHEDULER = "Scheduler"
+TRIGGER_OUTLET = "Outlet"
 
-_SENSITIVE_KEYS = ("password", "passwd", "secret", "token", "custom_fp_sftp_password")
+CSV_FIELDNAMES = ("sku", "barcode", "price", "active", "quantity")
+DEFAULT_SFTP_PREFIX = "catalog"
+DEFAULT_SFTP_REMOTE_PATH = "Catalog"
 
-
-def _csv_filename(branch):
-	return f"foodpanda-{frappe.scrub(branch)}-{frappe.utils.getdate().isoformat()}.csv"
+_SENSITIVE_KEYS = ("password", "passwd", "secret", "token", "sftp_password", "custom_fp_sftp_password")
 
 
 def _primary_barcode(row):
@@ -67,6 +70,23 @@ def resolve_foodpanda_active(quantity, inactive_if_qty_lte=None):
 	return 0 if quantity <= threshold else 1
 
 
+def _sku_map_for_branch(branch):
+	outlet_name = frappe.db.get_value("Foodpanda Outlet", {"branch": branch}, "name")
+	if not outlet_name:
+		return {}
+	rows = frappe.get_all(
+		"Foodpanda Product",
+		filters={"outlet": outlet_name},
+		fields=["item_code", "foodpanda_product_id"],
+		ignore_permissions=True,
+	)
+	return {
+		row.item_code: str(row.foodpanda_product_id).strip()
+		for row in rows
+		if row.item_code and row.foodpanda_product_id
+	}
+
+
 def build_foodpanda_csv_rows(branch, rows=None, inactive_if_qty_lte=None):
 	"""Return (csv_rows, skipped_count) for the vendor-upload shape.
 
@@ -76,6 +96,7 @@ def build_foodpanda_csv_rows(branch, rows=None, inactive_if_qty_lte=None):
 	Branch/scheduler uploads leave it unset.
 	"""
 	source_rows = rows if rows is not None else get_branch_price_sheet_rows(branch)
+	sku_map = _sku_map_for_branch(branch)
 	csv_rows = []
 	skipped = 0
 	for row in source_rows:
@@ -84,11 +105,12 @@ def build_foodpanda_csv_rows(branch, rows=None, inactive_if_qty_lte=None):
 		if not barcode or price <= 0:
 			skipped += 1
 			continue
-		quantity = max(flt(row.get("available_qty")), 0)
+		quantity = max(int(flt(row.get("available_qty"))), 0)
+		item_code = row.get("item_code")
 		csv_rows.append(
 			{
+				"sku": sku_map.get(item_code) or "",
 				"barcode": barcode,
-				"sku": "",
 				"price": price,
 				"active": resolve_foodpanda_active(quantity, inactive_if_qty_lte),
 				"quantity": quantity,
@@ -99,19 +121,47 @@ def build_foodpanda_csv_rows(branch, rows=None, inactive_if_qty_lte=None):
 
 def build_foodpanda_csv_bytes(csv_rows):
 	buffer = io.StringIO()
-	writer = csv.DictWriter(buffer, fieldnames=["barcode", "sku", "price", "active", "quantity"])
+	writer = csv.DictWriter(buffer, fieldnames=list(CSV_FIELDNAMES))
 	writer.writeheader()
 	for row in csv_rows:
 		writer.writerow(
 			{
-				"barcode": row["barcode"],
 				"sku": row.get("sku") or "",
+				"barcode": row["barcode"],
 				"price": row["price"],
 				"active": int(row["active"]),
-				"quantity": row["quantity"],
+				"quantity": int(row["quantity"]),
 			}
 		)
 	return buffer.getvalue().encode("utf-8")
+
+
+def sanitize_sftp_filename_prefix(prefix):
+	"""Return a Foodpanda-safe prefix (no path, no .csv, default catalog)."""
+	text = (prefix or "").strip()
+	if text.lower().endswith(".csv"):
+		text = text[:-4]
+	text = text.replace(" ", "")
+	if "/" in text or "\\" in text:
+		frappe.throw(_("SFTP filename prefix cannot contain a path separator"))
+	return text or DEFAULT_SFTP_PREFIX
+
+
+def csv_filename(vendor_id, prefix=None):
+	"""Foodpanda single-vendor Catalog-SFTP name: `{prefix}_{vendor_id}.csv`."""
+	vendor = (vendor_id or "").strip()
+	if not vendor:
+		frappe.throw(_("Foodpanda Outlet is missing Vendor ID for the SFTP filename"))
+	if "/" in vendor or "\\" in vendor:
+		frappe.throw(_("Foodpanda Vendor ID cannot contain a path separator"))
+	return f"{sanitize_sftp_filename_prefix(prefix)}_{vendor}.csv"
+
+
+def _csv_filename(branch, prefix=None, vendor_id=None):
+	"""Compatibility wrapper used by tests and scheduler error logs."""
+	if not vendor_id:
+		vendor_id = frappe.db.get_value("Foodpanda Outlet", {"branch": branch}, "vendor_id")
+	return csv_filename(vendor_id, prefix=prefix)
 
 
 def _sanitize_error(message, password=None):
@@ -125,35 +175,27 @@ def _sanitize_error(message, password=None):
 	return text
 
 
-def _load_sftp_settings(branch, require_enabled=False):
+def _get_outlet_for_branch(branch):
 	if not frappe.db.exists("Branch", branch):
 		frappe.throw(_("Branch {0} does not exist").format(branch))
+	outlet_name = frappe.db.get_value("Foodpanda Outlet", {"branch": branch}, "name")
+	if not outlet_name:
+		frappe.throw(_("No Foodpanda Outlet exists for branch {0}").format(branch))
+	return frappe.get_doc("Foodpanda Outlet", outlet_name)
 
-	values = frappe.db.get_value(
-		"Branch",
-		branch,
-		[
-			"custom_fp_sftp_enabled",
-			"custom_fp_sftp_host",
-			"custom_fp_sftp_port",
-			"custom_fp_sftp_username",
-			"custom_fp_sftp_remote_path",
-		],
-		as_dict=True,
-	)
-	if not values:
-		frappe.throw(_("Branch {0} does not exist").format(branch))
 
-	if require_enabled and not cint(values.custom_fp_sftp_enabled):
+def _load_sftp_settings(branch, require_enabled=False):
+	outlet = _get_outlet_for_branch(branch)
+	if require_enabled and not cint(outlet.sftp_enabled):
 		frappe.throw(_("Foodpanda SFTP is not enabled for branch {0}").format(branch))
 
-	host = (values.custom_fp_sftp_host or "").strip()
-	username = (values.custom_fp_sftp_username or "").strip()
-	remote_path = (values.custom_fp_sftp_remote_path or "").strip() or "/"
-	port = cint(values.custom_fp_sftp_port) or 22
-
-	branch_doc = frappe.get_doc("Branch", branch)
-	password = branch_doc.get_password("custom_fp_sftp_password", raise_exception=False)
+	settings = frappe.get_single("Foodpanda Settings")
+	host = (settings.sftp_host or "").strip()
+	username = (settings.sftp_username or "").strip()
+	remote_path = (settings.sftp_remote_path or "").strip() or DEFAULT_SFTP_REMOTE_PATH
+	port = cint(settings.sftp_port) or 22
+	prefix = outlet.sftp_filename_prefix or settings.sftp_filename_prefix
+	password = settings.get_password("sftp_password", raise_exception=False)
 
 	missing = []
 	if not host:
@@ -164,7 +206,9 @@ def _load_sftp_settings(branch, require_enabled=False):
 		missing.append(_("password"))
 	if missing:
 		frappe.throw(
-			_("Foodpanda SFTP is missing {0} on branch {1}").format(frappe.utils.comma_and(missing), branch)
+			_("Foodpanda SFTP is missing {0} on Foodpanda Settings").format(
+				frappe.utils.comma_and(missing)
+			)
 		)
 
 	return {
@@ -173,7 +217,10 @@ def _load_sftp_settings(branch, require_enabled=False):
 		"username": username,
 		"password": password,
 		"remote_path": remote_path,
-		"enabled": cint(values.custom_fp_sftp_enabled),
+		"filename_prefix": prefix,
+		"vendor_id": (outlet.vendor_id or "").strip(),
+		"outlet": outlet.name,
+		"enabled": cint(outlet.sftp_enabled),
 	}
 
 
@@ -258,13 +305,16 @@ def _write_upload_log(
 	return log
 
 
-def _update_branch_status(branch, *, success, error=None):
+def _update_outlet_status(branch, *, success, error=None):
+	outlet_name = frappe.db.get_value("Foodpanda Outlet", {"branch": branch}, "name")
+	if not outlet_name:
+		return
 	values = {
-		"custom_fp_sftp_last_error": error or "",
+		"sftp_last_error": error or "",
 	}
 	if success:
-		values["custom_fp_sftp_last_upload"] = now_datetime()
-	frappe.db.set_value("Branch", branch, values, update_modified=False)
+		values["sftp_last_upload"] = now_datetime()
+	frappe.db.set_value("Foodpanda Outlet", outlet_name, values, update_modified=False)
 
 
 def _sheet_rows_for_item_codes(branch, item_codes):
@@ -281,14 +331,16 @@ def _sheet_rows_for_item_codes(branch, item_codes):
 def upload_foodpanda_csv(
 	branch, rows=None, trigger=TRIGGER_BRANCH, require_enabled=False, inactive_if_qty_lte=None
 ):
-	"""Build CSV for ``branch`` and upload via that branch's SFTP settings.
+	"""Build CSV for ``branch`` and upload via Foodpanda Settings SFTP.
 
 	Returns a dict safe for Desk/RPC (no password). Raises on validation
 	errors before connecting; connection failures are logged then re-raised.
 	"""
 	settings = _load_sftp_settings(branch, require_enabled=require_enabled)
-	csv_rows, skipped = build_foodpanda_csv_rows(branch, rows=rows, inactive_if_qty_lte=inactive_if_qty_lte)
-	filename = _csv_filename(branch)
+	csv_rows, skipped = build_foodpanda_csv_rows(
+		branch, rows=rows, inactive_if_qty_lte=inactive_if_qty_lte
+	)
+	filename = csv_filename(settings["vendor_id"], prefix=settings["filename_prefix"])
 	csv_bytes = build_foodpanda_csv_bytes(csv_rows)
 
 	try:
@@ -305,7 +357,7 @@ def upload_foodpanda_csv(
 			error=error,
 			csv_bytes=csv_bytes,
 		)
-		_update_branch_status(branch, success=False, error=error)
+		_update_outlet_status(branch, success=False, error=error)
 		return {
 			"branch": branch,
 			"trigger": trigger,
@@ -326,7 +378,7 @@ def upload_foodpanda_csv(
 		status="Success",
 		csv_bytes=csv_bytes,
 	)
-	_update_branch_status(branch, success=True)
+	_update_outlet_status(branch, success=True)
 	return {
 		"branch": branch,
 		"trigger": trigger,
@@ -341,11 +393,23 @@ def upload_foodpanda_csv(
 
 @frappe.whitelist()
 def upload_branch_foodpanda_csv(branch):
-	"""Full-branch catalog upload (Branch form button)."""
+	"""Full-branch catalog upload (Branch / Outlet form button)."""
 	require_export_permission()
 	if not branch:
 		frappe.throw(_("Branch is required"))
 	return upload_foodpanda_csv(branch, rows=None, trigger=TRIGGER_BRANCH, require_enabled=False)
+
+
+@frappe.whitelist()
+def upload_outlet_foodpanda_csv(outlet):
+	"""Full-outlet catalog upload (Foodpanda Outlet form button)."""
+	require_export_permission()
+	if not outlet:
+		frappe.throw(_("Foodpanda Outlet is required"))
+	branch = frappe.db.get_value("Foodpanda Outlet", outlet, "branch")
+	if not branch:
+		frappe.throw(_("Foodpanda Outlet {0} has no Branch").format(outlet))
+	return upload_foodpanda_csv(branch, rows=None, trigger=TRIGGER_OUTLET, require_enabled=False)
 
 
 @frappe.whitelist()
@@ -368,48 +432,49 @@ def upload_branch_price_sheet_foodpanda_csv(branch, item_codes=None, inactive_if
 
 def _already_uploaded_today(branch, now=None):
 	now = now or now_datetime()
-	last_upload = frappe.db.get_value("Branch", branch, "custom_fp_sftp_last_upload")
+	last_upload = frappe.db.get_value("Foodpanda Outlet", {"branch": branch}, "sftp_last_upload")
 	if not last_upload:
 		return False
 	return getdate(last_upload) == getdate(now)
 
 
 def _is_branch_due_for_scheduled_upload(branch, now=None):
-	"""True when enabled branch has a schedule time that is due and not yet done today."""
+	"""True when enabled outlet has a schedule time that is due and not yet done today."""
 	now = now or now_datetime()
 	values = frappe.db.get_value(
-		"Branch",
-		branch,
-		["custom_fp_sftp_enabled", "custom_fp_sftp_schedule_time"],
+		"Foodpanda Outlet",
+		{"branch": branch},
+		["sftp_enabled", "sftp_schedule_time"],
 		as_dict=True,
 	)
-	if not values or not cint(values.custom_fp_sftp_enabled):
+	if not values or not cint(values.sftp_enabled):
 		return False
-	if not values.custom_fp_sftp_schedule_time:
+	if not values.sftp_schedule_time:
 		return False
 	if _already_uploaded_today(branch, now=now):
 		return False
 
-	schedule_time = get_time(values.custom_fp_sftp_schedule_time)
+	schedule_time = get_time(values.sftp_schedule_time)
 	scheduled_at = get_datetime(f"{getdate(now)} {schedule_time}")
 	return now >= scheduled_at
 
 
 def run_scheduled_foodpanda_sftp_uploads():
-	"""Upload each enabled Branch once its Branch schedule time is due today.
+	"""Upload each enabled Foodpanda Outlet once its schedule time is due today.
 
-	Invoked about every 15 minutes. Skips branches with no schedule time, and
-	skips any branch that already has a successful last_upload dated today.
+	Invoked about every 15 minutes. Skips outlets with no schedule time, and
+	skips any outlet that already has a successful last_upload dated today.
 	"""
-	branches = frappe.get_all(
-		"Branch",
-		filters={"custom_fp_sftp_enabled": 1},
-		pluck="name",
-		order_by="name asc",
+	outlets = frappe.get_all(
+		"Foodpanda Outlet",
+		filters={"sftp_enabled": 1},
+		fields=["name", "branch", "vendor_id", "sftp_filename_prefix"],
+		order_by="branch asc",
 	)
 	now = now_datetime()
 	results = []
-	for branch in branches:
+	for outlet in outlets:
+		branch = outlet.branch
 		if not _is_branch_due_for_scheduled_upload(branch, now=now):
 			results.append({"branch": branch, "status": "Skipped"})
 			continue
@@ -427,26 +492,28 @@ def run_scheduled_foodpanda_sftp_uploads():
 			else:
 				results.append({"branch": branch, "status": "Success", "log": result["log"]})
 		except Exception as exc:
-			# Validation / unexpected errors before or around upload. Mid-upload
-			# transport failures already return Failed above without raising.
 			password = None
 			try:
-				password = frappe.get_doc("Branch", branch).get_password(
-					"custom_fp_sftp_password", raise_exception=False
+				password = frappe.get_single("Foodpanda Settings").get_password(
+					"sftp_password", raise_exception=False
 				)
 			except Exception:
 				password = None
 			safe = _sanitize_error(exc, password=password)
+			try:
+				failed_name = csv_filename(outlet.vendor_id, prefix=outlet.sftp_filename_prefix)
+			except Exception:
+				failed_name = f"{DEFAULT_SFTP_PREFIX}_unknown.csv"
 			_write_upload_log(
 				branch=branch,
 				trigger=TRIGGER_SCHEDULER,
-				filename=_csv_filename(branch),
+				filename=failed_name,
 				row_count=0,
 				skipped_count=0,
 				status="Failed",
 				error=safe,
 			)
-			_update_branch_status(branch, success=False, error=safe)
+			_update_outlet_status(branch, success=False, error=safe)
 			frappe.log_error(
 				title=f"Foodpanda SFTP scheduled upload failed: {branch}",
 				message=frappe.get_traceback(),

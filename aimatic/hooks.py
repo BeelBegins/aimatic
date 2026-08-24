@@ -50,6 +50,9 @@ doc_events = {
 	"Account": {
 		"validate": "aimatic.coa_numbering.events.auto_assign_account_number",
 	},
+	"Journal Entry": {
+		"before_validate": "aimatic.journal_entry_cost_center.sync_journal_entry_cost_centers",
+	},
 	# Branch Management: derives cost_center / set_warehouse / rejected_warehouse
 	# from the document's Branch so normal Sales/Purchase users never pick these
 	# (and can't pick them wrong). POS Invoice is deliberately excluded - see
@@ -160,6 +163,8 @@ doc_events = {
 	},
 }
 
+
+
 auth_hooks = [
 	"aimatic.aimatic.offline_pos.device_auth.validate_android_pos_device_auth",
 	# Foodpanda WebhookKeyAuth often arrives as "Bearer <secret>". Frappe core
@@ -207,6 +212,7 @@ doctype_js = {
 		# Resolve item_code for barcodes pasted via Items grid Upload.
 		"public/js/purchase_barcode_import.js",
 		"public/js/purchase_principal.js",
+		"public/js/relationship_manager.js",
 	],
 	"Purchase Order": [
 		"public/js/purchase_items_excel_grid.js",
@@ -216,6 +222,7 @@ doctype_js = {
 		# Resolve item_code for barcodes pasted via Items grid Upload.
 		"public/js/purchase_barcode_import.js",
 		"public/js/purchase_principal.js",
+		"public/js/relationship_manager.js",
 	],
 	"Purchase Invoice": [
 		"public/js/purchase_items_excel_grid.js",
@@ -223,10 +230,23 @@ doctype_js = {
 		"public/js/foodpanda_price_prefill.js",
 		"public/js/purchase_principal.js",
 		"public/js/purchase_return_stock.js",
+		"public/js/relationship_manager.js",
 	],
-	"Delivery Note": "public/js/label_printing_source_buttons.js",
+	"Material Request": "public/js/relationship_manager.js",
+	"Quotation": "public/js/relationship_manager.js",
+	"Sales Order": "public/js/relationship_manager.js",
+	"Delivery Note": [
+		"public/js/label_printing_source_buttons.js",
+		"public/js/relationship_manager.js",
+	],
 	"Stock Entry": "public/js/label_printing_source_buttons.js",
-	"Sales Invoice": "public/js/label_printing_source_buttons.js",
+	"Sales Invoice": [
+		"public/js/label_printing_source_buttons.js",
+		"public/js/relationship_manager.js",
+	],
+	"Payment Entry": "public/js/relationship_manager.js",
+	"Landed Cost Voucher": "public/js/relationship_manager.js",
+	"Journal Entry": "public/js/journal_entry_cost_center.js",
 	"Supplier": "public/js/supplier_vendor_performance.js",
 	"Price List": "public/js/price_list_barcode_search.js",
 	"POS Profile": "public/js/pos_profile_device_enrollment.js",
@@ -238,6 +258,8 @@ doctype_js = {
 
 # Desk list helpers: resolve every barcode through the Item Barcode child table,
 # then filter the parent Item or its Item Price rows without denormalizing data.
+
+
 doctype_list_js = {
 	"Item": "public/js/barcode_list_search.js",
 	"Item Price": "public/js/barcode_list_search.js",
@@ -431,6 +453,10 @@ add_to_apps_screen = [
 # include js, css files in header of desk.html
 # app_include_css = "/assets/aimatic/css/aimatic.css"
 # app_include_js = "/assets/aimatic/js/aimatic.js"
+
+app_include_css = "aimatic_help.bundle.css"
+app_include_js = "aimatic_help.bundle.js"
+
 
 # include js, css files in header of web template
 # web_include_css = "/assets/aimatic/css/aimatic.css"

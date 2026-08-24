@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from aimatic.shelf_pricing.events import (
 	compute_shelf_gm_percent,
+	compute_shelf_price_from_gm,
 	reset_price_update_status_on_amend,
 	set_shelf_gm_percent,
 )
@@ -61,3 +62,15 @@ class TestShelfGmPercent(unittest.TestCase):
 		set_shelf_gm_percent(doc)
 
 		self.assertEqual(row.custom_gm_percent, 0.0)
+
+	def test_shelf_from_gm_round_whole_rupee(self):
+		# cost 100, GM 20 → 125; cost 83.33, GM 20 → round(104.1625) = 104
+		self.assertEqual(compute_shelf_price_from_gm(100, 20), 125.0)
+		self.assertEqual(compute_shelf_price_from_gm(83.33, 20), 104.0)
+
+	def test_shelf_from_gm_rejects_invalid_margin(self):
+		self.assertIsNone(compute_shelf_price_from_gm(100, 100))
+		self.assertIsNone(compute_shelf_price_from_gm(100, 120))
+
+	def test_shelf_from_gm_exact_without_round(self):
+		self.assertEqual(compute_shelf_price_from_gm(83.33, 20, round_whole=False), 104.16)

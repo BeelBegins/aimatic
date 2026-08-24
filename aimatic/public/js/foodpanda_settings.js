@@ -6,7 +6,7 @@ frappe.ui.form.on("Foodpanda Settings", {
 		frm.dashboard.clear_headline();
 		frm.dashboard.set_headline(
 			__(
-				"Site-wide Partner API credentials for synchronized Foodpanda outlets. Open the README for setup, webhooks, and next steps."
+				"Partner API credentials and shared SFTP host. Each Foodpanda Outlet has its own Chain ID and Vendor ID. SFTP files upload as {prefix}_{vendor_id}.csv."
 			)
 		);
 

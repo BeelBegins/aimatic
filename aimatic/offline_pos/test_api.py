@@ -309,6 +309,48 @@ class TestNormalizePakMobile(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# _apply_pos_profile_accounting_context — pure unit tests (no DB)
+# ---------------------------------------------------------------------------
+
+class TestApplyPosProfileAccountingContext(unittest.TestCase):
+    """Branch/Cost Center must come from the POS Profile, not the session user."""
+
+    def _doc(self, branch=None, cost_center=None, fields=("branch", "cost_center")):
+        return SimpleNamespace(
+            branch=branch,
+            cost_center=cost_center,
+            meta=SimpleNamespace(has_field=lambda name, _fields=fields: name in _fields),
+        )
+
+    def test_stamps_branch_and_cost_center_from_profile(self):
+        from aimatic.offline_pos.api import _apply_pos_profile_accounting_context
+
+        doc = self._doc()
+        pos = SimpleNamespace(branch="Store A", cost_center="CC-A")
+        _apply_pos_profile_accounting_context(doc, pos)
+        self.assertEqual(doc.branch, "Store A")
+        self.assertEqual(doc.cost_center, "CC-A")
+
+    def test_overwrites_wrong_session_default_branch(self):
+        from aimatic.offline_pos.api import _apply_pos_profile_accounting_context
+
+        doc = self._doc(branch="Other Store", cost_center="Other CC")
+        pos = SimpleNamespace(branch="Store A", cost_center="CC-A")
+        _apply_pos_profile_accounting_context(doc, pos)
+        self.assertEqual(doc.branch, "Store A")
+        self.assertEqual(doc.cost_center, "CC-A")
+
+    def test_leaves_blank_when_profile_has_no_values(self):
+        from aimatic.offline_pos.api import _apply_pos_profile_accounting_context
+
+        doc = self._doc(branch="Keep Me", cost_center="Keep CC")
+        pos = SimpleNamespace(branch=None, cost_center="")
+        _apply_pos_profile_accounting_context(doc, pos)
+        self.assertEqual(doc.branch, "Keep Me")
+        self.assertEqual(doc.cost_center, "Keep CC")
+
+
+# ---------------------------------------------------------------------------
 # customer_validation — integration tests
 # ---------------------------------------------------------------------------
 
@@ -2033,6 +2075,134 @@ class TestSubmitOnlineSaleCashier(_AimTestCase):
 		if not _ITEM_CODE:
 			raise unittest.SkipTest("No item fixture on site")
 		return _ITEM_CODE
+
+    # -- lock wait timeout retry ---------------------------------------------
+    # A slow FBR gateway call inside doc.submit() can hold the POS Invoice
+    # naming series row lock long enough that a concurrent terminal's own
+    # insert() hits MySQL error 1205 (Lock wait timeout exceeded). These
+    # tests simulate that on the first attempt and confirm submit_online_sale
+    # retries with a freshly-built document rather than surfacing the error
+    # to the cashier as a failed sale.
+
+    @_require_fixtures
+    def test_lock_wait_timeout_retried_then_succeeds(self):
+        import aimatic.offline_pos.api as offline_pos_api
+
+        if not _STOCKED_ITEM_CODE:
+            raise unittest.SkipTest("No item with on-hand stock found on site")
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        real_build = offline_pos_api._build_pos_invoice_doc
+        attempts = {"n": 0}
+
+        def flaky_build(*args, **kwargs):
+            attempts["n"] += 1
+            doc = real_build(*args, **kwargs)
+            if attempts["n"] == 1:
+                def failing_insert(*a, **kw):
+                    raise Exception(1205, "Lock wait timeout exceeded; try restarting transaction")
+                doc.insert = failing_insert
+            return doc
+
+        with patch.object(
+            offline_pos_api, "_build_pos_invoice_doc", side_effect=flaky_build
+        ), patch(
+            "aimatic.fbr_pos.events.submit_pos_invoice_to_fbr", return_value=None
+        ):
+            result = offline_pos_api.submit_online_sale(
+                terminal_invoice_id="TI-LOCKRETRY-{0}".format(frappe.generate_hash(length=6)),
+                terminal_id="TERM-1",
+                pos_profile=profile,
+                opening_entry=opening.name,
+                customer=self._customer_or_skip(),
+                items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
+                payments=[{"mode_of_payment": "Cash", "amount": 999999}],
+                cashier_user=cashier,
+                cashier_full_name="Test Cashier",
+            )
+
+        self.assertEqual(attempts["n"], 2)
+        self.assertEqual(result["docstatus"], 1)
+        self.assertEqual(
+            frappe.db.count(
+                "POS Invoice", {"custom_terminal_invoice_id": result["terminal_invoice_id"]}
+            ),
+            1,
+        )
+
+    @_require_fixtures
+    def test_non_lock_wait_error_not_retried(self):
+        import aimatic.offline_pos.api as offline_pos_api
+
+        if not _STOCKED_ITEM_CODE:
+            raise unittest.SkipTest("No item with on-hand stock found on site")
+
+        cashier, _password = _make_cashier(roles=("POS User",))
+        profile = _make_restricted_pos_profile(cashier)
+        frappe.clear_document_cache("POS Profile", profile)
+        opening = _create_opening_entry(profile, user=cashier)
+
+        real_build = offline_pos_api._build_pos_invoice_doc
+        attempts = {"n": 0}
+
+        def always_failing_build(*args, **kwargs):
+            attempts["n"] += 1
+            doc = real_build(*args, **kwargs)
+
+            def failing_insert(*a, **kw):
+                raise Exception(2013, "Lost connection to MySQL server during query")
+            doc.insert = failing_insert
+            return doc
+
+        with patch.object(
+            offline_pos_api, "_build_pos_invoice_doc", side_effect=always_failing_build
+        ), patch(
+            "aimatic.fbr_pos.events.submit_pos_invoice_to_fbr", return_value=None
+        ):
+            with self.assertRaises(Exception):
+                offline_pos_api.submit_online_sale(
+                    terminal_invoice_id="TI-NORETRY-{0}".format(frappe.generate_hash(length=6)),
+                    terminal_id="TERM-1",
+                    pos_profile=profile,
+                    opening_entry=opening.name,
+                    customer=self._customer_or_skip(),
+                    items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
+                    payments=[{"mode_of_payment": "Cash", "amount": 999999}],
+                    cashier_user=cashier,
+                    cashier_full_name="Test Cashier",
+                )
+
+        self.assertEqual(attempts["n"], 1)
+
+
+class TestLockWaitTimeoutHelpers(unittest.TestCase):
+    """Pure unit tests for the retry primitives shared by submit_online_sale
+    and submit_pos_refund - no site/DB fixtures needed."""
+
+    def test_is_lock_wait_timeout_matches_mysql_1205(self):
+        from aimatic.offline_pos.api import _is_lock_wait_timeout
+
+        exc = Exception(1205, "Lock wait timeout exceeded; try restarting transaction")
+        self.assertTrue(_is_lock_wait_timeout(exc))
+
+    def test_is_lock_wait_timeout_rejects_other_errors(self):
+        from aimatic.offline_pos.api import _is_lock_wait_timeout
+
+        self.assertFalse(_is_lock_wait_timeout(Exception(2013, "Lost connection")))
+        self.assertFalse(_is_lock_wait_timeout(frappe.ValidationError("some validation error")))
+        self.assertFalse(_is_lock_wait_timeout(Exception()))
+
+    def test_retry_backoff_grows_with_attempt_and_stays_bounded(self):
+        from aimatic.offline_pos.api import _lock_wait_retry_backoff
+
+        for attempt in range(3):
+            delay = _lock_wait_retry_backoff(attempt)
+            self.assertGreaterEqual(delay, 0.3 * (attempt + 1))
+            self.assertLessEqual(delay, 1.0 * (attempt + 1))
 
 
 class TestFoodPandaCreditPaymentMarker(_AimTestCase):
