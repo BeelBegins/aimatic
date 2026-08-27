@@ -16,7 +16,7 @@
 	position: fixed;
 	right: max(16px, var(--ah-safe-r));
 	bottom: calc(20px + var(--ah-safe-b));
-	z-index: 1020;
+	z-index: 2147483000;
 	width: 52px;
 	height: 52px;
 	border-radius: 14px;
@@ -50,7 +50,7 @@
 	position: fixed;
 	right: max(16px, var(--ah-safe-r));
 	bottom: calc(84px + var(--ah-safe-b));
-	z-index: 1021;
+	z-index: 2147483001;
 	width: min(380px, calc(100vw - 24px));
 	height: min(520px, calc(100dvh - 120px));
 	background: var(--ah-panel);

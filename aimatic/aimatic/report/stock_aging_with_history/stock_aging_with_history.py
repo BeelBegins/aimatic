@@ -55,48 +55,50 @@ def bucket_key(days: int, ranges: tuple[int, int, int]) -> str:
 
 def get_columns(ranges):
 	r1, r2, r3 = ranges
+	# Qty buckets first (after Item) so they are not buried behind wide name columns
+	# in fixed-layout Desk datatables that require horizontal scroll.
 	return [
 		{
 			"label": _("Item"),
 			"fieldname": "item_code",
 			"fieldtype": "Link",
 			"options": "Item",
-			"width": 160,
+			"width": 130,
 		},
-		{"label": _("Item Name"), "fieldname": "item_name", "fieldtype": "Data", "width": 220},
-		{"label": _("Source ItemCode"), "fieldname": "item_code_raw", "fieldtype": "Data", "width": 140},
 		{
 			"label": _("0-{0} Qty").format(r1),
 			"fieldname": "bucket_1",
 			"fieldtype": "Float",
-			"width": 110,
+			"width": 100,
 		},
 		{
 			"label": _("{0}-{1} Qty").format(r1 + 1, r2),
 			"fieldname": "bucket_2",
 			"fieldtype": "Float",
-			"width": 110,
+			"width": 100,
 		},
 		{
 			"label": _("{0}-{1} Qty").format(r2 + 1, r3),
 			"fieldname": "bucket_3",
 			"fieldtype": "Float",
-			"width": 110,
+			"width": 100,
 		},
 		{
 			"label": _("{0}+ Qty").format(r3 + 1),
 			"fieldname": "bucket_4",
 			"fieldtype": "Float",
-			"width": 110,
+			"width": 100,
 		},
-		{"label": _("Total Qty"), "fieldname": "total_qty", "fieldtype": "Float", "width": 110},
-		{"label": _("History Qty"), "fieldname": "history_qty", "fieldtype": "Float", "width": 110},
-		{"label": _("Live Qty"), "fieldname": "live_qty", "fieldtype": "Float", "width": 100},
+		{"label": _("Total Qty"), "fieldname": "total_qty", "fieldtype": "Float", "width": 100},
+		{"label": _("History Qty"), "fieldname": "history_qty", "fieldtype": "Float", "width": 100},
+		{"label": _("Live Qty"), "fieldname": "live_qty", "fieldtype": "Float", "width": 90},
+		{"label": _("Item Name"), "fieldname": "item_name", "fieldtype": "Data", "width": 180},
+		{"label": _("Source ItemCode"), "fieldname": "item_code_raw", "fieldtype": "Data", "width": 120},
 		{
 			"label": _("Cost (ref)"),
 			"fieldname": "total_cost",
 			"fieldtype": "Currency",
-			"width": 120,
+			"width": 110,
 		},
 		{"label": _("Unmatched"), "fieldname": "unmatched", "fieldtype": "Check", "width": 90},
 	]

@@ -1,4 +1,8 @@
 frappe.query_reports["Stock Aging with History"] = {
+	get_datatable_options(options) {
+		// Fluid layout keeps Qty columns visible without hunting horizontal scroll.
+		return Object.assign(options, { layout: "fluid" });
+	},
 	filters: [
 		{
 			fieldname: "company",

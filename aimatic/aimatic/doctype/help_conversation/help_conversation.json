@@ -60,6 +60,7 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
@@ -67,7 +68,14 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
-   "share": 1
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Desk User",
+   "write": 1
   }
  ],
  "sort_field": "last_activity",

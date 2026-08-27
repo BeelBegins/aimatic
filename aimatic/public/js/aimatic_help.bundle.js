@@ -7,10 +7,10 @@ frappe.provide("aimatic.help_float");
 (function () {
 	"use strict";
 
-	if (window.__aimaticHelpFloatMounted) {
+	if (window.__aimaticHelpFloatBooted) {
 		return;
 	}
-	window.__aimaticHelpFloatMounted = true;
+	window.__aimaticHelpFloatBooted = true;
 
 	const ICON =
 		'<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.5a8 8 0 0 0-8 8c0 2.6 1.2 4.9 3.1 6.4V21l3.2-1.7c.55.1 1.12.2 1.7.2a8 8 0 0 0 0-16Z" stroke="#fff" stroke-width="1.6"/><path d="M9.2 11.2h5.6M9.2 14h3.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>';
@@ -126,7 +126,17 @@ frappe.provide("aimatic.help_float");
 
 	function onDesk() {
 		const path = window.location.pathname || "";
-		return path.indexOf("/app") === 0 || path === "/app" || path.indexOf("/desk") === 0;
+		if (path.indexOf("/login") === 0 || path === "/login") return false;
+		// Frappe v16 Desk is /desk; older builds used /app
+		if (path.indexOf("/app") === 0 || path === "/app" || path.indexOf("/desk") === 0) {
+			return true;
+		}
+		// Logged-in Desk shell sometimes keeps a short path during boot
+		if (document.body && document.body.getAttribute("data-path") === "login") return false;
+		if (frappe.boot && frappe.session && frappe.session.user && frappe.session.user !== "Guest") {
+			return Boolean(document.getElementById("body") || document.querySelector(".frappe-container, #page-container, .desk-sidebar"));
+		}
+		return false;
 	}
 
 	class HelpFloat {
@@ -369,6 +379,7 @@ frappe.provide("aimatic.help_float");
 			if (!onDesk()) return false;
 			if (!document.body) return false;
 			aimatic.help_float.instance = new HelpFloat();
+			window.__aimaticHelpFloatMounted = true;
 			return true;
 		} catch (e) {
 			console.error("Help float failed to mount", e);
@@ -381,7 +392,7 @@ frappe.provide("aimatic.help_float");
 		let tries = 0;
 		const timer = setInterval(function () {
 			tries += 1;
-			if (tryMount() || tries >= 60) {
+			if (tryMount() || tries >= 120) {
 				clearInterval(timer);
 			}
 		}, 500);
@@ -389,8 +400,13 @@ frappe.provide("aimatic.help_float");
 
 	if (window.jQuery) {
 		jQuery(document).on("app_ready", tryMount);
+		jQuery(document).on("page-change", tryMount);
 	} else {
 		document.addEventListener("app_ready", tryMount);
 	}
+	if (frappe.router && frappe.router.on) {
+		frappe.router.on("change", tryMount);
+	}
+	window.addEventListener("popstate", tryMount);
 	scheduleMount();
 })();
