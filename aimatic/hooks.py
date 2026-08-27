@@ -72,6 +72,9 @@ doc_events = {
 			"aimatic.branch_management.events.apply_branch_defaults",
 			"aimatic.purchase_printing.populate_old_purchase_snapshot",
 			"aimatic.purchase_history_autofill.events.autofill_purchase_order_item_fields",
+			# After autofill: persist orphan Rate/Discount Amount into
+			# custom_discount_per before PurchaseOrderCalculation runs.
+			"aimatic.purchase_discount_sync.sync_purchase_order_discounts",
 		],
 		"validate": "aimatic.purchase_principal.validate_purchase_principal",
 	},
@@ -84,6 +87,9 @@ doc_events = {
 			"aimatic.purchase_principal.prefill_purchase_invoice_principal",
 			# PI returns must update stock (Bin); normal PIs use PR for stock.
 			"aimatic.purchase_return_stock.ensure_purchase_invoice_return_updates_stock",
+			# After autofill: inherit PR discount / backfill orphans so
+			# pichatgpt does not wipe receipt net rates (see ACC-PINV-2026-00200).
+			"aimatic.purchase_discount_sync.sync_purchase_invoice_discounts",
 		],
 		"validate": "aimatic.purchase_principal.validate_purchase_principal",
 		"on_submit": "aimatic.item_pricing.events.update_latest_price_incl_taxes",
@@ -95,6 +101,8 @@ doc_events = {
 			"aimatic.purchase_history_autofill.events.autofill_purchase_receipt_item_fields",
 			"aimatic.purchase_supplier_invoice.prefill_purchase_receipt_supplier_invoice",
 			"aimatic.purchase_principal.prefill_purchase_receipt_principal",
+			# After autofill: persist orphan discounts before PRV1 runs.
+			"aimatic.purchase_discount_sync.sync_purchase_receipt_discounts",
 		],
 		"validate": "aimatic.purchase_principal.validate_purchase_principal",
 		# Desk amend ignores Custom Field no_copy; force Pending so the
