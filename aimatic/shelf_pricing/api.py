@@ -5,6 +5,7 @@ from frappe.utils import flt, getdate
 from aimatic.shelf_pricing.utils import (
 	get_or_create_branch_foodpanda_price_list,
 	get_or_create_branch_price_list,
+	get_selling_item_price_rate,
 	log_price_update,
 	upsert_item_price,
 )
@@ -87,11 +88,11 @@ def skip_branch_price_update(purchase_receipt):
 
 
 @frappe.whitelist()
-def get_current_foodpanda_price(item_code, branch):
+def get_current_foodpanda_price(item_code, branch, uom=None):
 	"""Read-only lookup backing the client-side FP Price prefill (see
-	public/js/foodpanda_price_prefill.js) - returns whatever rate is
-	currently in this branch's Foodpanda Price List for this item, or 0 if
-	none yet. Deliberately does not call
+	public/js/foodpanda_price_prefill.js) - returns the rate for this item
+	in the branch Foodpanda Price List matching ``uom`` (or Item.stock_uom
+	when omitted). Deliberately does not call
 	get_or_create_branch_foodpanda_price_list - a plain read must not have
 	the side effect of creating that list.
 	"""
@@ -102,23 +103,19 @@ def get_current_foodpanda_price(item_code, branch):
 	if not price_list:
 		return {"rate": 0}
 
-	rate = frappe.db.get_value(
-		"Item Price",
-		{"item_code": item_code, "price_list": price_list, "selling": 1},
-		"price_list_rate",
-	)
-	return {"rate": flt(rate)}
+	return {"rate": get_selling_item_price_rate(item_code, price_list, uom=uom)}
 
 
 @frappe.whitelist()
-def get_current_branch_sale_price(item_code, branch):
+def get_current_branch_sale_price(item_code, branch, uom=None):
 	"""Read-only lookup backing the client-side custom_shelf_price prefill
-	(see public/js/current_sale_price_preview.js) - returns whatever rate is
-	currently in this branch's Selling Price List for this item, or 0 if
-	none yet. Deliberately does not call get_or_create_branch_price_list - a
-	plain read must not have the side effect of creating that list. Falls
-	back to Selling Settings.selling_price_list only so a branch that has no
-	dedicated list yet still shows something meaningful.
+	(see public/js/current_sale_price_preview.js) - returns the rate for
+	this item in the branch Selling Price List matching ``uom`` (or
+	Item.stock_uom when omitted). Never returns a different-UOM price.
+	Deliberately does not call get_or_create_branch_price_list - a plain
+	read must not create that list. Falls back to Selling
+	Settings.selling_price_list only so a branch with no dedicated list
+	yet still shows something meaningful.
 	"""
 	if not item_code or not branch:
 		return {"rate": 0}
@@ -129,12 +126,7 @@ def get_current_branch_sale_price(item_code, branch):
 	if not price_list:
 		return {"rate": 0}
 
-	rate = frappe.db.get_value(
-		"Item Price",
-		{"item_code": item_code, "price_list": price_list, "selling": 1},
-		"price_list_rate",
-	)
-	return {"rate": flt(rate)}
+	return {"rate": get_selling_item_price_rate(item_code, price_list, uom=uom)}
 
 
 @frappe.whitelist()
@@ -184,12 +176,10 @@ def apply_foodpanda_price_update(purchase_receipt):
 			# yet - seed it from the item's Standard Selling rate (initial
 			# setup only; every later receipt keeps whatever is already
 			# there).
-			fp_price = flt(
-				frappe.db.get_value(
-					"Item Price",
-					{"item_code": row.item_code, "price_list": default_selling_price_list, "selling": 1},
-					"price_list_rate",
-				)
+			fp_price = get_selling_item_price_rate(
+				row.item_code,
+				default_selling_price_list,
+				uom=row.uom,
 			)
 			if fp_price <= 0:
 				continue

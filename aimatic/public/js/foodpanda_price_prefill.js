@@ -1,7 +1,7 @@
 // Live pre-save preview only, mirroring purchase_history_autofill.js's
 // pattern. Prefills custom_fp_price with the branch's *current* Foodpanda
-// Price List rate for this item, purely for user convenience - if the row
-// is added another way (e.g. Get Items From Purchase Order), the field
+// Price List rate for this row's UOM, purely for user convenience - if the
+// row is added another way (e.g. Get Items From Purchase Order), the field
 // stays whatever it already was and apply_foodpanda_price_update on the
 // Purchase Receipt falls back to its own "leave existing FP price
 // untouched" behavior. Shared across Purchase Order, Purchase Receipt, and
@@ -23,6 +23,7 @@ function aimatic_register_foodpanda_price_prefill(doctype, child_doctype) {
 				args: {
 					item_code: row.item_code,
 					branch: frm.doc.branch,
+					uom: row.uom,
 				},
 				callback(r) {
 					const rate = (r.message || {}).rate || 0;
@@ -49,6 +50,9 @@ function aimatic_register_foodpanda_price_prefill(doctype, child_doctype) {
 
 	frappe.ui.form.on(child_doctype, {
 		item_code(frm, cdt, cdn) {
+			helpers.refresh_row(frm, cdt, cdn);
+		},
+		uom(frm, cdt, cdn) {
 			helpers.refresh_row(frm, cdt, cdn);
 		},
 	});

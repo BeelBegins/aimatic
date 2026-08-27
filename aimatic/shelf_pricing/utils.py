@@ -203,6 +203,33 @@ def log_price_update(purchase_receipt, item_code, price_list, branch, field_upda
 	).insert(ignore_permissions=True)
 
 
+def get_selling_item_price_rate(item_code, price_list, uom=None):
+	"""Return selling Item Price rate for item + price list + UOM.
+
+	Matches ``Item Price.uom`` to the caller's UOM (PR/PO line UOM). When UOM
+	is omitted, falls back to ``Item.stock_uom`` only — never returns a rate
+	from a different UOM (Pack vs Pcs), which would mis-prefill Sale Price.
+	"""
+	if not item_code or not price_list:
+		return 0.0
+
+	resolved_uom = (uom or "").strip() or frappe.db.get_value("Item", item_code, "stock_uom")
+	if not resolved_uom:
+		return 0.0
+
+	rate = frappe.db.get_value(
+		"Item Price",
+		{
+			"item_code": item_code,
+			"price_list": price_list,
+			"selling": 1,
+			"uom": resolved_uom,
+		},
+		"price_list_rate",
+	)
+	return flt(rate)
+
+
 def upsert_item_price(item_code, price_list, purchase_receipt, branch=None, rate=None, mrp=None):
 	"""Create or update the Item Price row for (item_code, price_list),
 	logging every field that actually changes before overwriting it."""

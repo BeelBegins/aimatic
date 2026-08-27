@@ -1,13 +1,14 @@
 // Live pre-save prefill only, mirroring foodpanda_price_prefill.js's exact
 // pattern for custom_fp_price. Prefills custom_shelf_price (Sale Price) with
-// the branch's *current* Selling Price List rate, and custom_mrp with the
-// item's *current* global Item.custom_mrp, purely so the user has a starting
-// point and a value to compare against/edit rather than a blank field - if
-// the user leaves either untouched, the submit-time update just reasserts
-// the same value (a no-op write), and a genuinely blank/zero value still
-// skips the update exactly as before. Never overwrites a manually entered
-// value. Deliberately scoped to Purchase Receipt only, per the shelf-pricing
-// feature's scope (see shelf-pricing skill).
+// the branch's *current* Selling Price List rate for this row's UOM, and
+// custom_mrp with the item's *current* global Item.custom_mrp, purely so the
+// user has a starting point and a value to compare against/edit rather than
+// a blank field - if the user leaves either untouched, the submit-time
+// update just reasserts the same value (a no-op write), and a genuinely
+// blank/zero value still skips the update exactly as before. Never
+// overwrites a manually entered value. Deliberately scoped to Purchase
+// Receipt only, per the shelf-pricing feature's scope (see shelf-pricing
+// skill).
 
 const helpers = {
 	refresh_row(frm, cdt, cdn) {
@@ -21,6 +22,7 @@ const helpers = {
 				args: {
 					item_code: row.item_code,
 					branch: frm.doc.branch,
+					uom: row.uom,
 				},
 				callback(r) {
 					const rate = (r.message || {}).rate || 0;
@@ -74,6 +76,11 @@ frappe.ui.form.on("Purchase Receipt", {
 
 frappe.ui.form.on("Purchase Receipt Item", {
 	item_code(frm, cdt, cdn) {
+		helpers.refresh_row(frm, cdt, cdn);
+	},
+	uom(frm, cdt, cdn) {
+		// UOM drives Item Price match - re-prefill only while Sale Price is
+		// still blank so a manual edit is never overwritten.
 		helpers.refresh_row(frm, cdt, cdn);
 	},
 });
