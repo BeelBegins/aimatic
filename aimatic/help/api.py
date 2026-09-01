@@ -140,7 +140,7 @@ def ask(message: str, history: str | None = None, conversation: str | None = Non
 
 	reply = ""
 	try:
-		for _ in range(_MAX_TOOL_ITERATIONS):
+		for _attempt in range(_MAX_TOOL_ITERATIONS):
 			assistant_msg = get_chat_completion(
 				messages,
 				tools=TOOL_SPECS,
