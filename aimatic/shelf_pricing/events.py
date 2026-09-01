@@ -25,6 +25,8 @@ def compute_shelf_price_from_gm(cost_after_taxes, gm_percent, round_whole=True):
 	"""
 	gm = flt(gm_percent)
 	cost = flt(cost_after_taxes)
+	if cost <= 0 or gm <= 0:
+		return None
 	if gm >= 100:
 		return None
 	denom = 1 - (gm / 100)

@@ -72,5 +72,10 @@ class TestShelfGmPercent(unittest.TestCase):
 		self.assertIsNone(compute_shelf_price_from_gm(100, 100))
 		self.assertIsNone(compute_shelf_price_from_gm(100, 120))
 
+	def test_shelf_from_gm_requires_positive_cost_and_gm(self):
+		self.assertIsNone(compute_shelf_price_from_gm(0, 25))
+		self.assertIsNone(compute_shelf_price_from_gm(100, 0))
+		self.assertIsNone(compute_shelf_price_from_gm(0, 0))
+
 	def test_shelf_from_gm_exact_without_round(self):
 		self.assertEqual(compute_shelf_price_from_gm(83.33, 20, round_whole=False), 104.16)
