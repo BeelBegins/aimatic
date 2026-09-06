@@ -130,20 +130,28 @@ def adjust_cash_payment_to_grand_total(doc):
 	if cint(getattr(doc, "is_return", 0)):
 		return
 
-	# The S1 Food Panda credit-sale marker (offline_pos.api._validate_and_set_payments)
-	# is deliberately a single zero-amount row pointing at a Receivable-type account
+	# The configured Foodpanda credit-sale marker
+	# (offline_pos.api._validate_and_set_payments) is deliberately a single
+	# zero-amount row pointing at a Receivable-type account
 	# (1311 - Food Panda Receivable), so the invoice stays fully outstanding until
 	# Accounts posts a real Payment Entry. Force-filling it to grand_total here (the
 	# "single implicit payment" branch below) turns it into a nonzero payment against
 	# a Receivable account, which then fails ERPNext's own "Customer is required
 	# against Receivable account" GL check at consolidation time -- confirmed live on
 	# szl (2026-08-03), see the CLAUDE.md offline_pos note. Leave it at 0 untouched.
-	if (
-		len(payments) == 1
-		and (payments[0].mode_of_payment or "").strip() == "Food Panda Credit"
-		and flt(payments[0].amount) == 0
-	):
-		return
+	if len(payments) == 1 and flt(payments[0].amount) == 0 and doc.pos_profile:
+		from aimatic.offline_pos.api import (
+			_get_food_panda_credit_mode,
+			_is_food_panda_credit_sale,
+		)
+
+		pos = frappe.get_cached_doc("POS Profile", doc.pos_profile)
+		if (
+			_is_food_panda_credit_sale(pos, doc.customer)
+			and (payments[0].mode_of_payment or "").strip()
+			== _get_food_panda_credit_mode(pos)
+		):
+			return
 
 	grand_total = flt(doc.grand_total, 2)
 	total_paid = flt(sum(flt(p.amount) for p in payments), 2)

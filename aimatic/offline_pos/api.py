@@ -28,9 +28,6 @@ _ALLOWED_REFUND_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_CLOSE_SHIFT_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_CASHIER_ROLES = {"POS User", "POS Supervisor", "System Manager"}
 _CASHIER_OFFLINE_LOGIN_VALID_DAYS = 7
-_FOOD_PANDA_PROFILE = "S1 Food Panda"
-_FOOD_PANDA_CUSTOMER = "Food Panda"
-
 # A slow FBR gateway call inside doc.submit() holds the POS Invoice naming
 # series row lock (tabSeries FOR UPDATE, taken during doc.insert()) for the
 # rest of the request, since Frappe doesn't commit mid-request. Any other
@@ -50,8 +47,6 @@ def _is_lock_wait_timeout(exc):
 
 def _lock_wait_retry_backoff(attempt):
     return uniform(0.3, 1.0) * (attempt + 1)
-_FOOD_PANDA_CREDIT_MODE = "Food Panda Credit"
-
 # Master-data doctypes the terminal client is allowed to read via
 # get_terminal_resource/list_terminal_resources below - see those functions'
 # docstrings. Explicit and reviewable in one place, same reasoning as the
@@ -282,18 +277,30 @@ def _load_customer(customer_name):
 
 
 def _is_food_panda_credit_sale(pos, customer):
-	"""Return whether the request is the dedicated S1 Food Panda credit flow.
+	"""Return whether this is the configured customer on a Foodpanda profile.
 
-	The marker is intentionally narrow: a client cannot turn an ordinary POS
-	Profile or another Customer into a credit sale by sending the special
-	payment mode. The profile, customer, and exact S1 configuration must all
-	match server-side.
+	The profile flag and its default Customer are the source of truth. A client
+	cannot turn an ordinary POS Profile or another Customer into a credit sale
+	by sending a zero-amount payment marker.
 	"""
 	return (
-		pos.name == _FOOD_PANDA_PROFILE
-		and cint(pos.get("custom_is_foodpanda_profile"))
-		and customer == _FOOD_PANDA_CUSTOMER
+		cint(pos.get("custom_is_foodpanda_profile"))
+		and bool(pos.get("customer"))
+		and customer == pos.get("customer")
 	)
+
+
+def _get_food_panda_credit_mode(pos):
+	"""Return the one configured default payment mode for a Foodpanda profile."""
+	if not cint(pos.get("custom_is_foodpanda_profile")):
+		return None
+
+	default_modes = [
+		(row.mode_of_payment or "").strip()
+		for row in (pos.get("payments") or [])
+		if cint(row.get("default")) and (row.mode_of_payment or "").strip()
+	]
+	return default_modes[0] if len(default_modes) == 1 else None
 
 
 def _parse_json_param(value, name="parameter"):
@@ -1699,7 +1706,7 @@ def submit_online_sale(
     local_offline_session_id=None,
     hardware_id=None,
 ):
-    """Create and submit a paid or S1 Food Panda credit POS Invoice.
+    """Create and submit a paid or configured Foodpanda credit POS Invoice.
 
     Idempotent: if a POS Invoice with the same terminal_invoice_id already exists
     it is returned immediately without creating a duplicate.  This protects
@@ -1720,10 +1727,10 @@ def submit_online_sale(
     must actually belong to this cashier.  An offline cache can go stale, so
     none of this is trusted from Electron without a fresh check.
 
-    The only unpaid path is a single zero-amount ``Food Panda Credit`` marker
-    on the dedicated ``S1 Food Panda`` profile for the ``Food Panda`` customer.
-    It leaves the customer receivable outstanding; all other sales still need
-    full positive payment rows.
+    The only unpaid path is a single zero-amount marker using the configured
+    default payment mode on a Foodpanda-marked POS Profile for that profile's
+    configured Customer. It leaves the customer receivable outstanding; all
+    other sales still need full positive payment rows.
 
     offline_authenticated sales must report offline_auth_method exactly as
     "cashier_pin" — a locally cached full account password is not an
@@ -1953,23 +1960,28 @@ def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
     if not allowed_modes:
         frappe.throw(_("POS Profile has no payment modes configured"))
 
-    credit_rows = [
-        p for p in payments_data
-        if (p.get("mode_of_payment") or "").strip() == _FOOD_PANDA_CREDIT_MODE
-    ]
-    if credit_rows:
-        if not _is_food_panda_credit_sale(pos, doc.customer):
+    if _is_food_panda_credit_sale(pos, doc.customer):
+        credit_mode = _get_food_panda_credit_mode(pos)
+        if not credit_mode:
             frappe.throw(
                 _(
-                    "Food Panda credit sales are restricted to the S1 Food Panda "
-                    "POS Profile and Food Panda customer."
-                ),
-                frappe.PermissionError,
+                    "Foodpanda POS Profile {0} must have exactly one default payment mode."
+                ).format(pos.name)
             )
-        if len(payments_data) != 1 or flt(credit_rows[0].get("amount") or 0, 2) != 0:
-            frappe.throw(_("Food Panda Credit must be submitted as one zero-amount marker row."))
+        payment_mode = (payments_data[0].get("mode_of_payment") or "").strip()
+        if (
+            len(payments_data) != 1
+            or payment_mode != credit_mode
+            or flt(payments_data[0].get("amount") or 0, 2) != 0
+        ):
+            frappe.throw(
+                _(
+                    "Foodpanda credit sales must use the profile's default payment mode "
+                    "as one zero-amount marker row."
+                )
+            )
         if gift_voucher_amount:
-            frappe.throw(_("Food Panda credit sales cannot use a gift voucher."))
+            frappe.throw(_("Foodpanda credit sales cannot use a gift voucher."))
 
         # ERPNext requires at least one payment child row on an is_pos invoice,
         # but its GL builder skips zero-amount rows and POS Invoice.on_submit
@@ -1978,14 +1990,18 @@ def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
         # that clear so shift consolidation still sees a payment mode while the
         # customer receivable stays outstanding for a later Payment Entry.
         doc.set("payments", [])
-        doc.append("payments", {"mode_of_payment": _FOOD_PANDA_CREDIT_MODE, "amount": 0})
+        doc.append("payments", {"mode_of_payment": credit_mode, "amount": 0})
         doc.change_amount = 0
         doc.base_change_amount = 0
         return
 
-    if _is_food_panda_credit_sale(pos, doc.customer):
+    if cint(pos.get("custom_is_foodpanda_profile")) and any(
+        flt(p.get("amount") or 0, 2) == 0 for p in payments_data
+    ):
         frappe.throw(
-            _("S1 Food Panda sales must use the Food Panda Credit payment."),
+            _(
+                "Foodpanda credit sales require the Customer configured on the active POS Profile."
+            ),
             frappe.PermissionError,
         )
 
@@ -3170,9 +3186,9 @@ def _set_refund_payments(doc, pos, payments_data):
     - Amounts are normalised to ERPNext's negative return convention.
     - Total refunded cannot exceed the calculated refund payable.
     - Split payments are preserved.
-    - S1 Food Panda credit returns use the same zero-amount Food Panda Credit
-      marker as sales. A non-zero MoP amount against the Receivable-type
-      Food Panda account fails consolidation with "Customer is required
+    - Foodpanda credit returns use the configured profile's same zero-amount
+      default-payment marker as sales. A non-zero MoP amount against a
+      Receivable-type account fails consolidation with "Customer is required
       against Receivable account"; the credit note reduces customer AR via
       the invoice GL / return_against link instead. Client amounts are ignored
       and forced to zero so older terminals keep working.
@@ -3183,10 +3199,17 @@ def _set_refund_payments(doc, pos, payments_data):
         frappe.throw(_("POS Profile has no payment modes configured"))
 
     if _is_food_panda_credit_sale(pos, doc.customer):
-        if _FOOD_PANDA_CREDIT_MODE not in allowed_modes:
+        credit_mode = _get_food_panda_credit_mode(pos)
+        if not credit_mode:
+            frappe.throw(
+                _(
+                    "Foodpanda POS Profile {0} must have exactly one default payment mode."
+                ).format(pos.name)
+            )
+        if credit_mode not in allowed_modes:
             frappe.throw(
                 _("Payment mode '{0}' is not allowed in POS Profile {1}").format(
-                    _FOOD_PANDA_CREDIT_MODE, pos.name
+                    credit_mode, pos.name
                 )
             )
         if isinstance(payments_data, list) and payments_data:
@@ -3194,13 +3217,13 @@ def _set_refund_payments(doc, pos, payments_data):
                 mode = (p.get("mode_of_payment") or "").strip()
                 if not mode:
                     frappe.throw(_("Each refund payment row must have mode_of_payment"))
-                if mode != _FOOD_PANDA_CREDIT_MODE:
+                if mode != credit_mode:
                     frappe.throw(
-                        _("S1 Food Panda refunds must use the Food Panda Credit payment."),
+                        _("Foodpanda refunds must use the profile's default payment mode."),
                         frappe.PermissionError,
                     )
         doc.set("payments", [])
-        doc.append("payments", {"mode_of_payment": _FOOD_PANDA_CREDIT_MODE, "amount": 0})
+        doc.append("payments", {"mode_of_payment": credit_mode, "amount": 0})
         doc.paid_amount = 0
         doc.base_paid_amount = 0
         doc.change_amount = 0

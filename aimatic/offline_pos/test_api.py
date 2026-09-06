@@ -2076,107 +2076,107 @@ class TestSubmitOnlineSaleCashier(_AimTestCase):
 			raise unittest.SkipTest("No item fixture on site")
 		return _ITEM_CODE
 
-    # -- lock wait timeout retry ---------------------------------------------
-    # A slow FBR gateway call inside doc.submit() can hold the POS Invoice
-    # naming series row lock long enough that a concurrent terminal's own
-    # insert() hits MySQL error 1205 (Lock wait timeout exceeded). These
-    # tests simulate that on the first attempt and confirm submit_online_sale
-    # retries with a freshly-built document rather than surfacing the error
-    # to the cashier as a failed sale.
+	# -- lock wait timeout retry ---------------------------------------------
+	# A slow FBR gateway call inside doc.submit() can hold the POS Invoice
+	# naming series row lock long enough that a concurrent terminal's own
+	# insert() hits MySQL error 1205 (Lock wait timeout exceeded). These
+	# tests simulate that on the first attempt and confirm submit_online_sale
+	# retries with a freshly-built document rather than surfacing the error
+	# to the cashier as a failed sale.
 
-    @_require_fixtures
-    def test_lock_wait_timeout_retried_then_succeeds(self):
-        import aimatic.offline_pos.api as offline_pos_api
+	@_require_fixtures
+	def test_lock_wait_timeout_retried_then_succeeds(self):
+		import aimatic.offline_pos.api as offline_pos_api
 
-        if not _STOCKED_ITEM_CODE:
-            raise unittest.SkipTest("No item with on-hand stock found on site")
+		if not _STOCKED_ITEM_CODE:
+			raise unittest.SkipTest("No item with on-hand stock found on site")
 
-        cashier, _password = _make_cashier(roles=("POS User",))
-        profile = _make_restricted_pos_profile(cashier)
-        frappe.clear_document_cache("POS Profile", profile)
-        opening = _create_opening_entry(profile, user=cashier)
+		cashier, _password = _make_cashier(roles=("POS User",))
+		profile = _make_restricted_pos_profile(cashier)
+		frappe.clear_document_cache("POS Profile", profile)
+		opening = _create_opening_entry(profile, user=cashier)
 
-        real_build = offline_pos_api._build_pos_invoice_doc
-        attempts = {"n": 0}
+		real_build = offline_pos_api._build_pos_invoice_doc
+		attempts = {"n": 0}
 
-        def flaky_build(*args, **kwargs):
-            attempts["n"] += 1
-            doc = real_build(*args, **kwargs)
-            if attempts["n"] == 1:
-                def failing_insert(*a, **kw):
-                    raise Exception(1205, "Lock wait timeout exceeded; try restarting transaction")
-                doc.insert = failing_insert
-            return doc
+		def flaky_build(*args, **kwargs):
+			attempts["n"] += 1
+			doc = real_build(*args, **kwargs)
+			if attempts["n"] == 1:
+				def failing_insert(*a, **kw):
+					raise Exception(1205, "Lock wait timeout exceeded; try restarting transaction")
+				doc.insert = failing_insert
+			return doc
 
-        with patch.object(
-            offline_pos_api, "_build_pos_invoice_doc", side_effect=flaky_build
-        ), patch(
-            "aimatic.fbr_pos.events.submit_pos_invoice_to_fbr", return_value=None
-        ):
-            result = offline_pos_api.submit_online_sale(
-                terminal_invoice_id="TI-LOCKRETRY-{0}".format(frappe.generate_hash(length=6)),
-                terminal_id="TERM-1",
-                pos_profile=profile,
-                opening_entry=opening.name,
-                customer=self._customer_or_skip(),
-                items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
-                payments=[{"mode_of_payment": "Cash", "amount": 999999}],
-                cashier_user=cashier,
-                cashier_full_name="Test Cashier",
-            )
+		with patch.object(
+			offline_pos_api, "_build_pos_invoice_doc", side_effect=flaky_build
+		), patch(
+			"aimatic.fbr_pos.events.submit_pos_invoice_to_fbr", return_value=None
+		):
+			result = offline_pos_api.submit_online_sale(
+				terminal_invoice_id="TI-LOCKRETRY-{0}".format(frappe.generate_hash(length=6)),
+				terminal_id="TERM-1",
+				pos_profile=profile,
+				opening_entry=opening.name,
+				customer=self._customer_or_skip(),
+				items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
+				payments=[{"mode_of_payment": "Cash", "amount": 999999}],
+				cashier_user=cashier,
+				cashier_full_name="Test Cashier",
+			)
 
-        self.assertEqual(attempts["n"], 2)
-        self.assertEqual(result["docstatus"], 1)
-        self.assertEqual(
-            frappe.db.count(
-                "POS Invoice", {"custom_terminal_invoice_id": result["terminal_invoice_id"]}
-            ),
-            1,
-        )
+		self.assertEqual(attempts["n"], 2)
+		self.assertEqual(result["docstatus"], 1)
+		self.assertEqual(
+			frappe.db.count(
+				"POS Invoice", {"custom_terminal_invoice_id": result["terminal_invoice_id"]}
+			),
+			1,
+		)
 
-    @_require_fixtures
-    def test_non_lock_wait_error_not_retried(self):
-        import aimatic.offline_pos.api as offline_pos_api
+	@_require_fixtures
+	def test_non_lock_wait_error_not_retried(self):
+		import aimatic.offline_pos.api as offline_pos_api
 
-        if not _STOCKED_ITEM_CODE:
-            raise unittest.SkipTest("No item with on-hand stock found on site")
+		if not _STOCKED_ITEM_CODE:
+			raise unittest.SkipTest("No item with on-hand stock found on site")
 
-        cashier, _password = _make_cashier(roles=("POS User",))
-        profile = _make_restricted_pos_profile(cashier)
-        frappe.clear_document_cache("POS Profile", profile)
-        opening = _create_opening_entry(profile, user=cashier)
+		cashier, _password = _make_cashier(roles=("POS User",))
+		profile = _make_restricted_pos_profile(cashier)
+		frappe.clear_document_cache("POS Profile", profile)
+		opening = _create_opening_entry(profile, user=cashier)
 
-        real_build = offline_pos_api._build_pos_invoice_doc
-        attempts = {"n": 0}
+		real_build = offline_pos_api._build_pos_invoice_doc
+		attempts = {"n": 0}
 
-        def always_failing_build(*args, **kwargs):
-            attempts["n"] += 1
-            doc = real_build(*args, **kwargs)
+		def always_failing_build(*args, **kwargs):
+			attempts["n"] += 1
+			doc = real_build(*args, **kwargs)
 
-            def failing_insert(*a, **kw):
-                raise Exception(2013, "Lost connection to MySQL server during query")
-            doc.insert = failing_insert
-            return doc
+			def failing_insert(*a, **kw):
+				raise Exception(2013, "Lost connection to MySQL server during query")
+			doc.insert = failing_insert
+			return doc
 
-        with patch.object(
-            offline_pos_api, "_build_pos_invoice_doc", side_effect=always_failing_build
-        ), patch(
-            "aimatic.fbr_pos.events.submit_pos_invoice_to_fbr", return_value=None
-        ):
-            with self.assertRaises(Exception):
-                offline_pos_api.submit_online_sale(
-                    terminal_invoice_id="TI-NORETRY-{0}".format(frappe.generate_hash(length=6)),
-                    terminal_id="TERM-1",
-                    pos_profile=profile,
-                    opening_entry=opening.name,
-                    customer=self._customer_or_skip(),
-                    items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
-                    payments=[{"mode_of_payment": "Cash", "amount": 999999}],
-                    cashier_user=cashier,
-                    cashier_full_name="Test Cashier",
-                )
+		with patch.object(
+			offline_pos_api, "_build_pos_invoice_doc", side_effect=always_failing_build
+		), patch(
+			"aimatic.fbr_pos.events.submit_pos_invoice_to_fbr", return_value=None
+		):
+			with self.assertRaises(Exception):
+				offline_pos_api.submit_online_sale(
+					terminal_invoice_id="TI-NORETRY-{0}".format(frappe.generate_hash(length=6)),
+					terminal_id="TERM-1",
+					pos_profile=profile,
+					opening_entry=opening.name,
+					customer=self._customer_or_skip(),
+					items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
+					payments=[{"mode_of_payment": "Cash", "amount": 999999}],
+					cashier_user=cashier,
+					cashier_full_name="Test Cashier",
+				)
 
-        self.assertEqual(attempts["n"], 1)
+		self.assertEqual(attempts["n"], 1)
 
 
 class TestLockWaitTimeoutHelpers(unittest.TestCase):
@@ -2205,6 +2205,118 @@ class TestLockWaitTimeoutHelpers(unittest.TestCase):
             self.assertLessEqual(delay, 1.0 * (attempt + 1))
 
 
+class TestFoodPandaCreditProfileConfiguration(unittest.TestCase):
+	def _profile(self, name, customer, enabled=1, payments=None):
+		return frappe._dict(
+			name=name,
+			customer=customer,
+			custom_is_foodpanda_profile=enabled,
+			payments=payments or [],
+		)
+
+	def test_credit_sale_uses_profile_flag_and_configured_customer(self):
+		from aimatic.offline_pos.api import _is_food_panda_credit_sale
+
+		for name, customer in (
+			("S1 Food Panda", "S1 Food Panda"),
+			("S7 Food Panda", "S7 Food Panda"),
+		):
+			with self.subTest(profile=name):
+				self.assertTrue(
+					_is_food_panda_credit_sale(self._profile(name, customer), customer)
+				)
+
+	def test_credit_sale_rejects_unmarked_profile_or_different_customer(self):
+		from aimatic.offline_pos.api import _is_food_panda_credit_sale
+
+		self.assertFalse(
+			_is_food_panda_credit_sale(
+				self._profile("Counter 1", "Walk In Customer", enabled=0),
+				"Walk In Customer",
+			)
+		)
+		self.assertFalse(
+			_is_food_panda_credit_sale(
+				self._profile("S7 Food Panda", "S7 Food Panda"),
+				"S1 Food Panda",
+			)
+		)
+
+	def test_credit_mode_is_the_one_configured_default_payment(self):
+		from aimatic.offline_pos.api import _get_food_panda_credit_mode
+
+		profile = self._profile(
+			"S7 Food Panda",
+			"S7 Food Panda",
+			payments=[
+				frappe._dict(mode_of_payment="Cash", default=0),
+				frappe._dict(mode_of_payment="Delivery Receivable", default=1),
+			],
+		)
+		self.assertEqual(_get_food_panda_credit_mode(profile), "Delivery Receivable")
+
+	def test_credit_mode_rejects_ambiguous_or_unmarked_configuration(self):
+		from aimatic.offline_pos.api import _get_food_panda_credit_mode
+
+		ambiguous = self._profile(
+			"Delivery",
+			"Delivery Customer",
+			payments=[
+				frappe._dict(mode_of_payment="Receivable A", default=1),
+				frappe._dict(mode_of_payment="Receivable B", default=1),
+			],
+		)
+		self.assertIsNone(_get_food_panda_credit_mode(ambiguous))
+		ambiguous.custom_is_foodpanda_profile = 0
+		self.assertIsNone(_get_food_panda_credit_mode(ambiguous))
+
+	def test_payment_validation_accepts_each_profile_configured_credit_flow(self):
+		from aimatic.offline_pos.api import _validate_and_set_payments
+
+		for name, customer, credit_mode in (
+			("S1 Food Panda", "S1 Food Panda", "Food Panda Credit"),
+			("S7 Food Panda", "S7 Food Panda", "Branch Delivery Receivable"),
+		):
+			with self.subTest(profile=name):
+				doc = frappe._dict(customer=customer, payments=[])
+				doc.set = lambda field, value: setattr(doc, field, value)
+				doc.append = (
+					lambda field, values: doc.payments.append(frappe._dict(values))
+					or doc.payments[-1]
+				)
+				profile = self._profile(
+					name,
+					customer,
+					payments=[frappe._dict(mode_of_payment=credit_mode, default=1)],
+				)
+
+				_validate_and_set_payments(
+					doc,
+					profile,
+					[{"mode_of_payment": credit_mode, "amount": 0}],
+				)
+
+				self.assertEqual(len(doc.payments), 1)
+				self.assertEqual(doc.payments[0].mode_of_payment, credit_mode)
+				self.assertEqual(doc.payments[0].amount, 0)
+
+	def test_payment_validation_rejects_other_customer_zero_marker(self):
+		from aimatic.offline_pos.api import _validate_and_set_payments
+
+		doc = frappe._dict(customer="Other Customer", payments=[])
+		profile = self._profile(
+			"S7 Food Panda",
+			"S7 Food Panda",
+			payments=[frappe._dict(mode_of_payment="Food Panda Credit", default=1)],
+		)
+		with self.assertRaises(frappe.PermissionError):
+			_validate_and_set_payments(
+				doc,
+				profile,
+				[{"mode_of_payment": "Food Panda Credit", "amount": 0}],
+			)
+
+
 class TestFoodPandaCreditPaymentMarker(_AimTestCase):
 	"""Zero-amount Food Panda Credit rows must survive POS Invoice submit.
 
@@ -2214,13 +2326,11 @@ class TestFoodPandaCreditPaymentMarker(_AimTestCase):
 	"""
 
 	def test_restore_reinserts_marker_when_payments_were_cleared(self):
-		from aimatic.offline_pos.api import (
-			_FOOD_PANDA_CREDIT_MODE,
-			_FOOD_PANDA_CUSTOMER,
-			_FOOD_PANDA_PROFILE,
-		)
 		from aimatic.offline_pos.events import restore_food_panda_credit_payment_marker
 
+		profile_name = "S7 Food Panda"
+		configured_customer = "S7 Food Panda"
+		credit_mode = "Delivery Receivable"
 		inserted = []
 
 		class _Row:
@@ -2231,8 +2341,8 @@ class TestFoodPandaCreditPaymentMarker(_AimTestCase):
 			doctype = "POS Invoice"
 			docstatus = 1
 			name = "POS-INV-TEST"
-			pos_profile = _FOOD_PANDA_PROFILE
-			customer = _FOOD_PANDA_CUSTOMER
+			pos_profile = profile_name
+			customer = configured_customer
 			company = "Test Co"
 			payments = []
 
@@ -2243,12 +2353,11 @@ class TestFoodPandaCreditPaymentMarker(_AimTestCase):
 				return row
 
 		pos = frappe._dict(
-			name=_FOOD_PANDA_PROFILE,
+			name=profile_name,
+			customer=configured_customer,
 			custom_is_foodpanda_profile=1,
-			get=lambda key, default=None: 1 if key == "custom_is_foodpanda_profile" else default,
+			payments=[frappe._dict(mode_of_payment=credit_mode, default=1)],
 		)
-		# frappe._dict.get exists; make getattr-style access work for cint(pos.get(...))
-		pos["custom_is_foodpanda_profile"] = 1
 
 		with (
 			patch("aimatic.offline_pos.events.frappe.get_cached_doc", return_value=pos),
@@ -2264,7 +2373,7 @@ class TestFoodPandaCreditPaymentMarker(_AimTestCase):
 			restore_food_panda_credit_payment_marker(_Doc())
 
 		self.assertEqual(len(inserted), 1)
-		self.assertEqual(inserted[0]["mode_of_payment"], _FOOD_PANDA_CREDIT_MODE)
+		self.assertEqual(inserted[0]["mode_of_payment"], credit_mode)
 		self.assertEqual(inserted[0]["amount"], 0)
 
 	def test_restore_skips_non_food_panda_invoices(self):
@@ -2279,7 +2388,6 @@ class TestFoodPandaCreditPaymentMarker(_AimTestCase):
 			company="Test Co",
 		)
 		pos = frappe._dict(name="S1GT Counter 1", custom_is_foodpanda_profile=0)
-		pos["custom_is_foodpanda_profile"] = 0
 
 		with patch("aimatic.offline_pos.events.frappe.get_cached_doc", return_value=pos):
 			restore_food_panda_credit_payment_marker(doc)
@@ -2290,14 +2398,13 @@ class TestFoodPandaCreditRefundPayments(_AimTestCase):
 
 	def test_set_refund_payments_forces_zero_marker(self):
 		from aimatic.offline_pos.api import (
-			_FOOD_PANDA_CREDIT_MODE,
-			_FOOD_PANDA_CUSTOMER,
-			_FOOD_PANDA_PROFILE,
 			_set_refund_payments,
 		)
 
+		customer = "S7 Food Panda"
+		credit_mode = "Delivery Receivable"
 		doc = frappe._dict(
-			customer=_FOOD_PANDA_CUSTOMER,
+			customer=customer,
 			grand_total=-1279.0,
 			payments=[],
 		)
@@ -2305,46 +2412,45 @@ class TestFoodPandaCreditRefundPayments(_AimTestCase):
 		doc.append = lambda field, values: doc.payments.append(frappe._dict(values)) or doc.payments[-1]
 
 		pos = frappe._dict(
-			name=_FOOD_PANDA_PROFILE,
+			name="S7 Food Panda",
+			customer=customer,
 			custom_is_foodpanda_profile=1,
-			payments=[frappe._dict(mode_of_payment=_FOOD_PANDA_CREDIT_MODE)],
+			payments=[frappe._dict(mode_of_payment=credit_mode, default=1)],
 		)
-		pos["custom_is_foodpanda_profile"] = 1
 
 		_set_refund_payments(
 			doc,
 			pos,
-			[{"mode_of_payment": _FOOD_PANDA_CREDIT_MODE, "amount": -1279}],
+			[{"mode_of_payment": credit_mode, "amount": -1279}],
 		)
 
 		self.assertEqual(len(doc.payments), 1)
-		self.assertEqual(doc.payments[0].mode_of_payment, _FOOD_PANDA_CREDIT_MODE)
+		self.assertEqual(doc.payments[0].mode_of_payment, credit_mode)
 		self.assertEqual(doc.payments[0].amount, 0)
 		self.assertEqual(doc.paid_amount, 0)
 		self.assertEqual(doc.base_paid_amount, 0)
 
 	def test_set_refund_payments_rejects_non_credit_mode(self):
 		from aimatic.offline_pos.api import (
-			_FOOD_PANDA_CREDIT_MODE,
-			_FOOD_PANDA_CUSTOMER,
-			_FOOD_PANDA_PROFILE,
 			_set_refund_payments,
 		)
 
+		customer = "S7 Food Panda"
+		credit_mode = "Delivery Receivable"
 		doc = frappe._dict(
-			customer=_FOOD_PANDA_CUSTOMER,
+			customer=customer,
 			grand_total=-100.0,
 			payments=[],
 		)
 		pos = frappe._dict(
-			name=_FOOD_PANDA_PROFILE,
+			name="S7 Food Panda",
+			customer=customer,
 			custom_is_foodpanda_profile=1,
 			payments=[
-				frappe._dict(mode_of_payment=_FOOD_PANDA_CREDIT_MODE),
-				frappe._dict(mode_of_payment="Cash"),
+				frappe._dict(mode_of_payment=credit_mode, default=1),
+				frappe._dict(mode_of_payment="Cash", default=0),
 			],
 		)
-		pos["custom_is_foodpanda_profile"] = 1
 
 		with self.assertRaises(frappe.PermissionError):
 			_set_refund_payments(
