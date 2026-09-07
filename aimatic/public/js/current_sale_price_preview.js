@@ -12,6 +12,13 @@
 
 const helpers = {
 	refresh_row(frm, cdt, cdn) {
+		// This is a draft-only convenience prefill. On a submitted receipt, an
+		// AJAX request here can hold the form refresh queue and delay the core
+		// controller actions, including Create → Purchase Invoice.
+		if (frm.doc.docstatus !== 0) {
+			return;
+		}
+
 		const row = locals[cdt][cdn];
 		if (!row || !row.item_code) {
 			return;
@@ -70,6 +77,10 @@ frappe.ui.form.on("Purchase Receipt", {
 	// value, so re-running here on every refresh only ever does real work for
 	// genuinely blank rows.
 	refresh(frm) {
+		if (frm.doc.docstatus !== 0) {
+			return;
+		}
+
 		helpers.refresh_all_rows(frm);
 	},
 });

@@ -359,7 +359,11 @@ aimatic.relationship_manager.SUPPORTED.forEach((doctype) => {
 	frappe.ui.form.on(doctype, {
 		refresh(frm) {
 			aimatic.relationship_manager.ensure_styles();
-			aimatic.relationship_manager.mount(frm);
+			// A refresh handler that starts an AJAX request holds the form event
+			// queue, delaying the standard controller actions (including Purchase
+			// Invoice). The relationship panel is optional, so mount it after the
+			// form core refresh sequence has completed.
+			setTimeout(() => aimatic.relationship_manager.mount(frm), 0);
 		},
 	});
 });
