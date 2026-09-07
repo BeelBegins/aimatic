@@ -18,9 +18,12 @@ doc_events = {
 	"User": {
 		"after_insert": "aimaticlearning.lms_learning.enrollment.send_student_welcome_email",
 	},
-	"Course Lesson": {
-		"on_update": "aimaticlearning.lms_learning.lesson_audio.enqueue_lesson_audio_regeneration",
-	},
+}
+
+# Lesson audio generation is a manual "Generate Audio" button on the form,
+# never automatic on save - see public/js/course_lesson_audio_button.js.
+doctype_js = {
+	"Course Lesson": "public/js/course_lesson_audio_button.js",
 }
 
 website_route_rules = [

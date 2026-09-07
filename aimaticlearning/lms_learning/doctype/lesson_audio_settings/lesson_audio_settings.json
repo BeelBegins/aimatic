@@ -1,0 +1,160 @@
+{
+ "actions": [],
+ "creation": "2026-09-07 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "enabled_courses",
+  "section_break_provider",
+  "primary_provider",
+  "enable_fallback",
+  "max_chunk_chars",
+  "section_break_hf",
+  "huggingface_api_token",
+  "huggingface_provider",
+  "huggingface_model",
+  "column_break_hf_rate",
+  "huggingface_rate_per_million_chars",
+  "section_break_or",
+  "openrouter_api_key",
+  "openrouter_model",
+  "openrouter_voice",
+  "column_break_or_rate",
+  "openrouter_rate_per_million_chars"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "description": "Master switch. When off, the \"Generate Audio\" button on a lesson refuses to run and no audio is generated.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Lesson Audio Enabled"
+  },
+  {
+   "description": "Only lessons in these courses can have audio generated. Generation is refused for any other course, even if triggered manually.",
+   "fieldname": "enabled_courses",
+   "fieldtype": "Table MultiSelect",
+   "label": "Enabled Courses",
+   "options": "Lesson Audio Enabled Course"
+  },
+  {
+   "fieldname": "section_break_provider",
+   "fieldtype": "Section Break",
+   "label": "Provider"
+  },
+  {
+   "default": "OpenRouter",
+   "description": "Which provider is tried first. OpenRouter is far cheaper per character than Hugging Face's working route (fal-ai) for this model - see the rate fields below.",
+   "fieldname": "primary_provider",
+   "fieldtype": "Select",
+   "label": "Primary Provider",
+   "options": "OpenRouter\nHugging Face",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "If the primary provider fails, automatically retry with the other provider. Leave off to avoid any surprise spend on the non-primary provider - a failure will just fail, and you decide what to do next.",
+   "fieldname": "enable_fallback",
+   "fieldtype": "Check",
+   "label": "Enable Fallback to Other Provider"
+  },
+  {
+   "default": "600",
+   "description": "Lesson text is split into chunks of roughly this many characters before synthesis.",
+   "fieldname": "max_chunk_chars",
+   "fieldtype": "Int",
+   "label": "Max Characters per Chunk",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "section_break_hf",
+   "fieldtype": "Section Break",
+   "label": "Hugging Face"
+  },
+  {
+   "description": "Get one at huggingface.co/settings/tokens. Stored encrypted; never shown in plain text again.",
+   "fieldname": "huggingface_api_token",
+   "fieldtype": "Password",
+   "label": "Hugging Face API Token"
+  },
+  {
+   "default": "fal-ai",
+   "description": "The Hugging Face Inference Providers routing target. \"deepinfra\" does not implement text-to-speech in the installed SDK - confirmed by reading its provider registry - so this must stay \"fal-ai\" unless that changes upstream.",
+   "fieldname": "huggingface_provider",
+   "fieldtype": "Data",
+   "label": "HF Inference Provider"
+  },
+  {
+   "default": "hexgrad/Kokoro-82M",
+   "fieldname": "huggingface_model",
+   "fieldtype": "Data",
+   "label": "HF Model"
+  },
+  {
+   "fieldname": "column_break_hf_rate",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "20.0",
+   "description": "Used only to show a cost estimate before generating - update if fal.ai's rate changes.",
+   "fieldname": "huggingface_rate_per_million_chars",
+   "fieldtype": "Float",
+   "label": "HF Rate (USD / 1M chars)"
+  },
+  {
+   "fieldname": "section_break_or",
+   "fieldtype": "Section Break",
+   "label": "OpenRouter"
+  },
+  {
+   "description": "Leave blank to reuse the openrouter_api_key already set via bench set-config for the chat assistant. Set here to use a different key for lesson audio specifically.",
+   "fieldname": "openrouter_api_key",
+   "fieldtype": "Password",
+   "label": "OpenRouter API Key (optional override)"
+  },
+  {
+   "default": "hexgrad/kokoro-82m",
+   "fieldname": "openrouter_model",
+   "fieldtype": "Data",
+   "label": "OpenRouter Model"
+  },
+  {
+   "default": "af_heart",
+   "description": "One of Kokoro's 54 preset voices (af_*/am_* American, bf_*/bm_* British, etc). af_heart is the model's own documented default.",
+   "fieldname": "openrouter_voice",
+   "fieldtype": "Data",
+   "label": "OpenRouter Voice"
+  },
+  {
+   "fieldname": "column_break_or_rate",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0.62",
+   "description": "Used only to show a cost estimate before generating - update if OpenRouter's rate changes.",
+   "fieldname": "openrouter_rate_per_million_chars",
+   "fieldtype": "Float",
+   "label": "OpenRouter Rate (USD / 1M chars)"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-07 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LMS Learning",
+ "name": "Lesson Audio Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

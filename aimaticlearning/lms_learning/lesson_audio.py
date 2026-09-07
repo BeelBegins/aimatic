@@ -1,13 +1,15 @@
 """Lesson-audio narration: generates and serves cached TTS audio per lesson.
 
-Audio is generated once per lesson (on save, when the narration text actually
-changed) and cached as attached files - never synthesized on request - so
-playback costs nothing beyond the one-time generation call.
+Generation is a manual, explicit action - a "Generate Audio" button on the
+Course Lesson form in Desk (wired via public/js/course_lesson_audio_button.js,
+hooks.py doctype_js) - never automatic on save. Audio is cached as attached
+files once generated, so playback itself costs nothing further.
 
-Regeneration is gated to an explicit course allowlist
-(frappe.conf `lesson_audio_enabled_courses`, defaulting to just
-property-practice) so editing lesson content anywhere else in the LMS never
-silently starts spending Hugging Face quota. See tasks/lms-lesson-audio/task.md.
+Everything about how/whether generation runs is controlled from Desk via the
+Lesson Audio Settings doctype: a master enable switch, an explicit course
+allowlist, and provider/fallback configuration (see tts_client.py). A lesson
+outside the allowlist, or the feature being disabled entirely, refuses to
+generate even if the button is clicked. See tasks/lms-lesson-audio/task.md.
 """
 
 from __future__ import annotations
@@ -24,18 +26,20 @@ from lms.lms.md import markdown_to_html
 
 from aimaticlearning.lms_learning.tts_client import (
 	TTSError,
+	estimate_cost,
+	get_settings,
 	sniff_audio_extension,
 	split_into_chunks,
 	synthesize_chunk,
 )
 from aimaticlearning.lms_learning.utils import throw_access_denied, user_can_access_course
 
-DEFAULT_ENABLED_COURSES = ["property-practice"]
+CONTENT_ROLES = ["System Manager", "LMS Content Reviewer"]
 
 
-def _enabled_courses() -> set[str]:
-	configured = frappe.conf.get("lesson_audio_enabled_courses")
-	return set(configured or DEFAULT_ENABLED_COURSES)
+def _require_content_role():
+	if not set(frappe.get_roles()) & set(CONTENT_ROLES):
+		throw_access_denied()
 
 
 def _narration_text(body: str) -> str:
@@ -47,28 +51,73 @@ def _content_hash(text: str) -> str:
 	return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def enqueue_lesson_audio_regeneration(doc, method=None):
-	"""Course Lesson on_update hook: (re)generate audio only for lessons in
-	an explicitly enabled course, and only when the narration text actually
-	changed since the last generation."""
-	if doc.course not in _enabled_courses():
-		return
+def _course_enabled(course: str, settings=None) -> bool:
+	settings = settings or get_settings()
+	return course in {row.course for row in settings.enabled_courses}
 
-	text = _narration_text(doc.body)
+
+@frappe.whitelist()
+def get_generation_estimate(lesson: str) -> dict[str, Any]:
+	"""Character count and estimated cost for one lesson, for the confirm
+	dialog before any spend happens."""
+	_require_content_role()
+	lesson_row = frappe.db.get_value("Course Lesson", lesson, ["course", "body"], as_dict=True)
+	if not lesson_row:
+		frappe.throw(_("This lesson could not be found."), frappe.DoesNotExistError)
+
+	settings = get_settings()
+	text = _narration_text(lesson_row.body)
+	estimate = estimate_cost(len(text), settings=settings)
+	return {
+		"enabled": bool(settings.enabled),
+		"course_enabled": _course_enabled(lesson_row.course, settings=settings),
+		"char_count": len(text),
+		**estimate,
+	}
+
+
+@frappe.whitelist()
+def get_status_for_lesson(lesson: str) -> dict[str, Any]:
+	_require_content_role()
+	audio = frappe.db.get_value(
+		"Learning Lesson Audio", lesson, ["status", "generated_at", "error_message"], as_dict=True
+	)
+	if not audio:
+		return {"status": "Not generated"}
+	return dict(audio)
+
+
+@frappe.whitelist()
+def generate_audio_for_lesson(lesson: str, force: bool = False) -> dict[str, Any]:
+	"""Explicit, manual trigger - the only way generation ever starts. Called
+	by the "Generate Audio" button on the Course Lesson form."""
+	_require_content_role()
+	settings = get_settings()
+	if not settings.enabled:
+		frappe.throw(_("Lesson audio is disabled in Lesson Audio Settings."))
+
+	lesson_doc = frappe.get_doc("Course Lesson", lesson)
+	if not _course_enabled(lesson_doc.course, settings=settings):
+		frappe.throw(
+			_("{0} is not in the enabled-courses list in Lesson Audio Settings.").format(lesson_doc.course)
+		)
+
+	text = _narration_text(lesson_doc.body)
 	if not text:
-		return
+		frappe.throw(_("This lesson has no narratable text."))
 	content_hash = _content_hash(text)
 
-	if frappe.db.get_value("Learning Lesson Audio", doc.name, "content_hash") == content_hash:
-		return
+	existing_hash = frappe.db.get_value("Learning Lesson Audio", lesson, "content_hash")
+	if existing_hash == content_hash and not force:
+		return {"status": "unchanged", "message": _("Audio already matches the current lesson text.")}
 
-	if frappe.db.exists("Learning Lesson Audio", doc.name):
-		audio_doc = frappe.get_doc("Learning Lesson Audio", doc.name)
+	if frappe.db.exists("Learning Lesson Audio", lesson):
+		audio_doc = frappe.get_doc("Learning Lesson Audio", lesson)
 	else:
 		audio_doc = frappe.new_doc("Learning Lesson Audio")
-		audio_doc.lesson = doc.name
+		audio_doc.lesson = lesson
 
-	audio_doc.course = doc.course
+	audio_doc.course = lesson_doc.course
 	audio_doc.status = "Queued"
 	audio_doc.content_hash = content_hash
 	audio_doc.audio_chunks = None
@@ -78,19 +127,21 @@ def enqueue_lesson_audio_regeneration(doc, method=None):
 	frappe.enqueue(
 		"aimaticlearning.lms_learning.lesson_audio.generate_lesson_audio_job",
 		queue="long",
-		lesson=doc.name,
+		lesson=lesson,
 		content_hash=content_hash,
 		enqueue_after_commit=True,
-		job_name=f"Lesson audio generation {doc.name}",
+		job_name=f"Lesson audio generation {lesson}",
 	)
+	return {"status": "queued"}
 
 
 def generate_lesson_audio_job(lesson: str, content_hash: str):
 	if not frappe.db.exists("Learning Lesson Audio", lesson):
 		return
 	audio_doc = frappe.get_doc("Learning Lesson Audio", lesson)
-	# Content may have changed again since this job was queued; only the
-	# most recently enqueued generation for this lesson should win.
+	# Content (or a repeat click) may have changed the target hash again
+	# since this job was queued; only the most recently enqueued generation
+	# for this lesson should win.
 	if audio_doc.content_hash != content_hash:
 		return
 
@@ -148,7 +199,8 @@ def _resolve_lesson_name(course: str, chapter: int, lesson: int) -> str | None:
 def get_lesson_audio(course: str, chapter: int, lesson: int) -> dict[str, Any]:
 	"""Return {"status": ...} and, once Ready, an ordered "chunks" list of
 	audio file URLs for the caller to play back-to-back. Access is gated the
-	same way as Study Buddy: enrolled/instructor/moderator only."""
+	same way as Study Buddy: enrolled/instructor/moderator only. This is the
+	read path only - it never triggers generation."""
 	if not course or len(course) > 140:
 		frappe.throw(_("Invalid lesson context."), frappe.ValidationError)
 	if not user_can_access_course(course, frappe.session.user):
