@@ -1,0 +1,55 @@
+import frappe
+
+
+COURSE_NAME = "business-law-practice-blp"
+MODULE_NAME = "LMOD-00017"
+
+
+def get_context(context):
+	context.no_cache = 1
+	context.title = "Examic Study | Focused SQE Preparation"
+	context.meta_description = (
+		"Prepare, practise and perform with structured SQE study notes, chapter MCQs, "
+		"flashcards and realistic module assessments."
+	)
+	context.body_class = "sqe-public-page"
+	context.canonical_url = frappe.utils.get_url("/sqe")
+	context.login_url = "/login"
+	context.signup_url = "/login#signup"
+	context.courses_url = "/lms/courses"
+	context.stats = _get_live_course_stats()
+	return context
+
+
+def _get_live_course_stats() -> dict:
+	stats = {
+		"chapters": 0,
+		"practice_mcqs": 0,
+		"flashcards": 0,
+		"mock_mcqs": 0,
+	}
+	if not frappe.db.exists("LMS Course", COURSE_NAME):
+		return stats
+
+	course = frappe.get_doc("LMS Course", COURSE_NAME)
+	stats["chapters"] = len(course.chapters or [])
+
+	if frappe.db.exists("Learning Module Config", MODULE_NAME):
+		module = frappe.get_doc("Learning Module Config", MODULE_NAME)
+		stats["flashcards"] = frappe.db.count(
+			"Learning Flashcard",
+			{"learning_module": MODULE_NAME, "status": "Published"},
+		)
+		quiz_names = frappe.get_all(
+			"Learning Chapter Profile",
+			filters={"learning_module": MODULE_NAME},
+			pluck="chapter_quiz",
+		)
+		for quiz_name in {name for name in quiz_names if name}:
+			stats["practice_mcqs"] += len(frappe.get_doc("LMS Quiz", quiz_name).questions or [])
+		if module.module_assessment_quiz:
+			stats["mock_mcqs"] = len(
+				frappe.get_doc("LMS Quiz", module.module_assessment_quiz).questions or []
+			)
+
+	return stats

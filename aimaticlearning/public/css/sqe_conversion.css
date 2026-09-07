@@ -1,0 +1,215 @@
+/* Examic Study conversion hierarchy — exact brand, one primary action per region. */
+.sqe-brand img {
+	display: block;
+	width: 244px;
+	height: auto;
+}
+
+.sqe-btn {
+	position: relative;
+	min-height: 46px;
+	padding: 11px 19px;
+	border-radius: 12px;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	isolation: isolate;
+	overflow: hidden;
+	transition:
+		transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+		box-shadow 180ms ease,
+		border-color 180ms ease,
+		background 180ms ease;
+}
+
+.sqe-btn::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: linear-gradient(110deg, transparent 18%, rgba(255, 255, 255, 0.18) 48%, transparent 76%);
+	transform: translateX(-115%);
+	transition: transform 420ms ease;
+}
+
+.sqe-btn:hover::before { transform: translateX(115%); }
+.sqe-btn:hover { transform: translateY(-2px); }
+.sqe-btn:active { transform: translateY(0) scale(0.985); }
+
+.sqe-btn:focus-visible,
+.sqe-secondary-link:focus-visible,
+.sqe-cta-login:focus-visible,
+.sqe-nav > a:focus-visible {
+	outline: 3px solid rgba(214, 169, 77, 0.55);
+	outline-offset: 3px;
+}
+
+.sqe-btn-primary {
+	border-color: rgba(226, 183, 93, 0.62);
+	background: linear-gradient(145deg, #17365d 0%, #10233f 55%, #0b1a2f 100%);
+	color: #fff;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.16) inset,
+		0 12px 26px rgba(16, 35, 63, 0.2),
+		0 3px 7px rgba(16, 35, 63, 0.14);
+}
+
+.sqe-btn-primary:hover {
+	border-color: #e2b75d;
+	background: linear-gradient(145deg, #1d426e 0%, #132b4b 55%, #0d2039 100%);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.2) inset,
+		0 18px 34px rgba(16, 35, 63, 0.24),
+		0 5px 10px rgba(16, 35, 63, 0.13);
+}
+
+.sqe-btn-ghost {
+	border-color: rgba(16, 35, 63, 0.13);
+	background: rgba(255, 255, 255, 0.75);
+	box-shadow: none;
+}
+
+.sqe-btn-header {
+	min-height: 44px;
+	padding-inline: 18px 14px;
+	gap: 12px;
+}
+
+.sqe-conversion-block {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0;
+	margin-top: 30px;
+}
+
+.sqe-btn-hero {
+	min-height: 60px;
+	padding: 10px 12px 10px 24px;
+	border-radius: 15px;
+	gap: 20px;
+	font-size: 1.02rem;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.17) inset,
+		0 20px 42px rgba(16, 35, 63, 0.22),
+		0 5px 12px rgba(16, 35, 63, 0.12);
+}
+
+.sqe-btn-arrow {
+	display: grid;
+	width: 36px;
+	height: 36px;
+	place-items: center;
+	border-radius: 10px;
+	background: #e2b75d;
+	color: #10233f;
+	font-size: 1.15rem;
+	transition: transform 180ms ease;
+}
+
+.sqe-btn-hero:hover .sqe-btn-arrow { transform: translateX(2px); }
+
+.sqe-cta-reassurance {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 13px 0 0;
+	color: #526179;
+	font-size: 0.76rem;
+	font-weight: 600;
+}
+
+.sqe-cta-reassurance > span { color: #c69a3b; }
+
+.sqe-secondary-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	gap: 9px;
+	margin-top: 8px;
+	color: #10233f;
+	font-size: 0.84rem;
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.sqe-secondary-link:hover {
+	color: #8f6517;
+	text-decoration: underline;
+	text-decoration-thickness: 1px;
+	text-underline-offset: 5px;
+}
+
+.sqe-trial-note {
+	margin-top: 8px;
+	padding-left: 13px;
+	border-left: 2px solid rgba(214, 169, 77, 0.55);
+}
+
+.sqe-btn-final {
+	min-height: 56px;
+	padding: 13px 20px;
+	border: 1px solid rgba(226, 183, 93, 0.7);
+	border-radius: 14px;
+	box-shadow: 0 16px 32px rgba(0, 0, 0, 0.2);
+}
+
+.sqe-btn-final:hover {
+	background: #fffaf0;
+	box-shadow: 0 21px 38px rgba(0, 0, 0, 0.24);
+}
+
+.sqe-cta-panel-note {
+	color: rgba(255, 255, 255, 0.68);
+	font-size: 0.7rem;
+	font-weight: 600;
+}
+
+.sqe-footer img {
+	width: 214px;
+	height: auto;
+}
+
+@media (max-width: 620px) {
+	.sqe-brand img { width: 176px; }
+	.sqe-btn-header { min-height: 44px; padding: 9px 12px; }
+	.sqe-btn-header span { display: none; }
+	.sqe-conversion-block { align-items: stretch; }
+	.sqe-btn-hero { width: 100%; justify-content: space-between; }
+	.sqe-cta-reassurance { justify-content: center; text-align: center; }
+	.sqe-secondary-link { justify-content: center; }
+	.sqe-trial-note { text-align: left; }
+	.sqe-btn-final { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sqe-btn,
+	.sqe-btn::before,
+	.sqe-btn-arrow { transition: none; }
+	.sqe-btn:hover,
+	.sqe-btn:active,
+	.sqe-btn-hero:hover .sqe-btn-arrow { transform: none; }
+}
+
+/* Compact, thumb-friendly treatment for the public study path. */
+@media (max-width: 620px) {
+	.sqe-header { gap: 10px; }
+	.sqe-brand img { width: min(176px, 46vw); }
+	.sqe-nav .sqe-btn-header { max-width: 142px; white-space: nowrap; }
+	.sqe-path-head strong { font-size: 1.28rem; line-height: 1.12; }
+	.sqe-path-list li { align-items: start; }
+	.sqe-path-list small { font-size: 0.78rem; }
+	.sqe-path-progress small a { display: inline-flex; align-items: center; min-height: 44px; }
+}
+
+@media (max-width: 390px) {
+	.sqe-brand img { width: 152px; }
+	.sqe-nav .sqe-btn-header { max-width: 126px; font-size: 0.77rem; }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+	.sqe-header { position: relative; }
+	.sqe-hero { gap: 28px; padding-top: 32px; padding-bottom: 32px; }
+	.sqe-hero h1 { font-size: clamp(2.35rem, 6vw, 3.2rem); }
+	.sqe-lead { margin-bottom: 18px; line-height: 1.5; }
+	.sqe-conversion-block { margin-top: 20px; }
+}

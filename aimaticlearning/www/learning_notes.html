@@ -1,0 +1,35 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<div class="aimatic-learning-notes" style="max-width:900px;margin:0 auto;padding:24px;">
+	<style>
+		.aimatic-learning-notes {
+			user-select: none;
+		}
+		.aimatic-learning-notes .notes-body {
+			line-height: 1.6;
+			font-size: 16px;
+		}
+		.aimatic-learning-notes .notes-banner {
+			background: var(--fg-color);
+			border: 1px solid var(--border-color);
+			border-radius: 8px;
+			padding: 12px 16px;
+			margin-bottom: 16px;
+			font-size: 13px;
+		}
+		@media (max-width: 620px) {
+			.aimatic-learning-notes { padding: 18px 16px 36px !important; }
+			.aimatic-learning-notes h2 { font-size: clamp(1.55rem, 7vw, 2rem); line-height: 1.15; overflow-wrap: anywhere; }
+			.aimatic-learning-notes .notes-banner { padding: 12px 14px; font-size: 0.8rem; line-height: 1.5; }
+			.aimatic-learning-notes .notes-body { font-size: 1rem; line-height: 1.72; overflow-wrap: anywhere; }
+			.aimatic-learning-notes .notes-body table { display: block; max-width: 100%; overflow-x: auto; }
+		}
+	</style>
+	<h2>{{ chapter_title }}</h2>
+	<div class="notes-banner text-muted">
+		Protected read-only notes. Download and export are disabled. Content is served only after enrolment checks.
+	</div>
+	<div class="notes-body">{{ notes_html | safe }}</div>
+</div>
+{% endblock %}

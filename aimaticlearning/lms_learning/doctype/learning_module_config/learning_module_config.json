@@ -1,0 +1,160 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:LMOD-{#####}",
+ "creation": "2026-08-30 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "lms_course",
+  "source_file",
+  "column_break_targets",
+  "target_chapter_mcq_count",
+  "module_assessment_count",
+  "flashcard_target",
+  "section_break_status",
+  "import_status",
+  "module_assessment_quiz",
+  "column_break_counts",
+  "chapter_count",
+  "published_flashcard_count",
+  "module_mcq_count"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "lms_course",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "LMS Course",
+   "options": "LMS Course",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "source_file",
+   "fieldtype": "Link",
+   "label": "Source File",
+   "options": "File"
+  },
+  {
+   "fieldname": "column_break_targets",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "20",
+   "fieldname": "target_chapter_mcq_count",
+   "fieldtype": "Int",
+   "label": "Chapter MCQ Target",
+   "non_negative": 1
+  },
+  {
+   "default": "150",
+   "fieldname": "module_assessment_count",
+   "fieldtype": "Int",
+   "label": "Module Assessment MCQ Target",
+   "non_negative": 1
+  },
+  {
+   "default": "200",
+   "fieldname": "flashcard_target",
+   "fieldtype": "Int",
+   "label": "Flashcard Target",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "section_break_status",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "default": "Not Started",
+   "fieldname": "import_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Import Status",
+   "options": "Not Started\nStructure Imported\nContent Ready\nPublished"
+  },
+  {
+   "fieldname": "module_assessment_quiz",
+   "fieldtype": "Link",
+   "label": "Module Assessment Quiz",
+   "options": "LMS Quiz"
+  },
+  {
+   "fieldname": "column_break_counts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "chapter_count",
+   "fieldtype": "Int",
+   "label": "Chapter Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "published_flashcard_count",
+   "fieldtype": "Int",
+   "label": "Published Flashcards",
+   "read_only": 1
+  },
+  {
+   "fieldname": "module_mcq_count",
+   "fieldtype": "Int",
+   "label": "Module MCQ Count",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LMS Learning",
+ "name": "Learning Module Config",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "LMS Content Reviewer",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Course Creator",
+   "share": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

@@ -1,0 +1,365 @@
+/* Kinnu alignment pass for Aimatic's LMS learner shell. */
+body.aimatic-lms-learner {
+	--aimatic-ink: #202322;
+	--aimatic-ink-soft: #747875;
+	--aimatic-teal: #307f73;
+	--aimatic-teal-dark: #245f58;
+	--aimatic-mint: #e9f1e7;
+	--aimatic-mint-deep: #d6e5d1;
+	--aimatic-cream: #f7f3eb;
+	--aimatic-salmon: #cf918b;
+	--aimatic-green: #8eb580;
+	--aimatic-surface: #f5f1e9;
+	--aimatic-line: rgba(45, 42, 36, 0.12);
+	--aimatic-shadow: 0 16px 44px rgba(57, 49, 38, 0.08);
+	background-color: var(--aimatic-surface) !important;
+	background-image: radial-gradient(rgba(67, 57, 44, 0.075) 0.7px, transparent 0.8px) !important;
+	background-size: 4px 4px !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-grid {
+	grid-template-columns: 274px minmax(520px, 1fr) 292px !important;
+	gap: 14px;
+	padding: 0 14px 0 0;
+	background: transparent !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main {
+	height: calc(100vh - 60px) !important;
+	margin-top: 10px;
+	border: 1px solid rgba(45, 42, 36, 0.08) !important;
+	border-radius: 24px 24px 0 0 !important;
+	background: #fff !important;
+	box-shadow: var(--aimatic-shadow);
+	overflow-y: auto !important;
+	scrollbar-width: thin;
+	scrollbar-color: #d8d4cc transparent;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main > div,
+body.aimatic-lms-learner .aimatic-lms-lesson-main > div > div:first-child {
+	background: #fff !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main > div > div:first-child {
+	padding: 34px 46px 0 !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main h1 {
+	font-family: "Source Serif 4", Georgia, serif !important;
+	font-size: clamp(2rem, 2.6vw, 2.65rem) !important;
+	font-weight: 500 !important;
+	line-height: 1.12 !important;
+	letter-spacing: -0.035em !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror {
+	max-width: 900px !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail {
+	height: calc(100vh - 48px) !important;
+	border-right: 0 !important;
+	background: rgba(247, 243, 235, 0.86) !important;
+	backdrop-filter: blur(8px);
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail [class~="bg-surface-gray-1"] {
+	padding: 24px 20px 18px !important;
+	border-bottom: 1px solid var(--aimatic-line) !important;
+	background: transparent !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail [class~="bg-surface-gray-1"]::before {
+	color: #8b7967;
+	font-size: 0.6rem;
+	letter-spacing: 0.13em;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail button,
+body.aimatic-lms-learner .aimatic-lms-chapter-rail a {
+	border-radius: 7px !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail button:hover,
+body.aimatic-lms-learner .aimatic-lms-chapter-rail a:hover {
+	background: rgba(255, 255, 255, 0.62) !important;
+	color: var(--aimatic-ink) !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail a[class*="bg-surface-gray-2"] {
+	background: #efe7dc !important;
+	color: var(--aimatic-ink) !important;
+	box-shadow: inset 3px 0 0 var(--aimatic-salmon) !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-ai-rail {
+	height: calc(100vh - 48px);
+	padding: 24px 0 24px 4px;
+	border-left: 0;
+	background: transparent;
+}
+
+body.aimatic-lms-learner .aimatic-lms-ai-card {
+	border-color: rgba(48, 127, 115, 0.17);
+	background: rgba(255, 255, 255, 0.9);
+	box-shadow: 0 12px 34px rgba(57, 49, 38, 0.06);
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub {
+	margin: 30px 0 8px !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	background: #fff !important;
+	box-shadow: none !important;
+	overflow: visible;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-hero {
+	padding: 17px 19px !important;
+	border: 1px solid rgba(45, 42, 36, 0.07) !important;
+	border-radius: 16px !important;
+	background: #f7f6f3 !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-title {
+	display: none !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-eyebrow {
+	margin-bottom: 5px;
+	color: #8b7967;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-sub {
+	color: var(--aimatic-ink-soft) !important;
+	font-size: 0.8rem !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tabbar {
+	display: grid !important;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+	padding: 20px 0 28px !important;
+	border: 0 !important;
+	background: #fff !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab-label,
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 50px;
+	padding: 11px 16px !important;
+	border: 0 !important;
+	border-radius: 10px !important;
+	background: #ece9e3 !important;
+	color: #474945 !important;
+	box-shadow: none !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab-label:nth-of-type(2),
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab:nth-child(2) {
+	background: var(--aimatic-salmon) !important;
+	color: #fff !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab-label:nth-of-type(3),
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab:nth-child(3) {
+	background: var(--aimatic-green) !important;
+	color: #fff !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab-label:hover,
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab:hover,
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab.is-active {
+	filter: brightness(0.97);
+	transform: translateY(-1px);
+	box-shadow: 0 7px 16px rgba(57, 49, 38, 0.1) !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-panel {
+	padding: 0 0 34px !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-panel-notes {
+	background: #fff !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-notes-intro {
+	margin: 0 !important;
+	padding: 0 0 16px !important;
+	border: 0 !important;
+	border-bottom: 1px solid var(--aimatic-line) !important;
+	border-radius: 0 !important;
+	background: #fff !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-notes-icon {
+	display: none !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-notes-intro strong {
+	font-family: "Source Serif 4", Georgia, serif;
+	font-size: 1.02rem;
+	font-weight: 500;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-notes-body {
+	max-height: none !important;
+	overflow: visible !important;
+	padding-right: 0 !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-details,
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-details[open] {
+	margin: 0 !important;
+	border: 0 !important;
+	border-bottom: 1px solid var(--aimatic-line) !important;
+	border-radius: 0 !important;
+	background: #fff !important;
+	box-shadow: none !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-details summary {
+	padding: 19px 0 !important;
+	font-family: "Source Serif 4", Georgia, serif !important;
+	font-size: 1.05rem !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-section-num {
+	min-width: 25px;
+	height: 25px;
+	border-radius: 50%;
+	background: #efe7dc;
+	color: #8b655f;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-section-label {
+	color: var(--aimatic-ink) !important;
+	font-size: 0.95rem !important;
+	font-weight: 500 !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-section-body {
+	padding: 0 8px 26px 38px !important;
+	color: #3e413e !important;
+	font-size: 1.04rem !important;
+	line-height: 1.82 !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card {
+	background: linear-gradient(145deg, #f1e8df, #e1eee1) !important;
+	box-shadow: 0 14px 32px rgba(57, 49, 38, 0.1) !important;
+	color: var(--aimatic-ink) !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card.is-back {
+	background: linear-gradient(145deg, #e1eee1, #cfe0c9) !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-rate-easy {
+	border-color: var(--aimatic-green) !important;
+	background: var(--aimatic-green) !important;
+	color: #fff !important;
+}
+
+@media (max-width: 1250px) {
+	body.aimatic-lms-learner .aimatic-lms-lesson-grid {
+		grid-template-columns: 244px minmax(0, 1fr) !important;
+	}
+	body.aimatic-lms-learner .aimatic-lms-ai-rail { display: none; }
+}
+
+@media (max-width: 767px) {
+	body.aimatic-lms-learner .aimatic-lms-lesson-grid {
+		display: block !important;
+		padding: 0 !important;
+	}
+	body.aimatic-lms-learner .aimatic-lms-lesson-main {
+		height: auto !important;
+		margin: 0;
+		border: 0 !important;
+		border-radius: 0 !important;
+	}
+	body.aimatic-lms-learner .aimatic-lms-lesson-main > div > div:first-child {
+		padding: 22px 18px 0 !important;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-tabbar {
+		grid-template-columns: 1fr;
+		gap: 8px;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-section-body {
+		padding-left: 0 !important;
+	}
+}
+
+/* Phone learner shell: retain course navigation without a desktop-width rail. */
+@media (max-width: 767px) {
+	body.aimatic-lms-learner .aimatic-lms-lesson-grid {
+		display: flex !important;
+		flex-direction: column;
+		min-height: 0 !important;
+	}
+	body.aimatic-lms-learner .aimatic-lms-chapter-rail {
+		position: relative !important;
+		top: auto !important;
+		width: 100%;
+		height: auto !important;
+		max-height: 38vh;
+		overflow-y: auto !important;
+		border-right: 0 !important;
+		border-bottom: 1px solid var(--aimatic-line) !important;
+		background: rgba(247, 243, 235, 0.96) !important;
+	}
+	body.aimatic-lms-learner .aimatic-lms-chapter-rail [class~="bg-surface-gray-1"] {
+		padding: 16px 18px 12px !important;
+	}
+	body.aimatic-lms-learner .aimatic-lms-lesson-main {
+		grid-column: auto !important;
+		grid-row: auto !important;
+		width: 100%;
+		height: auto !important;
+		overflow: visible !important;
+	}
+	body.aimatic-lms-learner .aimatic-lms-lesson-main > div > div:first-child {
+		padding: 20px 18px 28px !important;
+	}
+	body.aimatic-lms-learner .aimatic-lms-lesson-main h1 {
+		font-size: clamp(1.7rem, 8vw, 2.2rem) !important;
+		overflow-wrap: anywhere;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub { margin-top: 18px !important; }
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-hero { padding: 16px !important; }
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-tabbar {
+		grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+		gap: 7px;
+		padding: 16px 0 20px !important;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab-label,
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab {
+		min-height: 48px;
+		padding: 8px 6px !important;
+		font-size: 0.76rem;
+		line-height: 1.15;
+		text-align: center;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-panel { padding-bottom: 24px !important; }
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-section-body {
+		padding-bottom: 20px !important;
+		font-size: 1rem !important;
+		line-height: 1.72 !important;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-actions {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-rate { min-height: 44px; }
+}
+
+@media (max-width: 390px) {
+	body.aimatic-lms-learner .aimatic-lms-chapter-rail { max-height: 35vh; }
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab-label,
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab { font-size: 0.7rem; }
+}

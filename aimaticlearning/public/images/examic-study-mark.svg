@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="1024" height="1024" role="img" aria-label="Examic Study">
+  <circle cx="128.0" cy="128.0" r="118.0" fill="#102848"/>
+  <path d="M86.0 170.0 L128.0 138.0 L168.0 108.0" fill="none" stroke="#C4A056" stroke-width="9.0" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="86.0" cy="170.0" r="13.0" fill="#C4A056"/>
+  <circle cx="128.0" cy="138.0" r="13.0" fill="#C4A056"/>
+  <circle cx="168.0" cy="108.0" r="13.0" fill="#C4A056"/>
+  <circle cx="176.0" cy="90.0" r="26.0" fill="#102848"/>
+  <circle cx="176.0" cy="90.0" r="21.75" fill="none" stroke="#fff" stroke-width="4.5"/>
+  <path d="M166.0 91.2 L173.8 99.0 L188.5 81.0" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

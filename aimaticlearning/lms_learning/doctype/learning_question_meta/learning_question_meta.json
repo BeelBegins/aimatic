@@ -1,0 +1,143 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-08-30 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "lms_question",
+  "learning_module",
+  "course_chapter",
+  "column_break_tags",
+  "concept",
+  "learning_objective",
+  "difficulty",
+  "question_role",
+  "section_break_source",
+  "source_reference",
+  "revision",
+  "ai_generated"
+ ],
+ "fields": [
+  {
+   "fieldname": "lms_question",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "LMS Question",
+   "options": "LMS Question",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "learning_module",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Learning Module",
+   "options": "Learning Module Config",
+   "reqd": 1
+  },
+  {
+   "fieldname": "course_chapter",
+   "fieldtype": "Link",
+   "label": "Course Chapter",
+   "options": "Course Chapter"
+  },
+  {
+   "fieldname": "column_break_tags",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "concept",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Concept"
+  },
+  {
+   "fieldname": "learning_objective",
+   "fieldtype": "Small Text",
+   "label": "Learning Objective"
+  },
+  {
+   "default": "Medium",
+   "fieldname": "difficulty",
+   "fieldtype": "Select",
+   "label": "Difficulty",
+   "options": "Easy\nMedium\nHard"
+  },
+  {
+   "default": "Chapter MCQ",
+   "fieldname": "question_role",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Question Role",
+   "options": "Chapter MCQ\nModule Assessment\nBoth"
+  },
+  {
+   "fieldname": "section_break_source",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "source_reference",
+   "fieldtype": "Data",
+   "label": "Source Reference"
+  },
+  {
+   "default": "1",
+   "fieldname": "revision",
+   "fieldtype": "Int",
+   "label": "Revision",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "ai_generated",
+   "fieldtype": "Check",
+   "label": "AI Generated"
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LMS Learning",
+ "name": "Learning Question Meta",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "LMS Content Reviewer",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 1,
+   "role": "Course Creator",
+   "share": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

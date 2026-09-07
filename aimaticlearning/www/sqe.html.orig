@@ -1,0 +1,108 @@
+{% extends "templates/web.html" %}
+
+{% block meta_block %}
+<meta name="description" content="{{ meta_description }}">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="{{ meta_description }}">
+<meta property="og:type" content="website">
+<link rel="canonical" href="{{ canonical_url }}">
+{% endblock %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block head_include %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Newsreader:opsz,wght@6..72,500;6..72,600&amp;display=swap" rel="stylesheet">
+<link rel="icon" href="/assets/aimaticlearning/images/examic-study-mark-original.png" type="image/png">
+<link rel="stylesheet" href="/assets/aimaticlearning/css/sqe_prep.css?v=20260901-2">
+<link rel="stylesheet" href="/assets/aimaticlearning/css/sqe_conversion.css?v=20260901-2">
+{% endblock %}
+
+{% block page_content %}
+<div class="sqe-site">
+	<header class="sqe-header">
+		<a class="sqe-brand" href="/sqe" aria-label="Examic Study home">
+			<img src="/assets/aimaticlearning/images/examic-study-header.png" alt="Examic Study — Examination Preparation Portal" width="370" height="76">
+		</a>
+		<nav class="sqe-nav" aria-label="Primary navigation">
+			<a href="#how-it-works">How it works</a>
+			<a href="#inside">What you get</a>
+			<a class="sqe-btn sqe-btn-ghost" href="{{ login_url }}">Log in</a>
+			<a class="sqe-btn sqe-btn-primary sqe-btn-header" href="{{ signup_url }}">Start free trial <span aria-hidden="true">→</span></a>
+		</nav>
+	</header>
+
+	<main>
+		<section class="sqe-hero">
+			<div class="sqe-hero-copy">
+				<p class="sqe-eyebrow"><span></span> Focused SQE preparation</p>
+				<h1>Study with direction.<br><em>Practise with purpose.</em></h1>
+				<p class="sqe-lead">Clear study notes, targeted questions, flashcards and realistic mocks—organised into one calm learning path that shows you what to do next.</p>
+				<div class="sqe-hero-actions">
+					<a class="sqe-btn sqe-btn-primary sqe-btn-large" href="{{ signup_url }}">Create your free account <span>→</span></a>
+					<a class="sqe-btn sqe-btn-ghost sqe-btn-large" href="{{ courses_url }}">Explore courses</a>
+				</div>
+				<p class="sqe-trial-note"><strong>7-day introductory access.</strong> Launch offer: <strong>$25/month</strong> (normally $50). Choose your course after signing up—nothing is assigned automatically. Online checkout is not enabled yet.</p>
+			</div>
+			<div class="sqe-path-card" aria-label="Prepare, Practice, Perform learning path">
+				<div class="sqe-path-head"><span>Your study path</span><strong>Business Law &amp; Practice</strong></div>
+				<ol class="sqe-path-list">
+					<li class="is-active"><span class="sqe-path-number">01</span><div><strong>Prepare</strong><small>Build understanding with structured notes</small></div><span class="sqe-path-state">In progress</span></li>
+					<li><span class="sqe-path-number">02</span><div><strong>Practice</strong><small>Strengthen recall with MCQs and flashcards</small></div><span class="sqe-path-state">Next</span></li>
+					<li><span class="sqe-path-number">03</span><div><strong>Perform</strong><small>Test readiness with a full module mock</small></div><span class="sqe-path-state">Locked</span></li>
+				</ol>
+				<div class="sqe-path-progress"><span><i style="width:38%"></i></span><small>Keep going—consistency beats cramming.</small></div>
+			</div>
+		</section>
+
+		<section class="sqe-proof" aria-label="Current course resources">
+			<div><strong>{{ stats.chapters }}</strong><span>focused chapters</span></div>
+			<div><strong>{{ stats.practice_mcqs }}</strong><span>practice MCQs</span></div>
+			<div><strong>{{ stats.flashcards }}</strong><span>revision flashcards</span></div>
+			<div><strong>{{ stats.mock_mcqs }}</strong><span>mock questions</span></div>
+		</section>
+
+		<section class="sqe-section sqe-how" id="how-it-works">
+			<div class="sqe-section-heading">
+				<p class="sqe-eyebrow"><span></span> A better study rhythm</p>
+				<h2>Prepare → Practice → Perform</h2>
+				<p>Move from understanding the law to retrieving it under pressure, without losing your place or wondering what comes next.</p>
+			</div>
+			<div class="sqe-three">
+				<article><span>01</span><h3>Prepare</h3><p>Read focused, professionally reviewed notes in manageable lesson sections.</p><ul><li>Clear chapter structure</li><li>Readable, distraction-free lessons</li><li>Your progress saved</li></ul></article>
+				<article><span>02</span><h3>Practice</h3><p>Turn knowledge into recall with immediate feedback and explanations.</p><ul><li>Chapter MCQ sessions</li><li>Easy, medium and hard flashcards</li><li>Resume safely when you return</li></ul></article>
+				<article><span>03</span><h3>Perform</h3><p>Measure readiness with a realistic module assessment and useful results.</p><ul><li>150-question BLP mock</li><li>Canonical server scoring</li><li>Attempt history and results</li></ul></article>
+			</div>
+		</section>
+
+		<section class="sqe-section sqe-inside" id="inside">
+			<div class="sqe-section-heading">
+				<p class="sqe-eyebrow"><span></span> Inside Examic Study</p>
+				<h2>Everything in one calm workspace</h2>
+				<p>Course navigation stays on the left, your lesson stays centred, and Study Buddy AI follows the topic on the right.</p>
+			</div>
+			<div class="sqe-feature-grid">
+				<article class="sqe-feature sqe-feature-large"><span class="sqe-icon">Aa</span><h3>Study notes made to be read</h3><p>Soft typography, focused sections and a persistent chapter path keep long legal material approachable.</p></article>
+				<article class="sqe-feature"><span class="sqe-icon">✓</span><h3>Practice with feedback</h3><p>Check each answer and learn from the explanation—not just the score.</p></article>
+				<article class="sqe-feature"><span class="sqe-icon">↻</span><h3>Flashcards that remember</h3><p>Rate recall as hard, good or easy, pause safely, and return to your deck.</p></article>
+				<article class="sqe-feature"><span class="sqe-icon">◎</span><h3>Results you can use</h3><p>See your score, attempt history and the next practical step after a session.</p></article>
+				<article class="sqe-feature sqe-feature-gold"><span class="sqe-icon">✦</span><h3>Study Buddy AI</h3><p>A lesson-aware assistant is being prepared for a later release. Your selected lesson already provides its context.</p></article>
+			</div>
+		</section>
+
+		<section class="sqe-cta-panel">
+			<div><p class="sqe-eyebrow sqe-eyebrow-light"><span></span> Start where you are</p><h2>A clearer path to exam day.</h2><p>Create your account, choose an available course and begin when you are ready.</p></div>
+			<div class="sqe-cta-actions"><a class="sqe-btn sqe-btn-light sqe-btn-large" href="{{ signup_url }}">Start free <span>→</span></a><a class="sqe-cta-login" href="{{ login_url }}">Already studying? Log in</a></div>
+		</section>
+	</main>
+
+	<footer class="sqe-footer">
+		<img src="/assets/aimaticlearning/images/examic-study-header.png" alt="Examic Study" width="370" height="76">
+		<p>Focused preparation for professional exams.</p>
+		<span>© {{ frappe.utils.now_datetime().year }} Examic Study</span>
+	</footer>
+</div>
+{% endblock %}

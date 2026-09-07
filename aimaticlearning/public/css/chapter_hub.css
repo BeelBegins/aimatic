@@ -1,0 +1,104 @@
+/* Aimatic chapter hub — tabs inside LMS lesson */
+.aimatic-chapter-hub {
+	font-family: system-ui, -apple-system, sans-serif;
+	color: #04161c;
+	margin: 0 0 1.5rem;
+}
+.ach-header { margin-bottom: 16px; }
+.ach-title { margin: 0 0 6px; font-size: 1.25rem; font-weight: 700; }
+.ach-sub { margin: 0; font-size: 0.9rem; color: #1a3340; }
+.ach-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 16px;
+	border-bottom: 1px solid rgba(4, 22, 28, 0.1);
+	padding-bottom: 8px;
+}
+.ach-tab {
+	border: 1px solid rgba(4, 22, 28, 0.12);
+	background: #f7faf9;
+	color: #04161c;
+	padding: 8px 16px;
+	border-radius: 999px;
+	font-size: 0.85rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+.ach-tab.is-active {
+	background: #0b9a84;
+	border-color: #0b9a84;
+	color: #fff;
+}
+.ach-panel { min-height: 120px; }
+.ach-panel[hidden] { display: none !important; }
+.ach-notes-banner {
+	font-size: 0.8rem;
+	color: #1a3340;
+	background: #f7faf9;
+	border: 1px solid rgba(4, 22, 28, 0.08);
+	border-radius: 10px;
+	padding: 10px 12px;
+	margin-bottom: 12px;
+}
+.ach-notes-body {
+	line-height: 1.65;
+	font-size: 0.95rem;
+	user-select: none;
+	max-height: 52vh;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+.ach-notes-body p { margin: 0 0 12px; }
+.ach-notes-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-top: 12px;
+}
+.ach-notes-progress { font-size: 0.8rem; color: #1a3340; }
+.ach-btn {
+	border: 1px solid rgba(4, 22, 28, 0.15);
+	background: #fff;
+	padding: 8px 14px;
+	border-radius: 999px;
+	font-size: 0.82rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+.ach-btn-primary { background: #0b9a84; color: #fff; border-color: #0b9a84; }
+.ach-btn-ghost { background: #f7faf9; }
+.ach-btn[hidden] { display: none !important; }
+.ach-empty, .ach-flash-loading, .ach-flash-empty {
+	padding: 16px;
+	color: #1a3340;
+	font-size: 0.9rem;
+}
+.ach-quiz-wrap { margin-top: 4px; }
+.ach-flash-card {
+	background: linear-gradient(145deg, #04161c, #0d3d4a);
+	color: #fff;
+	border-radius: 14px;
+	padding: 24px;
+	min-height: 160px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	cursor: pointer;
+	line-height: 1.5;
+}
+.ach-flash-card.is-back { background: linear-gradient(145deg, #0b9a84, #077a69); }
+.ach-flash-meta {
+	display: flex;
+	justify-content: space-between;
+	font-size: 0.8rem;
+	color: #1a3340;
+	margin-top: 10px;
+}
+.ach-flash-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 12px;
+}

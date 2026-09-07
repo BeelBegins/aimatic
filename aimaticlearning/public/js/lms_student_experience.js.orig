@@ -1,0 +1,127 @@
+(function () {
+	"use strict";
+
+	function isBlpLesson() {
+		return /^\/lms\/courses\/business-law-practice-blp(?:\/|$)/.test(window.location.pathname);
+	}
+
+	function polishStudyBuddy() {
+		if (!isBlpLesson()) return;
+		const rail = document.querySelector(".aimatic-lms-ai-rail");
+		if (!rail) return;
+		const lessonHeading = document.querySelector(".aimatic-lms-lesson-main h1");
+		if (!rail.dataset.aimaticStudyBuddyReady) {
+			rail.setAttribute("aria-label", "Study Buddy AI");
+			const card = rail.querySelector(".aimatic-lms-ai-card");
+			const kicker = rail.querySelector(".aimatic-lms-ai-kicker");
+			const heading = rail.querySelector("h2");
+			const paragraph = rail.querySelector("p");
+			if (kicker) kicker.innerHTML = '<span class="aimatic-lms-ai-spark">✦</span> Study Buddy AI';
+			if (heading) heading.textContent = "Ask about this lesson.";
+			if (paragraph) {
+				paragraph.textContent = "Your lesson-aware study assistant will follow the topic you are reading. Chat will be enabled in the next phase.";
+			}
+			let context = rail.querySelector(".aimatic-lms-ai-context");
+			if (!context && card && kicker) {
+				context = document.createElement("div");
+				context.className = "aimatic-lms-ai-context";
+				context.innerHTML = "<span>Chatting about</span><strong>This lesson</strong>";
+				kicker.insertAdjacentElement("afterend", context);
+			}
+			rail.dataset.aimaticStudyBuddyReady = "1";
+		}
+		const context = rail.querySelector(".aimatic-lms-ai-context");
+		if (context && lessonHeading) {
+			const strong = context.querySelector("strong");
+			const topicTitle = lessonHeading.textContent.trim();
+			if (strong && strong.textContent !== topicTitle) {
+				strong.textContent = topicTitle;
+			}
+		}
+	}
+
+	function hideInstructorByline() {
+		if (!isBlpLesson()) return;
+		document.querySelectorAll('.aimatic-lms-lesson-main a[href*="/lms/user/"]').forEach(function (link) {
+			let row = link.parentElement;
+			while (row && row.parentElement && !row.classList.contains("aimatic-lms-lesson-main")) {
+				if (row.classList.contains("flex") && row.classList.contains("items-center")) break;
+				row = row.parentElement;
+			}
+			if (row) row.classList.add("aimatic-lms-instructor-byline");
+		});
+	}
+
+	function nextFlashcard(study, current) {
+		const cards = Array.from(study.querySelectorAll("[data-ach-card]"));
+		const nextIndex = cards.indexOf(current) + 1;
+		current.hidden = true;
+		if (nextIndex >= cards.length) {
+			study.innerHTML = '<div class="ach-flash-complete"><strong>Deck complete</strong><span>Nice work. Revisit the cards you found hardest later.</span></div>';
+			return;
+		}
+		const next = cards[nextIndex];
+		next.hidden = false;
+		next.querySelector(".ach-card-front").hidden = false;
+		next.querySelector(".ach-card-back").hidden = true;
+		next.querySelector("[data-ach-flash-card]").classList.remove("is-back");
+		study.querySelectorAll("[data-ach-rating]").forEach(function (button) {
+			button.disabled = true;
+		});
+	}
+
+	function saveFlashcardReview(button) {
+		const study = button.closest("[data-ach-flash-study]");
+		const current = study && Array.from(study.querySelectorAll("[data-ach-card]")).find(function (item) {
+			return !item.hidden;
+		});
+		if (!study || !current || button.disabled) return;
+		button.disabled = true;
+		fetch("/api/method/aimaticlearning.lms_learning.api.review_flashcard", {
+			method: "POST",
+			credentials: "same-origin",
+			headers: {
+				"Content-Type": "application/json",
+				"X-Frappe-CSRF-Token": window.csrf_token || "",
+			},
+			body: JSON.stringify({
+				name: current.dataset.achCardName,
+				rating: button.dataset.achRating,
+			}),
+		})
+			.then(function (response) {
+				if (!response.ok) throw new Error("Flashcard review could not be saved.");
+				nextFlashcard(study, current);
+			})
+			.catch(function () {
+				button.disabled = false;
+			});
+	}
+
+	function polish() {
+		polishStudyBuddy();
+		hideInstructorByline();
+	}
+
+	document.addEventListener(
+		"click",
+		function (event) {
+			if (!isBlpLesson()) return;
+			const button = event.target.closest("[data-ach-rating]");
+			if (!button) return;
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			saveFlashcardReview(button);
+		},
+		true
+	);
+
+	if (document.readyState === "loading") {
+		document.addEventListener("DOMContentLoaded", polish);
+	} else {
+		polish();
+	}
+	if (document.body) {
+		new MutationObserver(polish).observe(document.body, { childList: true, subtree: true });
+	}
+})();

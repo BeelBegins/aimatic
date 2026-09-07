@@ -1,0 +1,126 @@
+<div class="aimatic-chapter-hub ach-{{ profile_name }}">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap');
+.aimatic-chapter-hub{
+	--ach-ink:#1a2e35;--ach-ink-soft:#4a6570;--ach-teal:#2a9d8f;--ach-teal-soft:#7ec8be;
+	--ach-mint:#e8f7f4;--ach-mint-deep:#d4f0ea;--ach-surface:#f6f9f8;--ach-card:#ffffff;
+	--ach-warm:#faf8f5;--ach-border:rgba(26,46,53,.08);--ach-shadow:0 8px 32px rgba(26,46,53,.06);
+	font-family:"Bricolage Grotesque",system-ui,sans-serif;color:var(--ach-ink);
+	margin:0;padding:0;background:linear-gradient(180deg,var(--ach-surface) 0%,#fff 120px);
+	border-radius:20px;border:1px solid var(--ach-border);overflow:hidden;
+}
+.aimatic-chapter-hub *{box-sizing:border-box}
+.aimatic-chapter-hub .ach-hero{padding:20px 20px 12px;background:linear-gradient(135deg,#eef9f6 0%,#f8fbfb 55%,#fff 100%)}
+.aimatic-chapter-hub .ach-title{margin:0;font-size:1.35rem;font-weight:700;line-height:1.2;letter-spacing:-.02em}
+.aimatic-chapter-hub .ach-sub{margin:6px 0 0;font-size:.88rem;color:var(--ach-ink-soft);font-weight:500}
+.aimatic-chapter-hub .ach-tabbar{
+	display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px 14px;
+	background:rgba(255,255,255,.7);border-bottom:1px solid var(--ach-border)
+}
+.aimatic-chapter-hub .ach-radios{position:absolute;opacity:0;width:0;height:0;pointer-events:none}
+.aimatic-chapter-hub .ach-tab-label{
+	display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:12px;
+	border:1px solid transparent;background:var(--ach-warm);font-size:.84rem;font-weight:600;
+	color:var(--ach-ink-soft);cursor:pointer;transition:all .2s ease
+}
+.aimatic-chapter-hub .ach-radios:checked + .ach-tab-label{
+	background:var(--ach-teal);color:#fff;border-color:var(--ach-teal);
+	box-shadow:0 4px 14px rgba(42,157,143,.28)
+}
+.aimatic-chapter-hub .ach-panel{display:none;padding:16px 16px 20px;animation:achFade .25s ease}
+@keyframes achFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.aimatic-chapter-hub .ach-radios#ach-notes-{{ profile_name }}:checked ~ .ach-panel-notes,
+.aimatic-chapter-hub .ach-radios#ach-mcq-{{ profile_name }}:checked ~ .ach-panel-mcq,
+.aimatic-chapter-hub .ach-radios#ach-flash-{{ profile_name }}:checked ~ .ach-panel-flash{display:block}
+.aimatic-chapter-hub .ach-panel-notes{background:var(--ach-surface)}
+.aimatic-chapter-hub .ach-panel-mcq,.aimatic-chapter-hub .ach-panel-flash{background:#fff}
+.aimatic-chapter-hub .ach-notes-intro{
+	display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:12px 14px;
+	background:var(--ach-mint);border-radius:14px;border:1px solid rgba(42,157,143,.12)
+}
+.aimatic-chapter-hub .ach-notes-icon{
+	width:36px;height:36px;border-radius:10px;background:#fff;display:flex;align-items:center;
+	justify-content:center;color:var(--ach-teal);font-size:1rem;flex-shrink:0;
+	box-shadow:0 2px 8px rgba(42,157,143,.12)
+}
+.aimatic-chapter-hub .ach-notes-intro strong{display:block;font-size:.82rem;font-weight:700;color:var(--ach-ink)}
+.aimatic-chapter-hub .ach-notes-intro span{font-size:.76rem;color:var(--ach-ink-soft);line-height:1.4}
+.aimatic-chapter-hub .ach-notes-body{user-select:none;max-height:52vh;overflow-y:auto;padding-right:4px}
+.aimatic-chapter-hub .ach-notes-body::-webkit-scrollbar{width:6px}
+.aimatic-chapter-hub .ach-notes-body::-webkit-scrollbar-thumb{background:var(--ach-mint-deep);border-radius:99px}
+.aimatic-chapter-hub .ach-details{
+	border:none;border-radius:16px;margin-bottom:10px;background:var(--ach-card);
+	box-shadow:var(--ach-shadow);overflow:hidden;border:1px solid var(--ach-border)
+}
+.aimatic-chapter-hub .ach-details[open]{background:linear-gradient(180deg,#fff 0%,var(--ach-warm) 100%)}
+.aimatic-chapter-hub .ach-details summary{
+	list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;
+	gap:12px;font-weight:600;font-size:.88rem;color:var(--ach-ink)
+}
+.aimatic-chapter-hub .ach-details summary::-webkit-details-marker{display:none}
+.aimatic-chapter-hub .ach-section-num{
+	min-width:28px;height:28px;border-radius:8px;background:var(--ach-mint-deep);
+	color:var(--ach-teal);font-size:.75rem;font-weight:700;display:flex;align-items:center;
+	justify-content:center;flex-shrink:0
+}
+.aimatic-chapter-hub .ach-section-label{color:var(--ach-ink-soft);font-weight:600;font-size:.82rem}
+.aimatic-chapter-hub .ach-section-body{
+	padding:4px 16px 16px 56px;font-family:"Source Serif 4",Georgia,serif;
+	font-size:1.02rem;line-height:1.75;color:#2c3e47
+}
+.aimatic-chapter-hub .ach-section-body p{margin:0 0 14px}
+.aimatic-chapter-hub .ach-section-body p:last-child{margin-bottom:0}
+.aimatic-chapter-hub .ach-empty{
+	color:var(--ach-ink-soft);font-size:.92rem;padding:20px 16px;text-align:center;
+	background:var(--ach-warm);border-radius:14px;border:1px dashed var(--ach-border)
+}
+.aimatic-chapter-hub .ach-flash-card summary{align-items:flex-start}
+.aimatic-chapter-hub .ach-flash-front{
+	flex:1;font-family:"Bricolage Grotesque",sans-serif;font-size:.92rem;line-height:1.45;color:var(--ach-ink)
+}
+.aimatic-chapter-hub .ach-flash-hint{
+	font-size:.7rem;font-weight:600;color:var(--ach-teal-soft);white-space:nowrap
+}
+.aimatic-chapter-hub .ach-flash-back{
+	padding:0 16px 16px 56px;font-family:"Source Serif 4",Georgia,serif
+}
+.aimatic-chapter-hub .ach-flash-back p{
+	margin:0;padding:12px 14px;background:var(--ach-mint);border-radius:12px;
+	font-size:.98rem;line-height:1.65;color:#2c3e47;border:1px solid rgba(42,157,143,.1)
+}
+.aimatic-chapter-hub .ach-quiz-wrap{
+	border-radius:16px;border:1px solid var(--ach-border);padding:12px;background:var(--ach-warm)
+}
+</style>
+<div class="ach-hero">
+	<div class="ach-eyebrow"><span class="ach-eyebrow-dot"></span> Chapter study session</div>
+	<p class="ach-title">{{ chapter_title }}</p>
+	<p class="ach-sub">Learn the idea, test your understanding, then strengthen recall.</p>
+</div>
+<div class="ach-tabbar" role="tablist" aria-label="Chapter materials">
+	<button type="button" class="ach-tab is-active" data-ach-tab="notes" role="tab" aria-selected="true">📖 <span>Study notes</span></button>
+	<button type="button" class="ach-tab" data-ach-tab="mcq" role="tab" aria-selected="false">✓ <span>Practice MCQs</span></button>
+	<button type="button" class="ach-tab" data-ach-tab="flash" role="tab" aria-selected="false">🃏 <span>Flashcards</span></button>
+</div>
+<div class="ach-panel ach-panel-notes is-active" data-ach-panel="notes" role="tabpanel">
+	<div class="ach-notes-intro">
+		<div class="ach-notes-icon">📖</div>
+		<div><strong>Chapter study notes</strong><span>Bite-sized sections — expand each part as you read.</span></div>
+	</div>
+	<div class="ach-notes-body">{{ notes_html }}</div>
+</div>
+<div class="ach-panel ach-panel-mcq" data-ach-panel="mcq" role="tabpanel" hidden>
+	{% if quiz_html %}
+	<div class="ach-quiz-wrap">{{ quiz_html }}</div>
+	{% else %}
+	<p class="ach-empty">Practice questions for this chapter are coming soon.</p>
+	{% endif %}
+</div>
+<div class="ach-panel ach-panel-flash" data-ach-panel="flash" role="tabpanel" hidden>
+	<div class="ach-notes-intro">
+		<div class="ach-notes-icon">↻</div>
+		<div><strong>Strengthen recall</strong><span>Flip the card, rate how well you knew it, and continue.</span></div>
+	</div>
+	{{ flashcards_html }}
+</div>
+</div>

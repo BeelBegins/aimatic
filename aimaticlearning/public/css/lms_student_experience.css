@@ -1,0 +1,589 @@
+body.aimatic-lms-learner .aimatic-revision-entry {
+	display: block;
+	margin: 8px 12px 10px;
+	padding: 11px 12px;
+	border: 1px solid rgba(11, 154, 132, 0.22);
+	border-radius: 14px;
+	background: #eef8f5;
+	color: var(--aimatic-ink) !important;
+	text-decoration: none !important;
+}
+
+body.aimatic-lms-learner .aimatic-revision-entry small,
+body.aimatic-lms-learner .aimatic-revision-entry strong {
+	display: block;
+}
+
+body.aimatic-lms-learner .aimatic-revision-entry small {
+	margin-bottom: 2px;
+	color: var(--aimatic-teal-dark);
+	font-size: 0.59rem;
+	font-weight: 750;
+	letter-spacing: 0.11em;
+	text-transform: uppercase;
+}
+
+body.aimatic-lms-learner .aimatic-revision-entry strong {
+	font-size: 0.82rem;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-complete-actions,
+.ach-flash-complete-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-complete-actions button,
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-complete-actions a,
+.ach-flash-complete-actions button,
+.ach-flash-complete-actions a {
+	min-height: 40px;
+	padding: 8px 14px;
+	border: 1px solid rgba(16, 35, 63, 0.12);
+	border-radius: 999px;
+	background: #fff;
+	color: #10233f;
+	font-weight: 700;
+	font-size: 0.8rem;
+	text-decoration: none;
+	cursor: pointer;
+}
+body.aimatic-lms-learner .aimatic-flk1-switcher {
+	margin: 12px 12px 4px;
+	border: 1px solid rgba(23, 36, 58, 0.12);
+	border-radius: 14px;
+	background: #fffdf8;
+	overflow: hidden;
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher > button {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	padding: 11px 12px;
+	border: 0;
+	border-radius: 0 !important;
+	background: transparent;
+	color: var(--aimatic-ink);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher > button small,
+body.aimatic-lms-learner .aimatic-flk1-switcher > button strong {
+	display: block;
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher > button small {
+	margin-bottom: 2px;
+	color: var(--aimatic-teal-dark);
+	font-size: 0.59rem;
+	font-weight: 750;
+	letter-spacing: 0.11em;
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher > button strong {
+	font-size: 0.82rem;
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher > button > i {
+	font-size: 1.1rem;
+	font-style: normal;
+	transition: transform 160ms ease;
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher > button[aria-expanded="true"] > i {
+	transform: rotate(180deg);
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher > div {
+	padding: 4px 6px 7px;
+	border-top: 1px solid var(--aimatic-line);
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher a {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 8px 7px !important;
+	border-radius: 8px !important;
+	color: var(--aimatic-ink-soft) !important;
+	font-size: 0.72rem;
+	font-weight: 600;
+	line-height: 1.25;
+	text-decoration: none;
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher a[aria-current="page"] {
+	background: #f6ebd5 !important;
+	color: var(--aimatic-ink) !important;
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher a b {
+	color: var(--aimatic-teal-dark);
+	font-size: 0.58rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+body.aimatic-lms-learner .aimatic-flk1-switcher a i {
+	font-size: 1rem;
+	font-style: normal;
+}
+
+/* Source-backed BLP topics and Study Buddy polish. */
+
+/*
+ * Topic tools live in the published lesson HTML. They must still read as
+ * separate controls while the Learning SPA is mounting, before the learner
+ * shell class is added to <body>.
+ */
+.aimatic-topic-note {
+	max-width: 900px;
+	margin: 26px 0 54px;
+}
+
+.aimatic-topic-actions {
+	display: grid;
+	grid-template-columns: minmax(0, 1.75fr) minmax(190px, 1fr);
+	gap: 20px;
+	margin: 0 0 48px;
+}
+
+.aimatic-topic-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 52px;
+	padding: 12px 18px;
+	border-radius: 10px;
+	color: #fff !important;
+	font-size: 0.95rem;
+	font-weight: 650;
+	line-height: 1.25;
+	text-align: center;
+	text-decoration: none !important;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	transition: filter 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.aimatic-topic-action-mcq { background: #cf918b; }
+.aimatic-topic-action-flash { background: #8eb580; }
+
+.aimatic-topic-actions > p {
+	display: flex;
+	margin: 0;
+}
+
+.aimatic-topic-actions > p > .aimatic-topic-action {
+	width: 100%;
+}
+
+.aimatic-topic-intro .aimatic-topic-kicker {
+	display: block;
+	margin: 0 0 7px !important;
+	color: #307f73 !important;
+	font-family: "Source Serif 4", Georgia, serif;
+	font-size: 1.8rem !important;
+	font-weight: 500;
+	letter-spacing: -0.02em;
+}
+
+.aimatic-topic-intro {
+	margin-bottom: 28px;
+	padding-bottom: 24px;
+	border-bottom: 1px solid rgba(45, 42, 36, 0.12);
+}
+
+.aimatic-topic-intro > span {
+	display: block;
+	margin-bottom: 7px;
+	color: #307f73;
+	font-family: "Source Serif 4", Georgia, serif;
+	font-size: 1.8rem;
+	font-weight: 500;
+	letter-spacing: -0.02em;
+}
+
+.aimatic-topic-intro p {
+	margin: 0 !important;
+	color: #747875 !important;
+	font-size: 0.86rem !important;
+}
+
+.aimatic-topic-sections p,
+.aimatic-chapter-hub .ach-section-body p,
+.aimatic-chapter-hub .ach-notes-body p {
+	text-align: justify;
+	text-justify: inter-word;
+	hyphens: auto;
+}
+
+@media (max-width: 767px) {
+	.aimatic-topic-actions {
+		grid-template-columns: 1fr;
+		gap: 9px;
+		margin-bottom: 32px;
+	}
+
+	.aimatic-topic-action { min-height: 50px; }
+}
+body.aimatic-lms-learner .aimatic-lms-instructor-byline {
+	display: none !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-ai-context {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	margin: 18px 0 22px;
+	padding: 13px 14px;
+	border: 1px solid rgba(48, 127, 115, 0.14);
+	border-radius: 12px;
+	background: #f5f8f5;
+}
+
+body.aimatic-lms-learner .aimatic-lms-ai-context span {
+	color: #7e837e;
+	font-size: 0.64rem;
+	font-weight: 650;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+body.aimatic-lms-learner .aimatic-lms-ai-context strong {
+	color: var(--aimatic-teal-dark);
+	font-family: "Source Serif 4", Georgia, serif;
+	font-size: 0.98rem;
+	font-weight: 500;
+	line-height: 1.35;
+}
+
+body.aimatic-lms-learner .aimatic-topic-note {
+	max-width: 900px;
+	margin: 26px 0 54px;
+}
+
+body.aimatic-lms-learner .aimatic-topic-actions {
+	display: grid;
+	grid-template-columns: minmax(0, 1.75fr) minmax(190px, 1fr);
+	gap: 20px;
+	margin-bottom: 48px;
+}
+
+body.aimatic-lms-learner .aimatic-topic-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 52px;
+	padding: 12px 18px;
+	border-radius: 10px;
+	color: #fff !important;
+	font-size: 0.95rem;
+	font-weight: 650;
+	text-decoration: none !important;
+	transition: filter 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+body.aimatic-lms-learner .aimatic-topic-action:hover {
+	filter: brightness(0.97);
+	transform: translateY(-1px);
+	box-shadow: 0 8px 18px rgba(57, 49, 38, 0.12);
+}
+
+body.aimatic-lms-learner .aimatic-topic-action-mcq {
+	background: var(--aimatic-salmon);
+}
+
+body.aimatic-lms-learner .aimatic-topic-action-flash {
+	background: var(--aimatic-green);
+}
+
+body.aimatic-lms-learner .aimatic-topic-intro {
+	margin-bottom: 28px;
+	padding-bottom: 24px;
+	border-bottom: 1px solid var(--aimatic-line);
+}
+
+body.aimatic-lms-learner .aimatic-topic-intro > span {
+	display: block;
+	margin-bottom: 7px;
+	color: var(--aimatic-teal);
+	font-family: "Source Serif 4", Georgia, serif;
+	font-size: 1.8rem;
+	font-weight: 500;
+	letter-spacing: -0.02em;
+}
+
+body.aimatic-lms-learner .aimatic-topic-intro p {
+	margin: 0 !important;
+	color: var(--aimatic-ink-soft) !important;
+	font-size: 0.86rem !important;
+}
+
+body.aimatic-lms-learner .aimatic-topic-sections h2 {
+	margin: 38px 0 14px !important;
+	color: var(--aimatic-ink) !important;
+	font-family: "Source Serif 4", Georgia, serif !important;
+	font-size: clamp(1.35rem, 1.8vw, 1.75rem) !important;
+	font-weight: 500 !important;
+	line-height: 1.25 !important;
+	letter-spacing: -0.018em !important;
+}
+
+body.aimatic-lms-learner .aimatic-topic-sections h2:first-child {
+	margin-top: 0 !important;
+}
+
+body.aimatic-lms-learner .aimatic-topic-sections p {
+	margin: 0 0 15px !important;
+	color: #3f433f !important;
+	font-size: 1rem !important;
+	line-height: 1.78 !important;
+}
+
+body.aimatic-lms-learner .aimatic-flashcard-page {
+	max-width: 900px;
+	margin-top: 28px !important;
+}
+
+body.aimatic-lms-learner .aimatic-flashcard-page .ach-flash-study {
+	margin-top: 30px;
+}
+
+body.aimatic-lms-learner .aimatic-flashcard-loader,
+body.aimatic-lms-learner .aimatic-flashcard-state {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 11px;
+	min-height: 190px;
+	margin-top: 26px;
+	padding: 28px;
+	border: 1px solid rgba(42, 157, 143, 0.14);
+	border-radius: 20px;
+	background: #f5faf7;
+	color: var(--aimatic-teal-dark);
+	text-align: center;
+}
+
+body.aimatic-lms-learner .aimatic-flashcard-loader > span:first-child {
+	width: 18px;
+	height: 18px;
+	border: 2px solid var(--aimatic-mint-deep);
+	border-top-color: var(--aimatic-teal);
+	border-radius: 50%;
+	animation: aimatic-flashcard-spin 800ms linear infinite;
+}
+
+body.aimatic-lms-learner .aimatic-flashcard-loader.is-error,
+body.aimatic-lms-learner .aimatic-flashcard-empty {
+	flex-direction: column;
+	background: #fff9f5;
+	color: #8d554c;
+}
+
+body.aimatic-lms-learner .aimatic-flashcard-loader.is-error span,
+body.aimatic-lms-learner .aimatic-flashcard-empty span {
+	color: var(--aimatic-ink-soft);
+}
+
+body.aimatic-lms-learner .ach-rate:disabled {
+	opacity: 0.46;
+	cursor: not-allowed;
+	transform: none !important;
+}
+
+body.aimatic-lms-learner .ach-rate-easy {
+	color: #fff !important;
+}
+
+@keyframes aimatic-flashcard-spin {
+	to { transform: rotate(360deg); }
+}
+
+@media (max-width: 767px) {
+	body.aimatic-lms-learner .aimatic-topic-actions {
+		grid-template-columns: 1fr;
+		gap: 9px;
+		margin-bottom: 32px;
+	}
+	body.aimatic-lms-learner .aimatic-topic-intro > span {
+		font-size: 1.55rem;
+	}
+}
+
+body.aimatic-lms-learner .aimatic-sqe-pathway {
+	margin: 0 20px 28px;
+	padding: 26px;
+	border: 1px solid rgba(23, 36, 58, 0.1);
+	border-radius: 24px;
+	background: linear-gradient(145deg, #fffdf8, #f7fbf8);
+}
+
+body.aimatic-lms-learner .aimatic-sqe-pathway-intro {
+	max-width: 720px;
+	margin-bottom: 22px;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-kicker {
+	display: block;
+	margin-bottom: 5px;
+	color: var(--aimatic-teal-dark);
+	font-size: 0.63rem;
+	font-weight: 800;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-pathway-intro h2 {
+	margin: 0 0 7px;
+	color: var(--aimatic-ink);
+	font-family: "Source Serif 4", Georgia, serif;
+	font-size: clamp(1.8rem, 3vw, 2.45rem);
+	font-weight: 600;
+	letter-spacing: -0.035em;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-pathway-intro p {
+	max-width: 650px;
+	margin: 0;
+	color: var(--aimatic-ink-soft);
+	font-size: 0.9rem;
+	line-height: 1.6;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-pathway-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 18px;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-pathway-tab {
+	min-height: 44px;
+	padding: 9px 16px;
+	border: 1px solid rgba(48, 127, 115, 0.2);
+	border-radius: 999px;
+	background: #fff;
+	color: var(--aimatic-teal-dark);
+	font: inherit;
+	font-size: 0.78rem;
+	font-weight: 750;
+	cursor: pointer;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-pathway-tab[aria-selected="true"] {
+	border-color: var(--aimatic-teal-dark);
+	background: var(--aimatic-teal-dark);
+	color: #fff;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-pathway-tab:focus-visible,
+body.aimatic-lms-learner .aimatic-sqe-switcher > button:focus-visible,
+body.aimatic-lms-learner .aimatic-sqe-switcher a:focus-visible {
+	outline: 3px solid rgba(198, 154, 59, 0.55);
+	outline-offset: 2px;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-panel-heading {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-panel-heading h3 {
+	margin: 0;
+	color: var(--aimatic-ink);
+	font-family: "Source Serif 4", Georgia, serif;
+	font-size: 1.25rem;
+	font-weight: 600;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-panel-heading span {
+	color: var(--aimatic-ink-soft);
+	font-size: 0.72rem;
+	font-weight: 700;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-course-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 14px;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-course-card {
+	display: block;
+	min-width: 0;
+	padding: 0;
+	border-radius: 15px;
+	background: #fff;
+	box-shadow: 0 7px 22px rgba(16, 35, 63, 0.06);
+	color: inherit;
+	text-decoration: none;
+	transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-course-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 12px 28px rgba(16, 35, 63, 0.11);
+}
+
+body.aimatic-lms-learner .aimatic-sqe-switcher-group {
+	padding: 4px 0 7px;
+}
+
+body.aimatic-lms-learner .aimatic-sqe-switcher-group + .aimatic-sqe-switcher-group {
+	border-top: 1px solid var(--aimatic-line);
+}
+
+body.aimatic-lms-learner .aimatic-sqe-switcher-group > small {
+	display: block;
+	padding: 8px 7px 4px;
+	color: var(--aimatic-teal-dark);
+	font-size: 0.59rem;
+	font-weight: 800;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+	body.aimatic-lms-learner .aimatic-sqe-course-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 767px) {
+	body.aimatic-lms-learner .aimatic-sqe-pathway {
+		margin: 0 12px 20px;
+		padding: 18px 14px;
+		border-radius: 18px;
+	}
+
+	body.aimatic-lms-learner .aimatic-sqe-pathway-tabs {
+		gap: 6px;
+	}
+
+	body.aimatic-lms-learner .aimatic-sqe-pathway-tab {
+		flex: 1 1 150px;
+	}
+
+	body.aimatic-lms-learner .aimatic-sqe-course-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	body.aimatic-lms-learner .aimatic-sqe-course-card {
+		transition: none;
+	}
+}

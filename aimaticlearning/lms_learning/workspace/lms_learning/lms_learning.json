@@ -1,0 +1,111 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"lmod-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class='h4'><b>LMS Learning</b></span>\",\"col\":12}},{\"id\":\"lmod-shortcut-import\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Learning Module Config\",\"col\":4}},{\"id\":\"lmod-shortcut-map\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Learning Map\",\"col\":4}},{\"id\":\"lmod-shortcut-flash\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Learning Flashcard\",\"col\":4}}]",
+ "creation": "2026-08-30 00:00:00.000000",
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "education",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "LMS Learning",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Setup",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Learning Module Config",
+   "link_count": 0,
+   "link_to": "Learning Module Config",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Learning Chapter Profile",
+   "link_count": 0,
+   "link_to": "Learning Chapter Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Learning Flashcard",
+   "link_count": 0,
+   "link_to": "Learning Flashcard",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Learning Question Meta",
+   "link_count": 0,
+   "link_to": "Learning Question Meta",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Learning Map",
+   "link_count": 0,
+   "link_to": "learning-map",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-08-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LMS Learning",
+ "name": "LMS Learning",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 30.0,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "Learning Module Config",
+   "link_to": "Learning Module Config",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "label": "Learning Map",
+   "link_to": "learning-map",
+   "type": "Page"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "Learning Flashcard",
+   "link_to": "Learning Flashcard",
+   "type": "DocType"
+  }
+ ],
+ "title": "LMS Learning"
+}

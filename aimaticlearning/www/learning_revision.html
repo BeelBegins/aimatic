@@ -1,0 +1,264 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Revision{% endblock %}
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block page_content %}
+<div class="aimatic-revision" id="aimatic-revision">
+	<style>
+		.aimatic-revision {
+			max-width: 920px;
+			margin: 0 auto;
+			padding: 28px 16px 64px;
+			color: #10233f;
+			font-family: "Bricolage Grotesque", system-ui, sans-serif;
+		}
+		.aimatic-revision a { color: #8f6517; }
+		.aimatic-revision .is-hidden { display: none !important; }
+		.rev-top { display: flex; flex-wrap: wrap; gap: 12px 18px; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; }
+		.rev-kicker { margin: 0 0 6px; color: #0b9a84; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; }
+		.aimatic-revision h1 { margin: 0; font-size: 1.85rem; line-height: 1.15; }
+		.rev-lead { margin: 8px 0 0; max-width: 40rem; color: #68758a; font-size: 0.95rem; line-height: 1.55; }
+		.rev-select { min-width: 240px; padding: 10px 12px; border: 1px solid rgba(16, 35, 63, 0.14); border-radius: 12px; background: #fff; font: inherit; }
+		.rev-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 8px 0 22px; }
+		.rev-counts a, .rev-counts div {
+			display: block; padding: 16px 14px; border-radius: 16px; background: #f7f4ed; color: inherit; text-decoration: none;
+		}
+		.rev-counts strong { display: block; font-size: 1.45rem; }
+		.rev-counts span { color: #68758a; font-size: 0.78rem; }
+		.rev-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+		.rev-btn {
+			display: inline-flex; align-items: center; min-height: 42px; padding: 8px 14px;
+			border-radius: 999px; border: 1px solid rgba(16, 35, 63, 0.12); background: #fff;
+			color: #10233f; font-weight: 700; font-size: 0.84rem; text-decoration: none;
+		}
+		.rev-btn-primary { background: #0b9a84; border-color: #0b9a84; color: #fff; }
+		.rev-card { margin-bottom: 22px; padding: 18px; border: 1px solid rgba(16, 35, 63, 0.1); border-radius: 18px; background: #fff; }
+		.rev-card h2 { margin: 0 0 12px; font-size: 1.05rem; }
+		.rev-card ul { margin: 0; padding-left: 18px; color: #3d4d63; }
+		.rev-card li { margin: 0 0 8px; }
+		.rev-empty, .rev-loading { padding: 28px 8px; color: #68758a; text-align: center; }
+		.rev-noaccess { padding: 40px 24px; border: 1px solid rgba(16, 35, 63, 0.1); border-radius: 18px; background: #fff; text-align: center; }
+		.rev-noaccess h2 { margin: 0 0 8px; font-size: 1.15rem; }
+		.rev-noaccess p { margin: 0 0 18px; color: #68758a; }
+		.rev-chapters { display: grid; gap: 10px; }
+		.rev-chapter {
+			display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center;
+			padding: 12px 14px; border-radius: 14px; background: #fbfaf6;
+		}
+		.rev-chapter strong { display: block; }
+		.rev-chapter small { color: #68758a; }
+		.rev-chapter-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+		.rev-pill { padding: 6px 10px; border-radius: 999px; background: #fff; font-size: 0.75rem; font-weight: 700; text-decoration: none; }
+		.rev-needs { background: #fdecea; }
+		.rev-developing { background: #fff6e5; }
+		.rev-strong { background: #e8f6f2; }
+		@media (max-width: 720px) {
+			.rev-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+			.rev-chapter { grid-template-columns: 1fr; }
+			.rev-chapter-links { justify-content: flex-start; }
+			.rev-btn { width: 100%; justify-content: center; }
+		}
+	</style>
+
+	<div class="rev-top">
+		<div>
+			<p class="rev-kicker">Your progress</p>
+			<h1>Revision</h1>
+			<p class="rev-lead">Restudy flashcards you rated Hard, Good or Easy, and open the chapters that need more work.</p>
+		</div>
+		<label>
+			<span class="is-hidden">Course</span>
+			<select class="rev-select" id="rev-module"></select>
+		</label>
+	</div>
+
+	<div id="rev-loading" class="rev-loading">Loading your revision board…</div>
+	<div id="rev-noaccess" class="rev-noaccess is-hidden">
+		<h2>No course access yet</h2>
+		<p>You're not enrolled on a course, so there's nothing to revise yet.</p>
+		<a class="rev-btn rev-btn-primary" href="/lms/courses">Browse courses</a>
+	</div>
+	<div id="rev-body" class="is-hidden">
+		<div class="rev-counts" id="rev-counts"></div>
+		<div class="rev-actions" id="rev-actions"></div>
+		<section class="rev-card">
+			<h2>What to do next</h2>
+			<ul id="rev-recs"></ul>
+		</section>
+		<section class="rev-card">
+			<h2>Weak areas</h2>
+			<ul id="rev-weak"></ul>
+		</section>
+		<section class="rev-card">
+			<h2>Chapters</h2>
+			<div class="rev-chapters" id="rev-chapters"></div>
+		</section>
+		<p><a href="/lms/courses">Back to courses</a></p>
+	</div>
+</div>
+
+<script>
+(function () {
+	const initialCourse = {{ (course or "") | tojson }};
+	const initialModule = {{ (learning_module or "") | tojson }};
+	const el = {
+		loading: document.getElementById("rev-loading"),
+		noaccess: document.getElementById("rev-noaccess"),
+		body: document.getElementById("rev-body"),
+		select: document.getElementById("rev-module"),
+		counts: document.getElementById("rev-counts"),
+		actions: document.getElementById("rev-actions"),
+		recs: document.getElementById("rev-recs"),
+		weak: document.getElementById("rev-weak"),
+		chapters: document.getElementById("rev-chapters"),
+	};
+
+	function text(node, value) {
+		node.textContent = value || "";
+		return node;
+	}
+
+	function load(course, learningModule) {
+		el.loading.classList.remove("is-hidden");
+		el.body.classList.add("is-hidden");
+		el.noaccess.classList.add("is-hidden");
+		frappe.call({
+			method: "aimaticlearning.lms_learning.api.get_revision_board",
+			args: {
+				course: course || undefined,
+				learning_module: learningModule || undefined,
+			},
+			callback: function (r) {
+				el.loading.classList.add("is-hidden");
+				render(r.message || {});
+			},
+			error: function () {
+				el.loading.textContent = "Revision could not be loaded. Sign in and try again.";
+			},
+		});
+	}
+
+	function fillList(target, items, emptyText) {
+		target.replaceChildren();
+		if (!items || !items.length) {
+			const item = document.createElement("li");
+			text(item, emptyText);
+			target.append(item);
+			return;
+		}
+		items.forEach(function (entry) {
+			const item = document.createElement("li");
+			text(item, typeof entry === "string" ? entry : (entry.concept + " · " + entry.mastery_pct + "% over " + entry.attempts + " attempts"));
+			target.append(item);
+		});
+	}
+
+	function countCard(label, value, href) {
+		const node = document.createElement(href ? "a" : "div");
+		if (href) node.href = href;
+		const strong = document.createElement("strong");
+		text(strong, String(value));
+		const span = document.createElement("span");
+		text(span, label);
+		node.append(strong, span);
+		return node;
+	}
+
+	function button(label, href, primary) {
+		const link = document.createElement("a");
+		link.className = "rev-btn" + (primary ? " rev-btn-primary" : "");
+		link.href = href;
+		text(link, label);
+		return link;
+	}
+
+	function render(data) {
+		const modules = data.modules || [];
+		if (!modules.length) {
+			el.body.classList.add("is-hidden");
+			el.noaccess.classList.remove("is-hidden");
+			return;
+		}
+		el.body.classList.remove("is-hidden");
+		if (!el.select.dataset.ready) {
+			modules.forEach(function (module) {
+				const option = document.createElement("option");
+				option.value = module.name;
+				option.textContent = module.title;
+				el.select.append(option);
+			});
+			el.select.dataset.ready = "1";
+			el.select.addEventListener("change", function () {
+				load(undefined, el.select.value);
+			});
+		}
+		if (data.selected) el.select.value = data.selected.name;
+
+		const cards = data.flashcards || {};
+		const urls = data.study_urls || {};
+		el.counts.replaceChildren(
+			countCard("Hard", cards.hard || 0, cards.hard ? urls.hard : ""),
+			countCard("Good", cards.good || 0, cards.good ? urls.good : ""),
+			countCard("Easy", cards.easy || 0, cards.easy ? urls.easy : ""),
+			countCard("Not yet rated", cards.unreviewed || 0, cards.unreviewed ? urls.unreviewed : "")
+		);
+
+		el.actions.replaceChildren();
+		if (data.has_flashcards) {
+			if (cards.hard) el.actions.append(button("Revise Hard cards", urls.hard, true));
+			if (cards.good) el.actions.append(button("Revise Good cards", urls.good));
+			if (cards.easy) el.actions.append(button("Revise Easy cards", urls.easy));
+			el.actions.append(button("Study all flashcards", urls.all));
+		}
+		if (urls.course) el.actions.append(button("Open course notes", urls.course));
+
+		fillList(el.recs, data.recommendations, "Rate flashcards or complete chapter questions to build a revision plan.");
+		fillList(el.weak, data.weaknesses, "No weak concepts yet. Hard flashcards and missed questions will appear here.");
+
+		el.chapters.replaceChildren();
+		(data.chapters || []).forEach(function (chapter) {
+			const row = document.createElement("article");
+			row.className = "rev-chapter rev-" + (chapter.group || "not_started");
+			const copy = document.createElement("div");
+			const title = document.createElement("strong");
+			text(title, chapter.chapter_title || "Chapter");
+			const meta = document.createElement("small");
+			const bits = [];
+			if (chapter.attempts) bits.push(chapter.mastery_pct + "% mastery");
+			else bits.push("Not started");
+			if (chapter.hard_cards) bits.push(chapter.hard_cards + " hard card" + (chapter.hard_cards === 1 ? "" : "s"));
+			text(meta, bits.join(" · "));
+			copy.append(title, meta);
+			const links = document.createElement("div");
+			links.className = "rev-chapter-links";
+			if (chapter.notes_url) {
+				const notes = document.createElement("a");
+				notes.className = "rev-pill";
+				notes.href = chapter.notes_url;
+				text(notes, "Notes");
+				links.append(notes);
+			}
+			if (chapter.flashcard_url) {
+				const flash = document.createElement("a");
+				flash.className = "rev-pill";
+				flash.href = chapter.flashcard_url + "#revise-hard";
+				text(flash, chapter.hard_cards ? "Hard cards" : "Flashcards");
+				links.append(flash);
+			}
+			row.append(copy, links);
+			el.chapters.append(row);
+		});
+		if (!(data.chapters || []).length) {
+			const empty = document.createElement("p");
+			empty.className = "rev-empty";
+			text(empty, "No chapter data yet for this course.");
+			el.chapters.append(empty);
+		}
+	}
+
+	load(initialCourse, initialModule);
+})();
+</script>
+{% endblock %}

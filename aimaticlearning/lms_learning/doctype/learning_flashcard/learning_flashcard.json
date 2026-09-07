@@ -1,0 +1,148 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:FC-{YYYY}-{#####}",
+ "creation": "2026-08-30 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "learning_module",
+  "course_chapter",
+  "concept",
+  "column_break_meta",
+  "difficulty",
+  "source_reference",
+  "revision",
+  "ai_generated",
+  "section_break_card",
+  "front",
+  "back",
+  "column_break_status",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "learning_module",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Learning Module",
+   "options": "Learning Module Config",
+   "reqd": 1
+  },
+  {
+   "fieldname": "course_chapter",
+   "fieldtype": "Link",
+   "label": "Course Chapter",
+   "options": "Course Chapter"
+  },
+  {
+   "fieldname": "concept",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Concept"
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Medium",
+   "fieldname": "difficulty",
+   "fieldtype": "Select",
+   "label": "Difficulty",
+   "options": "Easy\nMedium\nHard"
+  },
+  {
+   "fieldname": "source_reference",
+   "fieldtype": "Data",
+   "label": "Source Reference"
+  },
+  {
+   "default": "1",
+   "fieldname": "revision",
+   "fieldtype": "Int",
+   "label": "Revision",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "ai_generated",
+   "fieldtype": "Check",
+   "label": "AI Generated"
+  },
+  {
+   "fieldname": "section_break_card",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "front",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "Front",
+   "reqd": 1
+  },
+  {
+   "fieldname": "back",
+   "fieldtype": "Text",
+   "label": "Back",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Draft\nUnder Review\nPublished\nRetired"
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LMS Learning",
+ "name": "Learning Flashcard",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "LMS Content Reviewer",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 1,
+   "role": "LMS Student",
+   "share": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "front",
+ "track_changes": 1
+}

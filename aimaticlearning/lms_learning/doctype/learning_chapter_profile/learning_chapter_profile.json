@@ -1,0 +1,139 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-08-30 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "learning_module",
+  "chapter_title",
+  "course_chapter",
+  "column_break_links",
+  "notes_lesson",
+  "chapter_quiz",
+  "section_break_content",
+  "concept_tags",
+  "notes_html",
+  "column_break_counts",
+  "mcq_count",
+  "source_revision"
+ ],
+ "fields": [
+  {
+   "fieldname": "learning_module",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Learning Module",
+   "options": "Learning Module Config",
+   "reqd": 1
+  },
+  {
+   "fieldname": "chapter_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Chapter Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "course_chapter",
+   "fieldtype": "Link",
+   "label": "Course Chapter",
+   "options": "Course Chapter"
+  },
+  {
+   "fieldname": "column_break_links",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "notes_lesson",
+   "fieldtype": "Link",
+   "label": "Notes Lesson",
+   "options": "Course Lesson"
+  },
+  {
+   "fieldname": "chapter_quiz",
+   "fieldtype": "Link",
+   "label": "Chapter Quiz",
+   "options": "LMS Quiz"
+  },
+  {
+   "fieldname": "section_break_content",
+   "fieldtype": "Section Break",
+   "label": "Protected Notes"
+  },
+  {
+   "fieldname": "concept_tags",
+   "fieldtype": "Small Text",
+   "label": "Concept Tags"
+  },
+  {
+   "fieldname": "notes_html",
+   "fieldtype": "Long Text",
+   "label": "Notes HTML",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_counts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "mcq_count",
+   "fieldtype": "Int",
+   "label": "MCQ Count",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "source_revision",
+   "fieldtype": "Int",
+   "label": "Source Revision",
+   "non_negative": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LMS Learning",
+ "name": "Learning Chapter Profile",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "LMS Content Reviewer",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 1,
+   "role": "LMS Student",
+   "share": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "chapter_title",
+ "track_changes": 1
+}

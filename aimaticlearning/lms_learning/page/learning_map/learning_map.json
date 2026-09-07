@@ -1,0 +1,28 @@
+{
+ "content": null,
+ "creation": "2026-08-30 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-08-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LMS Learning",
+ "name": "learning-map",
+ "owner": "Administrator",
+ "page_name": "learning-map",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "LMS Student"
+  },
+  {
+   "role": "Course Creator"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Learning Map"
+}

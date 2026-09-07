@@ -1,0 +1,175 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Flashcards — {{ chapter_title }}{% endblock %}
+
+{% block page_content %}
+<div class="aimatic-flashcards" id="aimatic-flashcards">
+	<style>
+		.aimatic-flashcards {
+			max-width: 720px;
+			margin: 0 auto;
+			padding: 24px 16px 48px;
+			font-family: system-ui, sans-serif;
+		}
+		.aimatic-flashcards .is-hidden { display: none !important; }
+		.fc-header { margin-bottom: 20px; }
+		.fc-header h2 { margin: 0 0 8px; font-size: 1.5rem; }
+		.fc-header p { margin: 0; color: #1a3340; font-size: 0.95rem; }
+		.fc-card {
+			background: linear-gradient(145deg, #04161c, #0d3d4a);
+			color: #fff;
+			border-radius: 16px;
+			padding: 28px 24px;
+			min-height: 200px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			text-align: center;
+			font-size: 1.05rem;
+			line-height: 1.55;
+			cursor: pointer;
+			box-shadow: 0 16px 40px rgba(4, 22, 28, 0.2);
+			user-select: none;
+		}
+		.fc-card.is-back { background: linear-gradient(145deg, #0b9a84, #077a69); }
+		.fc-meta {
+			display: flex;
+			justify-content: space-between;
+			margin-top: 12px;
+			font-size: 0.85rem;
+			color: #1a3340;
+		}
+		.fc-actions {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			margin-top: 20px;
+		}
+		.fc-btn {
+			padding: 10px 16px;
+			border-radius: 999px;
+			border: 1px solid rgba(4, 22, 28, 0.15);
+			background: #fff;
+			font-weight: 600;
+			font-size: 0.85rem;
+			cursor: pointer;
+		}
+		.fc-btn-primary { background: #0b9a84; color: #fff; border-color: #0b9a84; }
+		.fc-empty, .fc-loading { padding: 24px; text-align: center; color: #1a3340; }
+		.fc-back-link { display: inline-block; margin-bottom: 16px; color: #8f6517; text-decoration: none; font-weight: 600; }
+		@media (max-width: 620px) {
+			.aimatic-flashcards { padding: 18px 16px 36px; }
+			.fc-header { margin-bottom: 16px; }
+			.fc-header h2 { font-size: 1.38rem; }
+			.fc-card { min-height: 250px; padding: 22px 18px; font-size: 1rem; }
+			.fc-meta { align-items: flex-start; flex-direction: column; gap: 5px; }
+			.fc-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+			.fc-btn { width: 100%; min-height: 44px; padding: 9px 8px; }
+			#fc-next { grid-column: 1 / -1; }
+		}
+	</style>
+
+	<a class="fc-back-link" href="/learning-revision">← Back to revision</a>
+	<div class="fc-header">
+		<h2>Flashcards</h2>
+		<p>{{ chapter_title }} — tap card to flip, rate recall, then continue.</p>
+	</div>
+
+	<div id="fc-loading" class="fc-loading">Loading deck…</div>
+	<div id="fc-empty" class="fc-empty is-hidden">No matching flashcards for this filter yet. Rate a deck first, or open Revision.</div>
+	<div id="fc-deck" class="is-hidden">
+		<div class="fc-card" id="fc-card" role="button" tabindex="0" aria-label="Flashcard. Tap to flip."></div>
+		<div class="fc-meta">
+			<span id="fc-progress"></span>
+			<span id="fc-concept"></span>
+		</div>
+		<div class="fc-actions">
+			<button type="button" class="fc-btn" data-rating="hard">Hard</button>
+			<button type="button" class="fc-btn" data-rating="good">Good</button>
+			<button type="button" class="fc-btn fc-btn-primary" data-rating="easy">Easy</button>
+			<button type="button" class="fc-btn" id="fc-next">Next card</button>
+		</div>
+	</div>
+</div>
+
+<script>
+(function () {
+	const module = {{ (learning_module or "") | tojson }};
+	const courseChapter = {{ (course_chapter or "") | tojson }};
+	const ratingFilter = {{ (rating_filter or "") | tojson }};
+	let cards = [];
+	let index = 0;
+	let showingBack = false;
+
+	const el = {
+		loading: document.getElementById("fc-loading"),
+		empty: document.getElementById("fc-empty"),
+		deck: document.getElementById("fc-deck"),
+		card: document.getElementById("fc-card"),
+		progress: document.getElementById("fc-progress"),
+		concept: document.getElementById("fc-concept"),
+		next: document.getElementById("fc-next"),
+	};
+
+	function showCard() {
+		if (!cards.length) return;
+		const card = cards[index];
+		showingBack = false;
+		el.card.textContent = card.front;
+		el.card.classList.remove("is-back");
+		el.progress.textContent = "Card " + (index + 1) + " of " + cards.length;
+		el.concept.textContent = card.concept || "";
+	}
+
+	function flip() {
+		if (!cards.length) return;
+		showingBack = !showingBack;
+		const card = cards[index];
+		el.card.textContent = showingBack ? card.back : card.front;
+		el.card.classList.toggle("is-back", showingBack);
+	}
+
+	function nextCard() {
+		if (index < cards.length - 1) {
+			index += 1;
+			showCard();
+		}
+	}
+
+	el.card.addEventListener("click", flip);
+	el.next.addEventListener("click", nextCard);
+
+	document.querySelectorAll("[data-rating]").forEach(function (btn) {
+		btn.addEventListener("click", function () {
+			const card = cards[index];
+			if (!card) return;
+			frappe.call({
+				method: "aimaticlearning.lms_learning.api.review_flashcard",
+				args: { name: card.name, rating: btn.dataset.rating },
+				callback: function () { nextCard(); },
+			});
+		});
+	});
+
+	frappe.call({
+		method: "aimaticlearning.lms_learning.api.get_flashcard_deck",
+		args: {
+			learning_module: module,
+			course_chapter: courseChapter || undefined,
+			limit: 200,
+			rating_filter: ratingFilter || undefined,
+		},
+		callback: function (r) {
+			el.loading.classList.add("is-hidden");
+			cards = (r.message && r.message.cards) || [];
+			if (!cards.length) {
+				el.empty.classList.remove("is-hidden");
+				return;
+			}
+			el.deck.classList.remove("is-hidden");
+			showCard();
+		},
+	});
+})();
+</script>
+{% endblock %}

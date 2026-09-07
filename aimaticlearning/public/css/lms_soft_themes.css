@@ -1,0 +1,118 @@
+/* Soft, light-only learner palettes. Native Frappe dark mode is not mixed with lesson paper. */
+html[data-examic-soft-theme] { color-scheme: light; }
+
+html[data-examic-soft-theme] body[data-path="login"] {
+	background: #f6f7f8;
+	color: #26313d;
+}
+
+html[data-examic-soft-theme] body[data-path="login"] .page-card {
+	border: 1px solid #dfe4e8;
+	border-radius: 16px;
+	background: #fff;
+	box-shadow: 0 12px 30px rgba(38, 49, 61, 0.08);
+}
+
+html[data-examic-soft-theme] body[data-path="login"] .page-card-head,
+html[data-examic-soft-theme] body[data-path="login"] .page-card-body,
+html[data-examic-soft-theme] body[data-path="login"] .sign-up-message {
+	color: #26313d;
+}
+
+html[data-examic-soft-theme] body[data-path="login"] .form-control {
+	min-height: 44px;
+	border-color: #d4dce1;
+	border-radius: 8px;
+	background: #fff;
+	color: #26313d;
+}
+
+html[data-examic-soft-theme] body[data-path="login"] .btn-login,
+html[data-examic-soft-theme] body[data-path="login"] .btn-signup {
+	min-height: 48px;
+	border-radius: 10px;
+}
+
+/* Default: Soft Sage. */
+html[data-examic-soft-theme="sage"] body.aimatic-lms-learner {
+	--aimatic-ink: #26342f;
+	--aimatic-ink-soft: #68766f;
+	--aimatic-teal: #5f9585;
+	--aimatic-teal-dark: #416d60;
+	--aimatic-mint: #eaf3ed;
+	--aimatic-mint-deep: #d6e8dc;
+	--aimatic-cream: #f8fbf8;
+	--aimatic-surface: #f4f8f5;
+	--aimatic-line: rgba(38, 52, 47, 0.12);
+	--aimatic-salmon: #c8908b;
+	--aimatic-green: #8bb38e;
+}
+
+/* Option 2: Soft Sky. */
+html[data-examic-soft-theme="sky"] body.aimatic-lms-learner {
+	--aimatic-ink: #263847;
+	--aimatic-ink-soft: #687985;
+	--aimatic-teal: #6f9caf;
+	--aimatic-teal-dark: #4e7385;
+	--aimatic-mint: #e8f3f7;
+	--aimatic-mint-deep: #d3e7ee;
+	--aimatic-cream: #f8fbfc;
+	--aimatic-surface: #f4f8fa;
+	--aimatic-line: rgba(38, 56, 71, 0.12);
+	--aimatic-salmon: #c99b92;
+	--aimatic-green: #87ad9d;
+}
+
+/* Option 3: Soft Lilac. */
+html[data-examic-soft-theme="lilac"] body.aimatic-lms-learner {
+	--aimatic-ink: #3d3650;
+	--aimatic-ink-soft: #746d83;
+	--aimatic-teal: #8a7bae;
+	--aimatic-teal-dark: #665886;
+	--aimatic-mint: #f0edf8;
+	--aimatic-mint-deep: #dfd8ef;
+	--aimatic-cream: #fbfaff;
+	--aimatic-surface: #f7f5fb;
+	--aimatic-line: rgba(61, 54, 80, 0.12);
+	--aimatic-salmon: #c89ba6;
+	--aimatic-green: #9ba88d;
+}
+
+html[data-examic-soft-theme] body.aimatic-lms-learner .aimatic-lms-lesson-main,
+html[data-examic-soft-theme] body.aimatic-lms-learner .aimatic-lms-lesson-main > div,
+html[data-examic-soft-theme] body.aimatic-lms-learner .aimatic-lms-lesson-main > div > div:first-child {
+	color: var(--aimatic-ink) !important;
+}
+
+html[data-examic-soft-theme] body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror,
+html[data-examic-soft-theme] body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror p,
+html[data-examic-soft-theme] body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror li,
+html[data-examic-soft-theme] body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror div,
+html[data-examic-soft-theme] body.aimatic-lms-learner .aimatic-lms-lesson-main [class*="text-ink-gray-"] {
+	color: var(--aimatic-ink) !important;
+}
+
+.aimatic-theme-picker {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	margin: 10px 12px 0;
+	color: var(--aimatic-ink-soft);
+	font-size: 0.7rem;
+}
+
+.aimatic-theme-picker select {
+	min-height: 32px;
+	min-width: 0;
+	flex: 1;
+	border: 1px solid var(--aimatic-line);
+	border-radius: 7px;
+	background: rgba(255, 255, 255, 0.72);
+	color: var(--aimatic-ink);
+	font: inherit;
+}
+
+@media (max-width: 767px) {
+	.aimatic-theme-picker { margin: 8px 18px 12px; }
+	.aimatic-theme-picker select { min-height: 40px; }
+}

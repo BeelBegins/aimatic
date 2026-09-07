@@ -1,0 +1,220 @@
+/* Examic Study login/signup — loaded after Frappe login.bundle.css */
+body[data-path="login"] {
+	background: #f6f7f8;
+}
+
+body[data-path="login"] .page-content-wrapper {
+	min-height: auto;
+	padding: 16px 20px 48px;
+}
+
+body[data-path="login"] main.container,
+body[data-path="login"] .page_content > .container {
+	max-width: 100% !important;
+	width: 100% !important;
+	padding-left: 16px;
+	padding-right: 16px;
+}
+
+body[data-path="login"] .for-signup .page-card,
+body[data-path="login"] .examic-auth-card {
+	width: min(100%, 480px);
+	max-width: 480px !important;
+	margin: 0 auto !important;
+	padding: 32px 36px 36px !important;
+	box-sizing: border-box;
+	border: 1px solid #dfe4e8;
+	border-radius: 16px;
+	background: #fff;
+	box-shadow: 0 12px 30px rgba(38, 49, 61, 0.08);
+}
+
+body[data-path="login"] .for-login .page-card,
+body[data-path="login"] .for-forgot .page-card,
+body[data-path="login"] .for-login-with-email-link .page-card,
+body[data-path="login"] .for-email-login .page-card {
+	width: min(100%, 480px);
+	max-width: 480px !important;
+	margin: 0 auto !important;
+	padding: 32px 36px 36px !important;
+	box-sizing: border-box;
+}
+
+body[data-path="login"] .examic-auth-head,
+body[data-path="login"] .page-card-head {
+	max-width: none !important;
+	margin: 0 0 12px !important;
+	padding: 0 0 18px !important;
+	border-bottom: 1px solid #e8edf1;
+}
+
+body[data-path="login"] .examic-auth-head .app-logo,
+body[data-path="login"] .page-card-head .app-logo {
+	display: block;
+	width: 64px !important;
+	height: 64px !important;
+	max-width: 64px !important;
+	max-height: 64px !important;
+	margin: 0 auto 10px !important;
+	object-fit: contain;
+	background: transparent;
+}
+
+body[data-path="login"] .examic-auth-head h4,
+body[data-path="login"] .page-card-head h4 {
+	margin: 0 !important;
+	font-size: 1.35rem;
+	line-height: 1.35;
+	text-align: center;
+}
+
+body[data-path="login"] .for-login .page-card form,
+body[data-path="login"] .for-signup .page-card form,
+body[data-path="login"] .for-forgot .page-card form,
+body[data-path="login"] .for-login-with-email-link .page-card form,
+body[data-path="login"] .for-email-login .page-card form,
+body[data-path="login"] .examic-auth-card form {
+	max-width: 100% !important;
+	width: 100% !important;
+	margin: 0 !important;
+}
+
+body[data-path="login"] form.signup-form {
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+	width: 100%;
+}
+
+body[data-path="login"] .signup-form .page-card-body,
+body[data-path="login"] .signup-form .page-card-actions,
+body[data-path="login"] .form-signin .page-card-body,
+body[data-path="login"] .form-signin .page-card-actions {
+	width: 100%;
+	padding: 0;
+}
+
+body[data-path="login"] .signup-form .page-card-body {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+body[data-path="login"] .signup-form .form-group,
+body[data-path="login"] .form-signin .form-group {
+	width: 100%;
+	margin-bottom: 0;
+}
+
+body[data-path="login"] .signup-form .form-label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: #3d4d63;
+}
+
+body[data-path="login"] .signup-form .form-control,
+body[data-path="login"] .form-signin .form-control {
+	display: block;
+	width: 100% !important;
+	max-width: 100% !important;
+	box-sizing: border-box;
+	min-height: 46px !important;
+	padding: 10px 12px !important;
+	font-size: 1rem !important;
+	border: 1px solid #d4dce1 !important;
+	border-radius: 8px;
+	background: #fff !important;
+	color: #26313d;
+	margin-bottom: 0 !important;
+}
+
+body[data-path="login"] .signup-form select.form-control {
+	height: 46px !important;
+	min-height: 46px !important;
+	padding: 8px 36px 8px 12px !important;
+}
+
+body[data-path="login"] .signup-form .form-group.invalid .form-control {
+	border-color: #e03636 !important;
+}
+
+body[data-path="login"] .signup-form .field-error {
+	margin: 6px 0 0;
+	font-size: 0.88rem;
+	color: #e03636;
+}
+
+body[data-path="login"] .signup-form .field-error:empty {
+	display: none;
+}
+
+body[data-path="login"] .examic-signup-terms-label {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	width: 100%;
+	font-size: 0.96rem;
+	line-height: 1.5;
+	font-weight: 500;
+	color: #3d4d63;
+	cursor: pointer;
+}
+
+body[data-path="login"] .examic-signup-terms-label span {
+	flex: 1;
+	min-width: 0;
+}
+
+body[data-path="login"] .signup-form #signup-terms {
+	width: 18px;
+	height: 18px;
+	margin-top: 3px;
+	flex-shrink: 0;
+}
+
+body[data-path="login"] .examic-signup-banner {
+	margin-bottom: 12px;
+	padding: 10px 12px;
+	border-radius: 8px;
+	font-size: 0.95rem;
+	line-height: 1.45;
+}
+
+body[data-path="login"] .examic-signup-banner--success {
+	background: #eaf3ed;
+	color: #278f5e;
+}
+
+body[data-path="login"] .examic-signup-banner--error {
+	background: #fff0f0;
+	color: #cc2929;
+}
+
+body[data-path="login"] .signup-form .btn-signup,
+body[data-path="login"] .form-signin .btn-login {
+	width: 100%;
+	min-height: 50px !important;
+	border-radius: 10px;
+	font-size: 1rem !important;
+}
+
+body[data-path="login"] .signup-form .sign-up-message {
+	margin-top: 8px;
+}
+
+@media (max-width: 520px) {
+	body[data-path="login"] .page-content-wrapper {
+		padding: 8px 12px 36px;
+	}
+
+	body[data-path="login"] .examic-auth-card,
+	body[data-path="login"] .for-signup .page-card,
+	body[data-path="login"] .for-login .page-card,
+	body[data-path="login"] .for-forgot .page-card,
+	body[data-path="login"] .for-login-with-email-link .page-card,
+	body[data-path="login"] .for-email-login .page-card {
+		padding: 24px 20px 28px !important;
+	}
+}

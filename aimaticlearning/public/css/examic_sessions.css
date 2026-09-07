@@ -1,0 +1,37 @@
+body.aimatic-lms-learner .examic-quiz-start {
+	border-color: rgba(16, 35, 63, 0.12) !important;
+	border-radius: 20px !important;
+	background: #fff !important;
+	box-shadow: 0 14px 38px rgba(16, 35, 63, 0.07);
+}
+
+.examic-quiz-session-controls,
+.examic-session-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	margin-top: 18px;
+}
+
+.examic-quiz-session-controls p { flex-basis: 100%; margin: 0 0 2px; color: #68758a; font-size: 0.78rem; }
+.examic-session-button { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.examic-session-primary { background: #10233f; color: #fff; }
+.examic-session-link { padding: 8px 4px; border: 0; background: transparent; color: #8f6517; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
+.examic-quiz-toolbar, .examic-flash-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid rgba(16, 35, 63, 0.1); border-radius: 12px; background: #f7f4ed; color: #68758a; font-size: 0.76rem; }
+.examic-result-guidance { max-width: 520px; margin: 20px auto 0; padding-top: 16px; border-top: 1px solid rgba(16, 35, 63, 0.1); color: #68758a; font-size: 0.82rem; line-height: 1.55; }
+.examic-flash-intro { margin-top: 26px; padding: 38px 28px; border: 1px solid rgba(16, 35, 63, 0.11); border-radius: 20px; background: linear-gradient(145deg, #fbfaf6, #fff); text-align: center; box-shadow: 0 14px 38px rgba(16, 35, 63, 0.06); }
+.examic-flash-intro h3 { margin: 6px 0 10px; color: #10233f; font-family: "Source Serif 4", Georgia, serif; font-size: 1.6rem; }
+.examic-flash-intro > p:not(.examic-session-kicker) { max-width: 560px; margin: 0 auto; color: #68758a; font-size: 0.84rem; line-height: 1.6; }
+.examic-session-kicker { margin: 0; color: #8f6517; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; }
+.examic-flash-results { display: grid; grid-template-columns: repeat(3, minmax(70px, 1fr)); gap: 9px; max-width: 420px; margin: 22px auto; }
+.examic-flash-results span { padding: 13px; border-radius: 12px; background: #f2f4f7; color: #68758a; font-size: 0.72rem; }
+.examic-flash-results strong { display: block; margin-bottom: 4px; color: #10233f; font-size: 1.35rem; }
+
+@media (max-width: 620px) {
+	.examic-quiz-toolbar, .examic-flash-toolbar { align-items: flex-start; flex-direction: column; }
+	.examic-flash-intro { padding: 28px 18px; }
+	.examic-session-button { width: 100%; min-height: 44px; }
+	.examic-session-link { min-height: 44px; }
+}

@@ -1,0 +1,40 @@
+[project]
+name = "aimaticlearning"
+authors = [
+    { name = "Aimatic", email = "sthassan41@gmail.com"}
+]
+description = "Aimatic-owned LMS features"
+requires-python = ">=3.14"
+readme = "README.md"
+dynamic = ["version"]
+dependencies = [
+    "python-docx>=1.1.0",
+]
+
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.bench.frappe-dependencies]
+frappe = ">=16.0.0,<17.0.0-dev"
+lms = ">=2.62.0,<3.0.0"
+aimatic = ">=0.1.0,<1.0.0"
+
+[tool.ruff]
+line-length = 110
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "UP", "B", "RUF"]
+ignore = [
+    "B007", "B017", "B018", "B023", "B904", "B905",
+    "E101", "E402", "E501", "E741", "F401", "F403", "F405", "F722", "F841",
+    "RUF001", "RUF002", "RUF003", "RUF005", "RUF012", "RUF046", "RUF059",
+    "UP028", "UP030", "UP031", "UP032", "UP037", "UP040", "W191",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "tab"
+docstring-code-format = true
+

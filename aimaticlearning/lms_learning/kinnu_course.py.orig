@@ -1,0 +1,564 @@
+from __future__ import annotations
+
+import html
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+import frappe
+from docx import Document
+from frappe import _
+
+from aimaticlearning.lms_learning.content_generation import _link_question_to_quiz
+from aimaticlearning.lms_learning.mcq_import import (
+	_even_select,
+	_resolve_source_path,
+	_upsert_lms_question_by_source,
+	parse_mcqs_from_docx,
+)
+
+COURSE_NAME = "business-law-practice-blp"
+MODULE_NAME = "LMOD-00017"
+SOURCE_LABEL = "BLP approved source"
+PRACTICE_LESSON_BODY = (
+	"<p>Answer each question, then submit your attempt to review the correct answers and explanations.</p>"
+)
+MOCK_LESSON_BODY = (
+	"<p>Complete the 150-question mock assessment, then submit your attempt to review your results.</p>"
+)
+
+
+@dataclass(frozen=True)
+class TopicSpec:
+	title: str
+	start: str
+	end: str
+	region_start: str
+	region_end: str
+
+
+@dataclass(frozen=True)
+class ChapterSpec:
+	title: str
+	section_ids: tuple[int, ...]
+	topics: tuple[TopicSpec, ...]
+
+
+CHAPTER_SPECS = (
+	ChapterSpec(
+		"Business Organisations and Formation",
+		(1, 3, 4),
+		(
+			TopicSpec(
+				"Business and Organisational Characteristics",
+				"Overview of Business Structures",
+				"Chapter 1 Summary and Glossary",
+				"Chapter 1: Forms of Business Organisations",
+				"Chapter 1: Forms of Business Organisations - SQE1 Practice Questions",
+			),
+			TopicSpec(
+				"Legal Personality and Limited Liability",
+				"Types of Companies Under the Companies Act 2006",
+				"Chapter 2 Summary and Glossary",
+				"Chapter 2: The Various Types of Companies and the Theory Behind the Limited Company",
+				"Chapter 2: The Various Types of Companies and the Theory Behind the Limited Company - SQE1 Practice Questions",
+			),
+			TopicSpec(
+				"Formation and Commencement of Business Entities",
+				"Setting Up a Limited Company",
+				"Chapter 3 Summary and Glossary",
+				"Chapter 3: Private Limited Companies – Formalities, Statutory Filing and Disclosure",
+				"Chapter 3: Private Limited Companies – Formalities, Statutory Filing and Disclosure - SQE1 Practice Questions",
+			),
+		),
+	),
+	ChapterSpec(
+		"Corporate Governance and Compliance",
+		(5, 6, 7),
+		(
+			TopicSpec(
+				"Members and Shareholders",
+				"Introduction to Shares and Membership",
+				"Chapter 4 Summary and Glossary",
+				"Chapter 4: Company Members",
+				"Chapter 4: Company Members - Multiple Choice Questions",
+			),
+			TopicSpec(
+				"Directors: Appointment, Powers and Duties",
+				"Introduction to Directors",
+				"Chapter 5 Summary and Glossary",
+				"Chapter 5: Directors",
+				"Chapter 5: Directors - Multiple Choice Questions",
+			),
+		),
+	),
+	ChapterSpec(
+		"Partnership and LLP Governance",
+		(8, 9),
+		(
+			TopicSpec(
+				"General Partnerships",
+				"Definition",
+				"Summary and Glossary",
+				"7. Partnerships",
+				"Chapter 7: Partnerships - Multiple Choice Questions",
+			),
+			TopicSpec(
+				"Limited Liability Partnerships",
+				"Definition and Nature of an LLP",
+				"Summary and Glossary",
+				"Chapter 8: Limited Liability Partnership (LLP) - Study Notes",
+				"Chapter 8: Limited Liability Partnership (LLP) - SQE1 Practice Questions",
+			),
+		),
+	),
+	ChapterSpec(
+		"Business Finance and Security",
+		(11,),
+		(
+			TopicSpec(
+				"Individual Insolvency",
+				"Individual Insolvency Overview",
+				"Company Accounting Records",
+				"Chapter 9: Business Finance and Transactions - Study Notes",
+				"Chapter 9: Business Finance and Transactions - SQE1 Practice Questions",
+			),
+			TopicSpec(
+				"Company Accounts and Audit",
+				"Company Accounting Records",
+				"Debt Versus Equity Finance",
+				"Chapter 9: Business Finance and Transactions - Study Notes",
+				"Chapter 9: Business Finance and Transactions - SQE1 Practice Questions",
+			),
+			TopicSpec(
+				"Debt Finance and Security",
+				"Debt Versus Equity Finance",
+				"Share Capital Fundamentals",
+				"Chapter 9: Business Finance and Transactions - Study Notes",
+				"Chapter 9: Business Finance and Transactions - SQE1 Practice Questions",
+			),
+			TopicSpec(
+				"Share Capital and Transactions",
+				"Share Capital Fundamentals",
+				"Business Disposal Methods",
+				"Chapter 9: Business Finance and Transactions - Study Notes",
+				"Chapter 9: Business Finance and Transactions - SQE1 Practice Questions",
+			),
+			TopicSpec(
+				"Business Sales and Transfers",
+				"Business Disposal Methods",
+				"Summary and Glossary",
+				"Chapter 9: Business Finance and Transactions - Study Notes",
+				"Chapter 9: Business Finance and Transactions - SQE1 Practice Questions",
+			),
+		),
+	),
+)
+
+
+def rebuild_blp_kinnu_course(
+	course_name: str = COURSE_NAME,
+	learning_module: str = MODULE_NAME,
+) -> dict:
+	"""Rebuild the BLP learner path as source-backed chapters and topic lessons."""
+	module = frappe.get_doc("Learning Module Config", learning_module)
+	course = frappe.get_doc("LMS Course", course_name)
+	source_path = _resolve_source_path(module.source_file)
+	topics = parse_approved_topics(source_path)
+	parsed_mcqs = parse_mcqs_from_docx(source_path)
+
+	profiles = frappe.get_all(
+		"Learning Chapter Profile",
+		filters={"learning_module": learning_module},
+		fields=["name", "course_chapter", "notes_lesson", "chapter_quiz"],
+		order_by="creation asc",
+	)
+	if len(profiles) < len(CHAPTER_SPECS):
+		frappe.throw(_("BLP chapter profiles are missing."))
+
+	active_profiles = []
+	for chapter_index, spec in enumerate(CHAPTER_SPECS, start=1):
+		profile = frappe.get_doc("Learning Chapter Profile", profiles[chapter_index - 1].name)
+		_prepare_profile(profile, course, spec, topics[spec.title])
+		active_profiles.append(profile)
+
+	_link_course_chapters(course, active_profiles)
+	question_counts = _import_mapped_mcqs(module, active_profiles, parsed_mcqs)
+	flashcard_counts = _replace_source_flashcards(module, active_profiles, topics)
+	lesson_counts = _build_chapter_lessons(course, module, active_profiles, topics)
+
+	course.reload()
+	course.title = "Business Law and Practice"
+	course.short_introduction = (
+		"SQE Business Law and Practice with focused study notes, practice MCQs, "
+		"flashcards, and a 150-question mock assessment."
+	)
+	course.description = (
+		"<p>Work through each topic in order, test yourself with chapter MCQs, "
+		"and strengthen recall with source-backed flashcards.</p>"
+	)
+	course.save(ignore_permissions=True)
+
+	module.chapter_count = len(active_profiles)
+	module.module_mcq_count = min(150, len(parsed_mcqs))
+	module.import_status = "Content Ready"
+	module.save(ignore_permissions=True)
+	frappe.db.commit()
+
+	return {
+		"course": course.name,
+		"chapters": len(active_profiles),
+		"topic_lessons": sum(lesson_counts.values()),
+		"chapter_lessons": lesson_counts,
+		"chapter_mcqs": question_counts,
+		"source_mcqs": len(parsed_mcqs),
+		"flashcards": flashcard_counts,
+		"published_flashcards": sum(flashcard_counts.values()),
+		"mock_mcqs": min(150, len(parsed_mcqs)),
+	}
+
+
+def parse_approved_topics(path: Path) -> dict[str, list[dict]]:
+	document = Document(str(path))
+	paragraphs = document.paragraphs
+	texts = [_clean_text(paragraph.text) for paragraph in paragraphs]
+	result: dict[str, list[dict]] = {}
+
+	for chapter in CHAPTER_SPECS:
+		chapter_topics = []
+		for topic in chapter.topics:
+			region_start = _find_text(texts, topic.region_start)
+			region_end = _find_text(texts, topic.region_end, region_start + 1)
+			start = _find_text(texts, topic.start, region_start, region_end)
+			end = _find_text(texts, topic.end, start + 1, region_end)
+			blocks = _paragraph_blocks(paragraphs[start:end])
+			if not blocks:
+				frappe.throw(_("No content found for topic {0}.").format(topic.title))
+			chapter_topics.append({"title": topic.title, "blocks": blocks})
+		result[chapter.title] = chapter_topics
+
+	return result
+
+
+def _prepare_profile(profile, course, spec: ChapterSpec, topics: list[dict]) -> None:
+	profile.chapter_title = spec.title
+	profile.concept_tags = spec.title
+	profile.notes_html = "".join(_blocks_html(topic["blocks"]) for topic in topics)
+
+	chapter = frappe.get_doc("Course Chapter", profile.course_chapter)
+	chapter.title = spec.title
+	chapter.course = course.name
+	chapter.save(ignore_permissions=True)
+
+	quiz = frappe.get_doc("LMS Quiz", profile.chapter_quiz)
+	quiz.title = f"{spec.title} — Practice MCQs"
+	quiz.course = course.name
+	quiz.max_attempts = 0
+	quiz.show_answers = 1
+	quiz.passing_percentage = 60
+	quiz.save(ignore_permissions=True)
+	profile.save(ignore_permissions=True)
+
+
+def _link_course_chapters(course, profiles: list) -> None:
+	course.reload()
+	course.set("chapters", [])
+	for index, profile in enumerate(profiles, start=1):
+		course.append("chapters", {"chapter": profile.course_chapter, "idx": index})
+		frappe.db.set_value("Course Chapter", profile.course_chapter, "idx", index)
+	course.save(ignore_permissions=True)
+
+
+def _import_mapped_mcqs(module, profiles: list, parsed: list[dict]) -> dict[str, int]:
+	by_section: dict[int, list[dict]] = {}
+	for item in parsed:
+		by_section.setdefault(int(item["section_id"]), []).append(item)
+
+	all_question_names: list[str] = []
+	counts: dict[str, int] = {}
+	for spec, profile in zip(CHAPTER_SPECS, profiles):
+		quiz = frappe.get_doc("LMS Quiz", profile.chapter_quiz)
+		quiz.set("questions", [])
+		quiz.total_marks = 0
+		quiz.save(ignore_permissions=True)
+		items = [item for section in spec.section_ids for item in by_section.get(section, [])]
+		for item in items:
+			question_name = _upsert_lms_question_by_source(item)
+			if not question_name:
+				continue
+			all_question_names.append(question_name)
+			_upsert_question_meta(module.name, profile, question_name, item["source_reference"])
+			_link_question_to_quiz(profile.chapter_quiz, question_name)
+		quiz.reload()
+		quiz.total_marks = len(quiz.questions or [])
+		quiz.save(ignore_permissions=True)
+		counts[spec.title] = len(quiz.questions or [])
+
+	assessment = frappe.get_doc("LMS Quiz", module.module_assessment_quiz)
+	assessment.title = "BLP Mock MCQs (150 Questions)"
+	assessment.course = module.lms_course
+	assessment.set("questions", [])
+	selected = _even_select(list(dict.fromkeys(all_question_names)), min(150, len(all_question_names)))
+	for question_name in selected:
+		assessment.append("questions", {"question": question_name, "marks": 1})
+		meta_name = frappe.db.get_value("Learning Question Meta", {"lms_question": question_name})
+		if meta_name:
+			frappe.db.set_value("Learning Question Meta", meta_name, "question_role", "Both")
+	assessment.total_marks = len(selected)
+	assessment.max_attempts = 3
+	assessment.show_answers = 1
+	assessment.passing_percentage = 60
+	assessment.save(ignore_permissions=True)
+
+	for profile in profiles:
+		profile.reload()
+		profile.refresh_mcq_count()
+	return counts
+
+
+def _upsert_question_meta(module_name, profile, question_name: str, source_reference: str) -> None:
+	meta_name = frappe.db.get_value("Learning Question Meta", {"lms_question": question_name})
+	fields = {
+		"learning_module": module_name,
+		"course_chapter": profile.course_chapter,
+		"concept": profile.chapter_title,
+		"difficulty": "Medium",
+		"question_role": "Chapter MCQ",
+		"source_reference": source_reference,
+		"revision": 2,
+	}
+	if meta_name:
+		meta = frappe.get_doc("Learning Question Meta", meta_name)
+		meta.update(fields)
+		meta.save(ignore_permissions=True)
+	else:
+		frappe.get_doc({"doctype": "Learning Question Meta", "lms_question": question_name, **fields}).insert(
+			ignore_permissions=True
+		)
+
+
+def _replace_source_flashcards(module, profiles: list, topics: dict[str, list[dict]]) -> dict[str, int]:
+	for name in frappe.get_all(
+		"Learning Flashcard",
+		filters={"learning_module": module.name, "status": "Published"},
+		pluck="name",
+	):
+		frappe.db.set_value("Learning Flashcard", name, "status", "Draft", update_modified=False)
+	counts: dict[str, int] = {}
+	remaining = int(module.flashcard_target or 200)
+
+	for spec, profile in zip(CHAPTER_SPECS, profiles):
+		count = 0
+		for topic in topics[spec.title]:
+			for card_index, card in enumerate(_cards_from_blocks(topic["title"], topic["blocks"]), start=1):
+				if remaining <= 0:
+					break
+				source = f"{SOURCE_LABEL}: {topic['title']}:{card_index}"
+				existing = frappe.db.get_value(
+					"Learning Flashcard",
+					{"learning_module": module.name, "source_reference": source},
+				)
+				fields = {
+					"learning_module": module.name,
+					"course_chapter": profile.course_chapter,
+					"concept": card["concept"],
+					"front": card["front"],
+					"back": card["back"],
+					"difficulty": card["difficulty"],
+					"source_reference": source,
+					"status": "Published",
+					"ai_generated": 0,
+				}
+				if existing:
+					doc = frappe.get_doc("Learning Flashcard", existing)
+					doc.update(fields)
+					doc.save(ignore_permissions=True)
+				else:
+					frappe.get_doc({"doctype": "Learning Flashcard", **fields}).insert(
+						ignore_permissions=True
+					)
+				count += 1
+				remaining -= 1
+			if remaining <= 0:
+				break
+		counts[spec.title] = count
+	return counts
+
+
+def _build_chapter_lessons(course, module, profiles: list, topics: dict[str, list[dict]]) -> dict[str, int]:
+	counts: dict[str, int] = {}
+	for chapter_index, (spec, profile) in enumerate(zip(CHAPTER_SPECS, profiles), start=1):
+		lesson_names = []
+		topic_rows = topics[spec.title]
+		practice_index = len(topic_rows) + 1
+		flashcard_index = len(topic_rows) + 2
+		practice_url = _lesson_url(course.name, chapter_index, practice_index)
+		flashcard_url = _lesson_url(course.name, chapter_index, flashcard_index)
+
+		for topic_index, topic in enumerate(topic_rows, start=1):
+			preferred = profile.notes_lesson if topic_index == 1 else None
+			lesson = _ensure_lesson(course.name, profile.course_chapter, topic["title"], preferred)
+			lesson.title = topic["title"]
+			lesson.body = _topic_lesson_html(topic, practice_url, flashcard_url)
+			lesson.content = ""
+			lesson.quiz_id = ""
+			lesson.save(ignore_permissions=True)
+			lesson_names.append(lesson.name)
+
+		practice = _ensure_quiz_lesson(course.name, profile, "Practice MCQs")
+		lesson_names.append(practice.name)
+
+		flashcards = _ensure_lesson(course.name, profile.course_chapter, "Flashcards")
+		flashcards.title = "Flashcards"
+		flashcards.content = ""
+		flashcards.quiz_id = ""
+		flashcards.body = _flashcard_lesson_html(profile)
+		flashcards.save(ignore_permissions=True)
+		lesson_names.append(flashcards.name)
+
+		if chapter_index == len(CHAPTER_SPECS):
+			mock = _ensure_lesson(course.name, profile.course_chapter, "Mock MCQs (150 Questions)")
+			mock.title = "Mock MCQs (150 Questions)"
+			mock.content = ""
+			mock.body = MOCK_LESSON_BODY
+			mock.quiz_id = module.module_assessment_quiz
+			mock.save(ignore_permissions=True)
+			lesson_names.append(mock.name)
+
+		chapter = frappe.get_doc("Course Chapter", profile.course_chapter)
+		chapter.set("lessons", [])
+		for idx, lesson_name in enumerate(lesson_names, start=1):
+			chapter.append("lessons", {"lesson": lesson_name, "idx": idx})
+			frappe.db.set_value("Course Lesson", lesson_name, "idx", idx)
+		chapter.save(ignore_permissions=True)
+		counts[spec.title] = len(topic_rows)
+	return counts
+
+
+def _ensure_lesson(course_name: str, chapter_name: str, title: str, preferred: str | None = None):
+	if preferred and frappe.db.exists("Course Lesson", preferred):
+		return frappe.get_doc("Course Lesson", preferred)
+	existing = frappe.db.get_value(
+		"Course Lesson",
+		{"course": course_name, "chapter": chapter_name, "title": title},
+	)
+	if existing:
+		return frappe.get_doc("Course Lesson", existing)
+	lesson = frappe.get_doc(
+		{"doctype": "Course Lesson", "title": title, "course": course_name, "chapter": chapter_name}
+	)
+	lesson.insert(ignore_permissions=True)
+	return lesson
+
+
+def _ensure_quiz_lesson(course_name: str, profile, title: str):
+	existing = frappe.db.get_value(
+		"Course Lesson",
+		{"course": course_name, "chapter": profile.course_chapter, "quiz_id": profile.chapter_quiz},
+	)
+	lesson = (
+		frappe.get_doc("Course Lesson", existing)
+		if existing
+		else _ensure_lesson(course_name, profile.course_chapter, title)
+	)
+	lesson.title = title
+	lesson.body = PRACTICE_LESSON_BODY
+	lesson.content = ""
+	lesson.quiz_id = profile.chapter_quiz
+	lesson.save(ignore_permissions=True)
+	return lesson
+
+
+def _topic_lesson_html(topic: dict, practice_url: str, flashcard_url: str) -> str:
+	return (
+		'<div class="aimatic-topic-note" data-aimatic-topic-note>'
+		'<nav class="aimatic-topic-actions" aria-label="Topic study tools">'
+		f'<a class="aimatic-topic-action aimatic-topic-action-mcq" href="{html.escape(practice_url, quote=True)}">Practice MCQs</a>'
+		f'<a class="aimatic-topic-action aimatic-topic-action-flash" href="{html.escape(flashcard_url, quote=True)}">Flashcards</a>'
+		'</nav><header class="aimatic-topic-intro"><span>Study Note</span>'
+		'<p>Focused material from the approved Business Law and Practice source.</p></header>'
+		f'<div class="aimatic-topic-sections">{_blocks_html(topic["blocks"])}</div></div>'
+	).replace("\n", " ")
+
+
+def _flashcard_lesson_html(profile) -> str:
+	deck = _build_flashcard_details(profile)
+	return (
+		'<div class="aimatic-chapter-hub aimatic-flashcard-page">'
+		'<header class="aimatic-topic-intro"><span>Flashcards</span>'
+		'<p>Reveal each answer, then rate how confidently you recalled it.</p></header>'
+		f'{deck}</div>'
+	).replace("\n", " ")
+
+
+def _lesson_url(course_name: str, chapter_index: int, lesson_index: int) -> str:
+	return f"/lms/courses/{course_name}/learn/{chapter_index}-{lesson_index}"
+
+
+def _paragraph_blocks(paragraphs) -> list[dict]:
+	blocks = []
+	for paragraph in paragraphs:
+		text = _clean_text(paragraph.text)
+		if not text:
+			continue
+		kind = "heading" if _is_heading(paragraph, text) else "paragraph"
+		blocks.append({"kind": kind, "text": text})
+	return blocks
+
+
+def _blocks_html(blocks: list[dict]) -> str:
+	parts = []
+	for block in blocks:
+		text = html.escape(block["text"])
+		if block["kind"] == "heading":
+			parts.append(f"<h2>{text}</h2>")
+		else:
+			parts.append(f"<p>{text}</p>")
+	return "".join(parts)
+
+
+def _cards_from_blocks(topic_title: str, blocks: list[dict]) -> list[dict]:
+	cards = []
+	for index, block in enumerate(blocks):
+		if block["kind"] != "heading":
+			continue
+		answers = []
+		for following in blocks[index + 1 :]:
+			if following["kind"] == "heading":
+				break
+			if following["text"]:
+				answers.append(following["text"])
+			if len(" ".join(answers)) >= 420:
+				break
+		back = " ".join(answers).strip()
+		if len(back) < 35:
+			continue
+		if len(back) > 650:
+			back = back[:647].rsplit(" ", 1)[0] + "…"
+		cards.append(
+			{
+				"concept": block["text"],
+				"front": f"Explain: {block['text']}",
+				"back": back,
+				"difficulty": "Easy" if len(cards) % 4 == 0 else "Medium",
+			}
+		)
+	return cards
+
+
+def _is_heading(paragraph, text: str) -> bool:
+	runs = [run for run in paragraph.runs if _clean_text(run.text)]
+	return bool(runs) and len(text) <= 180 and all(bool(run.bold) for run in runs)
+
+
+def _find_text(texts: list[str], target: str, start: int = 0, end: int | None = None) -> int:
+	end = len(texts) if end is None else end
+	target_key = target.casefold()
+	for index in range(start, end):
+		if texts[index].casefold() == target_key:
+			return index
+	frappe.throw(_("Could not find approved source heading: {0}").format(target))
+
+
+def _clean_text(value: str | None) -> str:
+	return re.sub(r"\s+", " ", (value or "").replace("\xa0", " ")).strip()

@@ -1,0 +1,701 @@
+body.aimatic-lms-learner .aimatic-study-buddy-transcript {
+	max-height: 245px;
+	margin: 15px 0;
+	overflow: auto;
+	border: 1px solid rgba(23, 36, 58, 0.11);
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.75);
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-message {
+	padding: 10px 11px;
+	border-bottom: 1px solid rgba(23, 36, 58, 0.08);
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-message:last-child {
+	border-bottom: 0;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-message strong,
+body.aimatic-lms-learner .aimatic-study-buddy-message small {
+	display: block;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-message strong {
+	margin-bottom: 4px;
+	color: var(--aimatic-teal-dark);
+	font-size: 0.63rem;
+	font-weight: 750;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-message-user strong {
+	color: var(--aimatic-ink-soft);
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-message p {
+	margin: 0 !important;
+	color: var(--aimatic-ink) !important;
+	font-size: 0.76rem !important;
+	line-height: 1.55 !important;
+	white-space: pre-wrap;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-message small {
+	margin-top: 7px;
+	color: var(--aimatic-ink-soft);
+	font-size: 0.63rem;
+	line-height: 1.35;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-form button:disabled {
+	cursor: progress;
+	opacity: 0.68;
+	transform: none !important;
+}
+
+/* Study Buddy is lesson-aware by design. The model connection is intentionally
+ * disclosed as a preview until the approved SQE source corpus is live. */
+body.aimatic-lms-learner .aimatic-study-buddy {
+	padding: 19px !important;
+	border-color: rgba(23, 36, 58, 0.14) !important;
+	background: linear-gradient(160deg, #fffdf8 0%, #f6f8f7 100%) !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-ai-kicker b {
+	margin-left: auto;
+	padding: 4px 7px;
+	border-radius: 999px;
+	background: #f5ead3;
+	color: var(--aimatic-teal-dark);
+	font-size: 0.55rem;
+	font-weight: 750;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy .aimatic-lms-ai-context {
+	margin: 16px 0 18px;
+	padding: 12px 13px;
+	border: 1px solid rgba(143, 101, 23, 0.14);
+	border-radius: 13px;
+	background: rgba(247, 239, 222, 0.62);
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy .aimatic-lms-ai-context small {
+	display: block;
+	margin-top: 5px;
+	color: var(--aimatic-ink-soft);
+	font-size: 0.69rem;
+	line-height: 1.35;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy h2 {
+	margin-bottom: 7px;
+	font-size: 1.16rem;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy > p {
+	font-size: 0.79rem;
+	line-height: 1.55;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-prompts {
+	display: grid;
+	gap: 7px;
+	margin: 17px 0 14px;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-prompts button {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	padding: 9px 10px;
+	border: 1px solid rgba(23, 36, 58, 0.11);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.72);
+	color: var(--aimatic-ink);
+	font: inherit;
+	font-size: 0.73rem;
+	font-weight: 600;
+	text-align: left;
+	cursor: pointer;
+	transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-prompts button::before {
+	content: "↗";
+	margin-right: 8px;
+	color: var(--aimatic-teal-dark);
+	font-weight: 700;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-prompts button:hover,
+body.aimatic-lms-learner .aimatic-study-buddy-prompts button:focus-visible {
+	border-color: rgba(143, 101, 23, 0.42);
+	background: #fff;
+	outline: 0;
+	transform: translateY(-1px);
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-form textarea {
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 76px;
+	padding: 10px 11px;
+	border: 1px solid rgba(23, 36, 58, 0.16);
+	border-radius: 11px;
+	background: #fff;
+	color: var(--aimatic-ink);
+	font: inherit;
+	font-size: 0.77rem;
+	line-height: 1.45;
+	resize: vertical;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-form textarea:focus-visible {
+	border-color: var(--aimatic-teal-dark);
+	box-shadow: 0 0 0 3px rgba(209, 162, 69, 0.18);
+	outline: 0;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-form button {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	min-height: 39px;
+	margin-top: 8px;
+	padding: 8px 11px;
+	border: 0;
+	border-radius: 10px;
+	background: var(--aimatic-ink);
+	color: #fff;
+	font: inherit;
+	font-size: 0.75rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-form button:hover,
+body.aimatic-lms-learner .aimatic-study-buddy-form button:focus-visible {
+	background: #263c60;
+	box-shadow: 0 7px 16px rgba(23, 36, 58, 0.16);
+	outline: 0;
+	transform: translateY(-1px);
+}
+
+body.aimatic-lms-learner .aimatic-study-buddy-status {
+	margin: 11px 1px 0 !important;
+	color: var(--aimatic-ink-soft) !important;
+	font-size: 0.65rem !important;
+	line-height: 1.45 !important;
+}
+
+/* Aimatic LMS learner shell — scoped to the LMS SPA by lms_learning.js. */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap');
+
+body.aimatic-lms-learner {
+	--aimatic-ink: #17243a;
+	--aimatic-ink-soft: #68758a;
+	--aimatic-teal: #d1a245;
+	--aimatic-teal-dark: #8f6517;
+	--aimatic-mint: #f7efde;
+	--aimatic-mint-deep: #ead8b3;
+	--aimatic-cream: #fcfaf5;
+	--aimatic-surface: #f4f6f8;
+	--aimatic-line: rgba(16, 35, 63, 0.11);
+	--aimatic-shadow: 0 14px 40px rgba(16, 35, 63, 0.09);
+	background: var(--aimatic-surface) !important;
+	color: var(--aimatic-ink);
+	font-family: "Bricolage Grotesque", system-ui, sans-serif;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-grid {
+	display: grid !important;
+	grid-template-columns: 272px minmax(0, 1fr) 304px !important;
+	grid-template-rows: minmax(calc(100vh - 112px), auto) !important;
+	height: auto !important;
+	min-height: calc(100vh - 112px);
+	background: var(--aimatic-surface);
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main {
+	grid-column: 2 !important;
+	grid-row: 1 !important;
+	min-width: 0;
+	background: var(--aimatic-surface) !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main > div {
+	border: 0 !important;
+	background: transparent !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main > div > div:first-child {
+	padding-top: 28px !important;
+	border: 0 !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main h1 {
+	color: var(--aimatic-ink) !important;
+	font-size: clamp(1.65rem, 2.3vw, 2.35rem) !important;
+	font-weight: 700 !important;
+	letter-spacing: -0.035em;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror {
+	max-width: 820px !important;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail {
+	grid-column: 1 !important;
+	grid-row: 1 !important;
+	position: sticky !important;
+	top: 0 !important;
+	align-self: start;
+	height: calc(100vh - 112px) !important;
+	border: 0 !important;
+	border-right: 1px solid var(--aimatic-line) !important;
+	background: rgba(251, 253, 250, 0.92) !important;
+	backdrop-filter: blur(14px);
+	overflow: hidden;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail > div {
+	background: transparent !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail [class~="bg-surface-gray-1"] {
+	padding: 22px 18px 17px !important;
+	background: linear-gradient(145deg, #f7f0e2, #fbfcfd) !important;
+	border-bottom: 1px solid var(--aimatic-line) !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail [class~="bg-surface-gray-1"]::before {
+	content: "YOUR LEARNING PATH";
+	display: block;
+	margin-bottom: 8px;
+	color: var(--aimatic-teal-dark);
+	font-size: 0.62rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail ul {
+	scrollbar-width: thin;
+	scrollbar-color: var(--aimatic-mint-deep) transparent;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail button,
+body.aimatic-lms-learner .aimatic-lms-chapter-rail a {
+	border-radius: 12px !important;
+	transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail button:hover,
+body.aimatic-lms-learner .aimatic-lms-chapter-rail a:hover {
+	background: var(--aimatic-mint) !important;
+	color: var(--aimatic-teal-dark) !important;
+}
+
+body.aimatic-lms-learner .aimatic-lms-chapter-rail a[class*="bg-surface-gray-2"] {
+	background: var(--aimatic-mint-deep) !important;
+	color: var(--aimatic-teal-dark) !important;
+	font-weight: 600;
+	box-shadow: inset 3px 0 0 var(--aimatic-teal);
+}
+
+body.aimatic-lms-learner .aimatic-lms-ai-rail {
+	grid-column: 3;
+	grid-row: 1;
+	align-self: start;
+	position: sticky;
+	top: 0;
+	height: calc(100vh - 112px);
+	padding: 24px 18px;
+	border-left: 1px solid var(--aimatic-line);
+	background: linear-gradient(180deg, #fbfcfd 0%, #f3f0e8 100%);
+}
+
+body.aimatic-lms-learner .aimatic-lms-ai-card {
+	position: relative;
+	padding: 20px;
+	border: 1px solid rgba(16, 35, 63, 0.13);
+	border-radius: 20px;
+	background: rgba(255, 255, 255, 0.74);
+	box-shadow: var(--aimatic-shadow);
+	overflow: hidden;
+}
+
+body.aimatic-lms-learner .aimatic-lms-ai-card::after {
+	content: "";
+	position: absolute;
+	width: 110px;
+	height: 110px;
+	right: -38px;
+	top: -40px;
+	border-radius: 50%;
+	background: rgba(214, 169, 77, 0.22);
+}
+
+.aimatic-lms-ai-kicker {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 22px;
+	color: var(--aimatic-teal-dark);
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+.aimatic-lms-ai-spark {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 27px;
+	height: 27px;
+	border-radius: 9px;
+	background: var(--aimatic-teal);
+	color: #fff;
+	font-size: 0.95rem;
+}
+
+.aimatic-lms-ai-card h2 {
+	position: relative;
+	z-index: 1;
+	margin: 0 0 9px;
+	color: var(--aimatic-ink);
+	font-size: 1.22rem;
+	letter-spacing: -0.025em;
+}
+
+.aimatic-lms-ai-card p {
+	position: relative;
+	z-index: 1;
+	margin: 0;
+	color: var(--aimatic-ink-soft);
+	font-size: 0.84rem;
+	line-height: 1.6;
+}
+
+.aimatic-lms-ai-status {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 20px;
+	padding: 10px 12px;
+	border-radius: 11px;
+	background: var(--aimatic-mint);
+	color: var(--aimatic-teal-dark);
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+.aimatic-lms-ai-status span:first-child {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: #efb866;
+}
+
+/* Chapter hub: the style block in lesson bodies can be sanitized by LMS. */
+body.aimatic-lms-learner .aimatic-chapter-hub {
+	--ach-ink: var(--aimatic-ink);
+	--ach-ink-soft: var(--aimatic-ink-soft);
+	--ach-teal: var(--aimatic-teal);
+	--ach-teal-soft: #72bcb1;
+	--ach-mint: var(--aimatic-mint);
+	--ach-mint-deep: var(--aimatic-mint-deep);
+	--ach-surface: #f7faf7;
+	--ach-card: #fff;
+	--ach-warm: var(--aimatic-cream);
+	--ach-border: var(--aimatic-line);
+	--ach-shadow: 0 10px 28px rgba(35, 72, 67, 0.07);
+	margin: 22px 0 8px;
+	border: 1px solid var(--ach-border) !important;
+	border-radius: 22px !important;
+	background: linear-gradient(180deg, #f2faf6 0%, #fff 150px) !important;
+	box-shadow: 0 8px 30px rgba(35, 72, 67, 0.04);
+	overflow: hidden;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-hero {
+	padding: 26px 24px 20px !important;
+	background: transparent !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-eyebrow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 12px;
+	color: var(--aimatic-teal-dark);
+	font-size: 0.69rem;
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-eyebrow-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: #e8b464;
+	box-shadow: 0 0 0 4px rgba(232, 180, 100, 0.18);
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-title {
+	margin: 0 0 7px !important;
+	color: var(--aimatic-ink) !important;
+	font-size: clamp(1.3rem, 2vw, 1.7rem) !important;
+	font-weight: 700 !important;
+	letter-spacing: -0.035em;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-sub {
+	margin: 0 !important;
+	color: var(--aimatic-ink-soft) !important;
+	font-size: 0.84rem !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tabbar {
+	display: flex;
+	gap: 7px;
+	padding: 0 18px 14px !important;
+	border-bottom: 1px solid var(--aimatic-line) !important;
+	background: transparent !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab-label,
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab {
+	border: 1px solid transparent !important;
+	border-radius: 12px !important;
+	background: #f7f4ee !important;
+	color: var(--aimatic-ink-soft) !important;
+	font-weight: 600 !important;
+	transition: all 160ms ease;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab-label:hover,
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab:hover,
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab.is-active {
+	border-color: var(--aimatic-teal) !important;
+	background: var(--aimatic-teal) !important;
+	color: #fff !important;
+	box-shadow: 0 5px 14px rgba(42, 157, 143, 0.2);
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-panel {
+	padding: 20px 18px 24px !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-panel[hidden] {
+	display: none !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-panel.is-active {
+	display: block !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-notes-intro {
+	margin-bottom: 16px !important;
+	padding: 13px 15px !important;
+	border: 1px solid rgba(42, 157, 143, 0.13) !important;
+	border-radius: 15px !important;
+	background: var(--aimatic-mint) !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-notes-icon {
+	width: 37px !important;
+	height: 37px !important;
+	border-radius: 11px !important;
+	background: #fff !important;
+	color: var(--aimatic-teal-dark) !important;
+	font-size: 0.78rem !important;
+	font-weight: 700;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-details {
+	margin-bottom: 11px !important;
+	border: 1px solid var(--aimatic-line) !important;
+	border-radius: 16px !important;
+	box-shadow: var(--ach-shadow) !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-details summary {
+	padding: 15px 16px !important;
+	font-size: 0.88rem !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-section-body {
+	padding: 5px 18px 18px 58px !important;
+	font-family: "Source Serif 4", Georgia, serif !important;
+	font-size: 1.02rem !important;
+	line-height: 1.78 !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-section-chevron {
+	margin-left: auto;
+	color: var(--aimatic-teal-soft);
+	font-size: 1rem;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-study {
+	max-width: 620px;
+	margin: 0 auto;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-filter,
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	color: var(--aimatic-ink-soft);
+	font-size: 0.74rem;
+	font-weight: 600;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-filter {
+	margin: 0 2px 10px;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-filter-hint {
+	font-weight: 500;
+	opacity: 0.8;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-item[hidden] {
+	display: none !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 246px;
+	margin: 0 !important;
+	padding: 34px 30px !important;
+	border: 0 !important;
+	border-radius: 22px !important;
+	background: linear-gradient(145deg, #24494c, #2f8379) !important;
+	box-shadow: 0 18px 38px rgba(32, 83, 77, 0.2) !important;
+	color: #fff !important;
+	cursor: pointer;
+	font-family: "Source Serif 4", Georgia, serif;
+	font-size: 1.2rem;
+	line-height: 1.6;
+	text-align: center;
+	user-select: none;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card.is-back {
+	background: linear-gradient(145deg, #d1a245, #176f68) !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-card-face {
+	max-width: 500px;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flip-label {
+	position: absolute;
+	bottom: 14px;
+	font-family: "Bricolage Grotesque", system-ui, sans-serif;
+	font-size: 0.65rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	opacity: 0.7;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card-meta {
+	margin: 11px 3px 0;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-actions {
+	display: grid !important;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px !important;
+	margin-top: 16px !important;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-rate {
+	padding: 11px 12px;
+	border: 1px solid var(--aimatic-line);
+	border-radius: 12px;
+	background: #fff;
+	color: var(--aimatic-ink);
+	font-size: 0.8rem;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-rate:hover {
+	transform: translateY(-1px);
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-rate-hard { color: #a85a4e; }
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-rate-good { color: #7b6a34; }
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-rate-easy {
+	border-color: var(--aimatic-teal) !important;
+	background: var(--aimatic-teal) !important;
+}
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-complete {
+	display: grid;
+	gap: 8px;
+	padding: 42px 24px;
+	border-radius: 20px;
+	background: var(--aimatic-mint);
+	color: var(--aimatic-teal-dark);
+	text-align: center;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-complete span {
+	color: var(--aimatic-ink-soft);
+}
+
+@media (max-width: 1100px) {
+	body.aimatic-lms-learner .aimatic-lms-lesson-grid {
+		grid-template-columns: 236px minmax(0, 1fr) !important;
+	}
+	body.aimatic-lms-learner .aimatic-lms-ai-rail { display: none; }
+}
+
+@media (max-width: 767px) {
+	body.aimatic-lms-learner .aimatic-lms-lesson-main > div > div:first-child {
+		padding-top: 16px !important;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub {
+		margin-top: 14px;
+		border-radius: 17px !important;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-hero { padding: 20px 17px 16px !important; }
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-tabbar {
+		overflow-x: auto;
+		padding: 0 12px 12px !important;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab-label,
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-tab {
+		white-space: nowrap;
+		padding: 9px 12px !important;
+	}
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-panel { padding: 15px 12px 18px !important; }
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-section-body { padding-left: 18px !important; }
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card {
+		min-height: 220px;
+		padding: 28px 21px !important;
+		font-size: 1.05rem;
+	}
+}

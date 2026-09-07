@@ -1,0 +1,7 @@
+[pre_model_sync]
+aimaticlearning.patches.create_lms_learning_roles
+aimaticlearning.patches.expand_course_lesson_content_field
+
+[post_model_sync]
+aimaticlearning.patches.configure_lms_student_access
+

@@ -1,0 +1,132 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-08-30 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "learning_module",
+  "course_chapter",
+  "column_break_question",
+  "lms_question",
+  "learning_flashcard",
+  "quiz_submission",
+  "section_break_attempt",
+  "correct",
+  "time_seconds",
+  "attempt_order",
+  "concept_tags",
+  "question_revision"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "learning_module",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Learning Module",
+   "options": "Learning Module Config",
+   "reqd": 1
+  },
+  {
+   "fieldname": "course_chapter",
+   "fieldtype": "Link",
+   "label": "Course Chapter",
+   "options": "Course Chapter"
+  },
+  {
+   "fieldname": "column_break_question",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "lms_question",
+   "fieldtype": "Link",
+   "label": "LMS Question",
+   "options": "LMS Question"
+  },
+  {
+   "fieldname": "learning_flashcard",
+   "fieldtype": "Link",
+   "label": "Learning Flashcard",
+   "options": "Learning Flashcard"
+  },
+  {
+   "fieldname": "quiz_submission",
+   "fieldtype": "Link",
+   "label": "Quiz Submission",
+   "options": "LMS Quiz Submission"
+  },
+  {
+   "fieldname": "section_break_attempt",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "correct",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Correct"
+  },
+  {
+   "fieldname": "time_seconds",
+   "fieldtype": "Float",
+   "label": "Time (seconds)"
+  },
+  {
+   "fieldname": "attempt_order",
+   "fieldtype": "Int",
+   "label": "Attempt Order"
+  },
+  {
+   "fieldname": "concept_tags",
+   "fieldtype": "Small Text",
+   "label": "Concept Tags"
+  },
+  {
+   "fieldname": "question_revision",
+   "fieldtype": "Int",
+   "label": "Question Revision"
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "LMS Learning",
+ "name": "Learning Attempt Detail",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "LMS Learner Analytics",
+   "share": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
