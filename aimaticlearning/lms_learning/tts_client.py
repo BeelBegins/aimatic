@@ -29,8 +29,16 @@ import requests
 from huggingface_hub import InferenceClient
 
 HF_MODEL = "hexgrad/Kokoro-82M"
-HF_PROVIDER = "deepinfra"
+# "deepinfra" is listed on the model's HF page but this installed
+# huggingface_hub version has no DeepInfra text-to-speech task mapping
+# (verified locally: only ASR/conversational/text-generation are wired for
+# deepinfra here) - "fal-ai" is the provider this SDK actually implements
+# TTS routing for.
+HF_PROVIDER = "fal-ai"
 OPENROUTER_MODEL = "hexgrad/kokoro-82m"
+# Kokoro has 54 preset voices (af_*/am_* American, bf_*/bm_* British, etc.);
+# af_heart is the model's own documented default and reads as warm/calm.
+OPENROUTER_VOICE = "af_heart"
 OPENROUTER_TTS_URL = "https://openrouter.ai/api/v1/audio/speech"
 DEFAULT_TIMEOUT = 120
 
@@ -118,7 +126,12 @@ def _synthesize_openrouter(text: str) -> bytes:
 				"Authorization": f"Bearer {api_key}",
 				"Content-Type": "application/json",
 			},
-			json={"model": OPENROUTER_MODEL, "input": text, "response_format": "mp3"},
+			json={
+				"model": OPENROUTER_MODEL,
+				"input": text,
+				"voice": OPENROUTER_VOICE,
+				"response_format": "mp3",
+			},
 			timeout=DEFAULT_TIMEOUT,
 		)
 	except requests.RequestException as e:
