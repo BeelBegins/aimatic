@@ -1,0 +1,54 @@
+.aimatic-lesson-audio-player {
+	margin: 0 0 20px;
+	padding: 14px 18px;
+	border-radius: 13px;
+	background: var(--aimatic-mint, #f7efde);
+	border: 1px solid var(--aimatic-line, rgba(16, 35, 63, 0.11));
+	box-shadow: var(--aimatic-shadow, 0 14px 40px rgba(16, 35, 63, 0.09));
+}
+
+.aimatic-lesson-audio-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 10px;
+	flex-wrap: wrap;
+}
+
+.aimatic-lesson-audio-icon {
+	color: var(--aimatic-teal-dark, #8f6517);
+	font-size: 1rem;
+}
+
+.aimatic-lesson-audio-label {
+	font-weight: 600;
+	color: var(--aimatic-ink, #17243a);
+	flex: 1 1 auto;
+}
+
+.aimatic-lesson-audio-speed-label {
+	font-size: 0.85rem;
+	color: var(--aimatic-ink-soft, #68758a);
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.aimatic-lesson-audio-speed {
+	border-radius: 8px;
+	border: 1px solid var(--aimatic-line, rgba(16, 35, 63, 0.11));
+	background: var(--aimatic-cream, #fcfaf5);
+	color: var(--aimatic-ink, #17243a);
+	padding: 3px 6px;
+}
+
+.aimatic-lesson-audio-el {
+	width: 100%;
+	display: block;
+}
+
+.aimatic-lesson-audio-progress {
+	margin: 6px 0 0;
+	font-size: 0.8rem;
+	color: var(--aimatic-ink-soft, #68758a);
+}

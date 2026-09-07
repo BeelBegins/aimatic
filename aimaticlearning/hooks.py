@@ -18,6 +18,9 @@ doc_events = {
 	"User": {
 		"after_insert": "aimaticlearning.lms_learning.enrollment.send_student_welcome_email",
 	},
+	"Course Lesson": {
+		"on_update": "aimaticlearning.lms_learning.lesson_audio.enqueue_lesson_audio_regeneration",
+	},
 }
 
 website_route_rules = [
