@@ -22,7 +22,12 @@ from frappe.utils import now_datetime, strip_html
 from frappe.utils.file_manager import save_file
 from lms.lms.md import markdown_to_html
 
-from aimaticlearning.lms_learning.tts_client import TTSError, split_into_chunks, synthesize_chunk
+from aimaticlearning.lms_learning.tts_client import (
+	TTSError,
+	sniff_audio_extension,
+	split_into_chunks,
+	synthesize_chunk,
+)
 from aimaticlearning.lms_learning.utils import throw_access_denied, user_can_access_course
 
 DEFAULT_ENABLED_COURSES = ["property-practice"]
@@ -106,8 +111,8 @@ def generate_lesson_audio_job(lesson: str, content_hash: str):
 	chunk_urls: list[str] = []
 	try:
 		for i, chunk_text in enumerate(chunks, start=1):
-			audio_bytes, content_type = synthesize_chunk(chunk_text)
-			extension = "flac" if "flac" in content_type else "wav" if "wav" in content_type else "bin"
+			audio_bytes = synthesize_chunk(chunk_text)
+			extension = sniff_audio_extension(audio_bytes)
 			file_doc = save_file(
 				f"{frappe.scrub(lesson)}-audio-{i:03d}.{extension}",
 				audio_bytes,
