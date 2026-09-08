@@ -52,3 +52,26 @@
 	font-size: 0.8rem;
 	color: var(--aimatic-ink-soft, #68758a);
 }
+
+@media (max-width: 640px) {
+	.aimatic-lesson-audio-player {
+		margin: 0 0 18px;
+		padding: 13px 14px;
+		border-radius: 16px;
+	}
+
+	.aimatic-lesson-audio-head {
+		align-items: flex-start;
+	}
+
+	.aimatic-lesson-audio-speed-label {
+		width: 100%;
+		justify-content: space-between;
+		min-height: 40px;
+	}
+
+	.aimatic-lesson-audio-speed {
+		min-height: 36px;
+		padding: 5px 8px;
+	}
+}

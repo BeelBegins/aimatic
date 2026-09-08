@@ -68,6 +68,15 @@
 		if (existing) existing.remove();
 	}
 
+	function findLessonMain() {
+		const decorated = document.querySelector(".aimatic-lms-lesson-main");
+		if (decorated) return decorated;
+		// Mobile Lesson.vue omits the desktop chapter aside, so the learner
+		// decorator cannot tag the lesson column. This stable content surface is
+		// the mobile equivalent and keeps audio available on both layouts.
+		return document.querySelector('[class~="bg-surface-base"][class~="min-w-0"]');
+	}
+
 	function mountPlayer(main, context) {
 		const key = contextKey(context);
 		if (main.dataset.lessonAudioContext === key) return;
@@ -110,7 +119,7 @@
 		if (!isLmsRoute()) return;
 		const context = currentLessonContext();
 		if (!context) return;
-		const main = document.querySelector(".aimatic-lms-lesson-main");
+		const main = findLessonMain();
 		if (!main) return;
 		mountPlayer(main, context);
 	}
