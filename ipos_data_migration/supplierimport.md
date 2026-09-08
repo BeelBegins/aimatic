@@ -166,6 +166,28 @@ covered here.
 
 - `szl` (`import_szl_suppliers.py`) uses the exact linked Ghouri Town workbook at `sites/szl/private/files/vendordataghouritown.xlsx`; its final blank row is a summary row and must be excluded from vendor data. The target has multiple branches, so the script explicitly sets `BRANCH_OVERRIDE = "S1 - Ghouri Town VIP"`; every opening-entry account row receives that branch and its cost center. The cutover run is dated `2026-08-04` for the planned go-live.
 
+- `szl` (S7 Empire Heights, `import_s7_vendor_balances.py`) posts opening
+  balances only, against Suppliers that (mostly) already exist from the S1
+  import above — see `s7_empire_heights.md`'s "S7 vendor opening balances"
+  section for the full run. **Confirmed here: legacy `SupplierCode` is
+  branch-local, not a globally unique key** — S1's file and S7's file each
+  assign their own numbering independently, and the same numeric code can
+  mean two unrelated real vendors across branches (confirmed collision:
+  code `614` = `SIEZAL SUPERMARKET (BAHRIA PH7)` in S1's file, but a
+  different entity, `SIEZAL SUPERMARKET (KHANNA PULL)`, in S7's file). NTN
+  string formatting can also differ verbatim between a new branch file and
+  the already-stored `tax_id` (e.g. `230823` vs stored `4230823`). **Do not
+  auto-match a second branch's vendor file by `SupplierCode` equality alone**
+  — verify each row by NTN and/or literal name against the existing Supplier
+  list first, the way `import_szl_suppliers.py`'s own NTN-merge grouping does
+  for a *single* file's internal duplicates, and cross-check Purchase
+  Order/Invoice/Journal Entry activity when a match is ambiguous or a
+  candidate Supplier is disabled (found one stale case: `SHAN MARKETING
+  SERVICES (SEASONS)`, same NTN as `(NESTLE YOGURT)`, disabled after the
+  business consolidated purchasing onto the latter — the newer branch's
+  balance belonged on the active Supplier, not the disabled one it was
+  originally tagged against).
+
 ## Principal tagging (multi-company distributors)
 
 After NTN merge, brand/company lines that lived as separate legacy SupplierCodes are restored on the

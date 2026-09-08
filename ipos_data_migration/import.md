@@ -448,6 +448,18 @@ actually uploaded on that site; only the script itself is centralized.
   positive `Slprice` in the S1 Selling Price List, commits in resumable chunks, and refuses
   ambiguous/duplicate matches. Set the script-specific `S1_PRICE_UPDATE_LIVE = True` console
   variable only after the live-operation gate and a current backup.
+- **S7 Empire Heights** (`s7_empire_heights.md`, 2026-09-04) — branch cutover runbook. File roles:
+  master item file creates the 548 missing Items; S7 Itemonhand supplies branch prices + stock.
+  Hard gates: no new Item Group / FBR Tax Category without approval; mock on `siezal` before live
+  `szl`. Scripts: `audit_s7_barcodes_vs_szl.py`, `reconcile_s7_missing_vs_master.py`,
+  `create_s7_missing_items.py`, `attach_s7_orphan_barcode2.py`,
+  `merge_s7_duplicate_catalog_items.py`, `lock_pkr_currency.py`,
+  `import_s7_prices_and_stock.py`, `install_migration_workspace.py`; stock/price patterns reuse
+  `import_szl_s1_stock.py` / `update_szl_s1_sale_prices.py`. Do **not** use
+  `add_missing_items_from_file.py` as-is for S7 (that pass forced barcode = `item_code`). Mock
+  pass on `siezal` completed 2026-09-05; **live `szl` cutover ran 2026-09-06 and the branch is
+  trading** — do not re-run any S7 step against `szl`. The runbook status table is the source of
+  truth for what was posted; this index is a pointer, not a status record.
 - `close_migration_opening_balance.py` (2026-07-23) — the cross-cutting final step, shared across
   sites, not item- or supplier-specific: closes the `Temporary Opening` suspense account's residual
   balance to `Opening Balance Equity` once both imports for a site are complete. See "Opening-stock
