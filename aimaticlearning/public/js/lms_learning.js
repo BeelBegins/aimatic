@@ -1,6 +1,37 @@
 (function () {
 	"use strict";
 
+	// The LMS Vue shell (_lms.html, in Frappe LMS core) emits no <link rel="canonical">
+	// or og:url tag at all, and this app is reachable on three live hostnames
+	// (lms.aimatic.tech, examic.study, www.examic.study) serving identical content -
+	// without this, search engines see the same page three times with no signal for
+	// which URL is authoritative. examic.study is the public brand, so it is canonical.
+	// Core template can't be edited here, so the tag is inserted client-side instead.
+	var SEO_CANONICAL_HOST = "https://examic.study";
+
+	function ensureCanonicalTags() {
+		var path = window.location.pathname.replace(/\/+$/, "") || "/";
+		var canonicalUrl = SEO_CANONICAL_HOST + path;
+
+		var linkEl = document.head.querySelector('link[rel="canonical"]');
+		if (!linkEl) {
+			linkEl = document.createElement("link");
+			linkEl.setAttribute("rel", "canonical");
+			document.head.appendChild(linkEl);
+		}
+		linkEl.setAttribute("href", canonicalUrl);
+
+		var ogUrlEl = document.head.querySelector('meta[property="og:url"]');
+		if (!ogUrlEl) {
+			ogUrlEl = document.createElement("meta");
+			ogUrlEl.setAttribute("property", "og:url");
+			document.head.appendChild(ogUrlEl);
+		}
+		ogUrlEl.setAttribute("content", canonicalUrl);
+	}
+
+	ensureCanonicalTags();
+
 	function isLmsRoute() {
 		return /^\/lms(?:\/|$)/.test(window.location.pathname);
 	}
@@ -248,6 +279,7 @@
 	}
 
 	function apply() {
+		ensureCanonicalTags();
 		if (!isLmsRoute()) return;
 		decorateLessonPage();
 		bootHubs();

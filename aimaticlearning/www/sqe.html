@@ -2,10 +2,16 @@
 
 {% block meta_block %}
 <meta name="description" content="{{ meta_description }}">
+<meta name="robots" content="index, follow">
 <meta property="og:title" content="{{ title }}">
 <meta property="og:description" content="{{ meta_description }}">
 <meta property="og:type" content="website">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:image" content="{{ og_image }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ og_image }}">
 <link rel="canonical" href="{{ canonical_url }}">
+<script type="application/ld+json">{{ course_schema }}</script>
 {% endblock %}
 
 {% block title %}{{ title }}{% endblock %}
@@ -157,7 +163,7 @@
 				<article class="sqe-feature"><span class="sqe-icon">✓</span><h3>Practice with feedback</h3><p>Check each answer and learn from the explanation—not just the score.</p></article>
 				<article class="sqe-feature"><span class="sqe-icon">↻</span><h3>Flashcards that remember</h3><p>Rate recall as hard, good or easy, pause safely, and return to your deck.</p></article>
 				<article class="sqe-feature"><span class="sqe-icon">◎</span><h3>Results you can use</h3><p>See your score, attempt history and the next practical step after a session.</p></article>
-				<article class="sqe-feature sqe-feature-gold"><span class="sqe-icon">✦</span><h3>Study Buddy AI</h3><p>A lesson-aware assistant is being prepared for a later release. Your selected lesson already provides its context.</p></article>
+				<article class="sqe-feature sqe-feature-gold"><span class="sqe-icon">✦</span><h3>Study Buddy AI</h3><p>Live in beta: a source-grounded assistant that answers from your selected lesson's approved material only, with suggested questions to get started.</p></article>
 			</div>
 		</section>
 

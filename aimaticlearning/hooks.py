@@ -45,7 +45,7 @@ web_include_css = [
 	"/assets/aimaticlearning/css/lms_soft_themes.css?v=20260902-6",
 ]
 web_include_js = [
-	"/assets/aimaticlearning/js/lms_learning.js",
+	"/assets/aimaticlearning/js/lms_learning.js?v=20260909-seo1",
 	"/assets/aimaticlearning/js/lms_soft_themes.js?v=20260902-6",
 ]
 
@@ -60,5 +60,6 @@ override_whitelisted_methods = {
 	"lms.lms.api.get_sidebar_settings": "aimaticlearning.lms_learning.statistics.get_sidebar_settings",
 	"lms.lms.utils.get_chart_data": "aimaticlearning.lms_learning.statistics.get_chart_data",
 	"lms.lms.utils.get_course_completion_data": "aimaticlearning.lms_learning.statistics.get_course_completion_data",
+	"lms.lms.utils.get_course_details": "aimaticlearning.lms_learning.outline_sync.get_course_details",
 }
 
