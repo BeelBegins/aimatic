@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html as html_module
 import re
+from html.parser import HTMLParser
 
 import frappe
 from frappe import _
@@ -10,31 +11,11 @@ from aimaticlearning.lms_learning.protected_notes import get_notes_for_profile
 
 
 def chapter_hub_renderer(profile_name: str) -> str:
-	"""Self-contained chapter hub HTML for LMS lesson body (no macros / no external JS)."""
+	"""Return the chapter notes directly; MCQs and flashcards are separate lessons."""
 	if not frappe.db.exists("Learning Chapter Profile", profile_name):
 		return f"<p>{_('Chapter content not found.')}</p>"
-
 	profile = frappe.get_doc("Learning Chapter Profile", profile_name)
-	quiz_html = ""
-	if profile.chapter_quiz and frappe.session.user != "Guest":
-		try:
-			from lms.plugins import quiz_renderer
-
-			quiz_html = quiz_renderer(profile.chapter_quiz)
-		except Exception:
-			frappe.log_error(frappe.get_traceback(), "Chapter hub quiz render failed")
-
-	return frappe.render_template(
-		"templates/lms_learning/chapter_hub.html",
-		{
-			"profile_name": profile_name,
-			"chapter_title": profile.chapter_title,
-			"notes_html": _build_notes_details(profile),
-			"flashcards_html": _build_flashcard_details(profile),
-			"quiz_html": quiz_html,
-		},
-	)
-
+	return profile.notes_html or "<p>No study notes are available for this chapter yet.</p>"
 
 def notes_paragraphs_from_html(notes_html: str) -> list[str]:
 	if not notes_html:
@@ -47,6 +28,84 @@ def notes_paragraphs_from_html(notes_html: str) -> list[str]:
 		if len(text) > 20:
 			paragraphs.append(text)
 	return paragraphs
+
+
+class _NotesBlockParser(HTMLParser):
+    """Parse the small, sanitised HTML vocabulary used by chapter notes."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.blocks: list[dict] = []
+        self._text: tuple[str, int | None, list[str]] | None = None
+        self._list_stack: list[dict] = []
+        self._table_rows: list[list[str]] | None = None
+        self._row: list[str] | None = None
+
+    @staticmethod
+    def _clean(value: str) -> str:
+        return re.sub(r"\s+", " ", value).strip()
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        tag = tag.lower()
+        if tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+            self._text = ("heading", int(tag[1:]), [])
+        elif tag == "p":
+            self._text = ("paragraph", None, [])
+        elif tag in {"ul", "ol"}:
+            self._list_stack.append({"ordered": tag == "ol", "items": []})
+        elif tag == "li":
+            self._text = ("list_item", None, [])
+        elif tag == "table":
+            self._table_rows = []
+        elif tag == "tr":
+            self._row = []
+        elif tag in {"th", "td"}:
+            self._text = ("cell", None, [])
+
+    def handle_data(self, data: str) -> None:
+        if self._text is not None:
+            self._text[2].append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in {"h1", "h2", "h3", "h4", "h5", "h6", "p"} and self._text:
+            kind, level, parts = self._text
+            text = self._clean("".join(parts))
+            if text:
+                self.blocks.append({"kind": kind, "level": level, "text": text})
+            self._text = None
+        elif tag == "li" and self._text:
+            text = self._clean("".join(self._text[2]))
+            if text and self._list_stack:
+                self._list_stack[-1]["items"].append(text)
+            self._text = None
+        elif tag in {"ul", "ol"} and self._list_stack:
+            current = self._list_stack.pop()
+            if current["items"]:
+                self.blocks.append({"kind": "list", "ordered": current["ordered"], "items": current["items"]})
+        elif tag in {"th", "td"} and self._text:
+            text = self._clean("".join(self._text[2]))
+            if text and self._row is not None:
+                self._row.append(text)
+            self._text = None
+        elif tag == "tr" and self._row is not None:
+            if self._table_rows is not None and self._row:
+                self._table_rows.append(self._row)
+            self._row = None
+        elif tag == "table" and self._table_rows is not None:
+            if self._table_rows:
+                self.blocks.append({"kind": "table", "rows": self._table_rows})
+            self._table_rows = None
+
+
+def notes_blocks_from_html(notes_html: str) -> list[dict]:
+    """Return semantic note blocks without exposing raw HTML to the client."""
+    if not notes_html:
+        return []
+    parser = _NotesBlockParser()
+    parser.feed(notes_html)
+    parser.close()
+    return parser.blocks
 
 
 def _build_notes_details(profile: frappe.Document) -> str:

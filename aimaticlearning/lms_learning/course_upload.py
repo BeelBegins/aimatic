@@ -17,6 +17,13 @@ from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
+from aimaticlearning.lms_learning.content_format import (
+	iter_docx_blocks,
+	paragraph_kind,
+	render_content_blocks,
+	render_table_html,
+)
+
 CHAPTER_RE = re.compile(
 	r"^chapter\s*(?:(\d+)|(one|two|three|four|five|six|seven|eight|nine|ten))\b\s*[:.\-–]?\s*(.*)$",
 	re.I,
@@ -122,7 +129,10 @@ def fill_lessons_from_source(lesson_titles: list[str], source_file: str) -> dict
 		lesson.content = ""
 		lesson.save(ignore_permissions=True)
 		if lesson.chapter:
-			from aimaticlearning.lms_learning.outline_sync import link_chapter_to_course, link_lesson_to_chapter
+			from aimaticlearning.lms_learning.outline_sync import (
+				link_chapter_to_course,
+				link_lesson_to_chapter,
+			)
 
 			link_chapter_to_course(lesson.course, lesson.chapter)
 			link_lesson_to_chapter(lesson.chapter, lesson.name)
@@ -484,35 +494,35 @@ def relink_notes_lessons(course: str | None = None) -> dict:
 
 
 def parse_note_chapters(path: Path) -> list[dict]:
-	"""Split only on Chapter N / Chapter Six title lines, not every Heading 1."""
+	"""Split only on Chapter N / Chapter Six title lines, preserving body semantics."""
 	document = Document(str(path))
 	chapters: list[dict] = []
 	current = None
-	for block in _iter_blocks(document):
+	for block in iter_docx_blocks(document):
 		if isinstance(block, Table):
 			if current is None:
 				continue
-			markup = _table_html(block)
-			current["blocks"].append(("table", markup))
+			markup = render_table_html(block)
+			current["blocks"].append({"kind": "table", "html": markup})
 			current["table_count"] += 1
 			current["char_count"] += len(re.sub(r"<[^>]+>", "", markup))
 			continue
-		text = (block.text or "").replace("\xa0", " ").strip()
+		text = (block.text or "").replace(" ", " ").strip()
 		if not text:
 			continue
 		style = block.style.name if block.style else ""
 		if "table of contents" in text.lower():
 			continue
-		start = _chapter_start(text, style)
-		if start:
-			number, title = start
+		start_match = _chapter_start(text, style)
+		if start_match:
+			number, title = start_match
 			if current:
 				chapters.append(current)
 			current = {
 				"title": title,
 				"number": number,
 				"locator": title,
-				"blocks": [("heading", title, 2)],
+				"blocks": [{"kind": "heading", "text": title, "level": 2}],
 				"paragraph_count": 0,
 				"table_count": 0,
 				"char_count": len(title),
@@ -520,14 +530,18 @@ def parse_note_chapters(path: Path) -> list[dict]:
 			continue
 		if current is None:
 			continue
-		level = _heading_level(style)
-		if level:
-			current["blocks"].append(("heading", text, min(6, max(3, level + 1))))
-		elif style == "Key Point":
-			current["blocks"].append(("para", text, True))
+		item = paragraph_kind(block)
+		if item["kind"] == "empty":
+			continue
+		if item["kind"] == "heading":
+			current["blocks"].append(item)
+		elif item["kind"] == "list_item":
+			current["blocks"].append(item)
 			current["paragraph_count"] += 1
 		else:
-			current["blocks"].append(("para", text))
+			if style == "Key Point":
+				item["strong"] = True
+			current["blocks"].append(item)
 			current["paragraph_count"] += 1
 		current["char_count"] += len(text)
 	if current:
@@ -576,43 +590,16 @@ def _chapter_start(text: str, style: str) -> tuple[int, str] | None:
 
 
 def render_chapter_html(chapter: dict) -> str:
-	parts = ['<article class="aimatic-notes">']
-	for block in chapter["blocks"]:
-		kind = block[0]
-		if kind == "heading":
-			text, level = block[1], block[2]
-			parts.append(f"<h{level}>{html.escape(text)}</h{level}>")
-		elif kind == "para":
-			payload = html.escape(block[1])
-			if len(block) > 2 and block[2]:
-				payload = f"<strong>{payload}</strong>"
-			parts.append(f"<p>{payload}</p>")
-		elif kind == "table":
-			parts.append(block[1])
-	parts.append("</article>")
-	html_out = "".join(parts)
-	# LMS LessonContent.vue splits on blank lines; keep a single HTML block.
-	return re.sub(r"\n{2,}", "\n", html_out)
+	"""Render one parsed chapter using the canonical semantic HTML vocabulary."""
+	return render_content_blocks(chapter["blocks"])
 
 
 def _iter_blocks(document: Document):
-	parent = document.element.body
-	for child in parent.iterchildren():
-		if child.tag == qn("w:p"):
-			yield Paragraph(child, document)
-		elif child.tag == qn("w:tbl"):
-			yield Table(child, document)
+	yield from iter_docx_blocks(document)
 
 
 def _table_html(table: Table) -> str:
-	rows = []
-	for index, row in enumerate(table.rows):
-		cells = "".join(
-			f"<t{'h' if index == 0 else 'd'}>{html.escape((cell.text or '').replace(chr(160), ' ').strip())}</t{'h' if index == 0 else 'd'}>"
-			for cell in row.cells
-		)
-		rows.append(f"<tr>{cells}</tr>")
-	return f'<table class="aimatic-notes-table">{"".join(rows)}</table>'
+	return render_table_html(table)
 
 
 def _heading_level(style: str) -> int | None:

@@ -42,7 +42,7 @@
 	function addSqePathwayCatalogue() {
 		if (!/^\/lms\/courses\/?$/.test(window.location.pathname)) return;
 		const links = Array.from(document.querySelectorAll('a[href*="/lms/courses/"]')).filter(function (link) {
-			return Boolean(courseIdFromLink(link));
+			return !link.closest(".aimatic-sqe-pathway") && Boolean(courseIdFromLink(link));
 		});
 		if (!links.length) return;
 		const sourceGrid = links[0].closest(".grid");
@@ -269,6 +269,7 @@
 			flip.setAttribute("data-ach-flash-card", "");
 			flip.setAttribute("role", "button");
 			flip.setAttribute("tabindex", "0");
+			flip.setAttribute("aria-pressed", "false");
 			flip.setAttribute("aria-label", "Flashcard. Select to reveal the answer.");
 			flip.append(makeNode("span", "ach-card-face ach-card-front", cardData.front || ""));
 			const back = makeNode("span", "ach-card-face ach-card-back", cardData.back || "");
@@ -298,13 +299,13 @@
 		host.dataset.aimaticFlashcardsReady = "1";
 	}
 
-	function showFlashcardError(host) {
+	function showFlashcardError(host, message) {
 		const loader = host.querySelector("[data-aimatic-flashcard-loader]");
 		if (!loader) return;
 		loader.classList.add("is-error");
 		loader.replaceChildren(
-			makeNode("strong", "", "Flashcards could not be loaded."),
-			makeNode("span", "", "Refresh the page or sign in again.")
+			makeNode("strong", "", message || "Flashcards could not be loaded."),
+			makeNode("span", "", "Check your course enrolment, then refresh the page.")
 		);
 	}
 
@@ -337,24 +338,31 @@
 		if (host.dataset.ratingFilter && host.dataset.ratingFilter !== "all") {
 			params.set("rating_filter", host.dataset.ratingFilter);
 		}
+		const controller = new AbortController();
+		const requestTimeout = window.setTimeout(function () { controller.abort(); }, 14000);
 		fetch("/api/method/aimaticlearning.lms_learning.api.get_flashcard_deck?" + params.toString(), {
 			credentials: "same-origin",
+			headers: { Accept: "application/json" },
+			signal: controller.signal,
 		})
 			.then(function (response) {
-				if (!response.ok) throw new Error("Flashcards could not be loaded.");
+				if (!response.ok) {
+					if (response.status === 403) throw new Error("Flashcards require an active course enrolment.");
+					throw new Error("Flashcard request returned HTTP " + response.status);
+				}
 				return response.json();
 			})
 			.then(function (payload) {
 				renderFlashcardDeck(host, (payload.message && payload.message.cards) || []);
 			})
-			.catch(function () {
+			.catch(function (error) {
 				delete host.dataset.aimaticFlashcardsLoading;
-				showFlashcardError(host);
-			});
+				showFlashcardError(host, error.name === "AbortError" ? "Flashcards are taking too long to respond." : error.message);
+			})
+			.finally(function () { window.clearTimeout(requestTimeout); });
 	}
 
 	function loadFlashcardDecks() {
-		if (!isBlpLesson()) return;
 		document.querySelectorAll("[data-aimatic-flashcard-deck]").forEach(loadFlashcardDeck);
 	}
 
@@ -379,6 +387,7 @@
 		next.querySelector(".ach-card-back").hidden = true;
 		const flip = next.querySelector("[data-ach-flash-card]");
 		flip.classList.remove("is-back");
+		flip.setAttribute("aria-pressed", "false");
 		flip.setAttribute("aria-label", "Flashcard. Select to reveal the answer.");
 		flip.querySelector(".ach-flip-label").textContent = "Select to reveal";
 		study.querySelectorAll("[data-ach-rating]").forEach(function (button) {
@@ -425,15 +434,17 @@
 		polishStudyBuddy();
 		hideInstructorByline();
 		hidePoweredByBranding();
+		document.querySelectorAll("[data-ach-flash-card]").forEach(function (card) {
+			if (!card.hasAttribute("aria-pressed")) card.setAttribute("aria-pressed", "false");
+		});
 		loadFlashcardDecks();
 	}
 
 	document.addEventListener(
 		"click",
 		function (event) {
-			if (!isBlpLesson()) return;
 			const flashcard = event.target.closest("[data-ach-flash-card]");
-			if (flashcard) {
+			if (flashcard && flashcard.closest("[data-aimatic-flashcard-deck]")) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
 				const front = flashcard.querySelector(".ach-card-front");
@@ -443,6 +454,7 @@
 				front.hidden = revealing;
 				back.hidden = !revealing;
 				flashcard.classList.toggle("is-back", revealing);
+				flashcard.setAttribute("aria-pressed", String(revealing));
 				flashcard.setAttribute("aria-label", revealing ? "Flashcard answer shown." : "Flashcard. Select to reveal the answer.");
 				if (label) label.textContent = revealing ? "Answer revealed" : "Select to reveal";
 				const study = flashcard.closest("[data-ach-flash-study]");
@@ -452,7 +464,7 @@
 				return;
 			}
 			const button = event.target.closest("[data-ach-rating]");
-			if (!button) return;
+			if (!button || !button.closest("[data-aimatic-flashcard-deck]")) return;
 			event.preventDefault();
 			event.stopImmediatePropagation();
 			saveFlashcardReview(button);
@@ -461,9 +473,9 @@
 	);
 
 	document.addEventListener("keydown", function (event) {
-		if (!isBlpLesson() || (event.key !== "Enter" && event.key !== " ")) return;
+		if (event.key !== "Enter" && event.key !== " ") return;
 		const flashcard = event.target.closest("[data-ach-flash-card]");
-		if (!flashcard) return;
+		if (!flashcard || !flashcard.closest("[data-aimatic-flashcard-deck]")) return;
 		event.preventDefault();
 		flashcard.click();
 	});

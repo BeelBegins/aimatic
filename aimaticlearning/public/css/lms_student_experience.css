@@ -170,7 +170,9 @@ body.aimatic-lms-learner .aimatic-flk1-switcher a i {
 	text-align: center;
 	text-decoration: none !important;
 	white-space: normal;
-	overflow-wrap: anywhere;
+	overflow-wrap: break-word;
+	word-break: normal;
+	hyphens: none;
 	transition: filter 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
@@ -221,9 +223,11 @@ body.aimatic-lms-learner .aimatic-flk1-switcher a i {
 .aimatic-topic-sections p,
 .aimatic-chapter-hub .ach-section-body p,
 .aimatic-chapter-hub .ach-notes-body p {
-	text-align: justify;
-	text-justify: inter-word;
-	hyphens: auto;
+	text-align: left;
+	text-justify: auto;
+	word-break: normal;
+	overflow-wrap: break-word;
+	hyphens: none;
 }
 
 @media (max-width: 767px) {
@@ -331,11 +335,14 @@ body.aimatic-lms-learner .aimatic-topic-intro p {
 body.aimatic-lms-learner .aimatic-topic-sections h2 {
 	margin: 38px 0 14px !important;
 	color: var(--aimatic-ink) !important;
-	font-family: "Source Serif 4", Georgia, serif !important;
+	font-family: var(--aimatic-ui-font) !important;
 	font-size: clamp(1.35rem, 1.8vw, 1.75rem) !important;
-	font-weight: 500 !important;
+	font-weight: 650 !important;
 	line-height: 1.25 !important;
 	letter-spacing: -0.018em !important;
+	word-break: normal;
+	overflow-wrap: break-word;
+	hyphens: none;
 }
 
 body.aimatic-lms-learner .aimatic-topic-sections h2:first-child {
@@ -345,6 +352,7 @@ body.aimatic-lms-learner .aimatic-topic-sections h2:first-child {
 body.aimatic-lms-learner .aimatic-topic-sections p {
 	margin: 0 0 15px !important;
 	color: #3f433f !important;
+	font-family: var(--aimatic-reading-font) !important;
 	font-size: 1rem !important;
 	line-height: 1.78 !important;
 }
@@ -585,5 +593,26 @@ body.aimatic-lms-learner .aimatic-sqe-switcher-group > small {
 @media (prefers-reduced-motion: reduce) {
 	body.aimatic-lms-learner .aimatic-sqe-course-card {
 		transition: none;
+	}
+}
+
+
+/* Keep long lesson titles readable on phones; never hyphenate legal terms. */
+@media (max-width: 767px) {
+	body.aimatic-lms-learner .aimatic-lms-lesson-main h1 {
+		overflow-wrap: break-word;
+		word-break: normal;
+		hyphens: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	body.aimatic-lms-learner .aimatic-flashcard-loader > span:first-child,
+	body.aimatic-lms-learner .aimatic-topic-action,
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-rate,
+	body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card,
+	body.aimatic-lms-learner .aimatic-flk1-switcher > button > i {
+		animation: none !important;
+		transition: none !important;
 	}
 }

@@ -200,6 +200,8 @@ body.aimatic-lms-learner .aimatic-study-buddy-status {
 body.aimatic-lms-learner {
 	--aimatic-ink: #17243a;
 	--aimatic-ink-soft: #68758a;
+	--aimatic-ui-font: "Bricolage Grotesque", system-ui, sans-serif;
+	--aimatic-reading-font: "Source Serif 4", Georgia, serif;
 	--aimatic-teal: #d1a245;
 	--aimatic-teal-dark: #8f6517;
 	--aimatic-mint: #f7efde;
@@ -210,7 +212,7 @@ body.aimatic-lms-learner {
 	--aimatic-shadow: 0 14px 40px rgba(16, 35, 63, 0.09);
 	background: var(--aimatic-surface) !important;
 	color: var(--aimatic-ink);
-	font-family: "Bricolage Grotesque", system-ui, sans-serif;
+	font-family: var(--aimatic-ui-font);
 }
 
 body.aimatic-lms-learner .aimatic-lms-lesson-grid {
@@ -241,15 +243,86 @@ body.aimatic-lms-learner .aimatic-lms-lesson-main > div > div:first-child {
 
 body.aimatic-lms-learner .aimatic-lms-lesson-main h1 {
 	color: var(--aimatic-ink) !important;
+	font-family: var(--aimatic-ui-font) !important;
 	font-size: clamp(1.65rem, 2.3vw, 2.35rem) !important;
 	font-weight: 700 !important;
 	letter-spacing: -0.035em;
+	line-height: 1.12;
+	word-break: normal;
+	overflow-wrap: break-word;
+	hyphens: none;
 }
 
 body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror {
 	max-width: 820px !important;
 	margin-left: auto;
 	margin-right: auto;
+	font-family: var(--aimatic-reading-font);
+	font-size: 1.06rem;
+	line-height: 1.78;
+	color: var(--aimatic-ink);
+	word-break: normal;
+	overflow-wrap: break-word;
+	hyphens: none;
+}
+
+/* One semantic content scale for every imported chapter. The Vue shell owns
+ * h1; lesson HTML starts at h2 and keeps UI labels in the sans face. */
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror h2,
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror h3,
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror h4 {
+	font-family: var(--aimatic-ui-font);
+	font-weight: 650;
+	line-height: 1.22;
+	letter-spacing: -0.02em;
+	color: var(--aimatic-ink);
+	word-break: normal;
+	overflow-wrap: break-word;
+	hyphens: none;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror h2 {
+	margin: 2.25rem 0 0.75rem;
+	font-size: clamp(1.45rem, 2.1vw, 1.9rem);
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror h3 {
+	margin: 1.7rem 0 0.55rem;
+	font-size: clamp(1.2rem, 1.7vw, 1.5rem);
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror h4 {
+	margin: 1.35rem 0 0.45rem;
+	font-size: 1.08rem;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror h2:first-child,
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror h3:first-child {
+	margin-top: 0;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror p {
+	margin: 0 0 1rem;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror ul,
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror ol {
+	margin: 0 0 1.15rem;
+	padding-left: 1.55rem;
+	font-family: var(--aimatic-reading-font);
+	line-height: 1.7;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror li + li {
+	margin-top: 0.38rem;
+}
+
+body.aimatic-lms-learner .aimatic-lms-lesson-main .ProseMirror table {
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
+	border-collapse: collapse;
+	font-size: 0.94rem;
 }
 
 body.aimatic-lms-learner .aimatic-lms-chapter-rail {
@@ -599,6 +672,11 @@ body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card {
 	line-height: 1.6;
 	text-align: center;
 	user-select: none;
+}
+
+body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card:focus-visible {
+	outline: 3px solid var(--aimatic-teal-dark);
+	outline-offset: 3px;
 }
 
 body.aimatic-lms-learner .aimatic-chapter-hub .ach-flash-card.is-back {

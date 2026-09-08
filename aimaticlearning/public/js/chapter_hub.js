@@ -33,22 +33,56 @@
 		const body = root.querySelector("[data-ach-notes-body]");
 		const moreBtn = root.querySelector("[data-ach-notes-more]");
 		const progress = root.querySelector("[data-ach-notes-progress]");
-		let paragraphs = [];
+		let blocks = [];
 		let shown = 0;
 		const chunk = 3;
 
+		function renderBlock(block) {
+			if (!block || !block.kind) return null;
+			if (block.kind === "heading") {
+				const level = Math.min(4, Math.max(2, Number(block.level) || 3));
+				const heading = document.createElement("h" + level);
+				heading.textContent = block.text || "";
+				return heading;
+			}
+			if (block.kind === "list") {
+				const list = document.createElement(block.ordered ? "ol" : "ul");
+				(block.items || []).forEach((item) => {
+					const li = document.createElement("li");
+					li.textContent = item || "";
+					list.appendChild(li);
+				});
+				return list;
+			}
+			if (block.kind === "table") {
+				const table = document.createElement("table");
+				(block.rows || []).forEach((row, rowIndex) => {
+					const tr = document.createElement("tr");
+					(row || []).forEach((cell) => {
+						const node = document.createElement(rowIndex === 0 ? "th" : "td");
+						node.textContent = cell || "";
+						tr.appendChild(node);
+					});
+					table.appendChild(tr);
+				});
+				return table;
+			}
+			const paragraph = document.createElement("p");
+			paragraph.textContent = block.text || "";
+			return paragraph;
+		}
+
 		function renderChunk() {
-			const slice = paragraphs.slice(shown, shown + chunk);
-			slice.forEach((text) => {
-				const p = document.createElement("p");
-				p.textContent = text;
-				body.appendChild(p);
+			const slice = blocks.slice(shown, shown + chunk);
+			slice.forEach((block) => {
+				const node = renderBlock(block);
+				if (node) body.appendChild(node);
 			});
 			shown += slice.length;
-			const left = paragraphs.length - shown;
+			const left = blocks.length - shown;
 			progress.textContent =
-				paragraphs.length
-					? "Shown " + Math.min(shown, paragraphs.length) + " of " + paragraphs.length + " sections"
+				blocks.length
+					? "Shown " + Math.min(shown, blocks.length) + " of " + blocks.length + " sections"
 					: "";
 			if (left > 0) {
 				moreBtn.hidden = false;
@@ -64,8 +98,9 @@
 			method: "aimaticlearning.lms_learning.api.get_chapter_notes_chunks",
 			args: { chapter_profile: profile },
 			callback: (r) => {
-				paragraphs = (r.message && r.message.paragraphs) || [];
-				if (!paragraphs.length) {
+				const message = r.message || {};
+				blocks = message.blocks || (message.paragraphs || []).map((text) => ({ kind: "paragraph", text }));
+				if (!blocks.length) {
 					body.innerHTML = "<p>No study notes for this chapter yet.</p>";
 					return;
 				}
@@ -93,16 +128,26 @@
 			showingBack = false;
 			cardEl.textContent = card.front;
 			cardEl.classList.remove("is-back");
+			cardEl.setAttribute("aria-pressed", "false");
 			progress.textContent = "Card " + (index + 1) + " of " + cards.length;
 			concept.textContent = card.concept || "";
 		}
 
-		cardEl.addEventListener("click", () => {
+		function flipCard() {
 			if (!cards.length) return;
 			showingBack = !showingBack;
 			const card = cards[index];
 			cardEl.textContent = showingBack ? card.back : card.front;
 			cardEl.classList.toggle("is-back", showingBack);
+			cardEl.setAttribute("aria-pressed", showingBack ? "true" : "false");
+		}
+
+		cardEl.addEventListener("click", flipCard);
+		cardEl.addEventListener("keydown", (event) => {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				flipCard();
+			}
 		});
 
 		nextBtn.addEventListener("click", () => {

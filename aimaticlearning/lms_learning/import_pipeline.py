@@ -5,11 +5,17 @@ from pathlib import Path
 
 import frappe
 from docx import Document
+from docx.table import Table
 from frappe import _
 from frappe.utils import get_site_path
 
+from aimaticlearning.lms_learning.content_format import (
+	is_chapter_heading,
+	iter_docx_blocks,
+	paragraph_kind,
+	render_content_blocks,
+)
 from aimaticlearning.lms_learning.outline_sync import repair_course_content, sync_profile_outline
-from aimaticlearning.lms_learning.protected_notes import render_notes_html
 
 DEFAULT_SOURCE_FILE = "/private/files/BLP notes.docx"
 MODULE_TITLE = "Business Law & Practice (BLP)"
@@ -30,7 +36,7 @@ def import_blp_module_from_file(source_file: str | None = None) -> dict:
 			course=course,
 			chapter_index=idx,
 			chapter_title=chapter["title"],
-			paragraphs=chapter["paragraphs"],
+			blocks=chapter["blocks"],
 		)
 		created_profiles.append(profile.name)
 
@@ -68,35 +74,50 @@ def _resolve_source_path(source_file: str | None) -> Path:
 
 
 def _parse_docx_chapters(path: Path) -> list[dict]:
+	"""Split BLP source at document-level headings while preserving subheadings/lists."""
 	document = Document(str(path))
 	chapters: list[dict] = []
 	current: dict | None = None
 
-	for paragraph in document.paragraphs:
-		text = (paragraph.text or "").strip()
-		if not text:
+	for block in iter_docx_blocks(document):
+		if isinstance(block, Table):
+			if current is not None:
+				current["blocks"].append({"kind": "table", "html": _table_html(block)})
+				current["paragraphs"] += 1
 			continue
-		style = paragraph.style.name if paragraph.style else ""
-		chapter_match = re.match(r"^Chapter\s+(\d+)\s*[:.\-–]\s*(.+)$", text, re.I)
-		if style.startswith("Heading") or chapter_match:
+		item = paragraph_kind(block)
+		if item["kind"] == "empty":
+			continue
+		if is_chapter_heading(block):
 			if current:
 				chapters.append(current)
-			if chapter_match:
-				title = f"Chapter {chapter_match.group(1)}: {chapter_match.group(2).strip()}"
-			else:
-				title = text
-			current = {"title": title, "paragraphs": []}
+			title = item["text"]
+			current = {
+				"title": title,
+				"blocks": [{"kind": "heading", "text": title, "level": 2}],
+				"paragraphs": 0,
+			}
 			continue
 		if current is None:
-			current = {"title": "Introduction", "paragraphs": []}
-		current["paragraphs"].append(text)
+			current = {
+				"title": "Introduction",
+				"blocks": [],
+				"paragraphs": 0,
+			}
+		current["blocks"].append(item)
+		current["paragraphs"] += 1
 
 	if current:
 		chapters.append(current)
-
 	if not chapters:
 		frappe.throw(_("No chapters found in source document."))
 	return chapters
+
+
+def _table_html(table: Table) -> str:
+	from aimaticlearning.lms_learning.content_format import render_table_html
+
+	return render_table_html(table)
 
 
 def _ensure_course() -> frappe.Document:
@@ -108,7 +129,7 @@ def _ensure_course() -> frappe.Document:
 		{
 			"doctype": "LMS Course",
 			"title": MODULE_TITLE,
-			"short_introduction": "Examic Study BLP learning module with protected notes, chapter MCQs, flashcards, and module assessment.",
+			"short_introduction": "Examic Study BLP learning module with chapter notes, chapter MCQs, flashcards, and module assessment.",
 			"description": "Business Law & Practice study module imported from approved source notes.",
 			"published": 1,
 			"upcoming": 0,
@@ -168,7 +189,7 @@ def _ensure_chapter_bundle(
 	course: frappe.Document,
 	chapter_index: int,
 	chapter_title: str,
-	paragraphs: list[str],
+	blocks: list[dict],
 ) -> frappe.Document:
 	slug = _slugify(chapter_title)
 	profile_name = frappe.db.get_value(
@@ -193,7 +214,7 @@ def _ensure_chapter_bundle(
 	profile.course_chapter = chapter_name
 	profile.notes_lesson = lesson_name
 	profile.chapter_quiz = quiz_name
-	profile.notes_html = render_notes_html(paragraphs)
+	profile.notes_html = render_content_blocks(blocks)
 	profile.concept_tags = chapter_title
 	if not profile_name:
 		profile.insert(ignore_permissions=True)
@@ -276,8 +297,7 @@ def _ensure_chapter_quiz(course: frappe.Document, chapter_name: str, chapter_tit
 def _lesson_markdown_placeholder(chapter_title: str, slug: str) -> str:
 	return (
 		f"## {chapter_title}\n\n"
-		"Read the protected chapter notes in the portal viewer (download disabled).\n\n"
-		f"[Open protected notes](/learning-notes/{slug})"
+		"Work through the chapter notes across the lesson pages, then complete the Practice MCQs and Flashcards."
 	)
 
 
@@ -285,8 +305,7 @@ def _update_lesson_with_notes_link(lesson_name: str, profile_name: str, chapter_
 	lesson = frappe.get_doc("Course Lesson", lesson_name)
 	lesson.body = (
 		f"## {chapter_title}\n\n"
-		"Protected notes are rendered server-side after enrolment checks.\n\n"
-		f"[Open protected notes](/learning-notes/{profile_name})"
+		"Work through the chapter notes across the lesson pages, then complete the Practice MCQs and Flashcards."
 	)
 	lesson.save(ignore_permissions=True)
 

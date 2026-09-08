@@ -8,69 +8,146 @@
 <div class="aimatic-revision" id="aimatic-revision">
 	<style>
 		.aimatic-revision {
-			max-width: 920px;
+			--rev-ink: var(--aimatic-ink, #26342f);
+			--rev-muted: var(--aimatic-ink-soft, #68766f);
+			--rev-teal: var(--aimatic-teal, #5f9585);
+			--rev-accent: var(--aimatic-teal-dark, #416d60);
+			--rev-surface: var(--aimatic-surface, #f4f8f5);
+			--rev-card: var(--aimatic-cream, #f8fbf8);
+			--rev-mint: var(--aimatic-mint, #eaf3ed);
+			--rev-warm: var(--aimatic-cream, #f8fbf8);
+			--rev-hard-bg: #f7e9e6;
+			--rev-good-bg: #f6f0dc;
+			--rev-easy-bg: var(--aimatic-mint, #eaf3ed);
+			--rev-unrated-bg: #edf3f0;
+			--rev-line: var(--aimatic-line, rgba(38, 52, 47, 0.12));
+			box-sizing: border-box;
+			max-width: 1040px;
 			margin: 0 auto;
-			padding: 28px 16px 64px;
-			color: #10233f;
+			padding: clamp(18px, 4vw, 42px) clamp(14px, 3vw, 28px) 72px;
+			min-height: calc(100vh - 48px);
+			background: var(--rev-surface);
+			color: var(--rev-ink);
 			font-family: "Bricolage Grotesque", system-ui, sans-serif;
 		}
-		.aimatic-revision a { color: #8f6517; }
+		html[data-examic-soft-theme="sky"] .aimatic-revision {
+			--rev-ink: #263847;
+			--rev-muted: #687985;
+			--rev-teal: #6f9caf;
+			--rev-accent: #4e7385;
+			--rev-surface: #f4f8fa;
+			--rev-card: #f8fbfc;
+			--rev-mint: #e8f3f7;
+			--rev-warm: #f8fbfc;
+			--rev-hard-bg: #f8ebe9;
+			--rev-good-bg: #edf4f7;
+			--rev-easy-bg: #e8f3f7;
+			--rev-unrated-bg: #f1f5f7;
+			--rev-line: rgba(38, 56, 71, 0.12);
+		}
+		html[data-examic-soft-theme="lilac"] .aimatic-revision {
+			--rev-ink: #3d3650;
+			--rev-muted: #746d83;
+			--rev-teal: #8a7bae;
+			--rev-accent: #665886;
+			--rev-surface: #f7f5fb;
+			--rev-card: #fbfaff;
+			--rev-mint: #f0edf8;
+			--rev-warm: #fbfaff;
+			--rev-hard-bg: #f6eaef;
+			--rev-good-bg: #f1eef8;
+			--rev-easy-bg: #f0edf8;
+			--rev-unrated-bg: #f4f1f8;
+			--rev-line: rgba(61, 54, 80, 0.12);
+		}
+		.aimatic-revision *, .aimatic-revision *::before, .aimatic-revision *::after { box-sizing: border-box; }
+		.aimatic-revision a { color: var(--rev-accent); }
 		.aimatic-revision .is-hidden { display: none !important; }
-		.rev-top { display: flex; flex-wrap: wrap; gap: 12px 18px; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; }
-		.rev-kicker { margin: 0 0 6px; color: #0b9a84; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.12em; text-transform: uppercase; }
-		.aimatic-revision h1 { margin: 0; font-size: 1.85rem; line-height: 1.15; }
-		.rev-lead { margin: 8px 0 0; max-width: 40rem; color: #68758a; font-size: 0.95rem; line-height: 1.55; }
-		.rev-select { min-width: 240px; padding: 10px 12px; border: 1px solid rgba(16, 35, 63, 0.14); border-radius: 12px; background: #fff; font: inherit; }
-		.rev-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 8px 0 22px; }
+		.rev-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); gap: 24px; align-items: end; margin-bottom: 24px; }
+		.rev-kicker { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 10px; color: var(--rev-teal); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; }
+		.rev-kicker::before { width: 22px; height: 3px; border-radius: 9px; background: #e8b464; content: ""; }
+		.aimatic-revision h1 { margin: 0; color: var(--rev-ink); font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -0.045em; line-height: 1.04; }
+		.rev-lead { margin: 11px 0 0; max-width: 38rem; color: var(--rev-muted); font-size: 0.96rem; line-height: 1.55; }
+		.rev-course-control { display: grid; gap: 7px; }
+		.rev-course-control span { color: var(--rev-muted); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+		.rev-select { width: 100%; min-height: 48px; padding: 10px 38px 10px 14px; border: 1px solid var(--rev-line); border-radius: 14px; outline: 0; background: var(--rev-card); color: var(--rev-ink); font: inherit; box-shadow: 0 8px 24px rgba(23, 50, 77, 0.05); }
+		.rev-select:focus { border-color: var(--rev-teal); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rev-teal) 12%, transparent); }
+		.rev-select:disabled { cursor: wait; opacity: 0.62; }
+		.rev-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 8px 0 24px; }
 		.rev-counts a, .rev-counts div {
-			display: block; padding: 16px 14px; border-radius: 16px; background: #f7f4ed; color: inherit; text-decoration: none;
+			position: relative; display: block; min-height: 102px; padding: 17px 16px 14px; overflow: hidden; border: 1px solid transparent; border-radius: 18px; background: var(--rev-warm); color: inherit; text-decoration: none; transition: transform 160ms ease, box-shadow 160ms ease;
 		}
-		.rev-counts strong { display: block; font-size: 1.45rem; }
-		.rev-counts span { color: #68758a; font-size: 0.78rem; }
-		.rev-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+		.rev-counts a:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(23, 50, 77, 0.08); }
+		.rev-counts a::after, .rev-counts div::after { position: absolute; right: 14px; bottom: -13px; width: 52px; height: 52px; border: 10px solid rgba(255, 255, 255, 0.48); border-radius: 50%; content: ""; }
+		.rev-counts a:nth-child(1), .rev-counts div:nth-child(1) { background: var(--rev-hard-bg); }
+		.rev-counts a:nth-child(2), .rev-counts div:nth-child(2) { background: var(--rev-good-bg); }
+		.rev-counts a:nth-child(3), .rev-counts div:nth-child(3) { background: var(--rev-easy-bg); }
+		.rev-counts a:nth-child(4), .rev-counts div:nth-child(4) { background: var(--rev-unrated-bg); }
+		.rev-counts strong { position: relative; z-index: 1; display: block; font-size: 1.65rem; letter-spacing: -0.04em; }
+		.rev-counts span { position: relative; z-index: 1; display: block; margin-top: 5px; color: var(--rev-muted); font-size: 0.76rem; line-height: 1.25; }
+		.rev-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 30px; }
 		.rev-btn {
-			display: inline-flex; align-items: center; min-height: 42px; padding: 8px 14px;
-			border-radius: 999px; border: 1px solid rgba(16, 35, 63, 0.12); background: #fff;
-			color: #10233f; font-weight: 700; font-size: 0.84rem; text-decoration: none;
+			display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 9px 16px;
+			border-radius: 999px; border: 1px solid var(--rev-line); background: var(--rev-card);
+			color: var(--rev-ink); font-weight: 750; font-size: 0.82rem; line-height: 1.2; text-align: center; text-decoration: none; transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 		}
-		.rev-btn-primary { background: #0b9a84; border-color: #0b9a84; color: #fff; }
-		.rev-card { margin-bottom: 22px; padding: 18px; border: 1px solid rgba(16, 35, 63, 0.1); border-radius: 18px; background: #fff; }
-		.rev-card h2 { margin: 0 0 12px; font-size: 1.05rem; }
-		.rev-card ul { margin: 0; padding-left: 18px; color: #3d4d63; }
-		.rev-card li { margin: 0 0 8px; }
-		.rev-empty, .rev-loading { padding: 28px 8px; color: #68758a; text-align: center; }
-		.rev-noaccess { padding: 40px 24px; border: 1px solid rgba(16, 35, 63, 0.1); border-radius: 18px; background: #fff; text-align: center; }
+		.rev-btn:hover { transform: translateY(-1px); box-shadow: 0 7px 16px rgba(23, 50, 77, 0.1); text-decoration: none; }
+		.rev-btn-primary { background: var(--rev-teal); border-color: var(--rev-teal); color: #fff !important; box-shadow: 0 8px 16px rgba(11, 154, 132, 0.18); }
+		.rev-insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+		.rev-card { min-width: 0; margin-bottom: 14px; padding: 20px; border: 1px solid var(--rev-line); border-radius: 20px; background: var(--rev-card); box-shadow: 0 12px 28px rgba(23, 50, 77, 0.045); }
+		.rev-insights .rev-card { margin-bottom: 0; }
+		.rev-card h2 { margin: 0 0 14px; color: var(--rev-ink); font-size: 1.05rem; letter-spacing: -0.02em; }
+		.rev-card ul { margin: 0; padding-left: 18px; color: var(--rev-ink); }
+		.rev-card li { margin: 0 0 9px; line-height: 1.4; }
+		.rev-empty, .rev-loading { padding: 28px 8px; color: var(--rev-muted); text-align: center; }
+		.rev-loading { min-height: 136px; padding: 55px 16px; border: 1px dashed var(--rev-teal); border-radius: 20px; background: var(--rev-card); }
+		.rev-loading.rev-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; color: #9a3f38; background: #f7e9e6; }
+		.rev-noaccess { padding: 48px 24px; border: 1px solid var(--rev-line); border-radius: 20px; background: var(--rev-card); text-align: center; box-shadow: 0 12px 28px rgba(23, 50, 77, 0.045); }
 		.rev-noaccess h2 { margin: 0 0 8px; font-size: 1.15rem; }
-		.rev-noaccess p { margin: 0 0 18px; color: #68758a; }
+		.rev-noaccess p { margin: 0 0 18px; color: var(--rev-muted); }
+		.rev-chapters-card { margin-bottom: 22px; }
 		.rev-chapters { display: grid; gap: 10px; }
 		.rev-chapter {
 			display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center;
-			padding: 12px 14px; border-radius: 14px; background: #fbfaf6;
+			min-width: 0; padding: 14px; border: 1px solid var(--rev-line); border-radius: 15px; background: var(--rev-warm);
 		}
-		.rev-chapter strong { display: block; }
-		.rev-chapter small { color: #68758a; }
+		.rev-chapter strong { display: block; overflow-wrap: anywhere; }
+		.rev-chapter small { display: block; margin-top: 4px; color: var(--rev-muted); line-height: 1.35; }
 		.rev-chapter-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-		.rev-pill { padding: 6px 10px; border-radius: 999px; background: #fff; font-size: 0.75rem; font-weight: 700; text-decoration: none; }
-		.rev-needs { background: #fdecea; }
-		.rev-developing { background: #fff6e5; }
-		.rev-strong { background: #e8f6f2; }
+		.rev-pill { display: inline-flex; align-items: center; min-height: 36px; padding: 7px 11px; border-radius: 999px; background: var(--rev-card); font-size: 0.75rem; font-weight: 750; text-decoration: none; }
+		.rev-needs { background: var(--rev-hard-bg); }
+		.rev-developing { background: var(--rev-good-bg); }
+		.rev-strong { background: var(--rev-easy-bg); }
+		.rev-back { display: inline-flex; align-items: center; min-height: 40px; color: var(--rev-muted) !important; font-size: 0.82rem; font-weight: 700; text-decoration: none; }
+		.rev-back::before { margin-right: 7px; content: "←"; font-size: 1.1rem; }
+		@media (prefers-reduced-motion: reduce) {
+			.rev-counts a, .rev-btn { transition: none; }
+		}
 		@media (max-width: 720px) {
-			.rev-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+			.rev-top { grid-template-columns: 1fr; gap: 17px; }
+			.rev-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+			.rev-insights { grid-template-columns: 1fr; gap: 10px; }
 			.rev-chapter { grid-template-columns: 1fr; }
 			.rev-chapter-links { justify-content: flex-start; }
-			.rev-btn { width: 100%; justify-content: center; }
+			.rev-btn { width: 100%; }
+			.rev-card { padding: 17px; }
+		}
+		@media (max-width: 380px) {
+			.aimatic-revision { padding-right: 12px; padding-left: 12px; }
+			.rev-counts strong { font-size: 1.45rem; }
+			.rev-counts span { font-size: 0.7rem; }
 		}
 	</style>
 
 	<div class="rev-top">
-		<div>
+		<div class="rev-heading">
 			<p class="rev-kicker">Your progress</p>
 			<h1>Revision</h1>
 			<p class="rev-lead">Restudy flashcards you rated Hard, Good or Easy, and open the chapters that need more work.</p>
 		</div>
-		<label>
-			<span class="is-hidden">Course</span>
-			<select class="rev-select" id="rev-module"></select>
+		<label class="rev-course-control">
+			<span>Study track</span>
+			<select class="rev-select" id="rev-module" aria-label="Choose a study track" disabled></select>
 		</label>
 	</div>
 
@@ -83,6 +160,7 @@
 	<div id="rev-body" class="is-hidden">
 		<div class="rev-counts" id="rev-counts"></div>
 		<div class="rev-actions" id="rev-actions"></div>
+		<div class="rev-insights">
 		<section class="rev-card">
 			<h2>What to do next</h2>
 			<ul id="rev-recs"></ul>
@@ -91,11 +169,12 @@
 			<h2>Weak areas</h2>
 			<ul id="rev-weak"></ul>
 		</section>
-		<section class="rev-card">
+		</div>
+		<section class="rev-card rev-chapters-card">
 			<h2>Chapters</h2>
 			<div class="rev-chapters" id="rev-chapters"></div>
 		</section>
-		<p><a href="/lms/courses">Back to courses</a></p>
+		<p><a class="rev-back" href="/lms/courses">Back to courses</a></p>
 	</div>
 </div>
 
@@ -119,25 +198,70 @@
 		node.textContent = value || "";
 		return node;
 	}
+	function showLoadError(message, course, learningModule) {
+		el.loading.classList.remove("is-hidden");
+		el.loading.classList.add("rev-error");
+		el.loading.setAttribute("role", "alert");
+		el.loading.replaceChildren();
+		const copy = document.createElement("span");
+		text(copy, message);
+		const retry = document.createElement("button");
+		retry.className = "rev-btn";
+		retry.type = "button";
+		text(retry, "Try again");
+		retry.addEventListener("click", function () { load(course, learningModule); });
+		el.loading.append(copy, retry);
+	}
 
 	function load(course, learningModule) {
-		el.loading.classList.remove("is-hidden");
+		const requestId = Number(el.loading.dataset.requestId || 0) + 1;
+		el.loading.dataset.requestId = String(requestId);
+		el.loading.classList.remove("is-hidden", "rev-error");
+		el.loading.removeAttribute("role");
+		el.loading.textContent = "Loading your revision board…";
 		el.body.classList.add("is-hidden");
 		el.noaccess.classList.add("is-hidden");
-		frappe.call({
-			method: "aimaticlearning.lms_learning.api.get_revision_board",
-			args: {
-				course: course || undefined,
-				learning_module: learningModule || undefined,
-			},
-			callback: function (r) {
-				el.loading.classList.add("is-hidden");
-				render(r.message || {});
-			},
-			error: function () {
-				el.loading.textContent = "Revision could not be loaded. Sign in and try again.";
-			},
-		});
+		let settled = false;
+		let timeout;
+		const finish = function () {
+			if (settled || el.loading.dataset.requestId !== String(requestId)) return false;
+			settled = true;
+			window.clearTimeout(timeout);
+			return true;
+		};
+		timeout = window.setTimeout(function () {
+			if (finish()) showLoadError("Revision is taking too long to respond. Check your connection and try again.", course, learningModule);
+		}, 15000);
+		const params = new URLSearchParams();
+		if (course) params.set("course", course);
+		if (learningModule) params.set("learning_module", learningModule);
+		const controller = new AbortController();
+		const requestTimeout = window.setTimeout(function () { controller.abort(); }, 14000);
+		fetch("/api/method/aimaticlearning.lms_learning.api.get_revision_board?" + params.toString(), {
+			credentials: "same-origin",
+			headers: { Accept: "application/json" },
+			signal: controller.signal,
+		})
+			.then(function (response) {
+				if (!response.ok) throw new Error("Revision request returned HTTP " + response.status);
+				return response.json();
+			})
+			.then(function (payload) {
+				if (!finish()) return;
+				try {
+					el.loading.classList.add("is-hidden");
+					render(payload.message || {});
+				} catch (error) {
+					console.error("Revision board render failed", error);
+					showLoadError("Revision could not be displayed. Try again.", course, learningModule);
+				}
+			})
+			.catch(function (error) {
+				if (!finish()) return;
+				console.error("Revision board request failed", error);
+				showLoadError("Revision could not be loaded. Sign in and try again.", course, learningModule);
+			})
+			.finally(function () { window.clearTimeout(requestTimeout); });
 	}
 
 	function fillList(target, items, emptyText) {
@@ -182,6 +306,7 @@
 			return;
 		}
 		el.body.classList.remove("is-hidden");
+		el.select.disabled = false;
 		if (!el.select.dataset.ready) {
 			modules.forEach(function (module) {
 				const option = document.createElement("option");

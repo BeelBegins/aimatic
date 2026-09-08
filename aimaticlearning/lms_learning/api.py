@@ -5,11 +5,6 @@ import json
 import frappe
 
 from aimaticlearning.lms_learning.analytics import build_learning_map
-from aimaticlearning.lms_learning.revision import (
-	build_revision_board,
-	encode_recall_tags,
-	filter_cards_for_user,
-)
 from aimaticlearning.lms_learning.content_generation import (
 	build_module_assessment_blueprint,
 	export_chapter_source_bundle,
@@ -20,6 +15,11 @@ from aimaticlearning.lms_learning.course_presentation import repair_course_prese
 from aimaticlearning.lms_learning.import_pipeline import import_blp_module_from_file
 from aimaticlearning.lms_learning.outline_sync import repair_course_content
 from aimaticlearning.lms_learning.protected_notes import get_notes_for_profile
+from aimaticlearning.lms_learning.revision import (
+	build_revision_board,
+	encode_recall_tags,
+	filter_cards_for_user,
+)
 from aimaticlearning.lms_learning.utils import (
 	throw_access_denied,
 	user_can_access_chapter_profile,
@@ -34,16 +34,20 @@ def get_protected_chapter_notes(chapter_profile: str):
 
 @frappe.whitelist()
 def get_chapter_notes_chunks(chapter_profile: str):
-	"""Return note paragraphs for chunked in-lesson display (no full-page dump)."""
+	"""Return semantic note blocks for chunked in-lesson display."""
 	notes = get_notes_for_profile(chapter_profile)
+	from aimaticlearning.lms_learning.content_format import parse_notes_blocks
 	from aimaticlearning.lms_learning.lesson_macros import notes_paragraphs_from_html
 
-	paragraphs = notes_paragraphs_from_html(notes.get("notes_html") or "")
+	notes_html = notes.get("notes_html") or ""
+	blocks = parse_notes_blocks(notes_html)
+	paragraphs = notes_paragraphs_from_html(notes_html)
 	return {
 		"chapter_profile": chapter_profile,
 		"chapter_title": notes.get("chapter_title"),
+		"blocks": blocks,
 		"paragraphs": paragraphs,
-		"total": len(paragraphs),
+		"total": len(blocks),
 		"chunk_size": 3,
 	}
 
