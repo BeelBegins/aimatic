@@ -558,6 +558,201 @@
 						"filters": []
 					}
 				}
+			},
+			"tc-bin-kpis-stock-value": {
+				"name": "tc-bin-kpis-stock-value",
+				"title": "Stock value",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-bins",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Stock value",
+							"column_name": "stock_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-bin-kpis-qty": {
+				"name": "tc-bin-kpis-qty",
+				"title": "Qty",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-bins",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Qty",
+							"column_name": "actual_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-bin-kpis-skus": {
+				"name": "tc-bin-kpis-skus",
+				"title": "SKUs",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-bins",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "SKUs",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-cogs-cogs": {
+				"name": "tc-cogs-cogs",
+				"title": "COGS",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 100,
+				"query": "tq-sle",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "COGS",
+							"column_name": "cogs_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-cogs-inbound-value": {
+				"name": "tc-cogs-inbound-value",
+				"title": "Inbound value",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 101,
+				"query": "tq-sle",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Inbound value",
+							"column_name": "inbound_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
 			}
 		},
 		"dashboards": {
@@ -572,7 +767,8 @@
 						"filter_type": "Date",
 						"icon": "calendar",
 						"links": {
-							"tc-cogs": "`tq-sle`.`posting_date`",
+							"tc-cogs-cogs": "`tq-sle`.`posting_date`",
+							"tc-cogs-inbound-value": "`tq-sle`.`posting_date`",
 							"tc-cogs-trend": "`tq-sle`.`posting_date`"
 						},
 						"layout": {
@@ -591,7 +787,8 @@
 						"filter_type": "String",
 						"icon": "building-2",
 						"links": {
-							"tc-cogs": "`tq-sle`.`company`",
+							"tc-cogs-cogs": "`tq-sle`.`company`",
+							"tc-cogs-inbound-value": "`tq-sle`.`company`",
 							"tc-cogs-trend": "`tq-sle`.`company`"
 						},
 						"layout": {
@@ -604,9 +801,42 @@
 					},
 					{
 						"type": "chart",
-						"chart": "tc-bin-kpis",
+						"chart": "tc-bin-kpis-stock-value",
 						"layout": {
-							"i": "item-bin",
+							"i": "item-bin-1",
+							"x": 0,
+							"y": 1,
+							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-bin-kpis-qty",
+						"layout": {
+							"i": "item-bin-2",
+							"x": 6,
+							"y": 1,
+							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-bin-kpis-skus",
+						"layout": {
+							"i": "item-bin-3",
+							"x": 12,
+							"y": 1,
+							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-cogs-cogs",
+						"layout": {
+							"i": "item-cogs-1",
 							"x": 0,
 							"y": 1,
 							"w": 10,
@@ -615,9 +845,9 @@
 					},
 					{
 						"type": "chart",
-						"chart": "tc-cogs",
+						"chart": "tc-cogs-inbound-value",
 						"layout": {
-							"i": "item-cogs",
+							"i": "item-cogs-2",
 							"x": 10,
 							"y": 1,
 							"w": 10,

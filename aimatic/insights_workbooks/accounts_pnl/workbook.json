@@ -359,6 +359,150 @@
 						"filters": []
 					}
 				}
+			},
+			"tc-pnl-kpis-merchandise-income": {
+				"name": "tc-pnl-kpis-merchandise-income",
+				"title": "Merchandise income",
+				"workbook": "aimatic-accounts-pnl",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-gl",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Merchandise income",
+							"column_name": "merchandise_income",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-pnl-kpis-expense": {
+				"name": "tc-pnl-kpis-expense",
+				"title": "Expense",
+				"workbook": "aimatic-accounts-pnl",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-gl",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Expense",
+							"column_name": "expense_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-pnl-kpis-merchandise-net": {
+				"name": "tc-pnl-kpis-merchandise-net",
+				"title": "Merchandise net",
+				"workbook": "aimatic-accounts-pnl",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-gl",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Merchandise net",
+							"column_name": "net_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
 			}
 		},
 		"dashboards": {
@@ -373,7 +517,9 @@
 						"filter_type": "Date",
 						"icon": "calendar",
 						"links": {
-							"tc-pnl-kpis": "`tq-gl`.`posting_date`",
+							"tc-pnl-kpis-merchandise-income": "`tq-gl`.`posting_date`",
+							"tc-pnl-kpis-expense": "`tq-gl`.`posting_date`",
+							"tc-pnl-kpis-merchandise-net": "`tq-gl`.`posting_date`",
 							"tc-income-trend": "`tq-gl`.`posting_date`",
 							"tc-expense-trend": "`tq-gl`.`posting_date`",
 							"tc-income-acct": "`tq-gl`.`posting_date`",
@@ -395,7 +541,9 @@
 						"filter_type": "String",
 						"icon": "building-2",
 						"links": {
-							"tc-pnl-kpis": "`tq-gl`.`company`",
+							"tc-pnl-kpis-merchandise-income": "`tq-gl`.`company`",
+							"tc-pnl-kpis-expense": "`tq-gl`.`company`",
+							"tc-pnl-kpis-merchandise-net": "`tq-gl`.`company`",
 							"tc-income-trend": "`tq-gl`.`company`",
 							"tc-expense-trend": "`tq-gl`.`company`",
 							"tc-income-acct": "`tq-gl`.`company`",
@@ -415,7 +563,9 @@
 						"filter_type": "String",
 						"icon": "store",
 						"links": {
-							"tc-pnl-kpis": "`tq-gl`.`branch`",
+							"tc-pnl-kpis-merchandise-income": "`tq-gl`.`branch`",
+							"tc-pnl-kpis-expense": "`tq-gl`.`branch`",
+							"tc-pnl-kpis-merchandise-net": "`tq-gl`.`branch`",
 							"tc-income-trend": "`tq-gl`.`branch`",
 							"tc-expense-trend": "`tq-gl`.`branch`",
 							"tc-income-acct": "`tq-gl`.`branch`",
@@ -431,12 +581,34 @@
 					},
 					{
 						"type": "chart",
-						"chart": "tc-pnl-kpis",
+						"chart": "tc-pnl-kpis-merchandise-income",
 						"layout": {
-							"i": "item-kpis",
+							"i": "item-kpis-1",
 							"x": 0,
 							"y": 1,
-							"w": 20,
+							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-pnl-kpis-expense",
+						"layout": {
+							"i": "item-kpis-2",
+							"x": 6,
+							"y": 1,
+							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-pnl-kpis-merchandise-net",
+						"layout": {
+							"i": "item-kpis-3",
+							"x": 12,
+							"y": 1,
+							"w": 6,
 							"h": 3
 						}
 					},

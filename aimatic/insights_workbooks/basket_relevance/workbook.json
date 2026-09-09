@@ -444,6 +444,288 @@
 						"filters": []
 					}
 				}
+			},
+			"tc-basket-kpis-net-sales": {
+				"name": "tc-basket-kpis-net-sales",
+				"title": "Net sales",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-basket-detail",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Net sales",
+							"column_name": "net_sales",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-basket-kpis-baskets": {
+				"name": "tc-basket-kpis-baskets",
+				"title": "Baskets",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-basket-detail",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Baskets",
+							"column_name": "invoice",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-basket-kpis-avg-basket": {
+				"name": "tc-basket-kpis-avg-basket",
+				"title": "Avg basket",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-basket-detail",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Avg basket",
+							"column_name": "net_sales",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-basket-kpis-items-basket": {
+				"name": "tc-basket-kpis-items-basket",
+				"title": "Items / basket",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-basket-detail",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Items / basket",
+							"column_name": "distinct_items",
+							"data_type": "Decimal",
+							"aggregation": "avg"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-basket-kpis-units-basket": {
+				"name": "tc-basket-kpis-units-basket",
+				"title": "Units / basket",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-basket-detail",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Units / basket",
+							"column_name": "units",
+							"data_type": "Decimal",
+							"aggregation": "avg"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-basket-kpis-customers": {
+				"name": "tc-basket-kpis-customers",
+				"title": "Customers",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 5,
+				"query": "tq-basket-detail",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Customers",
+							"column_name": "customer",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
 			}
 		},
 		"dashboards": {
@@ -459,7 +741,12 @@
 						"filter_type": "Date",
 						"icon": "calendar",
 						"links": {
-							"tc-basket-kpis": "`tq-basket-detail`.`posting_date`",
+							"tc-basket-kpis-net-sales": "`tq-basket-detail`.`posting_date`",
+							"tc-basket-kpis-baskets": "`tq-basket-detail`.`posting_date`",
+							"tc-basket-kpis-avg-basket": "`tq-basket-detail`.`posting_date`",
+							"tc-basket-kpis-items-basket": "`tq-basket-detail`.`posting_date`",
+							"tc-basket-kpis-units-basket": "`tq-basket-detail`.`posting_date`",
+							"tc-basket-kpis-customers": "`tq-basket-detail`.`posting_date`",
 							"tc-basket-branch-sales": "`tq-basket-detail`.`posting_date`",
 							"tc-basket-branch-aov": "`tq-basket-detail`.`posting_date`",
 							"tc-basket-branch-items": "`tq-basket-detail`.`posting_date`",
@@ -482,7 +769,12 @@
 						"filter_type": "String",
 						"icon": "building-2",
 						"links": {
-							"tc-basket-kpis": "`tq-basket-detail`.`company`",
+							"tc-basket-kpis-net-sales": "`tq-basket-detail`.`company`",
+							"tc-basket-kpis-baskets": "`tq-basket-detail`.`company`",
+							"tc-basket-kpis-avg-basket": "`tq-basket-detail`.`company`",
+							"tc-basket-kpis-items-basket": "`tq-basket-detail`.`company`",
+							"tc-basket-kpis-units-basket": "`tq-basket-detail`.`company`",
+							"tc-basket-kpis-customers": "`tq-basket-detail`.`company`",
 							"tc-basket-branch-sales": "`tq-basket-detail`.`company`",
 							"tc-basket-branch-aov": "`tq-basket-detail`.`company`",
 							"tc-basket-branch-items": "`tq-basket-detail`.`company`",
@@ -503,7 +795,12 @@
 						"filter_type": "String",
 						"icon": "store",
 						"links": {
-							"tc-basket-kpis": "`tq-basket-detail`.`branch`",
+							"tc-basket-kpis-net-sales": "`tq-basket-detail`.`branch`",
+							"tc-basket-kpis-baskets": "`tq-basket-detail`.`branch`",
+							"tc-basket-kpis-avg-basket": "`tq-basket-detail`.`branch`",
+							"tc-basket-kpis-items-basket": "`tq-basket-detail`.`branch`",
+							"tc-basket-kpis-units-basket": "`tq-basket-detail`.`branch`",
+							"tc-basket-kpis-customers": "`tq-basket-detail`.`branch`",
 							"tc-basket-branch-sales": "`tq-basket-detail`.`branch`",
 							"tc-basket-branch-aov": "`tq-basket-detail`.`branch`",
 							"tc-basket-branch-items": "`tq-basket-detail`.`branch`",
@@ -520,13 +817,68 @@
 					},
 					{
 						"type": "chart",
-						"chart": "tc-basket-kpis",
+						"chart": "tc-basket-kpis-net-sales",
 						"layout": {
-							"i": "item-kpis",
+							"i": "item-kpis-1",
 							"x": 0,
 							"y": 1,
-							"w": 20,
-							"h": 4
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-basket-kpis-baskets",
+						"layout": {
+							"i": "item-kpis-2",
+							"x": 5,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-basket-kpis-avg-basket",
+						"layout": {
+							"i": "item-kpis-3",
+							"x": 10,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-basket-kpis-items-basket",
+						"layout": {
+							"i": "item-kpis-4",
+							"x": 15,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-basket-kpis-units-basket",
+						"layout": {
+							"i": "item-kpis-5",
+							"x": 0,
+							"y": 4,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-basket-kpis-customers",
+						"layout": {
+							"i": "item-kpis-6",
+							"x": 5,
+							"y": 4,
+							"w": 5,
+							"h": 3
 						}
 					},
 					{

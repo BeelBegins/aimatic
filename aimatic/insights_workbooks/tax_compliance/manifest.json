@@ -1,5 +1,5 @@
 {
-	"version": 2,
+	"version": 3,
 	"title": "Tax Compliance",
 	"description": "Splits output tax from POS service fee (fee is a payable, not merchandise tax). Submission mix and sales vs returns.",
 	"notes": "POS service fee rides on the tax table but posts to a liability ledger. Do not add it to income. Output tax is the inclusive GST row.",

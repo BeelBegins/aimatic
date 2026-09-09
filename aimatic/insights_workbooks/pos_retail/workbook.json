@@ -493,6 +493,194 @@
 						"filters": []
 					}
 				}
+			},
+			"tc-kpis-revenue": {
+				"name": "tc-kpis-revenue",
+				"title": "Revenue",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-pos",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Revenue",
+							"column_name": "base_net_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-kpis-tickets": {
+				"name": "tc-kpis-tickets",
+				"title": "Tickets",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-pos",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Tickets",
+							"column_name": "name",
+							"data_type": "Integer",
+							"aggregation": "count"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-kpis-avg-ticket": {
+				"name": "tc-kpis-avg-ticket",
+				"title": "Avg ticket",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-pos",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Avg ticket",
+							"column_name": "base_net_total",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-kpis-active-customers": {
+				"name": "tc-kpis-active-customers",
+				"title": "Active customers",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-pos",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Active customers",
+							"column_name": "customer",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
 			}
 		},
 		"dashboards": {
@@ -507,7 +695,10 @@
 						"filter_type": "Date",
 						"icon": "calendar",
 						"links": {
-							"tc-kpis": "`tq-pos`.`posting_date`",
+							"tc-kpis-revenue": "`tq-pos`.`posting_date`",
+							"tc-kpis-tickets": "`tq-pos`.`posting_date`",
+							"tc-kpis-avg-ticket": "`tq-pos`.`posting_date`",
+							"tc-kpis-active-customers": "`tq-pos`.`posting_date`",
 							"tc-trend": "`tq-pos`.`posting_date`",
 							"tc-branch": "`tq-pos`.`posting_date`",
 							"tc-customers": "`tq-pos`.`posting_date`",
@@ -531,7 +722,10 @@
 						"filter_type": "String",
 						"icon": "building-2",
 						"links": {
-							"tc-kpis": "`tq-pos`.`company`",
+							"tc-kpis-revenue": "`tq-pos`.`company`",
+							"tc-kpis-tickets": "`tq-pos`.`company`",
+							"tc-kpis-avg-ticket": "`tq-pos`.`company`",
+							"tc-kpis-active-customers": "`tq-pos`.`company`",
 							"tc-trend": "`tq-pos`.`company`",
 							"tc-branch": "`tq-pos`.`company`",
 							"tc-customers": "`tq-pos`.`company`",
@@ -553,7 +747,10 @@
 						"filter_type": "String",
 						"icon": "store",
 						"links": {
-							"tc-kpis": "`tq-pos`.`branch`",
+							"tc-kpis-revenue": "`tq-pos`.`branch`",
+							"tc-kpis-tickets": "`tq-pos`.`branch`",
+							"tc-kpis-avg-ticket": "`tq-pos`.`branch`",
+							"tc-kpis-active-customers": "`tq-pos`.`branch`",
 							"tc-trend": "`tq-pos`.`branch`",
 							"tc-branch": "`tq-pos`.`branch`",
 							"tc-customers": "`tq-pos`.`branch`",
@@ -571,12 +768,45 @@
 					},
 					{
 						"type": "chart",
-						"chart": "tc-kpis",
+						"chart": "tc-kpis-revenue",
 						"layout": {
-							"i": "item-kpis",
+							"i": "item-kpis-1",
 							"x": 0,
 							"y": 1,
-							"w": 20,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-kpis-tickets",
+						"layout": {
+							"i": "item-kpis-2",
+							"x": 5,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-kpis-avg-ticket",
+						"layout": {
+							"i": "item-kpis-3",
+							"x": 10,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-kpis-active-customers",
+						"layout": {
+							"i": "item-kpis-4",
+							"x": 15,
+							"y": 1,
+							"w": 5,
 							"h": 3
 						}
 					},

@@ -414,6 +414,198 @@
 						"filters": []
 					}
 				}
+			},
+			"tc-liab-kpis-liability-movement": {
+				"name": "tc-liab-kpis-liability-movement",
+				"title": "Liability movement",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-liab-gl",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Liability movement",
+							"column_name": "liability_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-liab-kpis-tax-payable-movement": {
+				"name": "tc-liab-kpis-tax-payable-movement",
+				"title": "Tax payable movement",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-liab-gl",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Tax payable movement",
+							"column_name": "tax_payable_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-liab-kpis-trade-payables-movement": {
+				"name": "tc-liab-kpis-trade-payables-movement",
+				"title": "Trade payables movement",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-liab-gl",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Trade payables movement",
+							"column_name": "trade_payable_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-liab-kpis-pos-service-fee-movement": {
+				"name": "tc-liab-kpis-pos-service-fee-movement",
+				"title": "POS service fee movement",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-liab-gl",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "POS service fee movement",
+							"column_name": "pos_fee_payable_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
 			}
 		},
 		"dashboards": {
@@ -428,7 +620,10 @@
 						"filter_type": "Date",
 						"icon": "calendar",
 						"links": {
-							"tc-liab-kpis": "`tq-liab-gl`.`posting_date`",
+							"tc-liab-kpis-liability-movement": "`tq-liab-gl`.`posting_date`",
+							"tc-liab-kpis-tax-payable-movement": "`tq-liab-gl`.`posting_date`",
+							"tc-liab-kpis-trade-payables-movement": "`tq-liab-gl`.`posting_date`",
+							"tc-liab-kpis-pos-service-fee-movement": "`tq-liab-gl`.`posting_date`",
 							"tc-liab-type": "`tq-liab-gl`.`posting_date`",
 							"tc-liab-acct": "`tq-liab-gl`.`posting_date`"
 						},
@@ -448,7 +643,10 @@
 						"filter_type": "String",
 						"icon": "building-2",
 						"links": {
-							"tc-liab-kpis": "`tq-liab-gl`.`company`",
+							"tc-liab-kpis-liability-movement": "`tq-liab-gl`.`company`",
+							"tc-liab-kpis-tax-payable-movement": "`tq-liab-gl`.`company`",
+							"tc-liab-kpis-trade-payables-movement": "`tq-liab-gl`.`company`",
+							"tc-liab-kpis-pos-service-fee-movement": "`tq-liab-gl`.`company`",
 							"tc-liab-type": "`tq-liab-gl`.`company`",
 							"tc-liab-acct": "`tq-liab-gl`.`company`",
 							"tc-liab-snap": "`tq-liab-snap`.`company`",
@@ -464,12 +662,45 @@
 					},
 					{
 						"type": "chart",
-						"chart": "tc-liab-kpis",
+						"chart": "tc-liab-kpis-liability-movement",
 						"layout": {
-							"i": "item-kpis",
+							"i": "item-kpis-1",
 							"x": 0,
 							"y": 1,
-							"w": 20,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-liab-kpis-tax-payable-movement",
+						"layout": {
+							"i": "item-kpis-2",
+							"x": 5,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-liab-kpis-trade-payables-movement",
+						"layout": {
+							"i": "item-kpis-3",
+							"x": 10,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-liab-kpis-pos-service-fee-movement",
+						"layout": {
+							"i": "item-kpis-4",
+							"x": 15,
+							"y": 1,
+							"w": 5,
 							"h": 3
 						}
 					},

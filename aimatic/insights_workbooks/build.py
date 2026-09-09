@@ -7,6 +7,8 @@ Do not hand-edit the emitted workbook.json files.
 from __future__ import annotations
 
 import json
+import re
+from copy import deepcopy
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -304,7 +306,7 @@ def _chart_item(chart: str, i: str, x: int, y: int, w: int, h: int) -> dict:
 
 
 def _workbook(name: str, title: str, queries: dict, charts: dict, dashboards: dict) -> dict:
-	return {
+	payload = {
 		"version": "1.0",
 		"type": "Workbook",
 		"name": name,
@@ -316,6 +318,101 @@ def _workbook(name: str, title: str, queries: dict, charts: dict, dashboards: di
 			"dashboards": dashboards,
 		},
 	}
+	return _split_number_dashboard_cards(payload)
+
+
+def _chart_slug(value: str) -> str:
+	"""Return a stable, workbook-safe suffix for a KPI measure name."""
+	slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+	return slug or "metric"
+
+
+def _split_number_dashboard_cards(payload: dict) -> dict:
+	"""Make multi-metric Number charts safe at the Insights mobile breakpoint.
+
+	The Insights Number chart renders one bordered card per measure. On a phone,
+	the dashboard grid collapses to one column, but the dashboard item's stored
+	height does not grow with the number of measures. A nine-measure chart in a
+	four-row item therefore clips its own cards and the next item paints over it.
+
+	Keep the original chart for workbook compatibility, and add one-measure
+	variants for dashboard use. The grid can then compact these small tiles on
+	desktop and reflow them one-per-row on mobile without changing query logic.
+	"""
+	charts = payload["dependencies"]["charts"]
+	split_map: dict[str, list[str]] = {}
+
+	for chart_name, chart in list(charts.items()):
+		if chart.get("chart_type") != "Number":
+			continue
+		config = chart.get("config") or {}
+		measures = config.get("number_columns") or []
+		if len(measures) <= 1:
+			continue
+
+		options = config.get("number_column_options") or []
+		split_names: list[str] = []
+		for index, measure in enumerate(measures):
+			suffix = _chart_slug(measure.get("measure_name") or f"metric-{index + 1}")
+			candidate = f"{chart_name}-{suffix}"
+			if candidate in charts:
+				candidate = f"{candidate}-{index + 1}"
+			while candidate in split_names:
+				candidate = f"{candidate}-{index + 1}"
+
+			split_chart = deepcopy(chart)
+			split_chart["name"] = candidate
+			split_chart["title"] = measure.get("measure_name") or chart.get("title")
+			split_chart["sort_order"] = int(chart.get("sort_order", 0)) * 100 + index
+			split_chart["config"]["number_columns"] = [deepcopy(measure)]
+			split_chart["config"]["number_column_options"] = [
+				deepcopy(options[index]) if index < len(options) else {}
+			]
+			charts[candidate] = split_chart
+			split_names.append(candidate)
+
+		split_map[chart_name] = split_names
+
+	if not split_map:
+		return payload
+
+	for dashboard in payload["dependencies"]["dashboards"].values():
+		items = dashboard.get("items") or []
+		new_items: list[dict] = []
+		for item in items:
+			if item.get("type") == "filter":
+				links = item.get("links") or {}
+				new_links: dict[str, str] = {}
+				for chart_name, value in links.items():
+					for split_name in split_map.get(chart_name, [chart_name]):
+						new_links[split_name] = value
+				item["links"] = new_links
+
+			if item.get("type") != "chart" or item.get("chart") not in split_map:
+				new_items.append(item)
+				continue
+
+			layout = item.get("layout") or {}
+			split_names = split_map[item["chart"]]
+			columns = min(len(split_names), 4)
+			width = max(1, 20 // columns)
+			for index, split_name in enumerate(split_names):
+				new_items.append(
+					{
+						"type": "chart",
+						"chart": split_name,
+						"layout": {
+							"i": f"{layout.get('i', item['chart'])}-{index + 1}",
+							"x": (index % columns) * width,
+							"y": layout.get("y", 0) + (index // columns) * 3,
+							"w": width,
+							"h": 3,
+						},
+					}
+				)
+		dashboard["items"] = new_items
+
+	return payload
 
 
 def build_pos_retail() -> dict:
@@ -2342,7 +2439,7 @@ def build_basket_relevance() -> dict:
 
 MANIFESTS = {
 	"owner_flash": {
-		"version": 3,
+		"version": 4,
 		"title": "CEO",
 		"description": "Executive morning scorecard: branch-filtered 14-day net sales, customer take, gross profit, COGS, average ticket, items per basket, tickets, returns, tax failures, store vs delivery, counters, till mix, on-shelf availability, overdue supplier bills, negative stock, and item margin.",
 		"notes": "Queries are bounded to 14 days. Branch filters use POS Invoice.branch for sales and Warehouse.custom_branch for stock cost/negative-stock rows. Delivery sales are Foodpanda-profile GMV; till charts exclude zero-amount delivery credit. Headline gross profit is POS net sales minus outward Stock Ledger cost on consolidated POS Sales Invoices, so it covers every POS sale; the item table narrows to lines that carry their own ledger cost and will read lower. POS service fee is not in net sales. On-shelf availability is a live Bin snapshot over enabled stock Items in enabled warehouses, so the date filter does not apply to it; it is filtered by company, branch and warehouse only.",
@@ -2360,7 +2457,7 @@ MANIFESTS = {
 		],
 	},
 	"basket_relevance": {
-		"version": 1,
+		"version": 2,
 		"title": "Customer Basket & Product Relevance",
 		"description": "Branch-aware basket KPIs, average basket, items per basket, high-lift product pairs, and single-item baskets that need cross-sell action.",
 		"notes": "Product relevance is deliberately bounded: last 30 days, submitted non-return POS Invoices, positive-qty lines only, branch/day basket baseline, minimum 3 baskets with the item in a branch/day, and 500 output rows. It measures attach rate and basket lift rather than running an expensive all-pairs recommender on dashboard load.",
@@ -2372,7 +2469,7 @@ MANIFESTS = {
 		],
 	},
 	"pos_retail": {
-		"version": 1,
+		"version": 2,
 		"title": "POS Sales and Customers",
 		"description": "Live POS tickets, average ticket, active customers, branch mix, top items and payment-mode collections. Built from submitted POS Invoices, not Sales Invoices after POS closing.",
 		"notes": "Retail supermarket KPIs (NetSuite/ROI-style: net sales, AOV, customer count). Amounts are company base currency and include returns as negative tickets.",
@@ -2381,7 +2478,7 @@ MANIFESTS = {
 		"source_doctypes": ["POS Invoice", "POS Invoice Item", "Sales Invoice Payment"],
 	},
 	"tax_compliance": {
-		"version": 2,
+		"version": 3,
 		"title": "Tax Compliance",
 		"description": "Splits output tax from POS service fee (fee is a payable, not merchandise tax). Submission mix and sales vs returns.",
 		"notes": "POS service fee rides on the tax table but posts to a liability ledger. Do not add it to income. Output tax is the inclusive GST row.",
@@ -2390,7 +2487,7 @@ MANIFESTS = {
 		"source_doctypes": ["POS Invoice", "Sales Taxes and Charges"],
 	},
 	"accounts_pnl": {
-		"version": 2,
+		"version": 3,
 		"title": "Merchandise P&L",
 		"description": "Income and expense from GL with Tax account-type excluded so output tax and POS service fee cannot inflate merchandise income.",
 		"notes": "POS service fee is a Liability. Use Liabilities and Payables for GST payable, creditors and fee payable. Older GL rows may lack Branch.",
@@ -2399,7 +2496,7 @@ MANIFESTS = {
 		"source_doctypes": ["GL Entry", "Account"],
 	},
 	"accounts_liabilities": {
-		"version": 1,
+		"version": 2,
 		"title": "Liabilities and Payables",
 		"description": "Period liability movement (tax payable, trade creditors, POS service fee) plus current outstanding snapshot and unpaid supplier invoices.",
 		"notes": "Snapshot is as-of-now (all uncancelled GL). Date filter applies only to period movement charts. Complements bundled AR/AP/Cash.",
@@ -2426,7 +2523,7 @@ MANIFESTS = {
 		"source_doctypes": ["POS Invoice Item", "POS Invoice", "Bin", "Item"],
 	},
 	"inventory_kpis": {
-		"version": 2,
+		"version": 3,
 		"title": "Inventory KPIs",
 		"description": "On-hand stock, COGS, warehouse mix, plus goods with quantity but no outward movement in 90 days.",
 		"notes": "COGS uses SLE cost basis. Dead-stock query scans SLE last-out dates — open with a date-independent Bin snapshot. Date filter applies to COGS charts only.",

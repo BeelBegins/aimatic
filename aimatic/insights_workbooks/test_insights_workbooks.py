@@ -47,6 +47,16 @@ class TestInsightsWorkbookTemplates(unittest.TestCase):
 		self.assertTrue(any(i.get("filter_name") == "Branch" for i in owner_items))
 		self.assertTrue(any(i.get("filter_name") == "Warehouse" for i in owner_items))
 		date_links = next(i for i in owner_items if i.get("filter_name") == "Date Range")["links"]
+		# Insights stacks Number-chart measures vertically on phones. Dashboard
+		# tiles must therefore reference one-measure variants, not the old
+		# multi-metric tile that clips labels and overlaps the next chart.
+		for item in owner_items:
+			if item.get("type") != "chart":
+				continue
+			chart = owner["dependencies"]["charts"][item["chart"]]
+			if chart["chart_type"] == "Number":
+				self.assertEqual(len(chart["config"]["number_columns"]), 1)
+		self.assertTrue(any(i.get("chart") == "tc-flash-net-sales" for i in owner_items))
 		self.assertNotIn("tc-availability", date_links)
 		self.assertNotIn("tc-availability-branch", date_links)
 		self.assertIn("basket_relevance", BUILDERS)

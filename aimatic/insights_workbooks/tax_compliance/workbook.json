@@ -382,6 +382,244 @@
 						"filters": []
 					}
 				}
+			},
+			"tc-tax-kpis-net-sales": {
+				"name": "tc-tax-kpis-net-sales",
+				"title": "Net sales",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-tax-pos",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Net sales",
+							"column_name": "base_net_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-tax-kpis-gross-sales": {
+				"name": "tc-tax-kpis-gross-sales",
+				"title": "Gross sales",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-tax-pos",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Gross sales",
+							"column_name": "base_grand_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-tax-kpis-invoices": {
+				"name": "tc-tax-kpis-invoices",
+				"title": "Invoices",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-tax-pos",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Invoices",
+							"column_name": "name",
+							"data_type": "Integer",
+							"aggregation": "count"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-tax-collected-output-tax": {
+				"name": "tc-tax-collected-output-tax",
+				"title": "Output tax",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 100,
+				"query": "tq-tax-rows",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Output tax",
+							"column_name": "output_tax_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-tax-collected-pos-service-fee": {
+				"name": "tc-tax-collected-pos-service-fee",
+				"title": "POS service fee",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 101,
+				"query": "tq-tax-rows",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "POS service fee",
+							"column_name": "pos_fee_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
 			}
 		},
 		"dashboards": {
@@ -396,8 +634,11 @@
 						"filter_type": "Date",
 						"icon": "calendar",
 						"links": {
-							"tc-tax-kpis": "`tq-tax-pos`.`posting_date`",
-							"tc-tax-collected": "`tq-tax-rows`.`posting_date`",
+							"tc-tax-kpis-net-sales": "`tq-tax-pos`.`posting_date`",
+							"tc-tax-kpis-gross-sales": "`tq-tax-pos`.`posting_date`",
+							"tc-tax-kpis-invoices": "`tq-tax-pos`.`posting_date`",
+							"tc-tax-collected-output-tax": "`tq-tax-rows`.`posting_date`",
+							"tc-tax-collected-pos-service-fee": "`tq-tax-rows`.`posting_date`",
 							"tc-submit": "`tq-tax-pos`.`posting_date`",
 							"tc-charge-kind": "`tq-tax-rows`.`posting_date`",
 							"tc-return-mix": "`tq-tax-pos`.`posting_date`"
@@ -418,8 +659,11 @@
 						"filter_type": "String",
 						"icon": "building-2",
 						"links": {
-							"tc-tax-kpis": "`tq-tax-pos`.`company`",
-							"tc-tax-collected": "`tq-tax-rows`.`company`",
+							"tc-tax-kpis-net-sales": "`tq-tax-pos`.`company`",
+							"tc-tax-kpis-gross-sales": "`tq-tax-pos`.`company`",
+							"tc-tax-kpis-invoices": "`tq-tax-pos`.`company`",
+							"tc-tax-collected-output-tax": "`tq-tax-rows`.`company`",
+							"tc-tax-collected-pos-service-fee": "`tq-tax-rows`.`company`",
 							"tc-submit": "`tq-tax-pos`.`company`",
 							"tc-charge-kind": "`tq-tax-rows`.`company`",
 							"tc-return-mix": "`tq-tax-pos`.`company`"
@@ -438,8 +682,11 @@
 						"filter_type": "String",
 						"icon": "store",
 						"links": {
-							"tc-tax-kpis": "`tq-tax-pos`.`branch`",
-							"tc-tax-collected": "`tq-tax-rows`.`branch`",
+							"tc-tax-kpis-net-sales": "`tq-tax-pos`.`branch`",
+							"tc-tax-kpis-gross-sales": "`tq-tax-pos`.`branch`",
+							"tc-tax-kpis-invoices": "`tq-tax-pos`.`branch`",
+							"tc-tax-collected-output-tax": "`tq-tax-rows`.`branch`",
+							"tc-tax-collected-pos-service-fee": "`tq-tax-rows`.`branch`",
 							"tc-submit": "`tq-tax-pos`.`branch`",
 							"tc-charge-kind": "`tq-tax-rows`.`branch`",
 							"tc-return-mix": "`tq-tax-pos`.`branch`"
@@ -454,23 +701,56 @@
 					},
 					{
 						"type": "chart",
-						"chart": "tc-tax-kpis",
+						"chart": "tc-tax-kpis-net-sales",
 						"layout": {
-							"i": "item-kpis",
+							"i": "item-kpis-1",
 							"x": 0,
 							"y": 1,
-							"w": 14,
+							"w": 6,
 							"h": 3
 						}
 					},
 					{
 						"type": "chart",
-						"chart": "tc-tax-collected",
+						"chart": "tc-tax-kpis-gross-sales",
 						"layout": {
-							"i": "item-collected",
-							"x": 14,
+							"i": "item-kpis-2",
+							"x": 6,
 							"y": 1,
 							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-tax-kpis-invoices",
+						"layout": {
+							"i": "item-kpis-3",
+							"x": 12,
+							"y": 1,
+							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-tax-collected-output-tax",
+						"layout": {
+							"i": "item-collected-1",
+							"x": 0,
+							"y": 1,
+							"w": 10,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-tax-collected-pos-service-fee",
+						"layout": {
+							"i": "item-collected-2",
+							"x": 10,
+							"y": 1,
+							"w": 10,
 							"h": 3
 						}
 					},

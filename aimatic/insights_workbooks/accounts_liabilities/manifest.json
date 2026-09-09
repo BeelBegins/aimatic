@@ -1,5 +1,5 @@
 {
-	"version": 1,
+	"version": 2,
 	"title": "Liabilities and Payables",
 	"description": "Period liability movement (tax payable, trade creditors, POS service fee) plus current outstanding snapshot and unpaid supplier invoices.",
 	"notes": "Snapshot is as-of-now (all uncancelled GL). Date filter applies only to period movement charts. Complements bundled AR/AP/Cash.",

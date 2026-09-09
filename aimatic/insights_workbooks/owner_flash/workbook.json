@@ -978,6 +978,625 @@
 						"filters": []
 					}
 				}
+			},
+			"tc-flash-net-sales": {
+				"name": "tc-flash-net-sales",
+				"title": "Net sales",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Net sales",
+							"column_name": "net_sales",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-flash-customer-take": {
+				"name": "tc-flash-customer-take",
+				"title": "Customer take",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Customer take",
+							"column_name": "customer_take",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-flash-tickets": {
+				"name": "tc-flash-tickets",
+				"title": "Tickets",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Tickets",
+							"column_name": "tickets",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-flash-average-ticket": {
+				"name": "tc-flash-average-ticket",
+				"title": "Average ticket",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Average ticket",
+							"column_name": "avg_ticket",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-flash-items-per-basket": {
+				"name": "tc-flash-items-per-basket",
+				"title": "Items per basket",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Items per basket",
+							"column_name": "units_per_ticket",
+							"data_type": "Decimal",
+							"aggregation": "avg"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-flash-return-tickets": {
+				"name": "tc-flash-return-tickets",
+				"title": "Return tickets",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 5,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Return tickets",
+							"column_name": "return_tickets",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-flash-failed-tax-invoices": {
+				"name": "tc-flash-failed-tax-invoices",
+				"title": "Failed tax invoices",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 6,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Failed tax invoices",
+							"column_name": "tax_failed",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-flash-store-sales": {
+				"name": "tc-flash-store-sales",
+				"title": "Store sales",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 7,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Store sales",
+							"column_name": "store_sales",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-flash-delivery-sales": {
+				"name": "tc-flash-delivery-sales",
+				"title": "Delivery sales",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 8,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Delivery sales",
+							"column_name": "delivery_sales",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-margin-kpis-gross-profit": {
+				"name": "tc-margin-kpis-gross-profit",
+				"title": "Gross profit",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 100,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Gross profit",
+							"column_name": "gross_profit",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-margin-kpis-cogs": {
+				"name": "tc-margin-kpis-cogs",
+				"title": "COGS",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 101,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "COGS",
+							"column_name": "cogs",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-availability-on-shelf-rate": {
+				"name": "tc-availability-on-shelf-rate",
+				"title": "On-shelf rate",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 800,
+				"query": "tq-owner-availability",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "On-shelf rate",
+							"column_name": "on_shelf_rate",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "percent"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-availability-out-of-stock-skus": {
+				"name": "tc-availability-out-of-stock-skus",
+				"title": "Out-of-stock SKUs",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 801,
+				"query": "tq-owner-availability",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Out-of-stock SKUs",
+							"column_name": "out_of_stock_skus",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-availability-negative-skus": {
+				"name": "tc-availability-negative-skus",
+				"title": "Negative SKUs",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 802,
+				"query": "tq-owner-availability",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Negative SKUs",
+							"column_name": "negative_skus",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
 			}
 		},
 		"dashboards": {
@@ -993,9 +1612,18 @@
 						"filter_type": "Date",
 						"icon": "calendar",
 						"links": {
-							"tc-flash": "`tq-owner-daily`.`posting_date`",
+							"tc-flash-net-sales": "`tq-owner-daily`.`posting_date`",
+							"tc-flash-customer-take": "`tq-owner-daily`.`posting_date`",
+							"tc-flash-tickets": "`tq-owner-daily`.`posting_date`",
+							"tc-flash-average-ticket": "`tq-owner-daily`.`posting_date`",
+							"tc-flash-items-per-basket": "`tq-owner-daily`.`posting_date`",
+							"tc-flash-return-tickets": "`tq-owner-daily`.`posting_date`",
+							"tc-flash-failed-tax-invoices": "`tq-owner-daily`.`posting_date`",
+							"tc-flash-store-sales": "`tq-owner-daily`.`posting_date`",
+							"tc-flash-delivery-sales": "`tq-owner-daily`.`posting_date`",
 							"tc-daily": "`tq-owner-daily`.`posting_date`",
-							"tc-margin-kpis": "`tq-owner-daily`.`posting_date`",
+							"tc-margin-kpis-gross-profit": "`tq-owner-daily`.`posting_date`",
+							"tc-margin-kpis-cogs": "`tq-owner-daily`.`posting_date`",
 							"tc-gp": "`tq-owner-daily`.`posting_date`",
 							"tc-counter": "`tq-owner-counter`.`posting_date`",
 							"tc-pay": "`tq-owner-pay`.`posting_date`",
@@ -1019,9 +1647,18 @@
 						"filter_type": "String",
 						"icon": "building-2",
 						"links": {
-							"tc-flash": "`tq-owner-daily`.`company`",
+							"tc-flash-net-sales": "`tq-owner-daily`.`company`",
+							"tc-flash-customer-take": "`tq-owner-daily`.`company`",
+							"tc-flash-tickets": "`tq-owner-daily`.`company`",
+							"tc-flash-average-ticket": "`tq-owner-daily`.`company`",
+							"tc-flash-items-per-basket": "`tq-owner-daily`.`company`",
+							"tc-flash-return-tickets": "`tq-owner-daily`.`company`",
+							"tc-flash-failed-tax-invoices": "`tq-owner-daily`.`company`",
+							"tc-flash-store-sales": "`tq-owner-daily`.`company`",
+							"tc-flash-delivery-sales": "`tq-owner-daily`.`company`",
 							"tc-daily": "`tq-owner-daily`.`company`",
-							"tc-margin-kpis": "`tq-owner-daily`.`company`",
+							"tc-margin-kpis-gross-profit": "`tq-owner-daily`.`company`",
+							"tc-margin-kpis-cogs": "`tq-owner-daily`.`company`",
 							"tc-gp": "`tq-owner-daily`.`company`",
 							"tc-counter": "`tq-owner-counter`.`company`",
 							"tc-pay": "`tq-owner-pay`.`company`",
@@ -1030,7 +1667,9 @@
 							"tc-item-margin": "`tq-owner-item-margin`.`company`",
 							"tc-ap": "`tq-owner-ap`.`company`",
 							"tc-neg": "`tq-owner-neg`.`company`",
-							"tc-availability": "`tq-owner-availability`.`company`",
+							"tc-availability-on-shelf-rate": "`tq-owner-availability`.`company`",
+							"tc-availability-out-of-stock-skus": "`tq-owner-availability`.`company`",
+							"tc-availability-negative-skus": "`tq-owner-availability`.`company`",
 							"tc-availability-branch": "`tq-owner-availability`.`company`"
 						},
 						"layout": {
@@ -1047,9 +1686,18 @@
 						"filter_type": "String",
 						"icon": "store",
 						"links": {
-							"tc-flash": "`tq-owner-daily`.`branch`",
+							"tc-flash-net-sales": "`tq-owner-daily`.`branch`",
+							"tc-flash-customer-take": "`tq-owner-daily`.`branch`",
+							"tc-flash-tickets": "`tq-owner-daily`.`branch`",
+							"tc-flash-average-ticket": "`tq-owner-daily`.`branch`",
+							"tc-flash-items-per-basket": "`tq-owner-daily`.`branch`",
+							"tc-flash-return-tickets": "`tq-owner-daily`.`branch`",
+							"tc-flash-failed-tax-invoices": "`tq-owner-daily`.`branch`",
+							"tc-flash-store-sales": "`tq-owner-daily`.`branch`",
+							"tc-flash-delivery-sales": "`tq-owner-daily`.`branch`",
 							"tc-daily": "`tq-owner-daily`.`branch`",
-							"tc-margin-kpis": "`tq-owner-daily`.`branch`",
+							"tc-margin-kpis-gross-profit": "`tq-owner-daily`.`branch`",
+							"tc-margin-kpis-cogs": "`tq-owner-daily`.`branch`",
 							"tc-gp": "`tq-owner-daily`.`branch`",
 							"tc-counter": "`tq-owner-counter`.`branch`",
 							"tc-pay": "`tq-owner-pay`.`branch`",
@@ -1058,7 +1706,9 @@
 							"tc-ap": "`tq-owner-ap`.`branch`",
 							"tc-neg": "`tq-owner-neg`.`branch`",
 							"tc-item-margin": "`tq-owner-item-margin`.`branch`",
-							"tc-availability": "`tq-owner-availability`.`branch`",
+							"tc-availability-on-shelf-rate": "`tq-owner-availability`.`branch`",
+							"tc-availability-out-of-stock-skus": "`tq-owner-availability`.`branch`",
+							"tc-availability-negative-skus": "`tq-owner-availability`.`branch`",
 							"tc-availability-branch": "`tq-owner-availability`.`branch`"
 						},
 						"layout": {
@@ -1076,7 +1726,9 @@
 						"icon": "warehouse",
 						"links": {
 							"tc-neg": "`tq-owner-neg`.`warehouse`",
-							"tc-availability": "`tq-owner-availability`.`warehouse`",
+							"tc-availability-on-shelf-rate": "`tq-owner-availability`.`warehouse`",
+							"tc-availability-out-of-stock-skus": "`tq-owner-availability`.`warehouse`",
+							"tc-availability-negative-skus": "`tq-owner-availability`.`warehouse`",
 							"tc-availability-branch": "`tq-owner-availability`.`warehouse`"
 						},
 						"layout": {
@@ -1089,34 +1741,155 @@
 					},
 					{
 						"type": "chart",
-						"chart": "tc-flash",
+						"chart": "tc-flash-net-sales",
 						"layout": {
-							"i": "item-flash",
+							"i": "item-flash-1",
 							"x": 0,
 							"y": 1,
-							"w": 13,
-							"h": 4
+							"w": 5,
+							"h": 3
 						}
 					},
 					{
 						"type": "chart",
-						"chart": "tc-margin-kpis",
+						"chart": "tc-flash-customer-take",
 						"layout": {
-							"i": "item-margin-kpis",
-							"x": 13,
+							"i": "item-flash-2",
+							"x": 5,
 							"y": 1,
-							"w": 7,
-							"h": 4
+							"w": 5,
+							"h": 3
 						}
 					},
 					{
 						"type": "chart",
-						"chart": "tc-availability",
+						"chart": "tc-flash-tickets",
 						"layout": {
-							"i": "item-availability",
+							"i": "item-flash-3",
+							"x": 10,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-flash-average-ticket",
+						"layout": {
+							"i": "item-flash-4",
+							"x": 15,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-flash-items-per-basket",
+						"layout": {
+							"i": "item-flash-5",
+							"x": 0,
+							"y": 4,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-flash-return-tickets",
+						"layout": {
+							"i": "item-flash-6",
+							"x": 5,
+							"y": 4,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-flash-failed-tax-invoices",
+						"layout": {
+							"i": "item-flash-7",
+							"x": 10,
+							"y": 4,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-flash-store-sales",
+						"layout": {
+							"i": "item-flash-8",
+							"x": 15,
+							"y": 4,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-flash-delivery-sales",
+						"layout": {
+							"i": "item-flash-9",
+							"x": 0,
+							"y": 7,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-margin-kpis-gross-profit",
+						"layout": {
+							"i": "item-margin-kpis-1",
+							"x": 0,
+							"y": 1,
+							"w": 10,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-margin-kpis-cogs",
+						"layout": {
+							"i": "item-margin-kpis-2",
+							"x": 10,
+							"y": 1,
+							"w": 10,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-availability-on-shelf-rate",
+						"layout": {
+							"i": "item-availability-1",
 							"x": 0,
 							"y": 5,
-							"w": 20,
+							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-availability-out-of-stock-skus",
+						"layout": {
+							"i": "item-availability-2",
+							"x": 6,
+							"y": 5,
+							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-availability-negative-skus",
+						"layout": {
+							"i": "item-availability-3",
+							"x": 12,
+							"y": 5,
+							"w": 6,
 							"h": 3
 						}
 					},
