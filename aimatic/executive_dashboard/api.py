@@ -13,6 +13,7 @@ from aimatic.sales_dashboard import api as sales_dashboard
 
 _ALLOWED_ROLES = {"System Manager", "Sales Manager", "Accounts Manager", "Stock Manager"}
 _BASKET_TRANSACTION_LIMIT = 5000
+_MIN_JOINT_BASKETS = 10
 
 
 def _check_access():
@@ -122,7 +123,10 @@ def get_basket_report(company=None, date_from=None, date_to=None, branch=None, w
 	for row in rows:
 		transactions[row.transaction_id].add(row.item_code)
 		names[row.item_code] = row.item_name or row.item_code
-	pairs, quality = calculate_basket_pairs(transactions, minimum_transactions=100, minimum_support=0.01, minimum_confidence=0.10, limit=30)
+	# 1% support returns nothing on a supermarket assortment — measured on szl,
+	# the strongest pair of 168k reaches 0.98%. The absolute floor is what keeps
+	# a short date range from ranking a one-basket coincidence at the top.
+	pairs, quality = calculate_basket_pairs(transactions, minimum_transactions=100, minimum_support=0.003, minimum_confidence=0.10, limit=30, minimum_joint_transactions=_MIN_JOINT_BASKETS)
 	for pair in pairs:
 		pair["item_a_name"] = names.get(pair["item_a"], pair["item_a"])
 		pair["item_b_name"] = names.get(pair["item_b"], pair["item_b"])

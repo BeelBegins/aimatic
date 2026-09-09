@@ -75,6 +75,26 @@ class TestBasketAnalysis(TestCase):
 		self.assertEqual(rows, [])
 		self.assertTrue(quality["insufficient_data"])
 
+	def test_absolute_joint_floor_drops_a_coincidental_pair(self):
+		# One shared basket out of 100 clears a 0.3% support floor on its own.
+		# Without the absolute floor it would rank top by lift, which is exactly
+		# what emptied — then falsified — the CEO affinity panel.
+		transactions = {str(i): {f"item-{i}"} for i in range(100)}
+		transactions["0"] = {"A", "B"}
+		rows, quality = calculate_basket_pairs(
+			transactions, minimum_transactions=50, minimum_support=0.003, minimum_confidence=0.1
+		)
+		self.assertFalse(quality["insufficient_data"])
+		self.assertTrue(any(r["item_a"] == "A" and r["item_b"] == "B" for r in rows))
+		guarded, _ = calculate_basket_pairs(
+			transactions,
+			minimum_transactions=50,
+			minimum_support=0.003,
+			minimum_confidence=0.1,
+			minimum_joint_transactions=10,
+		)
+		self.assertEqual(guarded, [])
+
 
 class TestAnomalyDetection(TestCase):
 	def test_outlier_has_expected_range_and_severity(self):

@@ -21,7 +21,17 @@ def calculate_basket_pairs(
 	minimum_support: float = 0.01,
 	minimum_confidence: float = 0.10,
 	limit: int = 100,
+	minimum_joint_transactions: int = 0,
 ):
+	"""Pairs that clear support, confidence and an absolute joint-basket floor.
+
+	Support alone does not survive a wide assortment. Measured on szl (5,000
+	baskets, 4,867 distinct items, 6.3 items per basket) the single strongest
+	pair reaches 0.98% support, so a 1% floor returns nothing at all. A caller
+	that lowers the support floor to compensate must then set
+	`minimum_joint_transactions`, or a short date range turns one coincidental
+	basket into a spectacular lift.
+	"""
 	total = len(transactions)
 	if total < minimum_transactions:
 		return [], {"insufficient_data": True, "required_transactions": minimum_transactions}
@@ -39,6 +49,8 @@ def calculate_basket_pairs(
 		confidence = max(confidence_left, confidence_right)
 		lift = support / ((item_counts[left] / total) * (item_counts[right] / total))
 		if support < minimum_support or confidence < minimum_confidence:
+			continue
+		if count < minimum_joint_transactions:
 			continue
 		rows.append(
 			{
