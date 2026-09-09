@@ -1,0 +1,15 @@
+{
+	"version": 1,
+	"title": "Pending Invoices and Orders",
+	"description": "Draft supplier invoices, POs still to receive or bill, unpaid purchase invoices, unpaid non-POS sales invoices.",
+	"notes": "Work queues for accounts and receiving. POS tickets are cash-complete and are not listed here.",
+	"module": "Accounts",
+	"required_apps": [
+		"erpnext"
+	],
+	"source_doctypes": [
+		"Purchase Invoice",
+		"Purchase Order",
+		"Sales Invoice"
+	]
+}

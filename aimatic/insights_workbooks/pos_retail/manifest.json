@@ -1,0 +1,16 @@
+{
+	"version": 1,
+	"title": "POS Sales and Customers",
+	"description": "Live POS tickets, average ticket, active customers, branch mix, top items and payment-mode collections. Built from submitted POS Invoices, not Sales Invoices after POS closing.",
+	"notes": "Retail supermarket KPIs (NetSuite/ROI-style: net sales, AOV, customer count). Amounts are company base currency and include returns as negative tickets.",
+	"module": "Selling",
+	"required_apps": [
+		"erpnext",
+		"aimatic"
+	],
+	"source_doctypes": [
+		"POS Invoice",
+		"POS Invoice Item",
+		"Sales Invoice Payment"
+	]
+}

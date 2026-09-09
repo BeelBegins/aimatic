@@ -1,0 +1,591 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-basket-relevance",
+	"doc": {
+		"name": "aimatic-basket-relevance",
+		"title": "Customer Basket & Product Relevance"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-basket-detail": {
+				"name": "tq-basket-detail",
+				"title": "Basket detail (last 30 days)",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "WITH basket_lines AS (\n\tSELECT\n\t\tp.name AS invoice,\n\t\tp.posting_date,\n\t\tp.company,\n\t\tCOALESCE(NULLIF(p.branch, ''), 'Unassigned') AS branch,\n\t\tp.customer,\n\t\tp.base_net_total AS net_sales,\n\t\tpii.item_code,\n\t\tSUM(pii.qty) AS qty\n\tFROM `tabPOS Invoice` p\n\tINNER JOIN `tabPOS Invoice Item` pii\n\t\tON pii.parent = p.name\n\t\tAND pii.parenttype = 'POS Invoice'\n\t\tAND pii.docstatus = 1\n\tWHERE p.docstatus = 1\n\t\tAND IFNULL(p.is_return, 0) = 0\n\t\tAND p.posting_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\n\t\tAND pii.qty > 0\n\tGROUP BY\n\t\tp.name,\n\t\tp.posting_date,\n\t\tp.company,\n\t\tCOALESCE(NULLIF(p.branch, ''), 'Unassigned'),\n\t\tp.customer,\n\t\tp.base_net_total,\n\t\tpii.item_code\n)\nSELECT\n\tinvoice,\n\tposting_date,\n\tcompany,\n\tbranch,\n\tcustomer,\n\tnet_sales,\n\tCOUNT(*) AS distinct_items,\n\tSUM(qty) AS units\nFROM basket_lines\nGROUP BY invoice, posting_date, company, branch, customer, net_sales"
+					}
+				]
+			},
+			"tq-product-relevance": {
+				"name": "tq-product-relevance",
+				"title": "Product relevance to baskets (last 30 days)",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 1,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "WITH basket_totals AS (\n\tSELECT\n\t\tp.name AS invoice,\n\t\tp.posting_date,\n\t\tp.company,\n\t\tCOALESCE(NULLIF(p.branch, ''), 'Unassigned') AS branch,\n\t\tp.base_net_total AS net_sales\n\tFROM `tabPOS Invoice` p\n\tWHERE p.docstatus = 1\n\t\tAND IFNULL(p.is_return, 0) = 0\n\t\tAND p.posting_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\n),\nbranch_day AS (\n\tSELECT\n\t\tposting_date,\n\t\tcompany,\n\t\tbranch,\n\t\tCOUNT(*) AS branch_baskets,\n\t\tAVG(net_sales) AS branch_avg_basket,\n\t\tSUM(net_sales) AS branch_net_sales\n\tFROM basket_totals\n\tGROUP BY posting_date, company, branch\n),\nitem_lines AS (\n\tSELECT\n\t\tbt.invoice,\n\t\tbt.posting_date,\n\t\tbt.company,\n\t\tbt.branch,\n\t\tpii.item_code,\n\t\tMAX(pii.item_name) AS item_name,\n\t\tMAX(pii.item_group) AS item_group,\n\t\tMAX(bt.net_sales) AS basket_net_sales,\n\t\tSUM(pii.qty) AS units,\n\t\tSUM(pii.base_net_amount) AS item_revenue\n\tFROM basket_totals bt\n\tINNER JOIN `tabPOS Invoice Item` pii\n\t\tON pii.parent = bt.invoice\n\t\tAND pii.parenttype = 'POS Invoice'\n\t\tAND pii.docstatus = 1\n\t\tAND pii.qty > 0\n\tGROUP BY bt.invoice, bt.posting_date, bt.company, bt.branch, pii.item_code\n),\nitem_day AS (\n\tSELECT\n\t\tposting_date,\n\t\tcompany,\n\t\tbranch,\n\t\titem_code,\n\t\tMAX(item_name) AS item_name,\n\t\tMAX(item_group) AS item_group,\n\t\tCOUNT(DISTINCT invoice) AS baskets_with_item,\n\t\tSUM(units) AS units,\n\t\tSUM(item_revenue) AS item_revenue,\n\t\tAVG(basket_net_sales) AS avg_basket_with_item\n\tFROM item_lines\n\tGROUP BY posting_date, company, branch, item_code\n\tHAVING COUNT(DISTINCT invoice) >= 3\n)\nSELECT\n\tid.posting_date,\n\tid.company,\n\tid.branch,\n\tid.item_code,\n\tid.item_name,\n\tid.item_group,\n\tid.baskets_with_item,\n\tid.units,\n\tid.item_revenue,\n\tid.avg_basket_with_item,\n\tROUND(id.baskets_with_item / NULLIF(bd.branch_baskets, 0), 4) AS attach_rate,\n\tROUND(id.avg_basket_with_item / NULLIF(bd.branch_avg_basket, 0), 2) AS basket_lift\nFROM item_day id\nINNER JOIN branch_day bd\n\tON bd.posting_date = id.posting_date\n\tAND bd.company = id.company\n\tAND bd.branch = id.branch\nORDER BY basket_lift DESC, baskets_with_item DESC\nLIMIT 500"
+					}
+				]
+			},
+			"tq-single-item-baskets": {
+				"name": "tq-single-item-baskets",
+				"title": "Single-item baskets (last 30 days)",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 2,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "WITH basket_lines AS (\n\tSELECT\n\t\tp.name AS invoice,\n\t\tp.posting_date,\n\t\tp.company,\n\t\tCOALESCE(NULLIF(p.branch, ''), 'Unassigned') AS branch,\n\t\tpii.item_code,\n\t\tMAX(pii.item_name) AS item_name,\n\t\tMAX(pii.item_group) AS item_group,\n\t\tSUM(pii.qty) AS qty,\n\t\tSUM(pii.base_net_amount) AS line_revenue\n\tFROM `tabPOS Invoice` p\n\tINNER JOIN `tabPOS Invoice Item` pii\n\t\tON pii.parent = p.name\n\t\tAND pii.parenttype = 'POS Invoice'\n\t\tAND pii.docstatus = 1\n\tWHERE p.docstatus = 1\n\t\tAND IFNULL(p.is_return, 0) = 0\n\t\tAND p.posting_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\n\t\tAND pii.qty > 0\n\tGROUP BY\n\t\tp.name,\n\t\tp.posting_date,\n\t\tp.company,\n\t\tCOALESCE(NULLIF(p.branch, ''), 'Unassigned'),\n\t\tpii.item_code\n),\nbasket_size AS (\n\tSELECT\n\t\tinvoice,\n\t\tCOUNT(*) AS distinct_items,\n\t\tSUM(qty) AS units,\n\t\tSUM(line_revenue) AS basket_revenue\n\tFROM basket_lines\n\tGROUP BY invoice\n)\nSELECT\n\tbl.posting_date,\n\tbl.company,\n\tbl.branch,\n\tbl.item_code,\n\tMAX(bl.item_name) AS item_name,\n\tMAX(bl.item_group) AS item_group,\n\tCOUNT(DISTINCT bl.invoice) AS single_item_baskets,\n\tSUM(bs.basket_revenue) AS revenue,\n\tAVG(bs.basket_revenue) AS avg_basket,\n\tAVG(bs.units) AS units_per_basket\nFROM basket_lines bl\nINNER JOIN basket_size bs ON bs.invoice = bl.invoice\nWHERE bs.distinct_items = 1\nGROUP BY bl.posting_date, bl.company, bl.branch, bl.item_code"
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-basket-kpis": {
+				"name": "tc-basket-kpis",
+				"title": "Customer basket KPIs",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-basket-detail",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Net sales",
+							"column_name": "net_sales",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Baskets",
+							"column_name": "invoice",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						},
+						{
+							"measure_name": "Avg basket",
+							"column_name": "net_sales",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Items / basket",
+							"column_name": "distinct_items",
+							"data_type": "Decimal",
+							"aggregation": "avg"
+						},
+						{
+							"measure_name": "Units / basket",
+							"column_name": "units",
+							"data_type": "Decimal",
+							"aggregation": "avg"
+						},
+						{
+							"measure_name": "Customers",
+							"column_name": "customer",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-basket-branch-sales": {
+				"name": "tc-basket-branch-sales",
+				"title": "Net sales by branch",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-basket-detail",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "branch",
+							"column_name": "branch",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Net sales",
+									"column_name": "net_sales",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Net sales"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 8,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-basket-branch-aov": {
+				"name": "tc-basket-branch-aov",
+				"title": "Average basket by branch",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-basket-detail",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "branch",
+							"column_name": "branch",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Avg basket",
+									"column_name": "net_sales",
+									"data_type": "Decimal",
+									"aggregation": "avg",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Avg basket"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 8,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-basket-branch-items": {
+				"name": "tc-basket-branch-items",
+				"title": "Items per basket by branch",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-basket-detail",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "branch",
+							"column_name": "branch",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Items / basket",
+									"column_name": "distinct_items",
+									"data_type": "Decimal",
+									"aggregation": "avg"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Items / basket"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 8,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-product-relevance": {
+				"name": "tc-product-relevance",
+				"title": "Product relevance: basket lift and attach rate",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-product-relevance",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Item",
+							"column_name": "item_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Group",
+							"column_name": "item_group",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Baskets with item",
+							"column_name": "baskets_with_item",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Attach rate",
+							"column_name": "attach_rate",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "percent"
+						},
+						{
+							"measure_name": "Avg basket with item",
+							"column_name": "avg_basket_with_item",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Basket lift",
+							"column_name": "basket_lift",
+							"data_type": "Decimal",
+							"aggregation": "avg"
+						},
+						{
+							"measure_name": "Item revenue",
+							"column_name": "item_revenue",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Basket lift"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 50,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-single-baskets": {
+				"name": "tc-single-baskets",
+				"title": "Single-item baskets that need cross-sell",
+				"workbook": "aimatic-basket-relevance",
+				"folder": null,
+				"sort_order": 5,
+				"query": "tq-single-item-baskets",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Item",
+							"column_name": "item_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Group",
+							"column_name": "item_group",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Single-item baskets",
+							"column_name": "single_item_baskets",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Revenue",
+							"column_name": "revenue",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Avg basket",
+							"column_name": "avg_basket",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Units / basket",
+							"column_name": "units_per_basket",
+							"data_type": "Decimal",
+							"aggregation": "avg"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Single-item baskets"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 50,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-basket-relevance": {
+				"name": "td-basket-relevance",
+				"title": "Customer Basket & Product Relevance",
+				"preview_image": "/assets/aimatic/images/insights-basket-preview.svg",
+				"workbook": "aimatic-basket-relevance",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Date Range",
+						"filter_type": "Date",
+						"icon": "calendar",
+						"links": {
+							"tc-basket-kpis": "`tq-basket-detail`.`posting_date`",
+							"tc-basket-branch-sales": "`tq-basket-detail`.`posting_date`",
+							"tc-basket-branch-aov": "`tq-basket-detail`.`posting_date`",
+							"tc-basket-branch-items": "`tq-basket-detail`.`posting_date`",
+							"tc-product-relevance": "`tq-product-relevance`.`posting_date`",
+							"tc-single-baskets": "`tq-single-item-baskets`.`posting_date`"
+						},
+						"layout": {
+							"i": "filter-date-range",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						},
+						"default_operator": "within",
+						"default_value": "Last 30 days"
+					},
+					{
+						"type": "filter",
+						"filter_name": "Company",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-basket-kpis": "`tq-basket-detail`.`company`",
+							"tc-basket-branch-sales": "`tq-basket-detail`.`company`",
+							"tc-basket-branch-aov": "`tq-basket-detail`.`company`",
+							"tc-basket-branch-items": "`tq-basket-detail`.`company`",
+							"tc-product-relevance": "`tq-product-relevance`.`company`",
+							"tc-single-baskets": "`tq-single-item-baskets`.`company`"
+						},
+						"layout": {
+							"i": "filter-company",
+							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Branch",
+						"filter_type": "String",
+						"icon": "store",
+						"links": {
+							"tc-basket-kpis": "`tq-basket-detail`.`branch`",
+							"tc-basket-branch-sales": "`tq-basket-detail`.`branch`",
+							"tc-basket-branch-aov": "`tq-basket-detail`.`branch`",
+							"tc-basket-branch-items": "`tq-basket-detail`.`branch`",
+							"tc-product-relevance": "`tq-product-relevance`.`branch`",
+							"tc-single-baskets": "`tq-single-item-baskets`.`branch`"
+						},
+						"layout": {
+							"i": "filter-branch",
+							"x": 8,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-basket-kpis",
+						"layout": {
+							"i": "item-kpis",
+							"x": 0,
+							"y": 1,
+							"w": 20,
+							"h": 4
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-basket-branch-sales",
+						"layout": {
+							"i": "item-sales",
+							"x": 0,
+							"y": 5,
+							"w": 7,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-basket-branch-aov",
+						"layout": {
+							"i": "item-aov",
+							"x": 7,
+							"y": 5,
+							"w": 6,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-basket-branch-items",
+						"layout": {
+							"i": "item-items",
+							"x": 13,
+							"y": 5,
+							"w": 7,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-product-relevance",
+						"layout": {
+							"i": "item-relevance",
+							"x": 0,
+							"y": 13,
+							"w": 20,
+							"h": 10
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-single-baskets",
+						"layout": {
+							"i": "item-single",
+							"x": 0,
+							"y": 23,
+							"w": 20,
+							"h": 10
+						}
+					}
+				]
+			}
+		}
+	}
+}

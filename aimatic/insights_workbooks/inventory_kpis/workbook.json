@@ -1,0 +1,697 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-inventory-kpis",
+	"doc": {
+		"name": "aimatic-inventory-kpis",
+		"title": "Inventory KPIs"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-bins": {
+				"name": "tq-bins",
+				"title": "Bin balances",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 1,
+				"is_native_query": 0,
+				"operations": [
+					{
+						"type": "source",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabBin"
+						}
+					},
+					{
+						"type": "join",
+						"join_type": "inner",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabItem"
+						},
+						"select_columns": [
+							{
+								"type": "column",
+								"column_name": "item_name"
+							},
+							{
+								"type": "column",
+								"column_name": "item_group"
+							},
+							{
+								"type": "column",
+								"column_name": "disabled"
+							}
+						],
+						"join_condition": {
+							"left_column": {
+								"type": "column",
+								"column_name": "item_code"
+							},
+							"right_column": {
+								"type": "column",
+								"column_name": "name"
+							}
+						}
+					}
+				]
+			},
+			"tq-sle": {
+				"name": "tq-sle",
+				"title": "Stock movements",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 1,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 1,
+				"is_native_query": 0,
+				"operations": [
+					{
+						"type": "source",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabStock Ledger Entry"
+						}
+					},
+					{
+						"type": "filter_group",
+						"logical_operator": "And",
+						"filters": [
+							{
+								"column": {
+									"type": "column",
+									"column_name": "is_cancelled"
+								},
+								"operator": "=",
+								"value": 0
+							}
+						]
+					},
+					{
+						"type": "mutate",
+						"new_name": "cogs_value",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else(actual_qty < 0, -stock_value_difference, 0)"
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "inbound_value",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else(actual_qty > 0, stock_value_difference, 0)"
+						}
+					}
+				]
+			},
+			"tq-dead": {
+				"name": "tq-dead",
+				"title": "Slow / no-movement stock (90 days)",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 2,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "WITH last_out AS (\n\tSELECT item_code, warehouse, MAX(posting_date) AS last_out\n\tFROM `tabStock Ledger Entry`\n\tWHERE IFNULL(is_cancelled, 0) = 0 AND actual_qty < 0\n\tGROUP BY item_code, warehouse\n)\nSELECT\n\tb.item_code,\n\ti.item_name,\n\ti.item_group,\n\tb.warehouse,\n\tb.actual_qty,\n\tb.stock_value,\n\tlo.last_out,\n\tDATEDIFF(CURDATE(), lo.last_out) AS days_since_out\nFROM `tabBin` b\nINNER JOIN `tabItem` i ON i.name = b.item_code\nLEFT JOIN last_out lo ON lo.item_code = b.item_code AND lo.warehouse = b.warehouse\nWHERE b.actual_qty > 0\n\tAND (lo.last_out IS NULL OR lo.last_out < DATE_SUB(CURDATE(), INTERVAL 90 DAY))"
+					}
+				]
+			},
+			"tq-wh-branch-gst": {
+				"name": "tq-wh-branch-gst",
+				"title": "Stock by warehouse & branch (incl. GST)",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 3,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tw.company,\n\tb.warehouse,\n\tw.custom_branch AS branch,\n\tSUM(b.actual_qty) AS qty,\n\tCOUNT(DISTINCT b.item_code) AS skus,\n\tSUM(b.stock_value) AS stock_value_excl_gst,\n\tSUM(b.stock_value * IFNULL(ftc.tax_rate, 0) / 100) AS gst_value,\n\tSUM(b.stock_value * (100 + IFNULL(ftc.tax_rate, 0)) / 100) AS stock_value_incl_gst\nFROM `tabBin` b\nINNER JOIN `tabWarehouse` w ON w.name = b.warehouse\nINNER JOIN `tabItem` i ON i.name = b.item_code\nLEFT JOIN `tabFBR Tax Category` ftc ON ftc.name = i.custom_fbr_tax_category\nGROUP BY w.company, b.warehouse, w.custom_branch"
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-bin-kpis": {
+				"name": "tc-bin-kpis",
+				"title": "On-hand inventory",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-bins",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Stock value",
+							"column_name": "stock_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Qty",
+							"column_name": "actual_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "SKUs",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-cogs": {
+				"name": "tc-cogs",
+				"title": "Movement KPIs",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-sle",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "COGS",
+							"column_name": "cogs_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Inbound value",
+							"column_name": "inbound_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-cogs-trend": {
+				"name": "tc-cogs-trend",
+				"title": "COGS trend",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-sle",
+				"chart_type": "Line",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "posting_date",
+							"column_name": "posting_date",
+							"data_type": "Date",
+							"granularity": "month"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "COGS",
+									"column_name": "cogs_value",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						],
+						"show_data_labels": false
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-wh": {
+				"name": "tc-wh",
+				"title": "Stock value by warehouse",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-bins",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "warehouse",
+						"column_name": "warehouse",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Stock value",
+						"column_name": "stock_value",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-grp": {
+				"name": "tc-grp",
+				"title": "Stock value by item group",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-bins",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "item_group",
+						"column_name": "item_group",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Stock value",
+						"column_name": "stock_value",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-top-stock": {
+				"name": "tc-top-stock",
+				"title": "Top items by value",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 5,
+				"query": "tq-bins",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "item_name",
+							"column_name": "item_name",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Stock value",
+									"column_name": "stock_value",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Stock value"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 10,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-dead": {
+				"name": "tc-dead",
+				"title": "Goods with qty but no outward movement in 90 days",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 6,
+				"query": "tq-dead",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Item",
+							"column_name": "item_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Group",
+							"column_name": "item_group",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Warehouse",
+							"column_name": "warehouse",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Last out",
+							"column_name": "last_out",
+							"data_type": "Date"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Stock value",
+							"column_name": "stock_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Qty",
+							"column_name": "actual_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Stock value"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 25,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-wh-branch-gst": {
+				"name": "tc-wh-branch-gst",
+				"title": "Stock by warehouse & branch (incl. GST)",
+				"workbook": "aimatic-inventory-kpis",
+				"folder": null,
+				"sort_order": 7,
+				"query": "tq-wh-branch-gst",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Company",
+							"column_name": "company",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Warehouse",
+							"column_name": "warehouse",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Qty",
+							"column_name": "qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "SKUs",
+							"column_name": "skus",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Stock value (excl. GST)",
+							"column_name": "stock_value_excl_gst",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "GST value",
+							"column_name": "gst_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Stock value (incl. GST)",
+							"column_name": "stock_value_incl_gst",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Stock value (incl. GST)"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 50,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-inv": {
+				"name": "td-inv",
+				"title": "Inventory KPIs",
+				"workbook": "aimatic-inventory-kpis",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Date Range",
+						"filter_type": "Date",
+						"icon": "calendar",
+						"links": {
+							"tc-cogs": "`tq-sle`.`posting_date`",
+							"tc-cogs-trend": "`tq-sle`.`posting_date`"
+						},
+						"layout": {
+							"i": "filter-date-range",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						},
+						"default_operator": "within",
+						"default_value": "Last 12 months"
+					},
+					{
+						"type": "filter",
+						"filter_name": "Company",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-cogs": "`tq-sle`.`company`",
+							"tc-cogs-trend": "`tq-sle`.`company`"
+						},
+						"layout": {
+							"i": "filter-company",
+							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-bin-kpis",
+						"layout": {
+							"i": "item-bin",
+							"x": 0,
+							"y": 1,
+							"w": 10,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-cogs",
+						"layout": {
+							"i": "item-cogs",
+							"x": 10,
+							"y": 1,
+							"w": 10,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-cogs-trend",
+						"layout": {
+							"i": "item-trend",
+							"x": 0,
+							"y": 4,
+							"w": 12,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-wh",
+						"layout": {
+							"i": "item-wh",
+							"x": 12,
+							"y": 4,
+							"w": 8,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-grp",
+						"layout": {
+							"i": "item-grp",
+							"x": 0,
+							"y": 12,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-top-stock",
+						"layout": {
+							"i": "item-top",
+							"x": 10,
+							"y": 12,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-dead",
+						"layout": {
+							"i": "item-dead",
+							"x": 0,
+							"y": 20,
+							"w": 20,
+							"h": 9
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-wh-branch-gst",
+						"layout": {
+							"i": "item-wh-branch-gst",
+							"x": 0,
+							"y": 29,
+							"w": 20,
+							"h": 9
+						}
+					}
+				]
+			}
+		}
+	}
+}

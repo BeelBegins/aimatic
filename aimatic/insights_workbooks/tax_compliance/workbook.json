@@ -1,0 +1,514 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-tax-compliance",
+	"doc": {
+		"name": "aimatic-tax-compliance",
+		"title": "Tax Compliance"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-tax-pos": {
+				"name": "tq-tax-pos",
+				"title": "POS Invoices",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 1,
+				"is_native_query": 0,
+				"operations": [
+					{
+						"type": "source",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabPOS Invoice"
+						}
+					},
+					{
+						"type": "filter_group",
+						"logical_operator": "And",
+						"filters": [
+							{
+								"column": {
+									"type": "column",
+									"column_name": "docstatus"
+								},
+								"operator": "=",
+								"value": 1
+							}
+						]
+					},
+					{
+						"type": "mutate",
+						"new_name": "submission_status",
+						"data_type": "String",
+						"expression": {
+							"type": "expression",
+							"expression": "cases((custom_fbr_status == 'Accepted', 'Accepted'), (custom_fbr_status == 'Failed', 'Failed'), (custom_fbr_status == 'Not Sent', 'Not sent'), else_='Other')"
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "is_return_flag",
+						"data_type": "String",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else(is_return == 1, 'Return', 'Sale')"
+						}
+					}
+				]
+			},
+			"tq-tax-rows": {
+				"name": "tq-tax-rows",
+				"title": "POS Tax Rows",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 1,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 1,
+				"is_native_query": 0,
+				"operations": [
+					{
+						"type": "source",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabSales Taxes and Charges"
+						}
+					},
+					{
+						"type": "filter_group",
+						"logical_operator": "And",
+						"filters": [
+							{
+								"column": {
+									"type": "column",
+									"column_name": "docstatus"
+								},
+								"operator": "=",
+								"value": 1
+							},
+							{
+								"column": {
+									"type": "column",
+									"column_name": "parenttype"
+								},
+								"operator": "=",
+								"value": "POS Invoice"
+							}
+						]
+					},
+					{
+						"type": "join",
+						"join_type": "inner",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabPOS Invoice"
+						},
+						"select_columns": [
+							{
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							{
+								"type": "column",
+								"column_name": "company"
+							},
+							{
+								"type": "column",
+								"column_name": "branch"
+							}
+						],
+						"join_condition": {
+							"left_column": {
+								"type": "column",
+								"column_name": "parent"
+							},
+							"right_column": {
+								"type": "column",
+								"column_name": "name"
+							}
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "output_tax_amount",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else(description == 'FBR Sales Tax', base_tax_amount, 0)"
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "pos_fee_amount",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else(description == 'FBR POS Service Fee', base_tax_amount, 0)"
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "charge_kind",
+						"data_type": "String",
+						"expression": {
+							"type": "expression",
+							"expression": "cases((description == 'FBR POS Service Fee', 'POS service fee'), (description == 'FBR Sales Tax', 'Output tax'), else_='Other charge')"
+						}
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-tax-kpis": {
+				"name": "tc-tax-kpis",
+				"title": "Merchandise vs ticket",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-tax-pos",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Net sales",
+							"column_name": "base_net_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Gross sales",
+							"column_name": "base_grand_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Invoices",
+							"column_name": "name",
+							"data_type": "Integer",
+							"aggregation": "count"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-tax-collected": {
+				"name": "tc-tax-collected",
+				"title": "Output tax vs POS service fee",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-tax-rows",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Output tax",
+							"column_name": "output_tax_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "POS service fee",
+							"column_name": "pos_fee_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-submit": {
+				"name": "tc-submit",
+				"title": "Tax invoice submission",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-tax-pos",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "submission_status",
+						"column_name": "submission_status",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Invoices",
+						"column_name": "name",
+						"data_type": "Integer",
+						"aggregation": "count"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-charge-kind": {
+				"name": "tc-charge-kind",
+				"title": "Charges: tax vs POS fee",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-tax-rows",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "charge_kind",
+						"column_name": "charge_kind",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Amount",
+						"column_name": "base_tax_amount",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-return-mix": {
+				"name": "tc-return-mix",
+				"title": "Sales vs returns",
+				"workbook": "aimatic-tax-compliance",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-tax-pos",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "is_return_flag",
+						"column_name": "is_return_flag",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Net sales",
+						"column_name": "base_net_total",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-tax": {
+				"name": "td-tax",
+				"title": "Tax Compliance",
+				"workbook": "aimatic-tax-compliance",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Date Range",
+						"filter_type": "Date",
+						"icon": "calendar",
+						"links": {
+							"tc-tax-kpis": "`tq-tax-pos`.`posting_date`",
+							"tc-tax-collected": "`tq-tax-rows`.`posting_date`",
+							"tc-submit": "`tq-tax-pos`.`posting_date`",
+							"tc-charge-kind": "`tq-tax-rows`.`posting_date`",
+							"tc-return-mix": "`tq-tax-pos`.`posting_date`"
+						},
+						"layout": {
+							"i": "filter-date-range",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						},
+						"default_operator": "within",
+						"default_value": "Last 12 months"
+					},
+					{
+						"type": "filter",
+						"filter_name": "Company",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-tax-kpis": "`tq-tax-pos`.`company`",
+							"tc-tax-collected": "`tq-tax-rows`.`company`",
+							"tc-submit": "`tq-tax-pos`.`company`",
+							"tc-charge-kind": "`tq-tax-rows`.`company`",
+							"tc-return-mix": "`tq-tax-pos`.`company`"
+						},
+						"layout": {
+							"i": "filter-company",
+							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Branch",
+						"filter_type": "String",
+						"icon": "store",
+						"links": {
+							"tc-tax-kpis": "`tq-tax-pos`.`branch`",
+							"tc-tax-collected": "`tq-tax-rows`.`branch`",
+							"tc-submit": "`tq-tax-pos`.`branch`",
+							"tc-charge-kind": "`tq-tax-rows`.`branch`",
+							"tc-return-mix": "`tq-tax-pos`.`branch`"
+						},
+						"layout": {
+							"i": "filter-branch",
+							"x": 8,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-tax-kpis",
+						"layout": {
+							"i": "item-kpis",
+							"x": 0,
+							"y": 1,
+							"w": 14,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-tax-collected",
+						"layout": {
+							"i": "item-collected",
+							"x": 14,
+							"y": 1,
+							"w": 6,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-submit",
+						"layout": {
+							"i": "item-submit",
+							"x": 0,
+							"y": 4,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-charge-kind",
+						"layout": {
+							"i": "item-head",
+							"x": 10,
+							"y": 4,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-return-mix",
+						"layout": {
+							"i": "item-returns",
+							"x": 0,
+							"y": 12,
+							"w": 20,
+							"h": 8
+						}
+					}
+				]
+			}
+		}
+	}
+}

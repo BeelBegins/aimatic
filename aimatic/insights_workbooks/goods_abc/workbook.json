@@ -1,0 +1,333 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-goods-abc",
+	"doc": {
+		"name": "aimatic-goods-abc",
+		"title": "Goods ABC Analysis"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-sales-abc": {
+				"name": "tq-sales-abc",
+				"title": "Sales ABC (12 months)",
+				"workbook": "aimatic-goods-abc",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "WITH s AS (\n\tSELECT\n\t\ti.item_code,\n\t\ti.item_name,\n\t\ti.item_group,\n\t\tSUM(i.base_net_amount) AS revenue,\n\t\tSUM(i.qty) AS qty\n\tFROM `tabPOS Invoice Item` i\n\tINNER JOIN `tabPOS Invoice` p ON p.name = i.parent\n\tWHERE i.docstatus = 1\n\t\tAND p.docstatus = 1\n\t\tAND p.posting_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)\n\tGROUP BY i.item_code, i.item_name, i.item_group\n),\nr AS (\n\tSELECT\n\t\ts.*,\n\t\tSUM(revenue) OVER (ORDER BY revenue DESC) AS cum_rev,\n\t\tSUM(revenue) OVER () AS tot_rev\n\tFROM s\n)\nSELECT\n\titem_code,\n\titem_name,\n\titem_group,\n\trevenue,\n\tqty,\n\tROUND(100 * revenue / NULLIF(tot_rev, 0), 2) AS pct,\n\tROUND(100 * cum_rev / NULLIF(tot_rev, 0), 2) AS cum_pct,\n\tCASE\n\t\tWHEN IFNULL(tot_rev, 0) = 0 THEN 'C'\n\t\tWHEN cum_rev / tot_rev <= 0.80 THEN 'A'\n\t\tWHEN cum_rev / tot_rev <= 0.95 THEN 'B'\n\t\tELSE 'C'\n\tEND AS abc_class\nFROM r"
+					}
+				]
+			},
+			"tq-stock-abc": {
+				"name": "tq-stock-abc",
+				"title": "Stock ABC (on hand)",
+				"workbook": "aimatic-goods-abc",
+				"folder": null,
+				"sort_order": 1,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "WITH s AS (\n\tSELECT\n\t\tb.item_code,\n\t\ti.item_name,\n\t\ti.item_group,\n\t\tSUM(b.stock_value) AS stock_value,\n\t\tSUM(b.actual_qty) AS qty\n\tFROM `tabBin` b\n\tINNER JOIN `tabItem` i ON i.name = b.item_code\n\tWHERE b.stock_value > 0\n\tGROUP BY b.item_code, i.item_name, i.item_group\n),\nr AS (\n\tSELECT\n\t\ts.*,\n\t\tSUM(stock_value) OVER (ORDER BY stock_value DESC) AS cum_val,\n\t\tSUM(stock_value) OVER () AS tot_val\n\tFROM s\n)\nSELECT\n\titem_code,\n\titem_name,\n\titem_group,\n\tstock_value,\n\tqty,\n\tROUND(100 * stock_value / NULLIF(tot_val, 0), 2) AS pct,\n\tROUND(100 * cum_val / NULLIF(tot_val, 0), 2) AS cum_pct,\n\tCASE\n\t\tWHEN IFNULL(tot_val, 0) = 0 THEN 'C'\n\t\tWHEN cum_val / tot_val <= 0.80 THEN 'A'\n\t\tWHEN cum_val / tot_val <= 0.95 THEN 'B'\n\t\tELSE 'C'\n\tEND AS abc_class\nFROM r"
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-sales-class": {
+				"name": "tc-sales-class",
+				"title": "Sales value by ABC class",
+				"workbook": "aimatic-goods-abc",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-sales-abc",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "abc_class",
+						"column_name": "abc_class",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Revenue",
+						"column_name": "revenue",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-sales-skus": {
+				"name": "tc-sales-skus",
+				"title": "SKU count by ABC class (sales)",
+				"workbook": "aimatic-goods-abc",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-sales-abc",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "abc_class",
+						"column_name": "abc_class",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "SKUs",
+						"column_name": "item_code",
+						"data_type": "Integer",
+						"aggregation": "count_distinct"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-sales-a": {
+				"name": "tc-sales-a",
+				"title": "Class A goods by sales (80% of revenue)",
+				"workbook": "aimatic-goods-abc",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-sales-abc",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Item",
+							"column_name": "item_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Group",
+							"column_name": "item_group",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Class",
+							"column_name": "abc_class",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Revenue",
+							"column_name": "revenue",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Qty",
+							"column_name": "qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Cum %",
+							"column_name": "cum_pct",
+							"data_type": "Decimal",
+							"aggregation": "max"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Revenue"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 30,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-stock-class": {
+				"name": "tc-stock-class",
+				"title": "Stock value by ABC class",
+				"workbook": "aimatic-goods-abc",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-stock-abc",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "abc_class",
+						"column_name": "abc_class",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Stock value",
+						"column_name": "stock_value",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-stock-a": {
+				"name": "tc-stock-a",
+				"title": "Class A goods by stock value",
+				"workbook": "aimatic-goods-abc",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-stock-abc",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Item",
+							"column_name": "item_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Group",
+							"column_name": "item_group",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Class",
+							"column_name": "abc_class",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Stock value",
+							"column_name": "stock_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Qty",
+							"column_name": "qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Cum %",
+							"column_name": "cum_pct",
+							"data_type": "Decimal",
+							"aggregation": "max"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Stock value"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 30,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-abc": {
+				"name": "td-abc",
+				"title": "Goods ABC Analysis",
+				"workbook": "aimatic-goods-abc",
+				"items": [
+					{
+						"type": "chart",
+						"chart": "tc-sales-class",
+						"layout": {
+							"i": "item-s-class",
+							"x": 0,
+							"y": 0,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-sales-skus",
+						"layout": {
+							"i": "item-s-skus",
+							"x": 10,
+							"y": 0,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-sales-a",
+						"layout": {
+							"i": "item-s-a",
+							"x": 0,
+							"y": 8,
+							"w": 20,
+							"h": 9
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-stock-class",
+						"layout": {
+							"i": "item-st-class",
+							"x": 0,
+							"y": 17,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-stock-a",
+						"layout": {
+							"i": "item-st-a",
+							"x": 10,
+							"y": 17,
+							"w": 10,
+							"h": 8
+						}
+					}
+				]
+			}
+		}
+	}
+}

@@ -1,0 +1,1237 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-owner-flash",
+	"doc": {
+		"name": "aimatic-owner-flash",
+		"title": "CEO"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-owner-daily": {
+				"name": "tq-owner-daily",
+				"title": "Daily scorecard",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "WITH sales AS (\n\tSELECT\n\t\tposting_date,\n\t\tcompany,\n\t\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\t\tCOUNT(*) AS tickets,\n\t\tSUM(base_net_total) AS net_sales,\n\t\tSUM(base_grand_total) AS customer_take,\n\t\tSUM(CASE WHEN is_return = 1 THEN 1 ELSE 0 END) AS return_tickets,\n\t\tSUM(CASE WHEN is_return = 1 THEN base_net_total ELSE 0 END) AS return_amount,\n\t\tSUM(CASE WHEN pos_profile LIKE '%Food Panda%' THEN base_net_total ELSE 0 END) AS delivery_sales,\n\t\tSUM(CASE WHEN IFNULL(pos_profile, '') NOT LIKE '%Food Panda%' THEN base_net_total ELSE 0 END) AS store_sales,\n\t\tSUM(CASE WHEN custom_fbr_status = 'Failed' THEN 1 ELSE 0 END) AS tax_failed\n\tFROM `tabPOS Invoice`\n\tWHERE docstatus = 1\n\t\tAND posting_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)\n\tGROUP BY posting_date, company, COALESCE(NULLIF(branch, ''), 'Unassigned')\n),\nbasket AS (\n\tSELECT\n\t\tp.posting_date,\n\t\tp.company,\n\t\tCOALESCE(NULLIF(p.branch, ''), 'Unassigned') AS branch,\n\t\tSUM(pii.qty) AS units\n\tFROM `tabPOS Invoice` p\n\tINNER JOIN `tabPOS Invoice Item` pii\n\t\tON pii.parent = p.name\n\t\tAND pii.parenttype = 'POS Invoice'\n\tWHERE p.docstatus = 1\n\t\tAND IFNULL(p.is_return, 0) = 0\n\t\tAND p.posting_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)\n\tGROUP BY p.posting_date, p.company, COALESCE(NULLIF(p.branch, ''), 'Unassigned')\n),\ncogs AS (\n\tSELECT\n\t\tsle.posting_date,\n\t\tsle.company,\n\t\tCOALESCE(NULLIF(w.custom_branch, ''), 'Unassigned') AS branch,\n\t\tSUM(CASE WHEN sle.actual_qty < 0 THEN -sle.stock_value_difference ELSE 0 END) AS cogs\n\tFROM `tabStock Ledger Entry` sle\n\tINNER JOIN `tabSales Invoice` si ON si.name = sle.voucher_no AND si.is_pos = 1\n\tLEFT JOIN `tabWarehouse` w ON w.name = sle.warehouse\n\tWHERE IFNULL(sle.is_cancelled, 0) = 0\n\t\tAND sle.voucher_type = 'Sales Invoice'\n\t\tAND sle.posting_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)\n\tGROUP BY sle.posting_date, sle.company, COALESCE(NULLIF(w.custom_branch, ''), 'Unassigned')\n)\nSELECT\n\ts.posting_date,\n\ts.company,\n\ts.branch,\n\ts.tickets,\n\ts.net_sales,\n\ts.customer_take,\n\ts.store_sales,\n\ts.delivery_sales,\n\ts.return_tickets,\n\ts.return_amount,\n\ts.tax_failed,\n\tIFNULL(c.cogs, 0) AS cogs,\n\ts.net_sales - IFNULL(c.cogs, 0) AS gross_profit,\n\tIFNULL(bk.units, 0) AS units,\n\tROUND(s.net_sales / NULLIF(s.tickets, 0), 2) AS avg_ticket,\n\tROUND(IFNULL(bk.units, 0) / NULLIF(s.tickets, 0), 2) AS units_per_ticket\nFROM sales s\nLEFT JOIN cogs c\n\tON c.posting_date = s.posting_date\n\tAND c.company = s.company\n\tAND c.branch = s.branch\nLEFT JOIN basket bk\n\tON bk.posting_date = s.posting_date\n\tAND bk.company = s.company\n\tAND bk.branch = s.branch"
+					}
+				]
+			},
+			"tq-owner-counter": {
+				"name": "tq-owner-counter",
+				"title": "Counter scorecard",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 1,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tposting_date,\n\tcompany,\n\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\tpos_profile,\n\tCOUNT(*) AS tickets,\n\tSUM(base_net_total) AS net_sales,\n\tSUM(base_grand_total) AS customer_take,\n\tSUM(CASE WHEN is_return = 1 THEN 1 ELSE 0 END) AS return_tickets\nFROM `tabPOS Invoice`\nWHERE docstatus = 1\n\tAND posting_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)\nGROUP BY posting_date, company, COALESCE(NULLIF(branch, ''), 'Unassigned'), pos_profile"
+					}
+				]
+			},
+			"tq-owner-pay": {
+				"name": "tq-owner-pay",
+				"title": "Money in the till",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 2,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tp.posting_date,\n\tp.company,\n\tCOALESCE(NULLIF(p.branch, ''), 'Unassigned') AS branch,\n\tsip.mode_of_payment,\n\tSUM(sip.base_amount) AS collected\nFROM `tabSales Invoice Payment` sip\nINNER JOIN `tabPOS Invoice` p ON p.name = sip.parent\nWHERE sip.parenttype = 'POS Invoice'\n\tAND p.docstatus = 1\n\tAND p.posting_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)\n\tAND sip.base_amount <> 0\nGROUP BY p.posting_date, p.company, COALESCE(NULLIF(p.branch, ''), 'Unassigned'), sip.mode_of_payment"
+					}
+				]
+			},
+			"tq-owner-daypart": {
+				"name": "tq-owner-daypart",
+				"title": "Daypart",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 3,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tposting_date,\n\tcompany,\n\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\tCASE\n\t\tWHEN HOUR(posting_time) < 12 THEN '1 Morning'\n\t\tWHEN HOUR(posting_time) < 17 THEN '2 Afternoon'\n\t\tWHEN HOUR(posting_time) < 21 THEN '3 Evening'\n\t\tELSE '4 Night'\n\tEND AS daypart,\n\tCOUNT(*) AS tickets,\n\tSUM(base_net_total) AS net_sales\nFROM `tabPOS Invoice`\nWHERE docstatus = 1\n\tAND posting_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)\nGROUP BY posting_date, company, COALESCE(NULLIF(branch, ''), 'Unassigned'),\n\tCASE\n\t\tWHEN HOUR(posting_time) < 12 THEN '1 Morning'\n\t\tWHEN HOUR(posting_time) < 17 THEN '2 Afternoon'\n\t\tWHEN HOUR(posting_time) < 21 THEN '3 Evening'\n\t\tELSE '4 Night'\n\tEND"
+					}
+				]
+			},
+			"tq-owner-tax-fail": {
+				"name": "tq-owner-tax-fail",
+				"title": "Failed tax invoices",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 4,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tposting_date,\n\tcompany,\n\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\tpos_profile,\n\tname AS invoice,\n\tcustomer_name,\n\tbase_grand_total,\n\tcustom_fbr_status AS submission_status\nFROM `tabPOS Invoice`\nWHERE docstatus = 1\n\tAND posting_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)\n\tAND custom_fbr_status = 'Failed'"
+					}
+				]
+			},
+			"tq-owner-ap": {
+				"name": "tq-owner-ap",
+				"title": "Overdue supplier bills",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 5,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tdue_date,\n\tcompany,\n\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tstatus,\n\toutstanding_amount,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabPurchase Invoice`\nWHERE docstatus = 1\n\tAND outstanding_amount > 0.005\n\tAND due_date < CURDATE()"
+					}
+				]
+			},
+			"tq-owner-neg": {
+				"name": "tq-owner-neg",
+				"title": "Negative stock",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 6,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tw.company,\n\tCOALESCE(NULLIF(w.custom_branch, ''), 'Unassigned') AS branch,\n\tb.item_code,\n\ti.item_name,\n\ti.item_group,\n\tb.warehouse,\n\tb.actual_qty,\n\tb.stock_value\nFROM `tabBin` b\nINNER JOIN `tabItem` i ON i.name = b.item_code\nINNER JOIN `tabWarehouse` w ON w.name = b.warehouse\nWHERE b.actual_qty < 0"
+					}
+				]
+			},
+			"tq-owner-item-margin": {
+				"name": "tq-owner-item-margin",
+				"title": "Item gross margin (last 14 days)",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 7,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "WITH pos_lines AS (\n\tSELECT\n\t\tp.posting_date,\n\t\tp.company,\n\t\tCOALESCE(NULLIF(p.branch, ''), 'Unassigned') AS branch,\n\t\tpii.item_code,\n\t\tpii.item_name,\n\t\tpii.item_group,\n\t\tpii.qty,\n\t\tpii.base_net_amount AS net_sales,\n\t\tsii.parent AS sales_invoice,\n\t\tsii.name AS sales_invoice_item\n\tFROM `tabPOS Invoice` p\n\tINNER JOIN `tabPOS Invoice Item` pii\n\t\tON pii.parent = p.name\n\t\tAND pii.parenttype = 'POS Invoice'\n\t\tAND pii.docstatus = 1\n\tLEFT JOIN `tabSales Invoice Item` sii\n\t\tON sii.parent = p.consolidated_invoice\n\t\tAND sii.pos_invoice = p.name\n\t\tAND sii.pos_invoice_item = pii.name\n\t\tAND sii.docstatus = 1\n\tWHERE p.docstatus = 1\n\t\tAND p.posting_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)\n),\ncogs_by_item AS (\n\tSELECT\n\t\tsle.voucher_no AS sales_invoice,\n\t\tsle.voucher_detail_no AS sales_invoice_item,\n\t\tSUM(-sle.stock_value_difference) AS cogs\n\tFROM `tabStock Ledger Entry` sle\n\tINNER JOIN (\n\t\tSELECT DISTINCT sales_invoice, sales_invoice_item\n\t\tFROM pos_lines\n\t\tWHERE sales_invoice IS NOT NULL\n\t\t\tAND sales_invoice_item IS NOT NULL\n\t) pl\n\t\tON pl.sales_invoice = sle.voucher_no\n\t\tAND pl.sales_invoice_item = sle.voucher_detail_no\n\tWHERE sle.voucher_type = 'Sales Invoice'\n\t\tAND IFNULL(sle.is_cancelled, 0) = 0\n\tGROUP BY sle.voucher_no, sle.voucher_detail_no\n)\nSELECT\n\tpl.posting_date,\n\tpl.company,\n\tpl.branch,\n\tpl.item_code,\n\tMAX(pl.item_name) AS item_name,\n\tMAX(pl.item_group) AS item_group,\n\tSUM(pl.qty) AS qty,\n\tSUM(pl.net_sales) AS net_sales,\n\tSUM(c.cogs) AS cogs,\n\tSUM(pl.net_sales) - SUM(c.cogs) AS gross_margin,\n\t(SUM(pl.net_sales) - SUM(c.cogs)) / NULLIF(ABS(SUM(pl.net_sales)), 0) AS gross_margin_rate\nFROM pos_lines pl\nINNER JOIN cogs_by_item c\n\tON c.sales_invoice = pl.sales_invoice\n\tAND c.sales_invoice_item = pl.sales_invoice_item\nGROUP BY pl.posting_date, pl.company, pl.branch, pl.item_code"
+					}
+				]
+			},
+			"tq-owner-availability": {
+				"name": "tq-owner-availability",
+				"title": "On-shelf availability",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 8,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tw.company,\n\tCOALESCE(NULLIF(w.custom_branch, ''), 'Unassigned') AS branch,\n\tw.name AS warehouse,\n\tCOUNT(*) AS stocked_skus,\n\tSUM(CASE WHEN b.actual_qty <= 0 THEN 1 ELSE 0 END) AS out_of_stock_skus,\n\tSUM(CASE WHEN b.actual_qty < 0 THEN 1 ELSE 0 END) AS negative_skus,\n\tROUND(\n\t\t100 * SUM(CASE WHEN b.actual_qty > 0 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0),\n\t\t2\n\t) AS on_shelf_rate,\n\tCOALESCE(SUM(b.stock_value), 0) AS stock_value\nFROM `tabBin` b\nINNER JOIN `tabWarehouse` w\n\tON w.name = b.warehouse\n\tAND w.disabled = 0\nINNER JOIN `tabItem` i\n\tON i.name = b.item_code\n\tAND i.is_stock_item = 1\n\tAND IFNULL(i.disabled, 0) = 0\nGROUP BY w.company, COALESCE(NULLIF(w.custom_branch, ''), 'Unassigned'), w.name"
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-flash": {
+				"name": "tc-flash",
+				"title": "Last 14 days: sales, customer take, tickets and risk",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Net sales",
+							"column_name": "net_sales",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Customer take",
+							"column_name": "customer_take",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Tickets",
+							"column_name": "tickets",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Average ticket",
+							"column_name": "avg_ticket",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Items per basket",
+							"column_name": "units_per_ticket",
+							"data_type": "Decimal",
+							"aggregation": "avg"
+						},
+						{
+							"measure_name": "Return tickets",
+							"column_name": "return_tickets",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Failed tax invoices",
+							"column_name": "tax_failed",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Store sales",
+							"column_name": "store_sales",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Delivery sales",
+							"column_name": "delivery_sales",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-margin-kpis": {
+				"name": "tc-margin-kpis",
+				"title": "Gross profit and cost of goods sold",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-owner-daily",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Gross profit",
+							"column_name": "gross_profit",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "COGS",
+							"column_name": "cogs",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-daily": {
+				"name": "tc-daily",
+				"title": "Net sales by day",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-owner-daily",
+				"chart_type": "Line",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "posting_date",
+							"column_name": "posting_date",
+							"data_type": "Date",
+							"granularity": "month"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Net sales",
+									"column_name": "net_sales",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						],
+						"show_data_labels": false
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-gp": {
+				"name": "tc-gp",
+				"title": "Gross profit by day",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-owner-daily",
+				"chart_type": "Line",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "posting_date",
+							"column_name": "posting_date",
+							"data_type": "Date",
+							"granularity": "month"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Gross profit",
+									"column_name": "gross_profit",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						],
+						"show_data_labels": false
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-counter": {
+				"name": "tc-counter",
+				"title": "Which counter is making money",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-owner-counter",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "pos_profile",
+							"column_name": "pos_profile",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Net sales",
+									"column_name": "net_sales",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Net sales"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 8,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-pay": {
+				"name": "tc-pay",
+				"title": "What actually hit the till (zero-amount delivery credit excluded)",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-owner-pay",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "mode_of_payment",
+						"column_name": "mode_of_payment",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Collected",
+						"column_name": "collected",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-daypart": {
+				"name": "tc-daypart",
+				"title": "When the store is busy",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 5,
+				"query": "tq-owner-daypart",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "daypart",
+							"column_name": "daypart",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Net sales",
+									"column_name": "net_sales",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Net sales"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 4,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-tax-fail": {
+				"name": "tc-tax-fail",
+				"title": "Tax invoices that failed \u2014 fix these today",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 6,
+				"query": "tq-owner-tax-fail",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Date",
+							"column_name": "posting_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Counter",
+							"column_name": "pos_profile",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Invoice",
+							"column_name": "invoice",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Customer",
+							"column_name": "customer_name",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Take",
+							"column_name": "base_grand_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Take"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 20,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-ap": {
+				"name": "tc-ap",
+				"title": "Supplier bills already overdue \u2014 cash leaving the business",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 7,
+				"query": "tq-owner-ap",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Due",
+							"column_name": "due_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Supplier",
+							"column_name": "supplier_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Bill",
+							"column_name": "bill_no",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Invoice",
+							"column_name": "invoice",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Outstanding",
+							"column_name": "outstanding_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Days overdue",
+							"column_name": "days_overdue",
+							"data_type": "Integer",
+							"aggregation": "max"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Days overdue"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 20,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-availability": {
+				"name": "tc-availability",
+				"title": "On-shelf availability right now",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 8,
+				"query": "tq-owner-availability",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "On-shelf rate",
+							"column_name": "on_shelf_rate",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "percent"
+						},
+						{
+							"measure_name": "Out-of-stock SKUs",
+							"column_name": "out_of_stock_skus",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Negative SKUs",
+							"column_name": "negative_skus",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-availability-branch": {
+				"name": "tc-availability-branch",
+				"title": "What the shelves cannot sell \u2014 stocked SKUs at or below zero",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 9,
+				"query": "tq-owner-availability",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Warehouse",
+							"column_name": "warehouse",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Stocked SKUs",
+							"column_name": "stocked_skus",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Out-of-stock SKUs",
+							"column_name": "out_of_stock_skus",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Negative SKUs",
+							"column_name": "negative_skus",
+							"data_type": "Integer",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Stock value",
+							"column_name": "stock_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Out-of-stock SKUs"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 20,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-neg": {
+				"name": "tc-neg",
+				"title": "Negative stock \u2014 sales without stock (shrink or missed GRN)",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 8,
+				"query": "tq-owner-neg",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Item",
+							"column_name": "item_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Group",
+							"column_name": "item_group",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Warehouse",
+							"column_name": "warehouse",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Qty",
+							"column_name": "actual_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Value",
+							"column_name": "stock_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Qty"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 20,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-item-margin": {
+				"name": "tc-item-margin",
+				"title": "Item-wise gross margin \u2014 last 14 days (ledger-covered sales only)",
+				"workbook": "aimatic-owner-flash",
+				"folder": null,
+				"sort_order": 9,
+				"query": "tq-owner-item-margin",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Date",
+							"column_name": "posting_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Company",
+							"column_name": "company",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Item",
+							"column_name": "item_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Code",
+							"column_name": "item_code",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Group",
+							"column_name": "item_group",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Qty",
+							"column_name": "qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Net sales",
+							"column_name": "net_sales",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "COGS",
+							"column_name": "cogs",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Gross margin",
+							"column_name": "gross_margin",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "GM %",
+							"column_name": "gross_margin_rate",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "percent"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Gross margin"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 50,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-owner": {
+				"name": "td-owner",
+				"title": "CEO",
+				"preview_image": "/assets/aimatic/images/insights-ceo-preview.svg",
+				"workbook": "aimatic-owner-flash",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Date Range",
+						"filter_type": "Date",
+						"icon": "calendar",
+						"links": {
+							"tc-flash": "`tq-owner-daily`.`posting_date`",
+							"tc-daily": "`tq-owner-daily`.`posting_date`",
+							"tc-margin-kpis": "`tq-owner-daily`.`posting_date`",
+							"tc-gp": "`tq-owner-daily`.`posting_date`",
+							"tc-counter": "`tq-owner-counter`.`posting_date`",
+							"tc-pay": "`tq-owner-pay`.`posting_date`",
+							"tc-daypart": "`tq-owner-daypart`.`posting_date`",
+							"tc-tax-fail": "`tq-owner-tax-fail`.`posting_date`",
+							"tc-item-margin": "`tq-owner-item-margin`.`posting_date`"
+						},
+						"layout": {
+							"i": "filter-date-range",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						},
+						"default_operator": "within",
+						"default_value": "Last 14 days"
+					},
+					{
+						"type": "filter",
+						"filter_name": "Company",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-flash": "`tq-owner-daily`.`company`",
+							"tc-daily": "`tq-owner-daily`.`company`",
+							"tc-margin-kpis": "`tq-owner-daily`.`company`",
+							"tc-gp": "`tq-owner-daily`.`company`",
+							"tc-counter": "`tq-owner-counter`.`company`",
+							"tc-pay": "`tq-owner-pay`.`company`",
+							"tc-daypart": "`tq-owner-daypart`.`company`",
+							"tc-tax-fail": "`tq-owner-tax-fail`.`company`",
+							"tc-item-margin": "`tq-owner-item-margin`.`company`",
+							"tc-ap": "`tq-owner-ap`.`company`",
+							"tc-neg": "`tq-owner-neg`.`company`",
+							"tc-availability": "`tq-owner-availability`.`company`",
+							"tc-availability-branch": "`tq-owner-availability`.`company`"
+						},
+						"layout": {
+							"i": "filter-company",
+							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Branch",
+						"filter_type": "String",
+						"icon": "store",
+						"links": {
+							"tc-flash": "`tq-owner-daily`.`branch`",
+							"tc-daily": "`tq-owner-daily`.`branch`",
+							"tc-margin-kpis": "`tq-owner-daily`.`branch`",
+							"tc-gp": "`tq-owner-daily`.`branch`",
+							"tc-counter": "`tq-owner-counter`.`branch`",
+							"tc-pay": "`tq-owner-pay`.`branch`",
+							"tc-daypart": "`tq-owner-daypart`.`branch`",
+							"tc-tax-fail": "`tq-owner-tax-fail`.`branch`",
+							"tc-ap": "`tq-owner-ap`.`branch`",
+							"tc-neg": "`tq-owner-neg`.`branch`",
+							"tc-item-margin": "`tq-owner-item-margin`.`branch`",
+							"tc-availability": "`tq-owner-availability`.`branch`",
+							"tc-availability-branch": "`tq-owner-availability`.`branch`"
+						},
+						"layout": {
+							"i": "filter-branch",
+							"x": 8,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Warehouse",
+						"filter_type": "String",
+						"icon": "warehouse",
+						"links": {
+							"tc-neg": "`tq-owner-neg`.`warehouse`",
+							"tc-availability": "`tq-owner-availability`.`warehouse`",
+							"tc-availability-branch": "`tq-owner-availability`.`warehouse`"
+						},
+						"layout": {
+							"i": "filter-warehouse",
+							"x": 12,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-flash",
+						"layout": {
+							"i": "item-flash",
+							"x": 0,
+							"y": 1,
+							"w": 13,
+							"h": 4
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-margin-kpis",
+						"layout": {
+							"i": "item-margin-kpis",
+							"x": 13,
+							"y": 1,
+							"w": 7,
+							"h": 4
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-availability",
+						"layout": {
+							"i": "item-availability",
+							"x": 0,
+							"y": 5,
+							"w": 20,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-daily",
+						"layout": {
+							"i": "item-daily",
+							"x": 0,
+							"y": 8,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-gp",
+						"layout": {
+							"i": "item-gp",
+							"x": 10,
+							"y": 8,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-counter",
+						"layout": {
+							"i": "item-counter",
+							"x": 0,
+							"y": 16,
+							"w": 7,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-pay",
+						"layout": {
+							"i": "item-pay",
+							"x": 7,
+							"y": 16,
+							"w": 6,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-daypart",
+						"layout": {
+							"i": "item-daypart",
+							"x": 13,
+							"y": 16,
+							"w": 7,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-tax-fail",
+						"layout": {
+							"i": "item-tax",
+							"x": 0,
+							"y": 24,
+							"w": 7,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-ap",
+						"layout": {
+							"i": "item-ap",
+							"x": 7,
+							"y": 24,
+							"w": 7,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-neg",
+						"layout": {
+							"i": "item-neg",
+							"x": 14,
+							"y": 24,
+							"w": 6,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-availability-branch",
+						"layout": {
+							"i": "item-availability-branch",
+							"x": 0,
+							"y": 32,
+							"w": 20,
+							"h": 7
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-item-margin",
+						"layout": {
+							"i": "item-margin",
+							"x": 0,
+							"y": 39,
+							"w": 20,
+							"h": 10
+						}
+					}
+				]
+			}
+		}
+	}
+}

@@ -1,0 +1,653 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-pos-retail",
+	"doc": {
+		"name": "aimatic-pos-retail",
+		"title": "POS Sales and Customers"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-pos": {
+				"name": "tq-pos",
+				"title": "POS Invoices",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 1,
+				"is_native_query": 0,
+				"operations": [
+					{
+						"type": "source",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabPOS Invoice"
+						}
+					},
+					{
+						"type": "filter_group",
+						"logical_operator": "And",
+						"filters": [
+							{
+								"column": {
+									"type": "column",
+									"column_name": "docstatus"
+								},
+								"operator": "=",
+								"value": 1
+							}
+						]
+					}
+				]
+			},
+			"tq-pos-items": {
+				"name": "tq-pos-items",
+				"title": "POS Invoice Items",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 1,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 1,
+				"is_native_query": 0,
+				"operations": [
+					{
+						"type": "source",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabPOS Invoice Item"
+						}
+					},
+					{
+						"type": "filter_group",
+						"logical_operator": "And",
+						"filters": [
+							{
+								"column": {
+									"type": "column",
+									"column_name": "docstatus"
+								},
+								"operator": "=",
+								"value": 1
+							}
+						]
+					},
+					{
+						"type": "join",
+						"join_type": "inner",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabPOS Invoice"
+						},
+						"select_columns": [
+							{
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							{
+								"type": "column",
+								"column_name": "company"
+							},
+							{
+								"type": "column",
+								"column_name": "branch"
+							},
+							{
+								"type": "column",
+								"column_name": "customer"
+							},
+							{
+								"type": "column",
+								"column_name": "customer_name"
+							}
+						],
+						"join_condition": {
+							"left_column": {
+								"type": "column",
+								"column_name": "parent"
+							},
+							"right_column": {
+								"type": "column",
+								"column_name": "name"
+							}
+						}
+					}
+				]
+			},
+			"tq-pos-payments": {
+				"name": "tq-pos-payments",
+				"title": "POS Payments",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 2,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 1,
+				"is_native_query": 0,
+				"operations": [
+					{
+						"type": "source",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabSales Invoice Payment"
+						}
+					},
+					{
+						"type": "filter_group",
+						"logical_operator": "And",
+						"filters": [
+							{
+								"column": {
+									"type": "column",
+									"column_name": "parenttype"
+								},
+								"operator": "=",
+								"value": "POS Invoice"
+							}
+						]
+					},
+					{
+						"type": "join",
+						"join_type": "inner",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabPOS Invoice"
+						},
+						"select_columns": [
+							{
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							{
+								"type": "column",
+								"column_name": "company"
+							},
+							{
+								"type": "column",
+								"column_name": "branch"
+							}
+						],
+						"join_condition": {
+							"left_column": {
+								"type": "column",
+								"column_name": "parent"
+							},
+							"right_column": {
+								"type": "column",
+								"column_name": "name"
+							}
+						}
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-kpis": {
+				"name": "tc-kpis",
+				"title": "Sales and customer KPIs",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-pos",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Revenue",
+							"column_name": "base_net_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Tickets",
+							"column_name": "name",
+							"data_type": "Integer",
+							"aggregation": "count"
+						},
+						{
+							"measure_name": "Avg ticket",
+							"column_name": "base_net_total",
+							"data_type": "Decimal",
+							"aggregation": "avg",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Active customers",
+							"column_name": "customer",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-trend": {
+				"name": "tc-trend",
+				"title": "Revenue trend",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-pos",
+				"chart_type": "Line",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "posting_date",
+							"column_name": "posting_date",
+							"data_type": "Date",
+							"granularity": "month"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Revenue",
+									"column_name": "base_net_total",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						],
+						"show_data_labels": false
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-branch": {
+				"name": "tc-branch",
+				"title": "Revenue by branch",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-pos",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "branch",
+						"column_name": "branch",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Revenue",
+						"column_name": "base_net_total",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-customers": {
+				"name": "tc-customers",
+				"title": "Top customers",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-pos",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "customer_name",
+							"column_name": "customer_name",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Revenue",
+									"column_name": "base_net_total",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Revenue"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 10,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-items": {
+				"name": "tc-items",
+				"title": "Top items",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-pos-items",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "item_name",
+							"column_name": "item_name",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Revenue",
+									"column_name": "base_net_amount",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Revenue"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 10,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-groups": {
+				"name": "tc-groups",
+				"title": "Revenue by item group",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 5,
+				"query": "tq-pos-items",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "item_group",
+						"column_name": "item_group",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Revenue",
+						"column_name": "base_net_amount",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-pay": {
+				"name": "tc-pay",
+				"title": "Collections by payment mode",
+				"workbook": "aimatic-pos-retail",
+				"folder": null,
+				"sort_order": 6,
+				"query": "tq-pos-payments",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "mode_of_payment",
+						"column_name": "mode_of_payment",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Collected",
+						"column_name": "base_amount",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-pos-retail": {
+				"name": "td-pos-retail",
+				"title": "POS Sales and Customers",
+				"workbook": "aimatic-pos-retail",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Date Range",
+						"filter_type": "Date",
+						"icon": "calendar",
+						"links": {
+							"tc-kpis": "`tq-pos`.`posting_date`",
+							"tc-trend": "`tq-pos`.`posting_date`",
+							"tc-branch": "`tq-pos`.`posting_date`",
+							"tc-customers": "`tq-pos`.`posting_date`",
+							"tc-items": "`tq-pos-items`.`posting_date`",
+							"tc-groups": "`tq-pos-items`.`posting_date`",
+							"tc-pay": "`tq-pos-payments`.`posting_date`"
+						},
+						"layout": {
+							"i": "filter-date-range",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						},
+						"default_operator": "within",
+						"default_value": "Last 12 months"
+					},
+					{
+						"type": "filter",
+						"filter_name": "Company",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-kpis": "`tq-pos`.`company`",
+							"tc-trend": "`tq-pos`.`company`",
+							"tc-branch": "`tq-pos`.`company`",
+							"tc-customers": "`tq-pos`.`company`",
+							"tc-items": "`tq-pos-items`.`company`",
+							"tc-groups": "`tq-pos-items`.`company`",
+							"tc-pay": "`tq-pos-payments`.`company`"
+						},
+						"layout": {
+							"i": "filter-company",
+							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Branch",
+						"filter_type": "String",
+						"icon": "store",
+						"links": {
+							"tc-kpis": "`tq-pos`.`branch`",
+							"tc-trend": "`tq-pos`.`branch`",
+							"tc-branch": "`tq-pos`.`branch`",
+							"tc-customers": "`tq-pos`.`branch`",
+							"tc-items": "`tq-pos-items`.`branch`",
+							"tc-groups": "`tq-pos-items`.`branch`",
+							"tc-pay": "`tq-pos-payments`.`branch`"
+						},
+						"layout": {
+							"i": "filter-branch",
+							"x": 8,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-kpis",
+						"layout": {
+							"i": "item-kpis",
+							"x": 0,
+							"y": 1,
+							"w": 20,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-trend",
+						"layout": {
+							"i": "item-trend",
+							"x": 0,
+							"y": 4,
+							"w": 12,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-branch",
+						"layout": {
+							"i": "item-branch",
+							"x": 12,
+							"y": 4,
+							"w": 8,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-customers",
+						"layout": {
+							"i": "item-cust",
+							"x": 0,
+							"y": 12,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-items",
+						"layout": {
+							"i": "item-items",
+							"x": 10,
+							"y": 12,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-groups",
+						"layout": {
+							"i": "item-groups",
+							"x": 0,
+							"y": 20,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-pay",
+						"layout": {
+							"i": "item-pay",
+							"x": 10,
+							"y": 20,
+							"w": 10,
+							"h": 8
+						}
+					}
+				]
+			}
+		}
+	}
+}

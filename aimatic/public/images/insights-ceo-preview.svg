@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="CEO dashboard preview">
+	<defs>
+		<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+			<stop offset="0" stop-color="#15212b"/>
+			<stop offset="0.56" stop-color="#243746"/>
+			<stop offset="1" stop-color="#0f3c3f"/>
+		</linearGradient>
+	</defs>
+	<rect width="800" height="450" fill="url(#bg)"/>
+	<rect x="32" y="28" width="736" height="54" rx="8" fill="#edf6f4" opacity="0.96"/>
+	<text x="56" y="64" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#15212b">CEO</text>
+	<text x="150" y="62" font-family="Arial, sans-serif" font-size="15" fill="#52636f">Sales, cash, margin, branch, stock and compliance</text>
+	<g transform="translate(32 108)">
+		<rect width="168" height="92" rx="8" fill="#0f766e"/>
+		<text x="18" y="34" font-family="Arial, sans-serif" font-size="15" fill="#d7fffa">Net sales</text>
+		<text x="18" y="69" font-family="Arial, sans-serif" font-size="29" font-weight="700" fill="#ffffff">PKR 8.4M</text>
+	</g>
+	<g transform="translate(216 108)">
+		<rect width="168" height="92" rx="8" fill="#2f6f9f"/>
+		<text x="18" y="34" font-family="Arial, sans-serif" font-size="15" fill="#dcefff">Tickets</text>
+		<text x="18" y="69" font-family="Arial, sans-serif" font-size="29" font-weight="700" fill="#ffffff">2,140</text>
+	</g>
+	<g transform="translate(400 108)">
+		<rect width="168" height="92" rx="8" fill="#b7791f"/>
+		<text x="18" y="34" font-family="Arial, sans-serif" font-size="15" fill="#fff3d3">Gross margin</text>
+		<text x="18" y="69" font-family="Arial, sans-serif" font-size="29" font-weight="700" fill="#ffffff">18.7%</text>
+	</g>
+	<g transform="translate(584 108)">
+		<rect width="184" height="92" rx="8" fill="#8a2c2c"/>
+		<text x="18" y="34" font-family="Arial, sans-serif" font-size="15" fill="#ffe0e0">Stock risk</text>
+		<text x="18" y="69" font-family="Arial, sans-serif" font-size="29" font-weight="700" fill="#ffffff">2,638</text>
+	</g>
+	<g transform="translate(32 226)">
+		<rect width="352" height="168" rx="8" fill="#ffffff" opacity="0.96"/>
+		<text x="22" y="34" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#15212b">Branch trend</text>
+		<polyline points="28,128 88,100 148,112 208,72 268,82 324,46" fill="none" stroke="#0f766e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+		<rect x="26" y="146" width="300" height="8" rx="4" fill="#d9e2e7"/>
+	</g>
+	<g transform="translate(416 226)">
+		<rect width="352" height="168" rx="8" fill="#ffffff" opacity="0.96"/>
+		<text x="22" y="34" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#15212b">Morning actions</text>
+		<rect x="24" y="58" width="244" height="16" rx="8" fill="#0f766e"/>
+		<rect x="24" y="88" width="292" height="16" rx="8" fill="#b7791f"/>
+		<rect x="24" y="118" width="188" height="16" rx="8" fill="#8a2c2c"/>
+	</g>
+</svg>

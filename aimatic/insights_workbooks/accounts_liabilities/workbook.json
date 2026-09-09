@@ -1,0 +1,524 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-accounts-liabilities",
+	"doc": {
+		"name": "aimatic-accounts-liabilities",
+		"title": "Liabilities and Payables"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-liab-gl": {
+				"name": "tq-liab-gl",
+				"title": "Liability GL movement",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 1,
+				"is_native_query": 0,
+				"operations": [
+					{
+						"type": "source",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabGL Entry"
+						}
+					},
+					{
+						"type": "filter_group",
+						"logical_operator": "And",
+						"filters": [
+							{
+								"column": {
+									"type": "column",
+									"column_name": "is_cancelled"
+								},
+								"operator": "=",
+								"value": 0
+							}
+						]
+					},
+					{
+						"type": "join",
+						"join_type": "inner",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabAccount"
+						},
+						"select_columns": [
+							{
+								"type": "column",
+								"column_name": "root_type"
+							},
+							{
+								"type": "column",
+								"column_name": "account_type"
+							},
+							{
+								"type": "column",
+								"column_name": "account_name"
+							}
+						],
+						"join_condition": {
+							"left_column": {
+								"type": "column",
+								"column_name": "account"
+							},
+							"right_column": {
+								"type": "column",
+								"column_name": "name"
+							}
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "liability_amount",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else(root_type == 'Liability', credit - debit, 0)"
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "tax_payable_amount",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else((root_type == 'Liability') & (account_type == 'Tax'), credit - debit, 0)"
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "trade_payable_amount",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else((root_type == 'Liability') & (account_type == 'Payable'), credit - debit, 0)"
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "pos_fee_payable_amount",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else((root_type == 'Liability') & (account_type == 'Liability'), credit - debit, 0)"
+						}
+					}
+				]
+			},
+			"tq-liab-snap": {
+				"name": "tq-liab-snap",
+				"title": "Liability outstanding snapshot",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 1,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\ta.account_name,\n\ta.account_type,\n\ta.root_type,\n\tgl.company,\n\tSUM(gl.credit - gl.debit) AS outstanding\nFROM `tabGL Entry` gl\nINNER JOIN `tabAccount` a ON a.name = gl.account\nWHERE IFNULL(gl.is_cancelled, 0) = 0\n\tAND a.root_type = 'Liability'\nGROUP BY a.account_name, a.account_type, a.root_type, gl.company"
+					}
+				]
+			},
+			"tq-pending-pi": {
+				"name": "tq-pending-pi",
+				"title": "Unpaid purchase invoices",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 2,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tposting_date,\n\tdue_date,\n\tcompany,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tstatus,\n\toutstanding_amount,\n\tbase_grand_total,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabPurchase Invoice`\nWHERE docstatus = 1 AND outstanding_amount > 0.005"
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-liab-kpis": {
+				"name": "tc-liab-kpis",
+				"title": "Liability movements this period",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-liab-gl",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Liability movement",
+							"column_name": "liability_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Tax payable movement",
+							"column_name": "tax_payable_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Trade payables movement",
+							"column_name": "trade_payable_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "POS service fee movement",
+							"column_name": "pos_fee_payable_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-liab-type": {
+				"name": "tc-liab-type",
+				"title": "Period movement by liability type",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-liab-gl",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "account_type",
+						"column_name": "account_type",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Liability movement",
+						"column_name": "liability_amount",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-liab-acct": {
+				"name": "tc-liab-acct",
+				"title": "Period movement by account",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-liab-gl",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "account_name",
+							"column_name": "account_name",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Liability movement",
+									"column_name": "liability_amount",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Liability movement"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 15,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-liab-snap": {
+				"name": "tc-liab-snap",
+				"title": "Outstanding liabilities (as of now)",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-liab-snap",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "account_name",
+							"column_name": "account_name",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Outstanding",
+									"column_name": "outstanding",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Outstanding"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 15,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-pending-pi": {
+				"name": "tc-pending-pi",
+				"title": "Unpaid supplier invoices",
+				"workbook": "aimatic-accounts-liabilities",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-pending-pi",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Due",
+							"column_name": "due_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Supplier",
+							"column_name": "supplier_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Invoice",
+							"column_name": "invoice",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Status",
+							"column_name": "status",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Outstanding",
+							"column_name": "outstanding_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Days overdue",
+							"column_name": "days_overdue",
+							"data_type": "Integer",
+							"aggregation": "max"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Days overdue"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 25,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-liab": {
+				"name": "td-liab",
+				"title": "Liabilities and Payables",
+				"workbook": "aimatic-accounts-liabilities",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Date Range",
+						"filter_type": "Date",
+						"icon": "calendar",
+						"links": {
+							"tc-liab-kpis": "`tq-liab-gl`.`posting_date`",
+							"tc-liab-type": "`tq-liab-gl`.`posting_date`",
+							"tc-liab-acct": "`tq-liab-gl`.`posting_date`"
+						},
+						"layout": {
+							"i": "filter-date-range",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						},
+						"default_operator": "within",
+						"default_value": "Last 12 months"
+					},
+					{
+						"type": "filter",
+						"filter_name": "Company",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-liab-kpis": "`tq-liab-gl`.`company`",
+							"tc-liab-type": "`tq-liab-gl`.`company`",
+							"tc-liab-acct": "`tq-liab-gl`.`company`",
+							"tc-liab-snap": "`tq-liab-snap`.`company`",
+							"tc-pending-pi": "`tq-pending-pi`.`company`"
+						},
+						"layout": {
+							"i": "filter-company",
+							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-liab-kpis",
+						"layout": {
+							"i": "item-kpis",
+							"x": 0,
+							"y": 1,
+							"w": 20,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-liab-type",
+						"layout": {
+							"i": "item-type",
+							"x": 0,
+							"y": 4,
+							"w": 8,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-liab-acct",
+						"layout": {
+							"i": "item-acct",
+							"x": 8,
+							"y": 4,
+							"w": 12,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-liab-snap",
+						"layout": {
+							"i": "item-snap",
+							"x": 0,
+							"y": 12,
+							"w": 10,
+							"h": 9
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-pending-pi",
+						"layout": {
+							"i": "item-pi",
+							"x": 10,
+							"y": 12,
+							"w": 10,
+							"h": 9
+						}
+					}
+				]
+			}
+		}
+	}
+}

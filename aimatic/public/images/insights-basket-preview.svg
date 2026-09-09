@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="Customer basket and product relevance preview">
+	<defs>
+		<linearGradient id="basket-bg" x1="0" y1="0" x2="1" y2="1">
+			<stop offset="0" stop-color="#1b2733"/>
+			<stop offset="0.55" stop-color="#314457"/>
+			<stop offset="1" stop-color="#294136"/>
+		</linearGradient>
+	</defs>
+	<rect width="800" height="450" fill="url(#basket-bg)"/>
+	<rect x="32" y="28" width="736" height="54" rx="8" fill="#f3f8ef" opacity="0.96"/>
+	<text x="56" y="63" font-family="Arial, sans-serif" font-size="27" font-weight="700" fill="#1b2733">Customer Basket</text>
+	<text x="300" y="62" font-family="Arial, sans-serif" font-size="15" fill="#5d6d74">Product relevance, cross-sell and branch basket health</text>
+	<g transform="translate(32 108)">
+		<rect width="168" height="86" rx="8" fill="#0d9488"/>
+		<text x="18" y="32" font-family="Arial, sans-serif" font-size="15" fill="#d7fffa">Avg basket</text>
+		<text x="18" y="65" font-family="Arial, sans-serif" font-size="27" font-weight="700" fill="#ffffff">PKR 3,920</text>
+	</g>
+	<g transform="translate(216 108)">
+		<rect width="168" height="86" rx="8" fill="#4f6f52"/>
+		<text x="18" y="32" font-family="Arial, sans-serif" font-size="15" fill="#e6f7dc">Items / basket</text>
+		<text x="18" y="65" font-family="Arial, sans-serif" font-size="27" font-weight="700" fill="#ffffff">7.4</text>
+	</g>
+	<g transform="translate(400 108)">
+		<rect width="168" height="86" rx="8" fill="#2563eb"/>
+		<text x="18" y="32" font-family="Arial, sans-serif" font-size="15" fill="#dbeafe">Customers</text>
+		<text x="18" y="65" font-family="Arial, sans-serif" font-size="27" font-weight="700" fill="#ffffff">1,820</text>
+	</g>
+	<g transform="translate(584 108)">
+		<rect width="184" height="86" rx="8" fill="#b45309"/>
+		<text x="18" y="32" font-family="Arial, sans-serif" font-size="15" fill="#ffedd5">High lift pairs</text>
+		<text x="18" y="65" font-family="Arial, sans-serif" font-size="27" font-weight="700" fill="#ffffff">100</text>
+	</g>
+	<g transform="translate(32 224)">
+		<rect width="736" height="168" rx="8" fill="#ffffff" opacity="0.96"/>
+		<text x="24" y="34" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#1b2733">Bought together relevance</text>
+		<line x1="98" y1="96" x2="240" y2="70" stroke="#0d9488" stroke-width="5" stroke-linecap="round"/>
+		<line x1="240" y1="70" x2="382" y2="116" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
+		<line x1="382" y1="116" x2="524" y2="76" stroke="#b45309" stroke-width="5" stroke-linecap="round"/>
+		<circle cx="98" cy="96" r="28" fill="#0d9488"/>
+		<circle cx="240" cy="70" r="31" fill="#2563eb"/>
+		<circle cx="382" cy="116" r="26" fill="#4f6f52"/>
+		<circle cx="524" cy="76" r="30" fill="#b45309"/>
+		<rect x="590" y="56" width="104" height="18" rx="9" fill="#0d9488"/>
+		<rect x="590" y="90" width="132" height="18" rx="9" fill="#2563eb"/>
+		<rect x="590" y="124" width="86" height="18" rx="9" fill="#b45309"/>
+	</g>
+</svg>

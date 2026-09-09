@@ -455,6 +455,11 @@ add_to_apps_screen = [
 	}
 ]
 
+# Frappe Insights workbook templates (POS sales, tax, P&L, inventory KPIs).
+# Discovered live; import a site copy via Insights library or
+# aimatic.insights_workbooks.import_workbook_templates.
+insights_workbooks = "insights_workbooks"
+
 # Includes in <head>
 # ------------------
 

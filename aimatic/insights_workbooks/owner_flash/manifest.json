@@ -1,0 +1,21 @@
+{
+	"version": 3,
+	"title": "CEO",
+	"description": "Executive morning scorecard: branch-filtered 14-day net sales, customer take, gross profit, COGS, average ticket, items per basket, tickets, returns, tax failures, store vs delivery, counters, till mix, on-shelf availability, overdue supplier bills, negative stock, and item margin.",
+	"notes": "Queries are bounded to 14 days. Branch filters use POS Invoice.branch for sales and Warehouse.custom_branch for stock cost/negative-stock rows. Delivery sales are Foodpanda-profile GMV; till charts exclude zero-amount delivery credit. Headline gross profit is POS net sales minus outward Stock Ledger cost on consolidated POS Sales Invoices, so it covers every POS sale; the item table narrows to lines that carry their own ledger cost and will read lower. POS service fee is not in net sales. On-shelf availability is a live Bin snapshot over enabled stock Items in enabled warehouses, so the date filter does not apply to it; it is filtered by company, branch and warehouse only.",
+	"module": "Selling",
+	"required_apps": [
+		"erpnext",
+		"aimatic"
+	],
+	"source_doctypes": [
+		"POS Invoice",
+		"POS Invoice Item",
+		"Sales Invoice Item",
+		"Sales Invoice Payment",
+		"Stock Ledger Entry",
+		"Purchase Invoice",
+		"Bin",
+		"Item"
+	]
+}

@@ -1,0 +1,14 @@
+{
+	"version": 2,
+	"title": "Merchandise P&L",
+	"description": "Income and expense from GL with Tax account-type excluded so output tax and POS service fee cannot inflate merchandise income.",
+	"notes": "POS service fee is a Liability. Use Liabilities and Payables for GST payable, creditors and fee payable. Older GL rows may lack Branch.",
+	"module": "Accounts",
+	"required_apps": [
+		"erpnext"
+	],
+	"source_doctypes": [
+		"GL Entry",
+		"Account"
+	]
+}

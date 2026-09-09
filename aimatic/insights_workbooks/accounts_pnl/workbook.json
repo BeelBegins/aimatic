@@ -1,0 +1,491 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-accounts-pnl",
+	"doc": {
+		"name": "aimatic-accounts-pnl",
+		"title": "Merchandise P&L"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-gl": {
+				"name": "tq-gl",
+				"title": "GL Entries",
+				"workbook": "aimatic-accounts-pnl",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 1,
+				"is_native_query": 0,
+				"operations": [
+					{
+						"type": "source",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabGL Entry"
+						}
+					},
+					{
+						"type": "filter_group",
+						"logical_operator": "And",
+						"filters": [
+							{
+								"column": {
+									"type": "column",
+									"column_name": "is_cancelled"
+								},
+								"operator": "=",
+								"value": 0
+							}
+						]
+					},
+					{
+						"type": "join",
+						"join_type": "inner",
+						"table": {
+							"type": "table",
+							"data_source": "Site DB",
+							"table_name": "tabAccount"
+						},
+						"select_columns": [
+							{
+								"type": "column",
+								"column_name": "root_type"
+							},
+							{
+								"type": "column",
+								"column_name": "account_type"
+							},
+							{
+								"type": "column",
+								"column_name": "account_name"
+							}
+						],
+						"join_condition": {
+							"left_column": {
+								"type": "column",
+								"column_name": "account"
+							},
+							"right_column": {
+								"type": "column",
+								"column_name": "name"
+							}
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "merchandise_income",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else((root_type == 'Income') & (account_type != 'Tax'), credit - debit, 0)"
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "expense_amount",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "if_else(root_type == 'Expense', debit - credit, 0)"
+						}
+					},
+					{
+						"type": "mutate",
+						"new_name": "net_amount",
+						"data_type": "Decimal",
+						"expression": {
+							"type": "expression",
+							"expression": "merchandise_income - expense_amount"
+						}
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-pnl-kpis": {
+				"name": "tc-pnl-kpis",
+				"title": "Merchandise P&L (excludes tax and POS service fee)",
+				"workbook": "aimatic-accounts-pnl",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-gl",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Merchandise income",
+							"column_name": "merchandise_income",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Expense",
+							"column_name": "expense_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Merchandise net",
+							"column_name": "net_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-income-trend": {
+				"name": "tc-income-trend",
+				"title": "Merchandise income trend",
+				"workbook": "aimatic-accounts-pnl",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-gl",
+				"chart_type": "Line",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "posting_date",
+							"column_name": "posting_date",
+							"data_type": "Date",
+							"granularity": "month"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Merchandise income",
+									"column_name": "merchandise_income",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						],
+						"show_data_labels": false
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-expense-trend": {
+				"name": "tc-expense-trend",
+				"title": "Expense trend",
+				"workbook": "aimatic-accounts-pnl",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-gl",
+				"chart_type": "Line",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "posting_date",
+							"column_name": "posting_date",
+							"data_type": "Date",
+							"granularity": "month"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Expense",
+									"column_name": "expense_amount",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						],
+						"show_data_labels": false
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-income-acct": {
+				"name": "tc-income-acct",
+				"title": "Merchandise income by account",
+				"workbook": "aimatic-accounts-pnl",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-gl",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "account_name",
+							"column_name": "account_name",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Merchandise income",
+									"column_name": "merchandise_income",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Merchandise income"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 15,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-expense-acct": {
+				"name": "tc-expense-acct",
+				"title": "Expense by account",
+				"workbook": "aimatic-accounts-pnl",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-gl",
+				"chart_type": "Row",
+				"config": {
+					"x_axis": {
+						"dimension": {
+							"dimension_name": "account_name",
+							"column_name": "account_name",
+							"data_type": "String"
+						}
+					},
+					"y_axis": {
+						"series": [
+							{
+								"measure": {
+									"measure_name": "Expense",
+									"column_name": "expense_amount",
+									"data_type": "Decimal",
+									"aggregation": "sum",
+									"format": "currency"
+								}
+							}
+						]
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Expense"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 15,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-pnl": {
+				"name": "td-pnl",
+				"title": "Merchandise P&L",
+				"workbook": "aimatic-accounts-pnl",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Date Range",
+						"filter_type": "Date",
+						"icon": "calendar",
+						"links": {
+							"tc-pnl-kpis": "`tq-gl`.`posting_date`",
+							"tc-income-trend": "`tq-gl`.`posting_date`",
+							"tc-expense-trend": "`tq-gl`.`posting_date`",
+							"tc-income-acct": "`tq-gl`.`posting_date`",
+							"tc-expense-acct": "`tq-gl`.`posting_date`"
+						},
+						"layout": {
+							"i": "filter-date-range",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						},
+						"default_operator": "within",
+						"default_value": "Last 12 months"
+					},
+					{
+						"type": "filter",
+						"filter_name": "Company",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-pnl-kpis": "`tq-gl`.`company`",
+							"tc-income-trend": "`tq-gl`.`company`",
+							"tc-expense-trend": "`tq-gl`.`company`",
+							"tc-income-acct": "`tq-gl`.`company`",
+							"tc-expense-acct": "`tq-gl`.`company`"
+						},
+						"layout": {
+							"i": "filter-company",
+							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Branch",
+						"filter_type": "String",
+						"icon": "store",
+						"links": {
+							"tc-pnl-kpis": "`tq-gl`.`branch`",
+							"tc-income-trend": "`tq-gl`.`branch`",
+							"tc-expense-trend": "`tq-gl`.`branch`",
+							"tc-income-acct": "`tq-gl`.`branch`",
+							"tc-expense-acct": "`tq-gl`.`branch`"
+						},
+						"layout": {
+							"i": "filter-branch",
+							"x": 8,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-pnl-kpis",
+						"layout": {
+							"i": "item-kpis",
+							"x": 0,
+							"y": 1,
+							"w": 20,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-income-trend",
+						"layout": {
+							"i": "item-inc-trend",
+							"x": 0,
+							"y": 4,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-expense-trend",
+						"layout": {
+							"i": "item-exp-trend",
+							"x": 10,
+							"y": 4,
+							"w": 10,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-income-acct",
+						"layout": {
+							"i": "item-inc-acct",
+							"x": 0,
+							"y": 12,
+							"w": 10,
+							"h": 9
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-expense-acct",
+						"layout": {
+							"i": "item-exp-acct",
+							"x": 10,
+							"y": 12,
+							"w": 10,
+							"h": 9
+						}
+					}
+				]
+			}
+		}
+	}
+}

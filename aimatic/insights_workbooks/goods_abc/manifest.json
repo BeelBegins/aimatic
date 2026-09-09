@@ -1,0 +1,17 @@
+{
+	"version": 1,
+	"title": "Goods ABC Analysis",
+	"description": "Pareto ABC on POS item sales (trailing 12 months: A=80%, B=next 15%, C=rest) and on-hand stock value.",
+	"notes": "Standard retail ABC cutoffs. Sales class is not date-filterable inside the workbook because class is computed on the trailing year. Stock class is current Bin value.",
+	"module": "Stock",
+	"required_apps": [
+		"erpnext",
+		"aimatic"
+	],
+	"source_doctypes": [
+		"POS Invoice Item",
+		"POS Invoice",
+		"Bin",
+		"Item"
+	]
+}

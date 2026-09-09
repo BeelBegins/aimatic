@@ -1,0 +1,406 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-pending-work",
+	"doc": {
+		"name": "aimatic-pending-work",
+		"title": "Pending Invoices and Orders"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-draft-pi": {
+				"name": "tq-draft-pi",
+				"title": "Draft purchase invoices",
+				"workbook": "aimatic-pending-work",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tposting_date,\n\tcompany,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tgrand_total,\n\tstatus\nFROM `tabPurchase Invoice`\nWHERE docstatus = 0"
+					}
+				]
+			},
+			"tq-open-po": {
+				"name": "tq-open-po",
+				"title": "Open purchase orders",
+				"workbook": "aimatic-pending-work",
+				"folder": null,
+				"sort_order": 1,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\ttransaction_date,\n\tschedule_date,\n\tcompany,\n\tsupplier_name,\n\tname AS purchase_order,\n\tstatus,\n\tper_received,\n\tgrand_total\nFROM `tabPurchase Order`\nWHERE docstatus = 1\n\tAND status IN ('To Receive', 'To Receive and Bill', 'To Bill')"
+					}
+				]
+			},
+			"tq-open-si": {
+				"name": "tq-open-si",
+				"title": "Unpaid sales invoices",
+				"workbook": "aimatic-pending-work",
+				"folder": null,
+				"sort_order": 2,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tposting_date,\n\tdue_date,\n\tcompany,\n\tcustomer_name,\n\tname AS invoice,\n\tstatus,\n\toutstanding_amount,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabSales Invoice`\nWHERE docstatus = 1\n\tAND outstanding_amount > 0.005\n\tAND IFNULL(is_pos, 0) = 0"
+					}
+				]
+			},
+			"tq-unpaid-pi": {
+				"name": "tq-unpaid-pi",
+				"title": "Unpaid purchase invoices",
+				"workbook": "aimatic-pending-work",
+				"folder": null,
+				"sort_order": 3,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tposting_date,\n\tdue_date,\n\tcompany,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tstatus,\n\toutstanding_amount,\n\tbase_grand_total,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabPurchase Invoice`\nWHERE docstatus = 1 AND outstanding_amount > 0.005"
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-draft": {
+				"name": "tc-draft",
+				"title": "Draft supplier invoices (not submitted)",
+				"workbook": "aimatic-pending-work",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-draft-pi",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Date",
+							"column_name": "posting_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Supplier",
+							"column_name": "supplier_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Invoice",
+							"column_name": "invoice",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Bill no",
+							"column_name": "bill_no",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Value",
+							"column_name": "grand_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Value"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 25,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-po": {
+				"name": "tc-po",
+				"title": "POs to receive or bill",
+				"workbook": "aimatic-pending-work",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-open-po",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Date",
+							"column_name": "transaction_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Supplier",
+							"column_name": "supplier_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "PO",
+							"column_name": "purchase_order",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Status",
+							"column_name": "status",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Value",
+							"column_name": "grand_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "% received",
+							"column_name": "per_received",
+							"data_type": "Decimal",
+							"aggregation": "avg"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Value"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 25,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-pi": {
+				"name": "tc-pi",
+				"title": "Unpaid supplier invoices",
+				"workbook": "aimatic-pending-work",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-unpaid-pi",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Due",
+							"column_name": "due_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Supplier",
+							"column_name": "supplier_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Invoice",
+							"column_name": "invoice",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Status",
+							"column_name": "status",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Outstanding",
+							"column_name": "outstanding_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Days overdue",
+							"column_name": "days_overdue",
+							"data_type": "Integer",
+							"aggregation": "max"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Days overdue"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 25,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-si": {
+				"name": "tc-si",
+				"title": "Unpaid customer invoices (non-POS)",
+				"workbook": "aimatic-pending-work",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-open-si",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Due",
+							"column_name": "due_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Customer",
+							"column_name": "customer_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Invoice",
+							"column_name": "invoice",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Status",
+							"column_name": "status",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Outstanding",
+							"column_name": "outstanding_amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Days overdue",
+							"column_name": "days_overdue",
+							"data_type": "Integer",
+							"aggregation": "max"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Days overdue"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 25,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-pending": {
+				"name": "td-pending",
+				"title": "Pending Invoices and Orders",
+				"workbook": "aimatic-pending-work",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Company",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-draft": "`tq-draft-pi`.`company`",
+							"tc-po": "`tq-open-po`.`company`",
+							"tc-pi": "`tq-unpaid-pi`.`company`",
+							"tc-si": "`tq-open-si`.`company`"
+						},
+						"layout": {
+							"i": "filter-company",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-draft",
+						"layout": {
+							"i": "item-draft",
+							"x": 0,
+							"y": 1,
+							"w": 10,
+							"h": 9
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-po",
+						"layout": {
+							"i": "item-po",
+							"x": 10,
+							"y": 1,
+							"w": 10,
+							"h": 9
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-pi",
+						"layout": {
+							"i": "item-pi",
+							"x": 0,
+							"y": 10,
+							"w": 10,
+							"h": 9
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-si",
+						"layout": {
+							"i": "item-si",
+							"x": 10,
+							"y": 10,
+							"w": 10,
+							"h": 9
+						}
+					}
+				]
+			}
+		}
+	}
+}

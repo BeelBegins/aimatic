@@ -34,6 +34,17 @@
    "collapsible": 1,
    "indent": 0,
    "keep_closed": 0,
+   "label": "CEO Dashboard",
+   "link_to": "ceo-dashboard-console",
+   "link_type": "Page",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "indent": 0,
+   "keep_closed": 0,
    "label": "Sales Dashboard",
    "link_to": "sales-dashboard-console",
    "link_type": "Page",

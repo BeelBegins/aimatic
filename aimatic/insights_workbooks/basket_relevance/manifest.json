@@ -1,0 +1,15 @@
+{
+	"version": 1,
+	"title": "Customer Basket & Product Relevance",
+	"description": "Branch-aware basket KPIs, average basket, items per basket, high-lift product pairs, and single-item baskets that need cross-sell action.",
+	"notes": "Product relevance is deliberately bounded: last 30 days, submitted non-return POS Invoices, positive-qty lines only, branch/day basket baseline, minimum 3 baskets with the item in a branch/day, and 500 output rows. It measures attach rate and basket lift rather than running an expensive all-pairs recommender on dashboard load.",
+	"module": "Selling",
+	"required_apps": [
+		"erpnext",
+		"aimatic"
+	],
+	"source_doctypes": [
+		"POS Invoice",
+		"POS Invoice Item"
+	]
+}

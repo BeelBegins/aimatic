@@ -1,0 +1,15 @@
+{
+	"version": 2,
+	"title": "Inventory KPIs",
+	"description": "On-hand stock, COGS, warehouse mix, plus goods with quantity but no outward movement in 90 days.",
+	"notes": "COGS uses SLE cost basis. Dead-stock query scans SLE last-out dates \u2014 open with a date-independent Bin snapshot. Date filter applies to COGS charts only.",
+	"module": "Stock",
+	"required_apps": [
+		"erpnext"
+	],
+	"source_doctypes": [
+		"Bin",
+		"Stock Ledger Entry",
+		"Item"
+	]
+}
