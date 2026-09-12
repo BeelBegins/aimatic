@@ -9,12 +9,12 @@ from aimatic.purchase_history_autofill.utils import (
 
 def _autofill_item_fields(doc, child_doctype):
 	"""Shared body for the per-doctype before_validate hooks below. Fills
-	empty/zero item-level purchase fields (taxes, discounts, trade offer,
-	FED, advance tax, GST, MRP, ...) from the most recent submitted
+	empty/zero eligible item-level purchase fields (taxes, discount, trade
+	offer, FED, advance tax, GST, MRP, ...) from the most recent submitted
 	Purchase Receipt/Purchase Invoice row for the same Supplier + Branch +
 	Item - see purchase_history_autofill/utils.py for the matching/exclusion
-	logic. Never touches Quantity/Rate/custom_vendor_rate - those are
-	excluded upstream in utils._ALWAYS_EXCLUDE, not just skipped because
+	logic. Never touches Quantity/Rate/custom_vendor_rate - those are excluded
+	upstream in utils._ALWAYS_EXCLUDE, not just skipped because
 	they're already non-empty.
 	"""
 	supplier = doc.get("supplier")

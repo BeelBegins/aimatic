@@ -25,11 +25,12 @@ class TestImpliedDiscountPer(unittest.TestCase):
 			places=4,
 		)
 
-	def test_from_rate_gap_when_no_discount_amount(self):
-		self.assertAlmostEqual(
-			implied_discount_per(vendor_rate=100, rate=75, discount_amount=0),
-			25.0,
-			places=4,
+	def test_rate_gap_is_not_a_discount(self):
+		# A calculated inventory rate can be a few paisa below the vendor rate
+		# because of rounding. It must not become an automatic discount.
+		self.assertEqual(
+			implied_discount_per(vendor_rate=100, rate=99.94, discount_amount=0),
+			0.0,
 		)
 
 	def test_skips_rate_gap_when_scheme_qty(self):
@@ -168,6 +169,29 @@ class TestInvoiceFromReceipt(unittest.TestCase):
 		sync_purchase_invoice_discounts(doc)
 		self.assertEqual(row.custom_discount_per, 7)
 
+	def test_new_draft_rows_do_not_infer_any_discount(self):
+		row = SimpleNamespace(
+			pr_detail=None,
+			purchase_order_item=None,
+			custom_discount_per=0,
+			custom_vendor_rate=100,
+			price_list_rate=100,
+			rate=99.94,
+			discount_amount=0.06,
+			custom_scheme_qty=0,
+			custom_trade_offer_total=0,
+			custom_fed_per=0,
+			custom_fed_amount=0,
+		)
+		row.get = lambda k, d=None: getattr(row, k, d)
+		doc = SimpleNamespace(docstatus=0, items=[row], get=lambda k, d=None: getattr(doc, k, d))
+
+		sync_purchase_receipt_discounts(doc)
+		sync_purchase_invoice_discounts(doc)
+		sync_purchase_order_discounts(doc)
+
+		self.assertEqual(row.custom_discount_per, 0)
+
 	def test_submitted_docs_untouched(self):
 		row = SimpleNamespace(
 			pr_detail=None,
@@ -189,7 +213,7 @@ class TestInvoiceFromReceipt(unittest.TestCase):
 
 
 class TestSourceApply(unittest.TestCase):
-	def test_source_none_falls_back_to_row(self):
+	def test_source_none_does_not_infer_from_row(self):
 		row = SimpleNamespace(
 			custom_discount_per=0,
 			custom_vendor_rate=100,
@@ -201,7 +225,8 @@ class TestSourceApply(unittest.TestCase):
 			custom_fed_amount=0,
 		)
 		row.get = lambda k, d=None: getattr(row, k, d)
-		self.assertEqual(apply_discount_per_from_source(row, None), 10.0)
+		self.assertEqual(apply_discount_per_from_source(row, None), 0.0)
+		self.assertEqual(row.custom_discount_per, 0)
 
 
 if __name__ == "__main__":

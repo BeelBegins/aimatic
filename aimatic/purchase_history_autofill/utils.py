@@ -8,9 +8,10 @@ Design notes:
     rate from, e.g. custom_vendor_rate) are never touched - see
     _ALWAYS_EXCLUDE below. This is enforced structurally, independent of the
     "only if empty" check, so a bug in that check can't reach these fields.
-  - Only the *input* custom fields (percentages, formulas, MRP, trade offer,
-    discount) are copied - the *_amount/*_total/read-only computed fields
-    are excluded because the existing Purchase Receipt/Purchase Order/
+  - Only eligible *input* custom fields (percentages, formulas, MRP, trade
+    offer, discount, etc.) are copied. The *_amount/*_total/read-only
+    computed fields are excluded because the existing Purchase Receipt/
+    Purchase Order/
     Purchase Invoice client scripts (prv1 / PurchaseInvoice tax-calc
     scripts) recompute them from those inputs on load - copying the
     computed outputs too would either be immediately overwritten or, worse,

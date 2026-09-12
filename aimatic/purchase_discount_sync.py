@@ -1,21 +1,19 @@
-"""Sync orphan purchase discounts into custom_discount_per.
+"""Preserve explicit purchase discounts across linked documents.
 
 The PO/PR/PI cost engines (PurchaseOrderCalculation, PRV1, pichatgpt) derive
-net rate only from custom_vendor_rate and custom_discount_per. Discounts that
-live only in ERPNext rate / discount_amount are wiped on the next validate —
-notably when a Purchase Invoice is made from a Purchase Receipt.
+net rate only from custom_vendor_rate and custom_discount_per. A linked
+Purchase Invoice can still need a legacy discount recovered from the source
+receipt's native ``discount_amount`` field before those engines run.
 
-This module backfills custom_discount_per before those engines run. Submitted
-documents are left untouched. Historical invoices are not amended.
+This module handles that linked-document compatibility case only. It must not
+turn a normal rate difference on a new draft row into a discount. Submitted
+documents are left untouched.
 """
 
 from __future__ import annotations
 
 import frappe
 from frappe.utils import flt
-
-
-_RATE_EPS = 0.005
 
 
 def _f(value) -> float:
@@ -32,10 +30,12 @@ def implied_discount_per(
 	fed_per: float = 0.0,
 	fed_amount: float = 0.0,
 ) -> float:
-	"""Return implied discount % when custom_discount_per is missing.
+	"""Return a legacy discount % from an explicit native discount amount.
 
-	Guards skip rows where scheme / trade offer / FED already explain a gap
-	between vendor rate and net rate (those must not be converted into %).
+	The old implementation also inferred a discount from ``vendor_rate -
+	rate``. That is unsafe on a new draft row because the gap can be caused by
+	rounding or by the custom cost calculation itself. Only a stored native
+	discount amount is suitable for recovering an old linked document.
 	"""
 	vendor_rate = _f(vendor_rate)
 	if vendor_rate <= 0:
@@ -46,19 +46,6 @@ def implied_discount_per(
 	std_disc = _f(discount_amount)
 	if std_disc > 0:
 		return round((std_disc / vendor_rate) * 100.0, 6)
-
-	# Rate-gap derivation only when scheme / trade offer / FED are not
-	# already explaining a lower net unit cost.
-	if _f(scheme_qty):
-		return 0.0
-	if _f(trade_offer_total):
-		return 0.0
-	if _f(fed_per) or _f(fed_amount):
-		return 0.0
-
-	rate = _f(rate)
-	if rate > 0 and rate + _RATE_EPS < vendor_rate:
-		return round(((vendor_rate - rate) / vendor_rate) * 100.0, 6)
 
 	return 0.0
 
@@ -87,7 +74,7 @@ def _commercial_fields(doctype: str, name: str):
 
 
 def apply_implied_discount_per(row, *, vendor_rate: float | None = None) -> float:
-	"""Set row.custom_discount_per from local orphan rate/discount_amount."""
+	"""Recover row.custom_discount_per from an explicit native discount amount."""
 	existing = _f(row.get("custom_discount_per"))
 	if existing:
 		return existing
@@ -110,7 +97,10 @@ def apply_implied_discount_per(row, *, vendor_rate: float | None = None) -> floa
 def apply_discount_per_from_source(row, source) -> float:
 	"""Copy or derive custom_discount_per onto row from a PO/PR source row."""
 	if not source:
-		return apply_implied_discount_per(row)
+		# A missing source is a normal manually-entered row, not permission to
+		# infer a discount from its current rate. The custom field is the sole
+		# source of truth in that case.
+		return _f(row.get("custom_discount_per"))
 
 	source_disc = _f(source.custom_discount_per)
 	if source_disc > 0:
@@ -135,20 +125,15 @@ def apply_discount_per_from_source(row, source) -> float:
 
 
 def sync_purchase_order_discounts(doc, method=None):
-	"""before_validate: backfill orphan discounts on draft Purchase Orders."""
-	if getattr(doc, "docstatus", 0) != 0:
-		return
-	for row in doc.get("items") or []:
-		apply_implied_discount_per(row)
+	"""Deprecated compatibility hook; draft POs require explicit discounts."""
+	return
 
 
 def sync_purchase_receipt_discounts(doc, method=None):
-	"""before_validate: backfill orphan discounts on draft Purchase Receipts."""
+	"""before_validate: inherit explicit discounts from linked Purchase Orders."""
 	if getattr(doc, "docstatus", 0) != 0:
 		return
 	for row in doc.get("items") or []:
-		if apply_implied_discount_per(row):
-			continue
 		po_detail = row.get("purchase_order_item") or row.get("po_detail")
 		if not po_detail:
 			continue
@@ -159,7 +144,7 @@ def sync_purchase_receipt_discounts(doc, method=None):
 
 
 def sync_purchase_invoice_discounts(doc, method=None):
-	"""before_validate: inherit PR discount / backfill orphans on draft PIs.
+	"""before_validate: inherit an explicit discount from linked PR rows.
 
 	PR-linked rows always take commercial discount from the PR line so a
 	client preview that already wiped rate cannot lose the receipt discount.
@@ -171,5 +156,3 @@ def sync_purchase_invoice_discounts(doc, method=None):
 		if pr_detail:
 			source = _commercial_fields("Purchase Receipt Item", pr_detail)
 			apply_discount_per_from_source(row, source)
-		else:
-			apply_implied_discount_per(row)
