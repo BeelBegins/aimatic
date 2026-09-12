@@ -20,7 +20,8 @@ system here.
 | Source files received | **Done** 2026-09-12: `Ho-MasterItemFiled5b674.xlsx` (master, File `9872249e71`), `1004stockposition.xls` (branch stock/price, File `3b594c134a`), `1004vendorbalances.xlsx` (vendor opening balances, File `16ee8a6a31`). "1004" is S4's own FBR-style branch code, same convention as S7's "1007" |
 | Mock restore of `szl` backup onto `siezal` | **Done** 2026-09-12 ~23:39 PKT — source `20260912_233859-szl-database.sql.gz` (+files/private-files tars), taken after the same-day cost-center GL fix and after the three S4 source files were uploaded, so the mock includes both. Verified: `siezal`'s GL missing-`cost_center` counts read 0 across all accounts (matches live `szl` post-fix), S4 branch/warehouse present, all three S4 files present on disk and in the `File` doctype |
 | Barcode gap audit vs catalog (mock `siezal`) | **Done** 2026-09-12 — see below |
-| Master reconcile, item create, prices, opening stock, vendor balances, POS go-live | **Not started** — do not proceed without explicit approval per phase, same as S7 |
+| Master reconcile (mock `siezal`) | **Done** 2026-09-13 — 4,717 / 4,897 ready, 180 blocked on 5 unknown subcategories (needs approval, see below) |
+| Item create, prices, opening stock, vendor balances, POS go-live | **Not started** — do not proceed without explicit approval per phase, same as S7 |
 
 ## Barcode gap audit (2026-09-12, on `siezal` mock)
 
@@ -57,6 +58,45 @@ on `siezal`): `s4_missing_items_*.xlsx` (4,897 rows), `s4_absent_barcodes_*.xlsx
 vs S7's 548 / 3,121 ≈ 18%) — expect a correspondingly larger master-reconcile
 and Item-create pass. Not yet reconciled against the master item file; that's
 the next read-only step, same as S7's "Master reconcile" phase.
+
+## Master reconcile (2026-09-13, on `siezal` mock)
+
+Script: `reconcile_s4_missing_vs_master.py` — adapted from
+`reconcile_s7_missing_vs_master.py`, `EXISTING_GROUP_ALIASES` carried over
+unchanged (same underlying master-file taxonomy; every alias target is an
+Item Group that already concretely exists). Read-only: no Items / groups /
+tax categories / brands created.
+
+| Metric | Count |
+|---|---|
+| Master file rows | 37,892 |
+| S4 missing rows (input) | 4,897 |
+| **Ready to create** | **4,717** (96.3%) |
+| Blocked | 180 (3.7%) |
+| Not found in master at all | 0 |
+| Ambiguous master match | 0 |
+| Unknown/blank FBR Tax Category | **0** — every ready row resolved cleanly, no FBR gate needed |
+| Brand left blank (no existing match; not a blocker) | 157 rows / 27 distinct brand names |
+
+**Blocked breakdown — all 180 rows are a subcategory gate, nothing else:**
+
+| SubCatName in master | Rows | Candidate existing Item Group (unconfirmed — needs approval, not applied) |
+|---|---|---|
+| `FRUITES & VEGETABLES` | 90 | **None found** — no existing group covers fresh produce; genuinely new territory, not a spelling/alias fix |
+| `ELECTONIC ITEMS` | 45 | `Electronic Items` (typo: missing "r" — same pattern as S7's alias fixes) |
+| `WATCH` | 31 | `Wrist Watches` |
+| (blank SubCatName) | 9 | — master row has no subcategory at all; needs a decision, not a group |
+| `TESTING` | 4 | Likely junk/test rows, same as S7's skipped `TEST` item — candidate to exclude rather than map |
+| `PET ACCESSORIES` | 1 | `Animal - Pet Items` |
+
+Per the hard gates above, none of these candidate mappings are applied —
+this table is informational only, same as S7's `Unknown SubCats` gate sheet.
+Needs explicit per-row approval before `reconcile_s4_missing_vs_master.py`'s
+`EXISTING_GROUP_ALIASES` is extended and re-run.
+
+Reports uploaded to `Home/Migrations/S4`: `s4_create_ready_*.xlsx` (4,717
+rows), `s4_create_blocked_*.xlsx` (180 rows), `s4_approval_gates_*.xlsx`
+(unknown subcats / FBR / blank-brand sheets), `s4_master_reconcile_summary_*.json`.
 
 ## File roles (do not mix) — same split as S7
 
