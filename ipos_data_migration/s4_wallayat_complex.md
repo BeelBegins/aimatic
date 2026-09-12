@@ -23,6 +23,8 @@ system here.
 | Master reconcile (mock `siezal`) | **Done** 2026-09-13 — 4,717 / 4,897 ready, 180 blocked on 5 unknown subcategories; user resolved all 5 (see Sign-off log) |
 | New Item Group `Fruits & Vegetables` (mock `siezal`) | **Done** 2026-09-13 — leaf under existing `Food Items`, via `ensure_s4_fruits_vegetables_group.py`. **Not yet created on live `szl`** |
 | Item create (mock `siezal`) | **Done** 2026-09-13 — 4,883 Items created (`STO-ITEM-2026-17898`–`22779`... one series number, `SZ002`, already existed, matching the S7-era note that it's already on `STO-ITEM-2026-16374`), 0 failed, 13 rows skipped (junk/blank subcat), 0 blocked. Verified: 0 `item_defaults`/warehouse leakage, 0 duplicate barcodes, exact expected counts landed in each aliased Item Group (Fruits & Vegetables 90, Electronic Items 45, Wrist Watches 31, Animal - Pet Items 1). **Not yet created on live `szl`** |
+| Orphan Barcode2 attach (mock `siezal`) | **Done** 2026-09-13 — 22/22 attached, 0 blocked, via `attach_s4_orphan_barcode2.py` |
+| Catalog duplicate check (mock `siezal`) | **Done** 2026-09-13 — 6 candidates found, **0 recommended for merge** (see below); differs from S7, which had 7 genuine merges |
 | Prices, opening stock, vendor balances, POS go-live | **Not started** — do not proceed without explicit approval per phase, same as S7 |
 
 ## Barcode gap audit (2026-09-12, on `siezal` mock)
@@ -100,6 +102,34 @@ Reports uploaded to `Home/Migrations/S4`: `s4_create_ready_*.xlsx` (4,717
 rows), `s4_create_blocked_*.xlsx` (180 rows), `s4_approval_gates_*.xlsx`
 (unknown subcats / FBR / blank-brand sheets), `s4_master_reconcile_summary_*.json`.
 
+## Catalog duplicate check (2026-09-13, on `siezal` mock)
+
+Script: `detect_s4_duplicate_catalog_items.py` — detects S4 stock rows whose
+Barcode1/Barcode2 resolve to two *different* existing Items (the situation
+S7 had 7 signed merge pairs for). Read-only: reports candidates with stock/
+sales activity for a human decision; does not merge anything. All these
+Items pre-date S4 (created mid-July, well before any S4 file), so this is
+about the *shared catalog*, not S4-specific data.
+
+544 stock rows carry both barcodes; 6 resolved to a Barcode1/Barcode2 pair
+split across two different Items:
+
+| Item A | Item B | Verdict |
+|---|---|---|
+| Olpers Dairy Cream 200Ml | Olpers Dairy Cream 200Ml Promo | **Not a duplicate** — S7's runbook already reviewed this exact pair and explicitly decided "Not merged: ... Olpers regular vs Promo" |
+| Lu Prince Chocolate Big S-Pack | Lu Prince Chocolate 57Gm | **Not a duplicate** — S7's runbook already reviewed this exact pair: "Not merged: ... LU Prince 57gm vs Big S-Pack (Box UOM)" |
+| Dove Hair Fall Rescue Conditioner 180Ml | Dove Hair Fall Bio Protein Shampoo 360Ml | **Not a duplicate** — different products (conditioner vs shampoo, different sizes); Barcode1/Barcode2 pairing in the source row looks like a data-entry coincidence, not the same SKU twice |
+| Enchanteur Charming Talcum Powder 125Gm | Enchanteur Stunning Talcum Powder 125Gm | **Not a duplicate** — different scent variants ("Charming" vs "Stunning"), not the same product re-entered |
+| Bisconni Chocolate Chip Cookies Rs-20 | Promo Chocolate Chip Rs 10 | **Not a duplicate** — different name and price point; S7's actual approved Bisconni merge was between two Items with the *identical* name/price, not this |
+| Knorr Chicken Noodles 200Gm | Knorr Chicken Noodles Family Pack | **Not a duplicate** — different pack sizes, genuinely separate SKUs |
+
+**Verdict: 0 merges recommended for this pass.** Unlike S7 (which found 7
+genuine same-name catalog splits), the S4 onhand file's Barcode1/Barcode2
+collisions all turned out to be different products/variants that happen to
+share a row, not the same item entered twice. Treat this as informational,
+not applied — no `merge_s4_duplicate_catalog_items.py` needed unless a
+future pass surfaces an actual name-identical pair.
+
 ## File roles (do not mix) — same split as S7
 
 | File | Use for | Do **not** use for |
@@ -166,6 +196,8 @@ Same shape as S7's:
 | `reconcile_s4_missing_vs_master.py` | Read-only master reconcile — done |
 | `ensure_s4_fruits_vegetables_group.py` | Approved exception: create `Fruits & Vegetables` leaf under `Food Items` — done on mock, not yet on live `szl` |
 | `create_s4_missing_items.py` | Create missing Items from master file — done on mock (4,883 created), not yet on live `szl` |
+| `attach_s4_orphan_barcode2.py` | Attach orphan Barcode2 rows — done on mock (22/22) |
+| `detect_s4_duplicate_catalog_items.py` | Read-only catalog duplicate detection — done, 0 merges recommended |
 | *(not yet written)* `import_s4_prices_and_stock.py` | S4 selling prices + opening stock |
 | *(not yet written)* `import_s4_vendor_balances.py` | S4 vendor opening balances |
 | `import.md` | Canonical field mapping, tax-exclusive CurCost, stock GL rules |
@@ -183,3 +215,5 @@ Same shape as S7's:
 | 2026-09-13 | `TESTING` (4 rows) and blank/literal-`NULL` SubCatName (9 rows): excluded, same treatment as S7's skipped `TEST`/`TEST3` junk rows | User |
 | 2026-09-13 | New Item Group `Fruits & Vegetables` created on `siezal` mock only via `ensure_s4_fruits_vegetables_group.py` (idempotent, allows mock or live) | Claude (executed), User (approved) |
 | 2026-09-13 | 4,883 Items created on `siezal` mock via `create_s4_missing_items.py` (adapted from `create_s7_missing_items.py`): 0 failed, 0 blocked, 13 skipped as junk/blank, 1 (`SZ002`) already existed pre-S4 (matches the S7-era note). Verified 0 warehouse leakage, 0 duplicate barcodes, exact per-group counts. **Live `szl` still untouched** — this was mock only | Claude (executed + verified), User (approved via master-reconcile decisions) |
+| 2026-09-13 | 22 orphan Barcode2 rows attached on `siezal` mock via `attach_s4_orphan_barcode2.py`: dry-run clean (0 blocked), applied, 22/22 attached | Claude (executed + verified) |
+| 2026-09-13 | Catalog duplicate check via `detect_s4_duplicate_catalog_items.py`: 6 candidates found, all reviewed and rejected as merges — 2 match S7's own already-declined pairs (Olpers regular/Promo, LU Prince 57gm/Big S-Pack), 4 are different products/variants coincidentally paired in the source row. 0 merges applied | Claude (analysis) |
