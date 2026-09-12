@@ -32,7 +32,7 @@ from pathlib import Path
 import frappe
 import xlrd
 
-TARGET_SITE = "siezal"
+TARGET_SITE = "szl"
 SOURCE_XLS = "/home/nabeel/frappe-bench/sites/szl/private/files/1004stockposition.xls"
 SOURCE_SHA256 = "f3761c6add0de4b21b78b89603e1a17cc246dc63850bdff89b1a5b9daaa4a6a6"
 EXPECTED_SOURCE_ROWS = 13_284

@@ -33,7 +33,7 @@ import frappe
 import xlrd
 from openpyxl import load_workbook
 
-TARGET_SITE = "siezal"
+TARGET_SITE = "szl"
 ITEM_NAMING_SERIES = "STO-ITEM-.YYYY.-"
 STOCK_UOM = "Pcs"
 MASTER_PATH = "/home/nabeel/frappe-bench/sites/szl/private/files/Ho-MasterItemFiled5b674.xlsx"

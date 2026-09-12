@@ -19,7 +19,7 @@ from pathlib import Path
 import frappe
 from openpyxl import load_workbook
 
-TARGET_SITE = "siezal"
+TARGET_SITE = "szl"
 ORPHAN_XLSX = "/tmp/s4_barcode_audit_20260912_235236/s4_orphan_barcode2_20260912_235236.xlsx"
 
 

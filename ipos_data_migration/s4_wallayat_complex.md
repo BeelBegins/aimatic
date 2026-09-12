@@ -10,23 +10,23 @@ Reusable mapping rules stay in `import.md`. This file records **S4-only
 verdicts, gates, file roles, and pass order**. Do not invent a second mapping
 system here.
 
-## Status (2026-09-13, mock preparation)
+## Status (2026-09-13, live items/prices/stock posted)
 
 | Phase | Status |
 |---|---|
 | Branch / warehouse / cost center / price list masters | Already present on live `szl` (`S4 - Wallayat Complex`, warehouse `S4 - Wallayat Complex - SSM` + `Rejected` variant, cost center `S4 - Wallayat Complex - SSM`, Selling + Foodpanda Price Lists) — see `szl_reference_data.py` (`ledger_suffix=S4WC`, inter-branch payable account number `2142`) |
 | Account (`Cash in Hand - S4WC`), Mode of Payment, walk-in Customer, POS Profile, FBR Integration Settings | **Not yet created** — matches S7's separate "POS go-live setup" step, still pending here |
-| Live `szl` S4 data | **Clean slate** — 0 Item Prices, 0 nonzero Bins, 0 Stock Ledger Entries on any S4 warehouse as of 2026-09-12. No re-run hazard (unlike S7, nothing has been posted yet) |
+| Live `szl` S4 data | **Items, selling prices, and opening stock posted 2026-09-13** — see Live cutover. Vendor balances and POS go-live still pending. Do not re-run Item create or opening-stock posting. |
 | Source files received | **Done** 2026-09-12: `Ho-MasterItemFiled5b674.xlsx` (master, File `9872249e71`), `1004stockposition.xls` (branch stock/price, File `3b594c134a`), `1004vendorbalances.xlsx` (vendor opening balances, File `16ee8a6a31`). "1004" is S4's own FBR-style branch code, same convention as S7's "1007" |
 | Mock restore of `szl` backup onto `siezal` | **Done** 2026-09-12 ~23:39 PKT — source `20260912_233859-szl-database.sql.gz` (+files/private-files tars), taken after the same-day cost-center GL fix and after the three S4 source files were uploaded, so the mock includes both. Verified: `siezal`'s GL missing-`cost_center` counts read 0 across all accounts (matches live `szl` post-fix), S4 branch/warehouse present, all three S4 files present on disk and in the `File` doctype |
 | Barcode gap audit vs catalog (mock `siezal`) | **Done** 2026-09-12 — see below |
 | Master reconcile (mock `siezal`) | **Done** 2026-09-13 — 4,717 / 4,897 ready, 180 blocked on 5 unknown subcategories; user resolved all 5 (see Sign-off log) |
-| New Item Group `Fruits & Vegetables` (mock `siezal`) | **Done** 2026-09-13 — leaf under existing `Food Items`, via `ensure_s4_fruits_vegetables_group.py`. **Not yet created on live `szl`** |
-| Item create (mock `siezal`) | **Done** 2026-09-13 — 4,882 new Items inserted (`STO-ITEM-2026-17898`–`22779`) plus pre-existing barcode `SZ002` resolved to `STO-ITEM-2026-16374`, for 4,883 successfully processed rows. Earlier output called all 4,883 "created"; the database range count is the authoritative 4,882. 0 failed, 13 rows skipped, 0 blocked. **Not yet created on live `szl`** |
-| Orphan Barcode2 attach (mock `siezal`) | **Done** 2026-09-13 — 22/22 attached, 0 blocked, via `attach_s4_orphan_barcode2.py` |
+| New Item Group `Fruits & Vegetables` | **Done** 2026-09-13 on mock and live `szl` — leaf under existing `Food Items`, via `ensure_s4_fruits_vegetables_group.py` |
+| Item create | **Done** 2026-09-13 on mock and live `szl` — 4,882 new Items inserted (`STO-ITEM-2026-17898`–`22779`) plus pre-existing barcode `SZ002` resolved to `STO-ITEM-2026-16374`, for 4,883 successfully processed rows. Earlier output called all 4,883 "created"; the database range count is the authoritative 4,882. 0 failed, 13 rows skipped, 0 blocked. |
+| Orphan Barcode2 attach | **Done** 2026-09-13 on mock and live `szl` — 22/22 attached, 0 blocked, via `attach_s4_orphan_barcode2.py` |
 | Catalog duplicate check (mock `siezal`) | **Done** 2026-09-13 — 6 candidates found, **0 recommended for merge** (see below); differs from S7, which had 7 genuine merges |
-| Colgate Premier/Twister correction (mock `siezal`) | **Done** 2026-09-13 after verified backup `20260913_011949-siezal-*`. Premier remains `STO-ITEM-2026-09751`; barcode `8886950093352` moved to new `STO-ITEM-2026-22780` (`Colgate Twister M`). Existing activity unchanged; idempotency verified. **Live `szl` untouched** |
-| S4 prices + opening stock (mock `siezal`) | Importer written; final dry-run **clean with 0 blockers**: 13,219 prices, 7,485 positive-stock rows, 801 negative-stock rows. Nothing posted; explicit mock-apply approval required. |
+| Colgate Premier/Twister correction | **Done** 2026-09-13 on mock after `20260913_011949-siezal-*`, then on live after `20260913_013922-szl-*`. Premier remains `STO-ITEM-2026-09751`; barcode `8886950093352` moved to new `STO-ITEM-2026-22780` (`Colgate Twister M`). Existing Premier activity unchanged. |
+| S4 prices + opening stock | **Done on live `szl` 2026-09-13** (mock price/stock posting skipped by user). Dry-run 0 blockers: 13,219 prices, 7,485 positive and 801 negative stock rows. Posted those totals; SLE=Bin=8,286. |
 | Vendor balances, POS go-live | **Not started** — explicit approval required per phase. |
 
 ## Barcode gap audit (2026-09-12, on `siezal` mock)
@@ -171,9 +171,9 @@ Same shape as S7's:
 4. ~~Create missing Items on `siezal` mock~~ — **done**: 4,882 inserted plus pre-existing `SZ002` resolved.
 5. ~~Attach orphan Barcode2 (22 rows).~~ **Done**: 22/22.
 5b. Check for S4-side catalog duplicates (two Items split across Barcode1/
-   Barcode2, as S7 had 7 pairs) — **done**: six source collisions remain separate; the later user-confirmed Colgate Premier/Twister master error was split on mock.
-6. S4 selling prices — importer ready; **mock apply awaits approval**.
-7. S4 opening stock — importer dry-run clean with branch/cost center stamping; **mock apply awaits approval**.
+   Barcode2, as S7 had 7 pairs) — **done**: six source collisions remain separate; the later user-confirmed Colgate Premier/Twister master error was split on mock then live.
+6. S4 selling prices — **done on live `szl` 2026-09-13** (mock posting skipped).
+7. S4 opening stock — **done on live `szl` 2026-09-13**; branch/cost center stamped; SLE=Bin=8,286.
 8. Vendor opening balances from `1004vendorbalances.xlsx` (238 rows) — same
    shape as `supplierimport.md` / S7's vendor balances step. **Check for
    `SupplierCode` collisions against other branches' legacy codes before any
@@ -183,7 +183,29 @@ Same shape as S7's:
 9. POS go-live setup (Account, Mode of Payment, walk-in Customer, POS
    Profile, FBR Integration Settings) — mirror S1/S7 field-for-field, watch
    for the same `default_price_list` gap that bit S7's walk-in Customer.
-10. Live cutover on `szl` after mock is fully reconciled and approved.
+10. ~~Live cutover of Items/prices/stock on `szl`~~ — **done** 2026-09-13; vendor and POS remain.
+
+## Live cutover (2026-09-13)
+
+User skipped remaining mock price/stock posting: "just take a szl backup do
+it all there we are running out of time." Codex took backup
+`20260913_013922-szl-*` (database, public files, private files; gzip/tar
+integrity checked) while series was still `17897` and S4 prices/stock were
+zero, then hit a usage limit before the first write. This session flipped
+`TARGET_SITE` from `siezal` to `szl` on the four mutating scripts, confirmed
+no POS/Item/SLE writes since that backup, and applied the mock order on live.
+
+| Step | Live result |
+|---|---|
+| Fruits & Vegetables group | Created under `Food Items` |
+| Item create | 4,882 inserted (`STO-ITEM-2026-17898`–`22779`); 4,883 processed including pre-existing `SZ002` → `STO-ITEM-2026-16374`; 13 skipped; 0 failed; 0 item_defaults warehouses |
+| Orphan Barcode2 attach | 22/22 attached, 0 blocked |
+| Colgate split | Twister barcode moved to `STO-ITEM-2026-22780`; Premier `STO-ITEM-2026-09751` activity unchanged (2 nonzero bins, qty 7, 6 SLE, 7 prices) |
+| S4 prices | 13,219 rows, 0 missing, 0 mismatched |
+| S4 opening stock | 38 Material Receipt + 5 Material Issue chunks (`MAT-STE-2026-00232`–`00274`); 8,286 SLE = 8,286 nonzero bins; 0 blank branch/cost-center on Stock Entry Detail and GL. Plan exclusive value ₨16,259,120.16; posted Bin value ₨16,259,122.55 (₨2.39). Six qty rows differ by 0.005 because System Settings `float_precision=2` (e.g. 11.925 → 11.92). |
+
+Rollback: restore `20260913_013922-szl-database.sql.gz` plus the matching
+files/private-files tars. Do not re-run Item create or opening-stock posting.
 
 ## Scripts / artifacts checklist
 
@@ -191,12 +213,12 @@ Same shape as S7's:
 |---|---|
 | `audit_s4_barcodes_vs_szl.py` | Gap audit + Excel upload to `Home/Migrations/S4` (done) |
 | `reconcile_s4_missing_vs_master.py` | Read-only master reconcile — done |
-| `ensure_s4_fruits_vegetables_group.py` | Approved exception: create `Fruits & Vegetables` leaf under `Food Items` — done on mock, not yet on live `szl` |
-| `create_s4_missing_items.py` | Create missing Items from master file — done on mock (4,882 inserted + pre-existing `SZ002` resolved), not yet on live `szl` |
-| `attach_s4_orphan_barcode2.py` | Attach orphan Barcode2 rows — done on mock (22/22) |
+| `ensure_s4_fruits_vegetables_group.py` | Approved exception: create `Fruits & Vegetables` leaf under `Food Items` — done on mock and live |
+| `create_s4_missing_items.py` | Create missing Items from master file — done on mock and live (4,882 inserted + pre-existing `SZ002` resolved). `TARGET_SITE` is now `szl`. |
+| `attach_s4_orphan_barcode2.py` | Attach orphan Barcode2 rows — done on mock and live (22/22) |
 | `detect_s4_duplicate_catalog_items.py` | Read-only catalog duplicate detection — done, 0 merges recommended |
-| `split_s4_colgate_twister.py` | User-approved Colgate product split — applied on mock only |
-| `import_s4_prices_and_stock.py` | S4 selling prices + opening stock — dry-run clean, mock apply awaits approval |
+| `split_s4_colgate_twister.py` | User-approved Colgate product split — applied on mock and live (`STO-ITEM-2026-22780`) |
+| `import_s4_prices_and_stock.py` | S4 selling prices + opening stock — posted on live `szl`; `TARGET_SITE` is now `szl`. Do not re-post stock. |
 | *(not yet written)* `import_s4_vendor_balances.py` | S4 vendor opening balances |
 | `import.md` | Canonical field mapping, tax-exclusive CurCost, stock GL rules |
 | `setup_szl.md` / `szl_reference_data.py` | S4 branch naming / accounts (already defines S4) |
@@ -218,4 +240,6 @@ Same shape as S7's:
 | 2026-09-13 | Colgate Premier and Twister are different products. After verified mock backup `20260913_011949-siezal-*`, moved barcode `8886950093352` to new `STO-ITEM-2026-22780` while preserving Premier and all historical activity. Applied and idempotency-verified on `siezal` only | User (decision + mock approval), Codex (executed + verified) |
 | 2026-09-13 | Combine duplicate source rows for the same product into the existing Item; leading-zero barcode variants are the same product; combine quantities and use the higher selling price unless explicitly overridden. The approved 25-Item price map is recorded in `import_s4_prices_and_stock.py`; explicit choices include 1319, 175, 188, 2785, 85, 230, 219, 819, 185, 1085, 60, 1235, 499, 1920, and 2759 for the reviewed products | User |
 | 2026-09-13 | Combined net-zero stock must be zero. Skip residual values for Guard Rice (`STO-ITEM-2026-06127`, -53.19), Nestle Nan (`STO-ITEM-2026-10318`, 0.66), and Dairy Life Ghee (`STO-ITEM-2026-17790`, 1071.10) | User |
-| 2026-09-13 | Final price/stock dry-run: 13,284 source rows; 13 exclusions; 13,232 resolved Items; 39 duplicate groups combined; 25 approved price choices; 13,219 prices; 7,485 positive and 801 negative stock rows; 0 blockers. Postable signed value after approved zero-net skips: inclusive 18,859,337.39; exclusive 16,259,120.16. **Nothing posted yet** | Codex (verified) |
+| 2026-09-13 | Final price/stock dry-run: 13,284 source rows; 13 exclusions; 13,232 resolved Items; 39 duplicate groups combined; 25 approved price choices; 13,219 prices; 7,485 positive and 801 negative stock rows; 0 blockers. Postable signed value after approved zero-net skips: inclusive 18,859,337.39; exclusive 16,259,120.16. **Nothing posted yet** (mock) | Codex (verified) |
+| 2026-09-13 | Skip remaining mock price/stock posting; take a current `szl` backup and apply the full prepared Item/price/stock cutover on live | User |
+| 2026-09-13 | Live `szl` cutover after `20260913_013922-szl-*`: Fruits & Vegetables group; 4,882 Items `STO-ITEM-2026-17898`–`22779` plus `SZ002` resolved; 22 orphan barcodes; Colgate Twister `STO-ITEM-2026-22780`; 13,219 prices; 8,286 bins/SLE. Bin value ₨16,259,122.55 vs plan ₨16,259,120.16. Vendor/POS still pending. | Cursor (executed + verified), User (approved live apply) |

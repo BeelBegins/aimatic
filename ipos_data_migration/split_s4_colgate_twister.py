@@ -23,7 +23,7 @@ from pathlib import Path
 
 import frappe
 
-TARGET_SITE = "siezal"
+TARGET_SITE = "szl"
 MASTER_PATH = "/home/nabeel/frappe-bench/sites/szl/private/files/Ho-MasterItemFiled5b674.xlsx"
 MASTER_SHA256 = "a91f2be7c1b8b09e2dd3d9040b02172d403a34b32847ffb3a087ae4e54b50f98"
 SOURCE_ITEM = "STO-ITEM-2026-09751"
