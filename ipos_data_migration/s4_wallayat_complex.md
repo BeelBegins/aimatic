@@ -15,7 +15,8 @@ system here.
 | Phase | Status |
 |---|---|
 | Branch / warehouse / cost center / price list masters | Already present on live `szl` (`S4 - Wallayat Complex`, warehouse `S4 - Wallayat Complex - SSM` + `Rejected` variant, cost center `S4 - Wallayat Complex - SSM`, Selling + Foodpanda Price Lists) — see `szl_reference_data.py` (`ledger_suffix=S4WC`, inter-branch payable account number `2142`) |
-| Account (`Cash in Hand - S4WC`), Mode of Payment, walk-in Customer, POS Profile, FBR Integration Settings | **Not yet created** — matches S7's separate "POS go-live setup" step, still pending here |
+| Account (`Cash in Hand - S4WC`), Mode of Payment, walk-in Customer, POS Profile | **Not yet created** — remaining POS go-live setup |
+| FBR Integration Settings | **Done** 2026-09-13 on live `szl`: copied from S7 (S5 has no FBR row) to `Siezal Supermarket-S4 - Wallayat Complex`, `branch_code=1004`. **`pos_id` is still S7's `196711` until S4's real FBR POS ID is provided.** |
 | Live `szl` S4 data | **Items, selling prices, and opening stock posted 2026-09-13** — see Live cutover. Vendor balances and POS go-live still pending. Do not re-run Item create or opening-stock posting. |
 | Source files received | **Done** 2026-09-12: `Ho-MasterItemFiled5b674.xlsx` (master, File `9872249e71`), `1004stockposition.xls` (branch stock/price, File `3b594c134a`), `1004vendorbalances.xlsx` (vendor opening balances, File `16ee8a6a31`). "1004" is S4's own FBR-style branch code, same convention as S7's "1007" |
 | Mock restore of `szl` backup onto `siezal` | **Done** 2026-09-12 ~23:39 PKT — source `20260912_233859-szl-database.sql.gz` (+files/private-files tars), taken after the same-day cost-center GL fix and after the three S4 source files were uploaded, so the mock includes both. Verified: `siezal`'s GL missing-`cost_center` counts read 0 across all accounts (matches live `szl` post-fix), S4 branch/warehouse present, all three S4 files present on disk and in the `File` doctype |
@@ -27,7 +28,8 @@ system here.
 | Catalog duplicate check (mock `siezal`) | **Done** 2026-09-13 — 6 candidates found, **0 recommended for merge** (see below); differs from S7, which had 7 genuine merges |
 | Colgate Premier/Twister correction | **Done** 2026-09-13 on mock after `20260913_011949-siezal-*`, then on live after `20260913_013922-szl-*`. Premier remains `STO-ITEM-2026-09751`; barcode `8886950093352` moved to new `STO-ITEM-2026-22780` (`Colgate Twister M`). Existing Premier activity unchanged. |
 | S4 prices + opening stock | **Done on live `szl` 2026-09-13** (mock price/stock posting skipped by user). Dry-run 0 blockers: 13,219 prices, 7,485 positive and 801 negative stock rows. Posted those totals; SLE=Bin=8,286. |
-| Vendor balances, POS go-live | **Not started** — explicit approval required per phase. |
+| Foodpanda prices | Source uploaded 2026-09-13 00:50: File `c85110c253` `products (1).xlsx` (16,234 portal rows, 2,683 active). S4 Foodpanda Price List exists and is empty. Barcode match vs catalog: 10,645 / 16,234. Import not started. |
+| Vendor balances, remaining POS go-live | **Not started** — Cash account, Mode of Payment, walk-in Customer, POS Profiles still needed. |
 
 ## Barcode gap audit (2026-09-12, on `siezal` mock)
 
@@ -243,3 +245,5 @@ files/private-files tars. Do not re-run Item create or opening-stock posting.
 | 2026-09-13 | Final price/stock dry-run: 13,284 source rows; 13 exclusions; 13,232 resolved Items; 39 duplicate groups combined; 25 approved price choices; 13,219 prices; 7,485 positive and 801 negative stock rows; 0 blockers. Postable signed value after approved zero-net skips: inclusive 18,859,337.39; exclusive 16,259,120.16. **Nothing posted yet** (mock) | Codex (verified) |
 | 2026-09-13 | Skip remaining mock price/stock posting; take a current `szl` backup and apply the full prepared Item/price/stock cutover on live | User |
 | 2026-09-13 | Live `szl` cutover after `20260913_013922-szl-*`: Fruits & Vegetables group; 4,882 Items `STO-ITEM-2026-17898`–`22779` plus `SZ002` resolved; 22 orphan barcodes; Colgate Twister `STO-ITEM-2026-22780`; 13,219 prices; 8,286 bins/SLE. Bin value ₨16,259,122.55 vs plan ₨16,259,120.16. Vendor/POS still pending. | Cursor (executed + verified), User (approved live apply) |
+| 2026-09-13 | Copy FBR Integration Settings to S4 from S5 | User |
+| 2026-09-13 | S5 has no FBR row on `szl`. Copied S7 row to `Siezal Supermarket-S4 - Wallayat Complex` after backup `20260913_021420-szl-*`. `branch_code=1004`. Token copied. `pos_id` still S7's `196711` pending S4's real POS ID. | Cursor (executed), User (requested copy) |
