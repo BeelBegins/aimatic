@@ -15,6 +15,7 @@ _ALLOWED_ROLES = {"System Manager", "Sales Manager", "Accounts Manager", "POS Su
 # Fixed lookback for the trend chart, independent of the KPI date-range filter - a
 # single-day filter (e.g. "Today") would otherwise produce a one-point "trend".
 _TREND_DAYS = 14
+_TOP_CUSTOMER_LIMIT = 20
 
 
 def _check_dashboard_role():
@@ -91,6 +92,7 @@ def get_dashboard_summary(
 
 	kpis = _get_range_kpis(company, date_from, date_to, branch_filter)
 	branch_comparison = _get_branch_comparison(company, date_from, date_to, branch_filter)
+	top_customers = _get_top_customers(company, date_from, date_to, branch_filter)
 	if branch_comparison:
 		kpis["top_branch"] = branch_comparison[0]["branch"]
 		kpis["top_branch_amount"] = branch_comparison[0]["net_sales"]
@@ -118,6 +120,7 @@ def get_dashboard_summary(
 		"kpis": kpis,
 		"trend": trend,
 		"branch_comparison": branch_comparison,
+		"top_customers": top_customers,
 		"branches": branches,
 		"active_shifts_preview": open_shifts[:5],
 		"payment_split": payment_split,
@@ -356,6 +359,52 @@ def _get_branch_comparison(company: str, date_from, date_to, branch_filter: list
 		as_dict=True,
 	)
 	return [{"branch": row.branch or _("Unassigned"), "net_sales": flt(row.net_sales)} for row in rows]
+
+
+def _get_top_customers(company: str, date_from, date_to, branch_filter: list[str] | None):
+	"""The selected range's top customers by net POS sales. Returns reduce the
+	customer's amount, while the transaction count intentionally counts sales only.
+	The fixed cap keeps this summary query cheap even for a long custom range."""
+	if branch_filter is not None and not branch_filter:
+		return []
+
+	rows = frappe.db.sql(
+		f"""
+        SELECT
+            pi.customer,
+            MAX(COALESCE(NULLIF(pi.customer_name, ''), pi.customer)) AS customer_name,
+            COALESCE(SUM(pi.grand_total), 0) AS net_sales,
+            COALESCE(SUM(CASE WHEN pi.is_return = 0 THEN 1 ELSE 0 END), 0) AS sales_txn_count
+        FROM `tabPOS Invoice` pi
+        LEFT JOIN `tabPOS Profile` pp ON pp.name = pi.pos_profile
+        WHERE pi.docstatus = 1
+          AND pi.company = %(company)s
+          AND pi.customer IS NOT NULL
+          AND pi.customer != ''
+          AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
+          {_branch_scope_clause(branch_filter)}
+        GROUP BY pi.customer
+        HAVING net_sales > 0
+        ORDER BY net_sales DESC, sales_txn_count DESC, pi.customer ASC
+        LIMIT {_TOP_CUSTOMER_LIMIT}
+        """,
+		{
+			"company": company,
+			"date_from": date_from,
+			"date_to": date_to,
+			"branch_names": tuple(branch_filter) if branch_filter else (),
+		},
+		as_dict=True,
+	)
+	return [
+		{
+			"customer": row.customer,
+			"customer_name": row.customer_name or row.customer,
+			"net_sales": flt(row.net_sales),
+			"txn_count": cint(row.sales_txn_count),
+		}
+		for row in rows
+	]
 
 
 def _get_today_branch_profile_grid(company: str, branch_filter: list[str] | None):

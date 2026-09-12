@@ -289,6 +289,7 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
 				)}
             </div>
             ${this.render_payment_mix(data.payment_split)}
+			${this.render_top_customers(data.top_customers || [])}
             <div class="sd-charts-row">
                 <div class="sd-chart-card">
                     <h4>${__("Sales Trend")} <span class="sd-item-meta">${__("Last {0} days", [
@@ -394,6 +395,68 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
 		});
 	}
 
+	render_top_customers(rows) {
+		const heading = `
+            <div class="sd-leaderboard-heading">
+                <div>
+                    <div class="sd-leaderboard-kicker">${frappe.utils.icon(
+					"award",
+					"sm"
+				)} ${__("Customer leaderboard")}</div>
+                    <h4>${__("Top 20 Customers")}</h4>
+                    <div class="sd-leaderboard-subtitle">${__(
+					"Selected range · net sales after returns"
+				)}</div>
+                </div>
+                <div class="sd-leaderboard-count"><strong>${this.number(
+					rows.length
+				)}</strong><span>${__("ranked")}</span></div>
+            </div>
+        `;
+		if (!rows.length) {
+			return `
+                <div class="sd-top-customers">
+                    ${heading}
+                    <div class="sd-empty sd-empty-inline">${__(
+						"No customers with net sales in the selected range."
+					)}</div>
+                </div>
+            `;
+		}
+		const topSales = Math.max(...rows.map((row) => flt(row.net_sales)), 1);
+		const body = rows
+			.map(
+				(row, index) => {
+					const rankTone = index < 3 ? ` sd-customer-rank-${index + 1}` : "";
+					const salesWidth = Math.max(5, (flt(row.net_sales) / topSales) * 100).toFixed(1);
+					return `
+                        <div class="sd-customer-row${rankTone}">
+                            <div class="sd-customer-rank">${index + 1}</div>
+                            <div class="sd-customer-main">
+                                <div class="sd-customer-name">${this.docLink(
+									"Customer",
+									row.customer,
+									row.customer_name
+								)}</div>
+                                <div class="sd-customer-meta">${this.number(row.txn_count)} ${__(
+									"sales"
+								)}</div>
+                            </div>
+                            <div class="sd-customer-bar" aria-hidden="true"><span style="width:${salesWidth}%"></span></div>
+                            <div class="sd-customer-value">${this.money(row.net_sales)}</div>
+                        </div>
+                    `;
+				}
+			)
+			.join("");
+		return `
+            <div class="sd-top-customers">
+                ${heading}
+                <div class="sd-customer-list">${body}</div>
+            </div>
+        `;
+	}
+
 	render_branch_sections(branches) {
 		if (!branches.length) {
 			return `
@@ -480,10 +543,11 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
         `;
 	}
 
-	docLink(doctype, name) {
+	docLink(doctype, name, label) {
 		const safeDoctype = frappe.utils.escape_html(doctype);
 		const safeName = frappe.utils.escape_html(name);
-		return `<a href="#" data-doctype="${safeDoctype}" data-name="${safeName}">${safeName}</a>`;
+		const safeLabel = frappe.utils.escape_html(label || name);
+		return `<a href="#" data-doctype="${safeDoctype}" data-name="${safeName}">${safeLabel}</a>`;
 	}
 
 	open_dialog(title) {

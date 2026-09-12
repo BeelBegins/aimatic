@@ -293,6 +293,9 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
                     <div><strong>${__("Cost of goods sold")}:</strong> ${frappe.utils.escape_html(
 			data.cogs_definition_note || ""
 		)}</div>
+                    <div><strong>${__("Outstanding payable")}:</strong> ${frappe.utils.escape_html(
+			data.payable_definition_note || ""
+		)}</div>
                     <div class="vp-item-meta">${frappe.utils.escape_html(
 						data.item_sources_note || ""
 					)}</div>
@@ -359,7 +362,11 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 					"wallet",
 					__("Outstanding Payable"),
 					this.money(summary.outstanding_amount),
-					`${this.number(summary.outstanding_invoice_count)} ${__("open invoices")}`
+					summary.outstanding_invoice_count
+						? `${this.number(summary.outstanding_invoice_count)} ${__(
+								"open purchase invoices"
+						  )} · ${__("GL creditors balance")}`
+						: __("GL creditors balance")
 				)}
                 ${this.card(
 					"payment",

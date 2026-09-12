@@ -175,6 +175,228 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Top customers ---------- */
+
+.sales-dashboard-page .sd-top-customers {
+    position: relative;
+    overflow: hidden;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg, 12px);
+    margin-bottom: 20px;
+    box-shadow: var(--card-shadow, 0 1px 2px rgba(0, 0, 0, 0.06));
+}
+
+.sales-dashboard-page .sd-top-customers::before {
+    content: "";
+    position: absolute;
+    top: -130px;
+    right: -80px;
+    width: 300px;
+    height: 260px;
+    pointer-events: none;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.16), transparent 68%);
+}
+
+.sales-dashboard-page .sd-leaderboard-heading {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 20px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sales-dashboard-page .sd-leaderboard-kicker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+    color: var(--text-muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.sales-dashboard-page .sd-leaderboard-kicker svg {
+    width: 14px;
+    height: 14px;
+    color: var(--text-on-purple, #8b5cf6);
+}
+
+.sales-dashboard-page .sd-leaderboard-heading h4 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--heading-color, var(--text-color));
+}
+
+.sales-dashboard-page .sd-leaderboard-subtitle {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.sales-dashboard-page .sd-leaderboard-count {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    flex: 0 0 auto;
+    border: 1px solid rgba(99, 102, 241, 0.24);
+    border-radius: 16px;
+    background: rgba(99, 102, 241, 0.10);
+    color: var(--text-on-purple, #8b5cf6);
+    line-height: 1;
+}
+
+.sales-dashboard-page .sd-leaderboard-count strong {
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+}
+
+.sales-dashboard-page .sd-leaderboard-count span {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.sales-dashboard-page .sd-customer-list {
+    position: relative;
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+}
+
+.sales-dashboard-page .sd-customer-row {
+    display: grid;
+    grid-template-columns: 38px minmax(150px, 1.15fr) minmax(100px, 0.85fr) minmax(120px, auto);
+    grid-template-areas: "rank customer bar value";
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.sales-dashboard-page .sd-customer-row:hover {
+    border-color: var(--border-color);
+    background: var(--subtle-fg);
+    transform: translateX(2px);
+}
+
+.sales-dashboard-page .sd-customer-rank {
+    grid-area: rank;
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border-radius: 9px;
+    background: var(--subtle-fg);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.sales-dashboard-page .sd-customer-rank-1 .sd-customer-rank {
+    background: rgba(245, 158, 11, 0.16);
+    color: #b45309;
+}
+
+.sales-dashboard-page .sd-customer-rank-2 .sd-customer-rank {
+    background: rgba(100, 116, 139, 0.16);
+    color: #475569;
+}
+
+.sales-dashboard-page .sd-customer-rank-3 .sd-customer-rank {
+    background: rgba(180, 83, 9, 0.14);
+    color: #92400e;
+}
+
+.sales-dashboard-page .sd-customer-main {
+    grid-area: customer;
+    min-width: 0;
+}
+
+.sales-dashboard-page .sd-customer-name {
+    overflow: hidden;
+    color: var(--heading-color, var(--text-color));
+    font-size: 13px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sales-dashboard-page .sd-customer-name a {
+    color: inherit;
+}
+
+.sales-dashboard-page .sd-customer-meta {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.sales-dashboard-page .sd-customer-bar {
+    grid-area: bar;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--subtle-fg);
+}
+
+.sales-dashboard-page .sd-customer-bar span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #818cf8, #8b5cf6);
+}
+
+.sales-dashboard-page .sd-customer-rank-1 .sd-customer-bar span {
+    background: linear-gradient(90deg, #f59e0b, #f97316);
+}
+
+.sales-dashboard-page .sd-customer-value {
+    grid-area: value;
+    color: var(--heading-color, var(--text-color));
+    font-size: 13px;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.sales-dashboard-page .sd-top-customers .sd-empty-inline {
+    position: relative;
+    margin: 10px;
+    margin-bottom: 0;
+}
+
+@media (max-width: 680px) {
+    .sales-dashboard-page .sd-customer-row {
+        grid-template-columns: 36px minmax(0, 1fr) auto;
+        grid-template-areas:
+            "rank customer value"
+            ". bar bar";
+        gap: 7px 10px;
+        min-height: 64px;
+    }
+
+    .sales-dashboard-page .sd-customer-bar {
+        margin-bottom: 3px;
+    }
+}
+
 /* ---------- Charts ---------- */
 
 .sales-dashboard-page .sd-charts-row {

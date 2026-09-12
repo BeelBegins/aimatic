@@ -189,6 +189,9 @@ def get_vendor_performance_summary(
 		"cogs_definition_note": _(
 			"Cost of goods sold is the cost-basis value (from stock ledger valuation) of supplier-linked SKUs consumed by submitted sales in the selected window - not the retail sales revenue."
 		),
+		"payable_definition_note": _(
+			"Outstanding payable is the supplier creditors balance from GL Entry (purchase invoices, payments, and opening-balance journal entries), not the sum of Purchase Invoice outstanding amounts alone."
+		),
 		"summary": {
 			"linked_item_count": len(item_codes),
 			"stock_item_count": cint(stock_summary.get("item_count")),
@@ -1094,10 +1097,33 @@ def _get_purchase_receipt_summary(supplier: str, company: str, date_from, date_t
 
 
 def _get_outstanding_summary(supplier: str, company: str, branch: str | None = None):
+	"""Outstanding payable from GL Entry (party creditors balance), not Purchase
+	Invoice.outstanding_amount alone. Legacy iPOS migration opening balances land
+	as Journal Entries, so PI-only sums miss real debt (same bug fixed in
+	aimatic.ai.tools.get_outstanding_payables_overview)."""
 	branch_clause = "AND branch = %(branch)s" if branch else ""
-	rows = frappe.db.sql(
+	params = {"supplier": supplier, "company": company, "branch": branch}
+
+	gl_row = frappe.db.sql(
 		f"""
-        SELECT COUNT(*) AS invoice_count, COALESCE(SUM(outstanding_amount), 0) AS outstanding_amount
+        SELECT COALESCE(SUM(credit - debit), 0) AS outstanding_amount
+        FROM `tabGL Entry`
+        WHERE party_type = 'Supplier'
+          AND is_cancelled = 0
+          AND company = %(company)s
+          AND party = %(supplier)s
+          {branch_clause}
+        """,
+		params,
+		as_dict=True,
+	)[0]
+	outstanding_amount = flt(gl_row.get("outstanding_amount"))
+	if outstanding_amount < 0:
+		outstanding_amount = 0
+
+	pi_row = frappe.db.sql(
+		f"""
+        SELECT COUNT(*) AS invoice_count
         FROM `tabPurchase Invoice`
         WHERE docstatus = 1
           AND IFNULL(is_return, 0) = 0
@@ -1106,13 +1132,13 @@ def _get_outstanding_summary(supplier: str, company: str, branch: str | None = N
           AND outstanding_amount > 0
           {branch_clause}
         """,
-		{"supplier": supplier, "company": company, "branch": branch},
+		params,
 		as_dict=True,
-	)
-	row = rows[0] if rows else {}
+	)[0]
+
 	return {
-		"invoice_count": cint(row.get("invoice_count")),
-		"outstanding_amount": flt(row.get("outstanding_amount")),
+		"invoice_count": cint(pi_row.get("invoice_count")),
+		"outstanding_amount": outstanding_amount,
 	}
 
 
