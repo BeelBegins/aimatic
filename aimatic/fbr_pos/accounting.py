@@ -82,6 +82,7 @@ def add_fbr_sales_tax_row(doc, settings):
 			"description": "FBR Sales Tax",
 			"rate": effective_rate,
 			"included_in_print_rate": 1,
+			"cost_center": doc.cost_center,
 		},
 	)
 
@@ -115,6 +116,7 @@ def add_fbr_pos_fee_row(doc, settings):
 			"description": "FBR POS Service Fee",
 			"tax_amount": fee_amount,
 			"included_in_print_rate": 0,
+			"cost_center": doc.cost_center,
 		},
 	)
 
