@@ -1,27 +1,7 @@
-# Aimatic application guidance
+# Aimatic application adapter
 
-Local code and uncommitted diffs are the immediate source of truth. Durable
-architecture, migration, current-state and incident guidance is maintained in
-`/home/nabeel/frappe-bench/CLAUDE.md` and its routed `.claude/skills/`.
-
-## Safety
-
-- Never modify Frappe, ERPNext or HRMS core for an aimatic feature.
-- Inspect status/diff first and preserve unfamiliar local changes.
-- Read-only site diagnosis is allowed. Live mutation/deploy/migrate/import
-  requires explicit approval, current backup, verification and rollback.
-- SZL was designated future production but not live as of 2026-07-28; verify.
-- The POS handles roughly 2,000 daily transactions. Treat transaction,
-  payment, pricing, offline/idempotency, stock/GL, FBR and permission paths as
-  high risk.
-- Never commit credentials. Public OAuth clients use PKCE without secrets.
-- Safe static/local checks are allowed; no destructive/live suites without
-  approval.
-
-## Development
-
-Own behavior in this app through modules, hooks, fixtures and ordered patches.
-Keep patches idempotent. Validate JSON fixtures and Python/JS syntax. Trace
-full document lifecycles including returns, cancellation, amendment and
-retries. Commit coherent behaviors and update the owning skill/reference when
-a durable fact changes.
+Read and follow `/home/nabeel/frappe-bench/AGENTS.md` before work, including
+in isolated worktrees. It owns shared rules, project routing, and delegation.
+Select this app's relevant project and skill through its `docs/architecture.md`.
+If the shared repository is unavailable, ask the lead for its provisioned path.
+Do not duplicate runtime state or safety rules here.
