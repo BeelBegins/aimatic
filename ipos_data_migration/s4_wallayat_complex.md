@@ -20,8 +20,10 @@ system here.
 | Source files received | **Done** 2026-09-12: `Ho-MasterItemFiled5b674.xlsx` (master, File `9872249e71`), `1004stockposition.xls` (branch stock/price, File `3b594c134a`), `1004vendorbalances.xlsx` (vendor opening balances, File `16ee8a6a31`). "1004" is S4's own FBR-style branch code, same convention as S7's "1007" |
 | Mock restore of `szl` backup onto `siezal` | **Done** 2026-09-12 ~23:39 PKT — source `20260912_233859-szl-database.sql.gz` (+files/private-files tars), taken after the same-day cost-center GL fix and after the three S4 source files were uploaded, so the mock includes both. Verified: `siezal`'s GL missing-`cost_center` counts read 0 across all accounts (matches live `szl` post-fix), S4 branch/warehouse present, all three S4 files present on disk and in the `File` doctype |
 | Barcode gap audit vs catalog (mock `siezal`) | **Done** 2026-09-12 — see below |
-| Master reconcile (mock `siezal`) | **Done** 2026-09-13 — 4,717 / 4,897 ready, 180 blocked on 5 unknown subcategories (needs approval, see below) |
-| Item create, prices, opening stock, vendor balances, POS go-live | **Not started** — do not proceed without explicit approval per phase, same as S7 |
+| Master reconcile (mock `siezal`) | **Done** 2026-09-13 — 4,717 / 4,897 ready, 180 blocked on 5 unknown subcategories; user resolved all 5 (see Sign-off log) |
+| New Item Group `Fruits & Vegetables` (mock `siezal`) | **Done** 2026-09-13 — leaf under existing `Food Items`, via `ensure_s4_fruits_vegetables_group.py`. **Not yet created on live `szl`** |
+| Item create (mock `siezal`) | **Done** 2026-09-13 — 4,883 Items created (`STO-ITEM-2026-17898`–`22779`... one series number, `SZ002`, already existed, matching the S7-era note that it's already on `STO-ITEM-2026-16374`), 0 failed, 13 rows skipped (junk/blank subcat), 0 blocked. Verified: 0 `item_defaults`/warehouse leakage, 0 duplicate barcodes, exact expected counts landed in each aliased Item Group (Fruits & Vegetables 90, Electronic Items 45, Wrist Watches 31, Animal - Pet Items 1). **Not yet created on live `szl`** |
+| Prices, opening stock, vendor balances, POS go-live | **Not started** — do not proceed without explicit approval per phase, same as S7 |
 
 ## Barcode gap audit (2026-09-12, on `siezal` mock)
 
@@ -161,8 +163,9 @@ Same shape as S7's:
 | Artifact | Role |
 |---|---|
 | `audit_s4_barcodes_vs_szl.py` | Gap audit + Excel upload to `Home/Migrations/S4` (done) |
-| *(not yet written)* `reconcile_s4_missing_vs_master.py` | Read-only master reconcile — next step |
-| *(not yet written)* `create_s4_missing_items.py` | Create missing Items from master file |
+| `reconcile_s4_missing_vs_master.py` | Read-only master reconcile — done |
+| `ensure_s4_fruits_vegetables_group.py` | Approved exception: create `Fruits & Vegetables` leaf under `Food Items` — done on mock, not yet on live `szl` |
+| `create_s4_missing_items.py` | Create missing Items from master file — done on mock (4,883 created), not yet on live `szl` |
 | *(not yet written)* `import_s4_prices_and_stock.py` | S4 selling prices + opening stock |
 | *(not yet written)* `import_s4_vendor_balances.py` | S4 vendor opening balances |
 | `import.md` | Canonical field mapping, tax-exclusive CurCost, stock GL rules |
@@ -175,3 +178,8 @@ Same shape as S7's:
 | 2026-09-12 | Follow the S7 pattern for S4 (file roles, hard gates, pass order) rather than a new process | User |
 | 2026-09-12 | Restored `20260912_233859-szl-database.sql.gz` (+files) onto `siezal` as the S4 mock baseline; verified GL cost_center fix and S4 masters both present post-restore | User (approved), Claude (executed + verified) |
 | 2026-09-12 | Barcode gap audit run against `siezal` mock (not live `szl`, since S4 has no pre-existing live data to protect either way, but mock is safer default for reporting writes) — 4,897 missing rows accepted as gap baseline | Audit run |
+| 2026-09-13 | `FRUITES & VEGETABLES` (90 rows): create new leaf Item Group `Fruits & Vegetables` under existing parent `Food Items` — no existing group covers fresh produce, genuinely new territory (unlike the other 3 subcat gates below) | User |
+| 2026-09-13 | Approved 3 typo/near-match aliases to existing groups: `ELECTONIC ITEMS`→`Electronic Items`, `WATCH`→`Wrist Watches`, `PET ACCESSORIES`→`Animal - Pet Items` | User |
+| 2026-09-13 | `TESTING` (4 rows) and blank/literal-`NULL` SubCatName (9 rows): excluded, same treatment as S7's skipped `TEST`/`TEST3` junk rows | User |
+| 2026-09-13 | New Item Group `Fruits & Vegetables` created on `siezal` mock only via `ensure_s4_fruits_vegetables_group.py` (idempotent, allows mock or live) | Claude (executed), User (approved) |
+| 2026-09-13 | 4,883 Items created on `siezal` mock via `create_s4_missing_items.py` (adapted from `create_s7_missing_items.py`): 0 failed, 0 blocked, 13 skipped as junk/blank, 1 (`SZ002`) already existed pre-S4 (matches the S7-era note). Verified 0 warehouse leakage, 0 duplicate barcodes, exact per-group counts. **Live `szl` still untouched** — this was mock only | Claude (executed + verified), User (approved via master-reconcile decisions) |
