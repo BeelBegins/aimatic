@@ -1,3 +1,5 @@
+import frappe
+
 from aimatic.label_printing.setup import after_install as setup_label_printing
 from aimatic.patches.create_pos_supervisor_role import execute as create_pos_supervisor_role
 from aimatic.patches.create_pos_user_role import execute as create_pos_user_role
@@ -8,7 +10,8 @@ from aimatic.restaurant.setup import create_roles as create_restaurant_roles
 def after_install():
 	setup_label_printing()
 	create_restaurant_roles()
-	setup_pos_master_data_permissions()
+	if frappe.db.table_exists("tabItem"):
+		setup_pos_master_data_permissions()
 
 
 def setup_pos_master_data_permissions():

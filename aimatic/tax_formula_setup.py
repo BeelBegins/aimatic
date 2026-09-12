@@ -95,6 +95,18 @@ def repair_dangling_advance_tax_accounts() -> dict:
 
 def repair_dangling_tax_formula_accounts() -> dict:
 	"""Repair every known Tax Formula account link field."""
+	if not all(
+		frappe.db.table_exists(table)
+		for table in ("tabCompany", "tabAccount", "tabTax Formula")
+	):
+		return {
+			fieldname: {
+				"status": "skipped",
+				"reason": "erpnext_accounting_not_installed",
+				"updated": [],
+			}
+			for _formula_type, fieldname, _template in _REPAIRABLE_ACCOUNTS
+		}
 	return {
 		fieldname: _repair_formula_account(formula_type, fieldname, template)
 		for formula_type, fieldname, template in _REPAIRABLE_ACCOUNTS
