@@ -13,9 +13,10 @@ Full status (done / left / how sync works):
 
 ## What this page is for
 
-Fill Partner API credentials once per site. Shared SFTP host/user/password
-also live here. Per-branch work (chain ID, vendor ID, catalog sync, mapping,
-push, SFTP enable/schedule) lives on **Foodpanda Outlet**, **Foodpanda Catalog
+Fill Partner API credentials once per site. The SFTP host/user/password here
+are the default fallback; chain-specific overrides can be stored on **Foodpanda
+Outlet**. Per-branch work (chain ID, vendor ID, catalog sync, mapping, push,
+SFTP enable/schedule, and SFTP connection overrides) lives on **Foodpanda Outlet**, **Foodpanda Catalog
 Sheet**, and the **Catalog Console**.
 
 | Field | Purpose |

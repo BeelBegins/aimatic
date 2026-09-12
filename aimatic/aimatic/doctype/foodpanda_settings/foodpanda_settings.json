@@ -123,7 +123,7 @@
   },
   {
    "default": "vendor-automation-sftp-live-ap.prod.aws.qcommerce.live",
-   "description": "Foodpanda central vendor-automation SFTP host. Shared by every outlet; the uploaded filename identifies the vendor.",
+   "description": "Default Foodpanda vendor-automation SFTP host. Blank outlet connection fields use this value; set an override on Foodpanda Outlet for a separate chain account.",
    "fieldname": "sftp_host",
    "fieldtype": "Data",
    "label": "SFTP Host"

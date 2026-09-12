@@ -111,10 +111,10 @@
    "read_only": 1
   },
   {
-   "description": "CSV of every row whose barcode(s) did not resolve to an Item, for reconciliation.",
+   "description": "CSV of unmatched rows, invalid prices, and conflicts skipped because every source row was inactive.",
    "fieldname": "unmatched_report",
    "fieldtype": "Attach",
-   "label": "Unmatched Report",
+   "label": "Import Exceptions Report",
    "read_only": 1
   }
  ],

@@ -9,6 +9,9 @@ class FoodpandaOutlet(Document):
 		self.chain_id = (self.chain_id or "").strip()
 		self.vendor_id = (self.vendor_id or "").strip()
 		self.sftp_filename_prefix = (self.sftp_filename_prefix or "").strip()
+		self.sftp_host = (self.sftp_host or "").strip()
+		self.sftp_username = (self.sftp_username or "").strip()
+		self.sftp_remote_path = (self.sftp_remote_path or "").strip()
 		if not self.chain_id:
 			self.chain_id = (
 				frappe.db.get_single_value("Foodpanda Settings", "chain_id") or ""

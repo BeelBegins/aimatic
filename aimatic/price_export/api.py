@@ -439,9 +439,25 @@ def _apply_foodpanda_price_updates(branch, normalized, source_file=None, skip_in
 			normalized.pop(code, None)
 		item_codes = list(normalized)
 		if not item_codes:
+			price_list = get_or_create_branch_foodpanda_price_list(branch)
+			log = frappe.get_doc(
+				{
+					"doctype": "Foodpanda Price Import Log",
+					"branch": branch,
+					"price_list": price_list,
+					"run_by": frappe.session.user,
+					"run_datetime": now_datetime(),
+					"created_count": 0,
+					"updated_count": 0,
+					"unchanged_count": 0,
+					"skipped_disabled_count": len(invalid),
+					**({"source_file": source_file} if source_file else {}),
+				}
+			)
+			log.insert(ignore_permissions=True)
 			return {
-				"log": None,
-				"price_list": None,
+				"log": log.name,
+				"price_list": price_list,
 				"created": 0,
 				"updated": 0,
 				"unchanged": 0,

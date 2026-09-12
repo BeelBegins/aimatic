@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 from aimatic.price_export.foodpanda_sftp import (
 	_remote_file_path,
 	_sanitize_error,
+	_sftp_put,
 	build_foodpanda_csv_bytes,
 	build_foodpanda_csv_rows,
 	csv_filename,
@@ -92,6 +93,15 @@ class TestFoodpandaSftpCsv(unittest.TestCase):
 			"auth failed for [redacted]",
 		)
 
+	def test_sftp_host_normalizes_portal_url(self):
+		from aimatic.price_export.foodpanda_sftp import _normalize_sftp_host
+
+		self.assertEqual(
+			_normalize_sftp_host("sftp://vendor-automation.example/"),
+			"vendor-automation.example",
+		)
+		self.assertEqual(_normalize_sftp_host("vendor-automation.example"), "vendor-automation.example")
+
 
 class TestFoodpandaSftpUpload(unittest.TestCase):
 	def _settings(self):
@@ -147,7 +157,59 @@ class TestFoodpandaSftpUpload(unittest.TestCase):
 		self.assertEqual(result["status"], "Failed")
 		self.assertNotIn("secret", result["error"])
 		mock_status.assert_called_once_with("S1", success=False, error=result["error"])
+
 		self.assertEqual(mock_log.call_args.kwargs["status"], "Failed")
+
+	@patch("paramiko.SFTPClient.from_transport")
+	@patch("paramiko.Transport")
+	def test_sftp_put_writes_payload_once(self, mock_transport, mock_from_transport):
+		transport = mock_transport.return_value
+		sftp = mock_from_transport.return_value
+		remote_file = MagicMock()
+		sftp.file.return_value.__enter__.return_value = remote_file
+
+		result = _sftp_put(self._settings(), "catalog_rg26.csv", b"payload")
+
+		self.assertEqual(result, "Catalog/catalog_rg26.csv")
+		remote_file.write.assert_called_once_with(b"payload")
+		transport.connect.assert_called_once_with(username="FP_PK_test", password="secret")
+
+	@patch("aimatic.price_export.foodpanda_sftp._", new=lambda x: x)
+	@patch("aimatic.price_export.foodpanda_sftp.frappe")
+	def test_outlet_connection_overrides_settings_fallback(self, mock_frappe):
+		mock_frappe.db.exists.return_value = True
+		mock_frappe.db.get_value.return_value = "Outlet-1"
+		outlet = SimpleNamespace(
+			sftp_enabled=1,
+			sftp_filename_prefix="Siezal",
+			sftp_host="sftp://branch.example/",
+			sftp_port=2222,
+			sftp_username="branch-user",
+			sftp_remote_path="BranchCatalog",
+			vendor_id="vgqd",
+			name="Outlet-1",
+		)
+		outlet.get_password = MagicMock(return_value="branch-secret")
+		settings = SimpleNamespace(
+			sftp_host="site.example",
+			sftp_username="site-user",
+			sftp_remote_path="Catalog",
+			sftp_port=22,
+			sftp_filename_prefix="catalog",
+		)
+		settings.get_password = MagicMock(return_value="site-secret")
+		mock_frappe.get_doc.return_value = outlet
+		mock_frappe.get_single.return_value = settings
+
+		from aimatic.price_export import foodpanda_sftp as mod
+
+		loaded = mod._load_sftp_settings("S1")
+		self.assertEqual(loaded["host"], "branch.example")
+		self.assertEqual(loaded["port"], 2222)
+		self.assertEqual(loaded["username"], "branch-user")
+		self.assertEqual(loaded["password"], "branch-secret")
+		self.assertEqual(loaded["remote_path"], "BranchCatalog")
+		self.assertEqual(loaded["filename_prefix"], "Siezal")
 
 	@patch("aimatic.price_export.foodpanda_sftp._", new=lambda x: x)
 	@patch("aimatic.price_export.foodpanda_sftp.frappe")

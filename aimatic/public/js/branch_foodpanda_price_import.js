@@ -4,14 +4,17 @@ function show_foodpanda_import_result(result) {
 		`${__("Created")}: ${result.created}`,
 		`${__("Updated")}: ${result.updated}`,
 		`${__("Unchanged")}: ${result.unchanged}`,
-		`${__("Skipped (Item disabled)")}: ${result.skipped_disabled}`,
+		`${__("Skipped (invalid Item)")}: ${result.skipped_invalid}`,
 		`${__("Unmatched (no barcode match)")}: ${result.unmatched}`,
+		`${__("Rows matched to multiple Items")}: ${result.multi_item_rows}`,
+		`${__("Conflicts resolved from active rows")}: ${result.resolved_conflicts}`,
+		`${__("Conflicts skipped (all rows inactive)")}: ${result.skipped_inactive_conflicts}`,
 	];
 
 	if (result.unmatched_report) {
 		lines.push(
 			`<a href="${result.unmatched_report}" target="_blank">${__(
-				"Download unmatched rows report"
+				"Download import exceptions report"
 			)}</a>`
 		);
 	}

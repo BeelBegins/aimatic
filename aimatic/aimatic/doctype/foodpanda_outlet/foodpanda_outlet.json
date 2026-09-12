@@ -27,6 +27,12 @@
   "sftp_enabled",
   "sftp_schedule_time",
   "sftp_filename_prefix",
+  "section_break_sftp_connection",
+  "sftp_host",
+  "sftp_port",
+  "sftp_username",
+  "sftp_password",
+  "sftp_remote_path",
   "sftp_column_break",
   "sftp_last_upload",
   "sftp_last_error"
@@ -147,7 +153,7 @@
   },
   {
    "default": "0",
-   "description": "When enabled, the scheduler uploads this outlet once per day at SFTP Schedule Time (site timezone). Manual upload still works without this. SFTP host/user/password live on Foodpanda Settings.",
+   "description": "When enabled, the scheduler uploads this outlet once per day at SFTP Schedule Time (site timezone). Manual upload still works without this. Blank connection fields use the Foodpanda Settings fallback.",
    "fieldname": "sftp_enabled",
    "fieldtype": "Check",
    "label": "SFTP Enabled"
@@ -166,8 +172,43 @@
    "label": "SFTP Filename Prefix"
   },
   {
+   "fieldname": "section_break_sftp_connection",
+   "fieldtype": "Section Break",
+   "label": "SFTP connection override (optional)"
+  },
+  {
+   "description": "Optional per-outlet host override. Leave blank to use Foodpanda Settings.",
+   "fieldname": "sftp_host",
+   "fieldtype": "Data",
+   "label": "SFTP Host"
+  },
+  {
+   "description": "Optional per-outlet port override. Leave blank to use Foodpanda Settings.",
+   "fieldname": "sftp_port",
+   "fieldtype": "Int",
+   "label": "SFTP Port"
+  },
+  {
+   "description": "Optional per-outlet username override. Leave blank to use Foodpanda Settings.",
+   "fieldname": "sftp_username",
+   "fieldtype": "Data",
+   "label": "SFTP Username"
+  },
+  {
+   "description": "Optional per-outlet password override. Leave blank to use Foodpanda Settings. Never exported as a fixture.",
+   "fieldname": "sftp_password",
+   "fieldtype": "Password",
+   "label": "SFTP Password"
+  },
+  {
    "fieldname": "sftp_column_break",
    "fieldtype": "Column Break"
+  },
+  {
+   "description": "Optional per-outlet remote folder override. Leave blank to use Foodpanda Settings.",
+   "fieldname": "sftp_remote_path",
+   "fieldtype": "Data",
+   "label": "SFTP Remote Path"
   },
   {
    "fieldname": "sftp_last_upload",

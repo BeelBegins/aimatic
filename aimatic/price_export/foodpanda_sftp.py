@@ -4,10 +4,10 @@
 """Foodpanda vendor-automation SFTP CSV upload.
 
 Builds the same `sku,barcode,price,active,quantity` shape as Branch Price
-Sheet's Download Foodpanda CSV, then puts the file via site-wide SFTP
-credentials on Foodpanda Settings. Filename is `{prefix}_{vendor_id}.csv`
-as required by Foodpanda Catalog-SFTP. Per-outlet enable/schedule lives on
-Foodpanda Outlet. This is the portal CSV path — not Partner API catalog
+Sheet's Download Foodpanda CSV, then puts the file via optional per-outlet SFTP
+credentials, falling back to Foodpanda Settings. Filename is `{prefix}_{vendor_id}.csv`
+as required by Foodpanda Catalog-SFTP. Per-outlet enable/schedule and connection
+overrides live on Foodpanda Outlet. This is the portal CSV path — not Partner API
 sync.
 """
 
@@ -16,6 +16,7 @@ from __future__ import annotations
 import csv
 import io
 from contextlib import closing
+from urllib.parse import urlsplit
 
 import frappe
 from frappe import _
@@ -184,18 +185,39 @@ def _get_outlet_for_branch(branch):
 	return frappe.get_doc("Foodpanda Outlet", outlet_name)
 
 
+def _normalize_sftp_host(host):
+	"""Return a Paramiko host from a portal-style host or SFTP URL."""
+	host = (host or "").strip()
+	if "://" in host:
+		parsed = urlsplit(host)
+		if parsed.scheme.lower() not in {"sftp", "ssh"}:
+			frappe.throw(_("SFTP Host must be a hostname or an sftp:// URL"))
+		host = parsed.hostname or parsed.path
+	return host.strip().rstrip("/")
+
+
+def _password_for(doc, fieldname):
+	try:
+		return doc.get_password(fieldname, raise_exception=False)
+	except (AttributeError, TypeError):
+		return None
+
+
 def _load_sftp_settings(branch, require_enabled=False):
 	outlet = _get_outlet_for_branch(branch)
 	if require_enabled and not cint(outlet.sftp_enabled):
 		frappe.throw(_("Foodpanda SFTP is not enabled for branch {0}").format(branch))
 
 	settings = frappe.get_single("Foodpanda Settings")
-	host = (settings.sftp_host or "").strip()
-	username = (settings.sftp_username or "").strip()
-	remote_path = (settings.sftp_remote_path or "").strip() or DEFAULT_SFTP_REMOTE_PATH
-	port = cint(settings.sftp_port) or 22
+	host = (getattr(outlet, "sftp_host", None) or settings.sftp_host or "").strip()
+	username = (getattr(outlet, "sftp_username", None) or settings.sftp_username or "").strip()
+	remote_path = (
+		getattr(outlet, "sftp_remote_path", None) or settings.sftp_remote_path or ""
+	).strip() or DEFAULT_SFTP_REMOTE_PATH
+	port = cint(getattr(outlet, "sftp_port", None)) or cint(settings.sftp_port) or 22
 	prefix = outlet.sftp_filename_prefix or settings.sftp_filename_prefix
-	password = settings.get_password("sftp_password", raise_exception=False)
+	password = _password_for(outlet, "sftp_password") or _password_for(settings, "sftp_password")
+	host = _normalize_sftp_host(host)
 
 	missing = []
 	if not host:
@@ -206,7 +228,7 @@ def _load_sftp_settings(branch, require_enabled=False):
 		missing.append(_("password"))
 	if missing:
 		frappe.throw(
-			_("Foodpanda SFTP is missing {0} on Foodpanda Settings").format(
+			_("Foodpanda SFTP is missing {0} on the outlet or Foodpanda Settings").format(
 				frappe.utils.comma_and(missing)
 			)
 		)
