@@ -10,7 +10,14 @@ class TestBranchPriceListInitialization(unittest.TestCase):
 
 		frappe.db.get_value.return_value = None
 		frappe.db.exists.return_value = False
-		frappe.db.get_single_value.side_effect = ["PKR", "Standard Selling"]
+		frappe.db.get_single_value.side_effect = lambda _dt, field: (
+			"Co"
+			if field == "default_company"
+			else "Standard Selling"
+			if field == "selling_price_list"
+			else "PKR"
+		)
+		frappe.db.get_value.side_effect = lambda dt, *a, **k: "PKR" if dt == "Company" else None
 		frappe.session.user = "Administrator"
 		frappe.generate_hash.return_value = "item-price-hash"
 		baseline = {
@@ -68,7 +75,10 @@ class TestBranchPriceListInitialization(unittest.TestCase):
 
 		frappe.db.get_value.return_value = None
 		frappe.db.exists.return_value = False
-		frappe.db.get_single_value.return_value = "PKR"
+		frappe.db.get_single_value.side_effect = lambda _dt, field: (
+			"Co" if field == "default_company" else "PKR"
+		)
+		frappe.db.get_value.side_effect = lambda dt, *a, **k: "PKR" if dt == "Company" else None
 		frappe.get_all.return_value = ["POS-1"]
 		inserted = []
 
@@ -102,10 +112,16 @@ class TestBranchPriceListInitialization(unittest.TestCase):
 	def test_existing_branch_list_must_be_enabled_and_selling_only(self, frappe):
 		from aimatic.shelf_pricing.utils import get_or_create_branch_price_list
 
-		frappe.db.get_value.side_effect = [
-			"Wrong List",
-			SimpleNamespace(selling=1, buying=1, enabled=1),
-		]
+		frappe.db.get_value.side_effect = lambda dt, *a, **k: (
+			"Wrong List"
+			if dt == "Branch"
+			else SimpleNamespace(selling=1, buying=1, enabled=1, currency="PKR")
+			if dt == "Price List"
+			else "PKR"
+			if dt == "Company"
+			else None
+		)
+		frappe.db.get_single_value.return_value = "Co"
 		frappe.throw.side_effect = ValueError
 
 		with self.assertRaises(ValueError):

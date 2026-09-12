@@ -31,7 +31,12 @@ BRANCH_BASELINE_FIELDS = (
 
 
 def _default_currency():
-	return frappe.db.get_single_value("Global Defaults", "default_currency")
+	company = frappe.db.get_single_value("Global Defaults", "default_company")
+	if company:
+		currency = frappe.db.get_value("Company", company, "default_currency")
+		if currency:
+			return currency
+	return frappe.db.get_single_value("Global Defaults", "default_currency") or "PKR"
 
 
 def get_branch_price_list_name(branch):
@@ -54,6 +59,7 @@ def _copy_branch_price_baseline(source_price_list, target_price_list):
 
 	timestamp = now_datetime()
 	user = frappe.session.user or "Administrator"
+	currency = _default_currency()
 	fields = [
 		"name",
 		"owner",
@@ -77,7 +83,7 @@ def _copy_branch_price_baseline(source_price_list, target_price_list):
 			user,
 			0,
 			index,
-			*(row.get(field) for field in BRANCH_BASELINE_FIELDS),
+			*(currency if field == "currency" else row.get(field) for field in BRANCH_BASELINE_FIELDS),
 			target_price_list,
 			None,
 			0,
@@ -138,7 +144,9 @@ def get_or_create_branch_price_list(branch):
 
 
 def _validate_selling_only_price_list(price_list):
-	details = frappe.db.get_value("Price List", price_list, ["selling", "buying", "enabled"], as_dict=True)
+	details = frappe.db.get_value(
+		"Price List", price_list, ["selling", "buying", "enabled"], as_dict=True
+	)
 	if not details:
 		frappe.throw(f"Branch Price List {price_list} does not exist.")
 	if not details.selling or details.buying or not details.enabled:
