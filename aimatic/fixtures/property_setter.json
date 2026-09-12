@@ -382,7 +382,7 @@
   "property_type": "Check",
   "row_name": null,
   "value": "1"
-},
+ },
  {
   "default_value": null,
   "doc_type": "Delivery Note Item",
@@ -7083,6 +7083,22 @@
   "module": null,
   "name": "Purchase Order-custom_barcode-hidden",
   "property": "hidden",
+  "property_type": "Check",
+  "row_name": null,
+  "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Payment Entry",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "cost_center",
+  "is_system_generated": 1,
+  "modified": "2026-09-12 23:40:28.184517",
+  "module": null,
+  "name": "Payment Entry-cost_center-reqd",
+  "property": "reqd",
   "property_type": "Check",
   "row_name": null,
   "value": "1"
