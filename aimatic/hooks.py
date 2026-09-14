@@ -20,6 +20,9 @@ doc_events = {
 			# amount=0 payment rows — restores the Food Panda Credit marker.
 			"aimatic.offline_pos.events.restore_food_panda_credit_payment_marker",
 			"aimatic.loyalty.events.on_submit_correct_loyalty_points",
+			# Core validates a loyalty redemption but never debits the
+			# customer's balance for it — see the function docstring.
+			"aimatic.loyalty.events.on_submit_debit_redeemed_loyalty_points",
 			"aimatic.gift_voucher.events.on_submit_issue_gift_voucher",
 		],
 		"on_cancel": [
@@ -63,6 +66,10 @@ doc_events = {
 	},
 	"Sales Invoice": {
 		"before_validate": "aimatic.branch_management.events.apply_branch_defaults",
+		# Consolidated POS invoices: ERPNext skips its own loyalty-redemption
+		# GL credit to Debtors when is_consolidated is set — see the function
+		# docstring for why that leaves a real, uncollectible receivable.
+		"on_submit": "aimatic.loyalty.events.on_submit_close_consolidated_loyalty_gap",
 	},
 	"Delivery Note": {
 		"before_validate": "aimatic.branch_management.events.apply_branch_defaults",

@@ -99,3 +99,160 @@ def on_submit_correct_loyalty_points(doc, method=None):
 		_correct_loyalty_point_entry(original, returned_qty_by_row(original.name))
 	else:
 		_correct_loyalty_point_entry(doc)
+
+
+def _debit_redeemed_loyalty_points(doc):
+	"""Debit the customer's balance for points redeemed on this POS Invoice.
+
+	Core never creates a redemption-side Loyalty Point Entry here -- it only
+	validates the redemption (loyalty_program.validate_loyalty_points) and
+	folds loyalty_amount into paid_amount/change_amount arithmetic.
+	get_loyalty_details sums every row for the customer with no docstatus
+	filter and nothing else ever offsets a redemption, so without this the
+	same points stay redeemable indefinitely (confirmed on szl: 0 of 6,232
+	Loyalty Point Entry rows have redeem_against populated).
+
+	`invoice_type` is mandatory on this doctype. Leaves it as `"Journal
+	Entry"` with `invoice` blank -- the same combination this bench's own
+	2026-08-02 loyalty-opening migration already used for a manual/correction
+	entry with no real originating document -- rather than `"POS Invoice"` +
+	doc.name, which would collide with _correct_loyalty_point_entry's exact
+	`{"invoice_type": "POS Invoice", "invoice": invoice.name}` lookup: with
+	two rows matching, frappe.db.get_value could return this one and have its
+	negative points silently overwritten by the earning recompute.
+	`redeem_against` is a Link to another Loyalty Point Entry (which earning
+	entry's points are being consumed) -- not usable here -- so
+	`discretionary_reason` carries the marker this function checks for
+	idempotency instead.
+	"""
+	if not (cint(doc.redeem_loyalty_points) and doc.loyalty_points and doc.loyalty_program):
+		return
+
+	marker = f"Redemption debit for {doc.doctype} {doc.name}"
+	if frappe.db.exists("Loyalty Point Entry", {"discretionary_reason": marker}):
+		return
+
+	frappe.get_doc(
+		{
+			"doctype": "Loyalty Point Entry",
+			"company": doc.company,
+			"loyalty_program": doc.loyalty_program,
+			"customer": doc.customer,
+			"invoice_type": "Journal Entry",
+			"discretionary_reason": marker,
+			"loyalty_points": -cint(doc.loyalty_points),
+			"purchase_amount": 0,
+			"posting_date": doc.posting_date,
+			"expiry_date": add_days(doc.posting_date, 365),
+		}
+	).insert(ignore_permissions=True)
+
+
+def on_submit_debit_redeemed_loyalty_points(doc, method=None):
+	"""Registered as a POS Invoice on_submit doc_event."""
+	if cint(getattr(doc, "is_return", 0)):
+		return
+	_debit_redeemed_loyalty_points(doc)
+
+
+def on_submit_close_consolidated_loyalty_gap(doc, method=None):
+	"""Registered as a Sales Invoice on_submit doc_event.
+
+	ERPNext's Sales Invoice.make_loyalty_point_redemption_gle -- the GL entry
+	that credits Debtors for a redeemed-points discount -- is unconditionally
+	skipped `if ... not self.is_consolidated`, on the assumption the original
+	POS Invoice already posted it. On this bench POS Invoice defers all GL to
+	the consolidated Sales Invoice (POS Settings.post_change_gl_entries is
+	off, verified: POS Invoice submission posts zero GL Entry rows), so that
+	credit is never posted at all. The customer still paid the full listed
+	price -- Cash: charged in full, the loyalty top-up then reads as phantom
+	"change" that make_pos_gl_entries subtracts from the real cash GL row;
+	Bank/Card: charged in full outright, nothing to subtract -- but the
+	invoice is left carrying a receivable equal to the redeemed points that
+	nobody is ever going to collect from a customer who already paid.
+
+	Close it the same way this business already writes off a POS residual it
+	won't chase -- a Journal Entry against the invoice's own POS Profile
+	write-off account -- rather than editing an already-submitted document's
+	stored totals directly.
+	"""
+	if not (
+		cint(doc.is_consolidated)
+		and cint(doc.redeem_loyalty_points)
+		and flt(doc.loyalty_amount)
+		and not cint(doc.is_return)
+	):
+		return
+
+	gap = flt(doc.outstanding_amount, 2)
+	if gap <= 0.5:
+		return
+
+	already_closed = frappe.db.sql(
+		"""
+		SELECT jea.name
+		FROM `tabJournal Entry Account` jea
+		JOIN `tabJournal Entry` je ON je.name = jea.parent
+		WHERE jea.reference_type = 'Sales Invoice'
+		  AND jea.reference_name = %s
+		  AND je.docstatus = 1
+		""",
+		doc.name,
+	)
+	if already_closed:
+		return
+
+	write_off = (
+		frappe.get_cached_value(
+			"POS Profile",
+			doc.pos_profile,
+			["write_off_account", "write_off_cost_center"],
+			as_dict=True,
+		)
+		if doc.pos_profile
+		else None
+	)
+	if not write_off or not write_off.write_off_account:
+		frappe.log_error(
+			title="Loyalty redemption gap could not be closed",
+			message=(
+				f"Sales Invoice {doc.name}: consolidated loyalty redemption left "
+				f"{gap} outstanding but POS Profile {doc.pos_profile} has no "
+				"write_off_account configured. Close manually."
+			),
+		)
+		return
+
+	je = frappe.new_doc("Journal Entry")
+	je.voucher_type = "Journal Entry"
+	je.posting_date = doc.posting_date
+	je.company = doc.company
+	je.user_remark = (
+		f"Close loyalty-redemption receivable gap left by consolidated invoice "
+		f"{doc.name} (ERPNext skips make_loyalty_point_redemption_gle when "
+		"is_consolidated is set)."
+	)
+	je.append(
+		"accounts",
+		{
+			"account": write_off.write_off_account,
+			"cost_center": write_off.write_off_cost_center or doc.cost_center,
+			"branch": doc.branch,
+			"debit_in_account_currency": gap,
+		},
+	)
+	je.append(
+		"accounts",
+		{
+			"account": doc.debit_to,
+			"party_type": "Customer",
+			"party": doc.customer,
+			"cost_center": doc.cost_center,
+			"branch": doc.branch,
+			"credit_in_account_currency": gap,
+			"reference_type": "Sales Invoice",
+			"reference_name": doc.name,
+		},
+	)
+	je.insert(ignore_permissions=True)
+	je.submit()
