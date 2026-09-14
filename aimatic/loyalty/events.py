@@ -101,16 +101,46 @@ def on_submit_correct_loyalty_points(doc, method=None):
 		_correct_loyalty_point_entry(doc)
 
 
-def _debit_redeemed_loyalty_points(doc):
-	"""Debit the customer's balance for points redeemed on this POS Invoice.
+def _redemption_was_actually_honored(doc):
+	"""True only if the discount a redeem-points claim implies was really
+	collected less cash/bank, not just recorded on the invoice.
 
-	Core never creates a redemption-side Loyalty Point Entry here -- it only
-	validates the redemption (loyalty_program.validate_loyalty_points) and
-	folds loyalty_amount into paid_amount/change_amount arithmetic.
-	get_loyalty_details sums every row for the customer with no docstatus
-	filter and nothing else ever offsets a redemption, so without this the
-	same points stay redeemable indefinitely (confirmed on szl: 0 of 6,232
-	Loyalty Point Entry rows have redeem_against populated).
+	get_pos_invoice_preview already computes and returns the correctly
+	discounted `amount_due` to the terminal for display, so the backend side
+	of this has never been wrong. But checked against every one of the 43
+	redemption POS Invoices on szl (2026-09-15): every single one collected
+	the FULL grand_total regardless -- payment.amount sums to grand_total (or
+	more, for ordinary round-note change unrelated to loyalty, itself computed
+	against grand_total rather than the discounted payable, e.g. `change_amount
+	= tendered - grand_total` with no loyalty_amount in that subtraction at
+	all). Zero of them ever reduced what the customer actually paid. That
+	looks like a terminal/cashier-workflow gap (redemption is claimed but the
+	discounted amount_due is never what gets collected), not something fixable
+	from this backend -- see the offline_pos / Electron client, out of scope
+	here.
+
+	Debiting a customer's balance for a claim that was never honored took real
+	point value from every one of those 43 customers for nothing (confirmed
+	and reversed 2026-09-15). Only debit when the arithmetic proves the
+	discount was genuinely taken off what was collected, so this can't repeat.
+	"""
+	real_kept = flt(doc.paid_amount, 2) - flt(doc.change_amount, 2)
+	discounted = flt(flt(doc.grand_total, 2) - flt(doc.loyalty_amount, 2), 2)
+	return abs(real_kept - discounted) <= 0.5
+
+
+def _debit_redeemed_loyalty_points(doc):
+	"""Debit the customer's balance for points genuinely redeemed on this
+	POS Invoice -- see _redemption_was_actually_honored for why "claimed"
+	and "genuinely redeemed" are not the same thing here.
+
+	Core never creates a redemption-side Loyalty Point Entry even for an
+	honored redemption -- it only validates the redemption
+	(loyalty_program.validate_loyalty_points) and folds loyalty_amount into
+	paid_amount/change_amount arithmetic. get_loyalty_details sums every row
+	for the customer with no docstatus filter and nothing else ever offsets a
+	redemption, so without this an honored redemption's points would stay
+	redeemable indefinitely.
 
 	`invoice_type` is mandatory on this doctype. Leaves it as `"Journal
 	Entry"` with `invoice` blank -- the same combination this bench's own
@@ -126,6 +156,8 @@ def _debit_redeemed_loyalty_points(doc):
 	idempotency instead.
 	"""
 	if not (cint(doc.redeem_loyalty_points) and doc.loyalty_points and doc.loyalty_program):
+		return
+	if not _redemption_was_actually_honored(doc):
 		return
 
 	marker = f"Redemption debit for {doc.doctype} {doc.name}"

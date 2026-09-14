@@ -1,6 +1,7 @@
 """One-off backfill: close the loyalty-redemption receivable gap left on
 consolidated Sales Invoices, and debit the Loyalty Point Entry ledger for
-every POS Invoice redemption that never got one.
+every POS Invoice redemption that was actually honored (real cash/bank
+collected less, not just claimed) but never got one.
 
 Root cause and evidence: tasks/szl-loyalty-cash-redemption-outstanding-20260913/
 findings.md. The two corrections applied here are exactly
@@ -9,6 +10,16 @@ on_submit_close_consolidated_loyalty_gap -- the forward-fix hooks -- run
 retroactively against already-submitted documents. Each correction guards on
 its own existence check, so this is safe to re-run; it only touches invoices
 the forward-fix (once deployed) hasn't already covered.
+
+2026-09-15 correction: the first run of this script debited all 43 redemption
+invoices unconditionally and was wrong to. Checked against every one of them:
+0 of 43 ever actually collected less cash/bank for the claimed points -- the
+discount was never applied at the register (see
+_redemption_was_actually_honored's docstring). That took real point value
+from all 43 customers for nothing; the 43 wrongful debits were deleted the
+same day. _debit_redeemed_loyalty_points now only creates a debit when the
+arithmetic proves the discount was genuinely taken off what was collected, so
+re-running this script is safe -- it will not repeat that mistake.
 
 Dry run first:
     bench --site szl execute aimatic.ops_backfill_loyalty_redemption_20260915.run --kwargs '{"dry_run": true}'
@@ -22,6 +33,7 @@ from frappe.utils import flt
 
 from aimatic.loyalty.events import (
 	_debit_redeemed_loyalty_points,
+	_redemption_was_actually_honored,
 	on_submit_close_consolidated_loyalty_gap,
 )
 
@@ -45,16 +57,22 @@ def run(dry_run=True):
 		pluck="name",
 	)
 
-	debited, already_debited = [], []
+	debited, already_debited, not_honored = [], [], []
 	for name in pos_invoices:
 		marker = f"Redemption debit for POS Invoice {name}"
 		if frappe.db.exists("Loyalty Point Entry", {"discretionary_reason": marker}):
 			already_debited.append(name)
 			continue
-		if not dry_run:
+		if dry_run:
 			doc = frappe.get_doc("POS Invoice", name)
-			_debit_redeemed_loyalty_points(doc)
-		debited.append(name)
+			(debited if _redemption_was_actually_honored(doc) else not_honored).append(name)
+			continue
+		doc = frappe.get_doc("POS Invoice", name)
+		_debit_redeemed_loyalty_points(doc)
+		if frappe.db.exists("Loyalty Point Entry", {"discretionary_reason": marker}):
+			debited.append(name)
+		else:
+			not_honored.append(name)
 
 	closed, no_gap = [], []
 	for name in sales_invoices:
@@ -73,6 +91,7 @@ def run(dry_run=True):
 		"pos_invoices_checked": len(pos_invoices),
 		"loyalty_debits_applied_or_pending": debited,
 		"loyalty_debits_already_present": len(already_debited),
+		"redemption_not_actually_honored_no_debit": len(not_honored),
 		"sales_invoices_checked": len(sales_invoices),
 		"gaps_closed_or_pending": closed,
 		"invoices_with_no_gap": len(no_gap),
