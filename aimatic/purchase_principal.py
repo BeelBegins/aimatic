@@ -40,6 +40,7 @@ def validate_purchase_principal(doc, method=None):
 					frappe.bold(principal), frappe.bold(doc.supplier)
 				)
 			)
+		validate_item_principals(doc, principal)
 		return
 
 	if principal:
@@ -48,6 +49,42 @@ def validate_purchase_principal(doc, method=None):
 				"Supplier {0} has no Principals configured. Clear Principal or "
 				"add allowed Principals on the Supplier."
 			).format(frappe.bold(doc.supplier))
+		)
+
+
+def validate_item_principals(doc, principal: str):
+	"""Enforce approved Item mappings after the supplier rollout gate is on."""
+	if not getattr(doc, "supplier", None):
+		return
+	# Code can be loaded briefly before migrate creates the rollout field.
+	if not frappe.get_meta("Supplier").has_field("custom_enforce_item_principal"):
+		return
+	if not frappe.db.get_value("Supplier", doc.supplier, "custom_enforce_item_principal"):
+		return
+
+	item_codes = sorted({row.item_code for row in (getattr(doc, "items", None) or []) if row.item_code})
+	if not item_codes:
+		return
+	mapped = dict(
+		frappe.get_all(
+			"Item",
+			filters={"name": ["in", item_codes]},
+			fields=["name", "custom_principal"],
+			as_list=True,
+		)
+	)
+	missing = [code for code in item_codes if not mapped.get(code)]
+	mismatched = [code for code in item_codes if mapped.get(code) and mapped[code] != principal]
+	if missing:
+		frappe.throw(
+			_("Principal is not mapped on Items: {0}").format(
+				", ".join(frappe.bold(code) for code in missing)
+			)
+		)
+	if mismatched:
+		details = ", ".join(f"{code} ({mapped[code]})" for code in mismatched)
+		frappe.throw(
+			_("Item Principal must match document Principal {0}: {1}").format(frappe.bold(principal), details)
 		)
 
 

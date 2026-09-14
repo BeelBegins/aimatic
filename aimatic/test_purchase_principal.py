@@ -10,11 +10,44 @@ from aimatic.purchase_principal import (
 	prefill_purchase_receipt_principal,
 	resolve_principal_for_invoice,
 	resolve_principal_for_receipt,
+	validate_item_principals,
 	validate_purchase_principal,
 )
 
 
 class TestPurchasePrincipal(unittest.TestCase):
+	@patch("aimatic.purchase_principal.frappe.get_all")
+	@patch("aimatic.purchase_principal.frappe.db.get_value", return_value=1)
+	@patch("aimatic.purchase_principal.frappe.get_meta")
+	def test_item_principal_enforcement_accepts_matching_items(self, get_meta, _get_value, get_all):
+		get_meta.return_value.has_field.return_value = True
+		get_all.return_value = [["ITEM-1", "ABBOTT"], ["ITEM-2", "ABBOTT"]]
+		doc = SimpleNamespace(
+			supplier="SUP-1",
+			items=[SimpleNamespace(item_code="ITEM-1"), SimpleNamespace(item_code="ITEM-2")],
+		)
+		validate_item_principals(doc, "ABBOTT")
+
+	@patch("aimatic.purchase_principal.frappe.get_all")
+	@patch("aimatic.purchase_principal.frappe.db.get_value", return_value=1)
+	@patch("aimatic.purchase_principal.frappe.get_meta")
+	def test_item_principal_enforcement_rejects_missing_mapping(self, get_meta, _get_value, get_all):
+		get_meta.return_value.has_field.return_value = True
+		get_all.return_value = [["ITEM-1", None]]
+		doc = SimpleNamespace(supplier="SUP-1", items=[SimpleNamespace(item_code="ITEM-1")])
+		with self.assertRaises(frappe.ValidationError):
+			validate_item_principals(doc, "ABBOTT")
+
+	@patch("aimatic.purchase_principal.frappe.get_all")
+	@patch("aimatic.purchase_principal.frappe.db.get_value", return_value=1)
+	@patch("aimatic.purchase_principal.frappe.get_meta")
+	def test_item_principal_enforcement_rejects_mismatch(self, get_meta, _get_value, get_all):
+		get_meta.return_value.has_field.return_value = True
+		get_all.return_value = [["ITEM-1", "SHIELD"]]
+		doc = SimpleNamespace(supplier="SUP-1", items=[SimpleNamespace(item_code="ITEM-1")])
+		with self.assertRaises(frappe.ValidationError):
+			validate_item_principals(doc, "ABBOTT")
+
 	@patch("aimatic.purchase_principal.frappe.get_all")
 	def test_get_allowed_principals(self, get_all):
 		get_all.return_value = [

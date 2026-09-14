@@ -1,0 +1,26 @@
+{
+ "actions": [],
+ "creation": "2026-09-15 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["source_row","item_code","principal","allocated_amount","evidence_voucher","notes"],
+ "fields": [
+  {"fieldname":"source_row","fieldtype":"Data","in_list_view":1,"label":"Source Row"},
+  {"fieldname":"item_code","fieldtype":"Link","in_list_view":1,"label":"Item","options":"Item"},
+  {"fieldname":"principal","fieldtype":"Link","in_list_view":1,"label":"Principal","options":"Principal","reqd":1},
+  {"fieldname":"allocated_amount","fieldtype":"Currency","in_list_view":1,"label":"Allocated Payable Amount","reqd":1},
+  {"fieldname":"evidence_voucher","fieldtype":"Data","label":"Evidence Voucher"},
+  {"fieldname":"notes","fieldtype":"Small Text","label":"Notes"}
+ ],
+ "istable": 1,
+ "modified": "2026-09-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Principal Historical Allocation Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
