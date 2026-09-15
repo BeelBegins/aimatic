@@ -21,6 +21,18 @@ same day. _debit_redeemed_loyalty_points now only creates a debit when the
 arithmetic proves the discount was genuinely taken off what was collected, so
 re-running this script is safe -- it will not repeat that mistake.
 
+2026-09-15, later same day: on_submit_close_consolidated_loyalty_gap now
+splits into two outcomes instead of one. All 43 known invoices are unhonored
+(no gap change here), but once the register-side fix lands and a real
+redemption happens, that invoice's own outstanding_amount reads ~0 (core's
+paid_amount/change_amount arithmetic cancels for an honored redemption) even
+though Debtors still carries a genuine, uncleared loyalty_amount -- the gap
+check alone would silently skip it forever. This script no longer
+pre-filters on outstanding_amount before deciding whether there's anything to
+do; it checks _redemption_was_actually_honored first and lets the hook itself
+route to the correct GL treatment (Debtors credit / 5246 - Loyalty Points
+Redemption Expense debit for honored, write-off for not).
+
 Dry run first:
     bench --site szl execute aimatic.ops_backfill_loyalty_redemption_20260915.run --kwargs '{"dry_run": true}'
 
@@ -34,6 +46,7 @@ from frappe.utils import flt
 from aimatic.loyalty.events import (
 	_debit_redeemed_loyalty_points,
 	_redemption_was_actually_honored,
+	_sales_invoice_gl_already_closed,
 	on_submit_close_consolidated_loyalty_gap,
 )
 
@@ -74,17 +87,24 @@ def run(dry_run=True):
 		else:
 			not_honored.append(name)
 
-	closed, no_gap = [], []
+	honored_gle, write_offs, no_action = [], [], []
 	for name in sales_invoices:
 		doc = frappe.get_doc("Sales Invoice", name)
+		if _sales_invoice_gl_already_closed(name):
+			no_action.append(name)
+			continue
+		honored = _redemption_was_actually_honored(doc)
 		gap = round(flt(doc.outstanding_amount), 2)
-		if gap <= 0.5:
-			no_gap.append(name)
+		if not honored and gap <= 0.5:
+			no_action.append(name)
 			continue
 		if not dry_run:
 			on_submit_close_consolidated_loyalty_gap(doc)
 			frappe.db.commit()
-		closed.append({"invoice": name, "gap": gap})
+		if honored:
+			honored_gle.append({"invoice": name, "loyalty_amount": round(flt(doc.loyalty_amount), 2)})
+		else:
+			write_offs.append({"invoice": name, "gap": gap})
 
 	return {
 		"dry_run": dry_run,
@@ -93,6 +113,7 @@ def run(dry_run=True):
 		"loyalty_debits_already_present": len(already_debited),
 		"redemption_not_actually_honored_no_debit": len(not_honored),
 		"sales_invoices_checked": len(sales_invoices),
-		"gaps_closed_or_pending": closed,
-		"invoices_with_no_gap": len(no_gap),
+		"honored_redemption_gle_applied_or_pending": honored_gle,
+		"write_offs_applied_or_pending": write_offs,
+		"invoices_with_no_action": len(no_action),
 	}

@@ -187,6 +187,88 @@ def on_submit_debit_redeemed_loyalty_points(doc, method=None):
 	_debit_redeemed_loyalty_points(doc)
 
 
+def _sales_invoice_gl_already_closed(sales_invoice_name):
+	"""True if a submitted Journal Entry already references this Sales
+	Invoice -- either correction JE on_submit_close_consolidated_loyalty_gap
+	can create (honored-redemption GLE or unhonored write-off) checks this
+	first, so re-running it or the one-off backfill never double-posts.
+	"""
+	return bool(
+		frappe.db.sql(
+			"""
+			SELECT jea.name
+			FROM `tabJournal Entry Account` jea
+			JOIN `tabJournal Entry` je ON je.name = jea.parent
+			WHERE jea.reference_type = 'Sales Invoice'
+			  AND jea.reference_name = %s
+			  AND je.docstatus = 1
+			""",
+			sales_invoice_name,
+		)
+	)
+
+
+def _post_honored_redemption_gle(doc):
+	"""Post the Debtors-credit / loyalty-expense-debit entry ERPNext's own
+	make_loyalty_point_redemption_gle would have posted for this invoice, had
+	it not unconditionally skipped `is_consolidated`. Only ever called after
+	_redemption_was_actually_honored confirms a real discount was collected
+	-- this is a genuine loyalty-program cost, not a write-off.
+	"""
+	amount = flt(doc.loyalty_amount, 2)
+	if amount <= 0:
+		return
+
+	expense_account = frappe.get_cached_value(
+		"Loyalty Program", doc.loyalty_program, "expense_account"
+	)
+	if not expense_account:
+		frappe.log_error(
+			title="Loyalty redemption GL could not be posted",
+			message=(
+				f"Sales Invoice {doc.name}: a genuinely honored loyalty "
+				f"redemption of {amount} has no GL entry because Loyalty "
+				f"Program {doc.loyalty_program} has no expense_account "
+				"configured. Close manually."
+			),
+		)
+		return
+
+	je = frappe.new_doc("Journal Entry")
+	je.voucher_type = "Journal Entry"
+	je.posting_date = doc.posting_date
+	je.company = doc.company
+	je.user_remark = (
+		f"Loyalty Points redeemed by the customer on {doc.name} -- posted "
+		"here because ERPNext's own make_loyalty_point_redemption_gle "
+		"unconditionally skips is_consolidated invoices."
+	)
+	je.append(
+		"accounts",
+		{
+			"account": expense_account,
+			"cost_center": doc.cost_center,
+			"branch": doc.branch,
+			"debit_in_account_currency": amount,
+		},
+	)
+	je.append(
+		"accounts",
+		{
+			"account": doc.debit_to,
+			"party_type": "Customer",
+			"party": doc.customer,
+			"cost_center": doc.cost_center,
+			"branch": doc.branch,
+			"credit_in_account_currency": amount,
+			"reference_type": "Sales Invoice",
+			"reference_name": doc.name,
+		},
+	)
+	je.insert(ignore_permissions=True)
+	je.submit()
+
+
 def on_submit_close_consolidated_loyalty_gap(doc, method=None):
 	"""Registered as a Sales Invoice on_submit doc_event.
 
@@ -196,17 +278,29 @@ def on_submit_close_consolidated_loyalty_gap(doc, method=None):
 	POS Invoice already posted it. On this bench POS Invoice defers all GL to
 	the consolidated Sales Invoice (POS Settings.post_change_gl_entries is
 	off, verified: POS Invoice submission posts zero GL Entry rows), so that
-	credit is never posted at all. The customer still paid the full listed
-	price -- Cash: charged in full, the loyalty top-up then reads as phantom
-	"change" that make_pos_gl_entries subtracts from the real cash GL row;
-	Bank/Card: charged in full outright, nothing to subtract -- but the
-	invoice is left carrying a receivable equal to the redeemed points that
-	nobody is ever going to collect from a customer who already paid.
+	entry is never posted at all, for EITHER outcome below.
 
-	Close it the same way this business already writes off a POS residual it
-	won't chase -- a Journal Entry against the invoice's own POS Profile
-	write-off account -- rather than editing an already-submitted document's
-	stored totals directly.
+	Two different situations both land here, and need opposite treatment:
+
+	- Honored (a real discount was actually collected,
+	  _redemption_was_actually_honored): core's own paid_amount/change_amount
+	  arithmetic happens to net doc.outstanding_amount to ~0 for this case,
+	  which looks fully settled -- but the real GL entries only ever clear
+	  Debtors by what was actually collected (grand_total - loyalty_amount),
+	  leaving a genuine, hidden loyalty_amount sitting uncleared in the
+	  Debtors control account that outstanding_amount never surfaces. This is
+	  a real loyalty-program cost, not a write-off -- post the same
+	  Debtors-credit / expense-debit entry core would have, against the
+	  Loyalty Program's own expense_account.
+	- Not honored (the customer paid full price and the "redemption" never
+	  reduced anything): the invoice is left carrying a receivable equal to
+	  the redeemed points that nobody is ever going to collect from a
+	  customer who already paid in full. Close it the same way this business
+	  already writes off a POS residual it won't chase -- a Journal Entry
+	  against the invoice's own POS Profile write-off account.
+
+	Either way, edit via a Journal Entry rather than an already-submitted
+	document's stored totals.
 	"""
 	if not (
 		cint(doc.is_consolidated)
@@ -216,22 +310,15 @@ def on_submit_close_consolidated_loyalty_gap(doc, method=None):
 	):
 		return
 
-	gap = flt(doc.outstanding_amount, 2)
-	if gap <= 0.5:
+	if _sales_invoice_gl_already_closed(doc.name):
 		return
 
-	already_closed = frappe.db.sql(
-		"""
-		SELECT jea.name
-		FROM `tabJournal Entry Account` jea
-		JOIN `tabJournal Entry` je ON je.name = jea.parent
-		WHERE jea.reference_type = 'Sales Invoice'
-		  AND jea.reference_name = %s
-		  AND je.docstatus = 1
-		""",
-		doc.name,
-	)
-	if already_closed:
+	if _redemption_was_actually_honored(doc):
+		_post_honored_redemption_gle(doc)
+		return
+
+	gap = flt(doc.outstanding_amount, 2)
+	if gap <= 0.5:
 		return
 
 	write_off = (
