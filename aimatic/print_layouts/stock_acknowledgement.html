@@ -32,6 +32,11 @@ html, body { width: 200mm; margin: 0; padding: 0; }
 .aim-summary .summary-value { width: 38%; text-align: right; }
 .aim-summary .grand-total td { padding-top: .7mm; border-top: .25mm solid #000; font-weight: 700; font-size: 7.2pt; }
 .aim-note { min-height: 8mm; font-size: 6.5pt; }
+.aim-kpi { width: 58mm; margin: 2.5mm 0 0; border-collapse: collapse; border: .25mm solid #000; page-break-inside: avoid; }
+.aim-kpi td { border: 0; padding: .6mm 1.2mm; font-size: 6.5pt; vertical-align: bottom; }
+.aim-kpi .aim-kpi-title { font-weight: 700; font-size: 7pt; text-align: left; padding-bottom: .8mm; border-bottom: .2mm solid #000; }
+.aim-kpi .aim-kpi-label { width: 38%; font-weight: 700; white-space: nowrap; padding-top: 1.2mm; }
+.aim-kpi .aim-kpi-line { width: 62%; border-bottom: .2mm solid #000; min-height: 4mm; padding-top: 1.2mm; }
 .aim-sign-block { width: 100%; margin-top: 5mm; border-collapse: collapse; page-break-inside: avoid; }
 .aim-sign-block td { border: 0; padding: 0 3mm; text-align: center; vertical-align: bottom; }
 .aim-sign-line { min-height: 9mm; border-top: .25mm solid #000; margin: 0 2mm 1mm; }
@@ -99,7 +104,16 @@ html, body { width: 200mm; margin: 0; padding: 0; }
 </div>
 <table class="aim-bottom">
  <tr>
-  <td style="width:55%"><span class="aim-label">Note:</span> {{ doc.remarks or doc.instructions or '' }}</td>
+  <td style="width:55%; text-align:left; vertical-align:top">
+   <div class="aim-note"><span class="aim-label">Note:</span> {{ doc.remarks or doc.instructions or '' }}</div>
+   <table class="aim-kpi">
+    <tr><td colspan="2" class="aim-kpi-title">Internal KPI</td></tr>
+    <tr><td class="aim-kpi-label">Purchase:</td><td class="aim-kpi-line">&nbsp;</td></tr>
+    <tr><td class="aim-kpi-label">Sale:</td><td class="aim-kpi-line">&nbsp;</td></tr>
+    <tr><td class="aim-kpi-label">Stock:</td><td class="aim-kpi-line">&nbsp;</td></tr>
+    <tr><td class="aim-kpi-label">Net Payable:</td><td class="aim-kpi-line">&nbsp;</td></tr>
+   </table>
+  </td>
   <td style="width:45%">
    <table class="aim-summary">
     <tr><td class="summary-label">Gross Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(gross, currency=doc.currency) }}</td></tr>

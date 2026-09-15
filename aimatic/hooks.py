@@ -79,6 +79,7 @@ doc_events = {
 			"aimatic.branch_management.events.apply_branch_defaults",
 			"aimatic.purchase_printing.populate_old_purchase_snapshot",
 			"aimatic.purchase_history_autofill.events.autofill_purchase_order_item_fields",
+			"aimatic.purchase_principal.prefill_purchase_order_principal",
 		],
 		"validate": "aimatic.purchase_principal.validate_purchase_principal",
 	},
@@ -266,6 +267,7 @@ doctype_js = {
 	"Foodpanda Settings": "public/js/foodpanda_settings.js",
 	"Foodpanda Product": "public/js/foodpanda_product_sync.js",
 	"Branch": "public/js/branch_foodpanda_price_import.js",
+	"Principal Historical Allocation": "public/js/principal_historical_allocation.js",
 }
 
 # Desk list helpers: resolve every barcode through the Item Barcode child table,
@@ -275,6 +277,7 @@ doctype_js = {
 doctype_list_js = {
 	"Item": "public/js/barcode_list_search.js",
 	"Item Price": "public/js/barcode_list_search.js",
+	"Principal Historical Allocation": "public/js/principal_historical_allocation.js",
 }
 
 jinja = {
@@ -616,6 +619,9 @@ scheduler_events = {
 		# advance_tax_account) and skips the after_migrate repair below.
 		# This self-heals daily.
 		"aimatic.tax_formula_setup.repair_dangling_tax_formula_accounts",
+		# Auto-apply Principals (seed allow-lists + tag PR/PI/Items) when site_config
+		# principal_allocation_auto_drafts=1. No human review.
+		"aimatic.principal_allocation_automation.run_daily_allocation_draft_bot",
 	],
 	# Branch Foodpanda SFTP: each Branch sets its own schedule time; this cron
 	# only checks which enabled branches are due (about every 15 minutes).

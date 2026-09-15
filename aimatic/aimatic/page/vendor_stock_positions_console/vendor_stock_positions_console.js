@@ -21,6 +21,9 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 				company: filters.company || undefined,
 				branch: filters.branch || undefined,
 				warehouse: filters.warehouse || undefined,
+				from_date: filters.from_date || undefined,
+				to_date: filters.to_date || undefined,
+				principal: filters.principal || undefined,
 			};
 			frappe.set_route('vendor-performance-console');
 		});
@@ -38,7 +41,12 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 			fieldtype: 'Link',
 			options: 'Supplier',
 			reqd: 1,
-			change: () => this.refresh_if_ready(),
+			change: () => {
+				if (this.principal_field.get_value()) {
+					this.principal_field.set_value('');
+				}
+				this.refresh_if_ready();
+			},
 		});
 		this.company_field = this.page.add_field({
 			label: __('Company'),
@@ -46,6 +54,33 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 			fieldtype: 'Link',
 			options: 'Company',
 			default: frappe.defaults.get_user_default('Company') || frappe.defaults.get_default('company'),
+			reqd: 1,
+			change: () => this.refresh_if_ready(),
+		});
+		this.principal_field = this.page.add_field({
+			label: __('Principal'),
+			fieldname: 'principal',
+			fieldtype: 'Link',
+			options: 'Principal',
+			get_query: () => ({
+				query: 'aimatic.purchase_principal.get_principal_query',
+				filters: { supplier: this.supplier_field.get_value() },
+			}),
+			change: () => this.refresh_if_ready(),
+		});
+		this.from_date_field = this.page.add_field({
+			label: __('From Date'),
+			fieldname: 'from_date',
+			fieldtype: 'Date',
+			default: frappe.datetime.month_start(),
+			reqd: 1,
+			change: () => this.refresh_if_ready(),
+		});
+		this.to_date_field = this.page.add_field({
+			label: __('To Date'),
+			fieldname: 'to_date',
+			fieldtype: 'Date',
+			default: frappe.datetime.get_today(),
 			reqd: 1,
 			change: () => this.refresh_if_ready(),
 		});
@@ -77,14 +112,6 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 				}
 				this.refresh_if_ready();
 			},
-		});
-		this.lookback_field = this.page.add_field({
-			label: __('Days'),
-			fieldname: 'lookback_days',
-			fieldtype: 'Int',
-			default: 30,
-			reqd: 1,
-			change: () => this.refresh_if_ready(),
 		});
 		this.group_field = this.page.add_field({
 			label: __('Group By'),
@@ -127,6 +154,15 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 		if (route_options.warehouse && !this.warehouse_field.get_value()) {
 			this.warehouse_field.set_value(route_options.warehouse);
 		}
+		if (route_options.from_date) {
+			this.from_date_field.set_value(route_options.from_date);
+		}
+		if (route_options.to_date) {
+			this.to_date_field.set_value(route_options.to_date);
+		}
+		if (route_options.principal) {
+			this.principal_field.set_value(route_options.principal);
+		}
 		this.refresh_if_ready();
 	}
 
@@ -136,21 +172,23 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 			company: this.company_field.get_value(),
 			branch: this.branch_field.get_value(),
 			warehouse: this.warehouse_field.get_value(),
-			lookback_days: parseInt(this.lookback_field.get_value() || 30, 10) || 30,
+			from_date: this.from_date_field.get_value(),
+			to_date: this.to_date_field.get_value(),
+			principal: this.principal_field.get_value(),
 			group_by_warehouse: this.group_field.get_value() === 'Warehouse' ? 1 : 0,
 		};
 	}
 
 	refresh_if_ready() {
 		const filters = this.get_filters();
-		if (filters.supplier && filters.company) {
+		if (filters.supplier && filters.company && filters.from_date && filters.to_date) {
 			this.refresh();
 		}
 	}
 
 	async refresh() {
 		const filters = this.get_filters();
-		if (!filters.supplier || !filters.company) {
+		if (!filters.supplier || !filters.company || !filters.from_date || !filters.to_date) {
 			this.render_empty_state();
 			return;
 		}
@@ -171,9 +209,9 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 
 	export_excel() {
 		const filters = this.get_filters();
-		if (!filters.supplier || !filters.company) {
+		if (!filters.supplier || !filters.company || !filters.from_date || !filters.to_date) {
 			frappe.show_alert({
-				message: __('Choose a supplier and company first.'),
+				message: __('Choose a supplier, company, and date range first.'),
 				indicator: 'orange',
 			});
 			return;
@@ -233,7 +271,7 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 					<div><strong>${__('Incl. taxes')}:</strong> ${frappe.utils.escape_html(data.stock_incl_tax_note || '')}</div>
 					<div><strong>${__('Cost of goods sold')}:</strong> ${frappe.utils.escape_html(data.cogs_definition_note || '')}</div>
 					<div class="vp-item-meta">${frappe.utils.escape_html(data.item_sources_note || '')}</div>
-					<div class="vp-item-meta">${__('Window')}: ${frappe.datetime.str_to_user(data.date_from)} → ${frappe.datetime.str_to_user(data.date_to)} · ${frappe.utils.escape_html(data.supplier_name || data.supplier || '')}</div>
+					<div class="vp-item-meta">${__('Window')}: ${frappe.datetime.str_to_user(data.date_from)} → ${frappe.datetime.str_to_user(data.date_to)}${data.principal ? ` · ${__('Principal')}: ${frappe.utils.escape_html(data.principal)}` : ''} · ${frappe.utils.escape_html(data.supplier_name || data.supplier || '')}</div>
 					${truncatedNote}
 				</div>
 			</div>

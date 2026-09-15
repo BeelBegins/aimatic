@@ -6,6 +6,7 @@ import frappe
 
 from aimatic.purchase_principal import (
 	get_allowed_principals,
+	guess_principal_from_items,
 	prefill_purchase_invoice_principal,
 	prefill_purchase_receipt_principal,
 	resolve_principal_for_invoice,
@@ -58,31 +59,34 @@ class TestPurchasePrincipal(unittest.TestCase):
 		self.assertEqual(get_allowed_principals("SUP-1"), ["UNILEVER", "DETTOL"])
 		get_all.assert_called_once()
 
+	@patch("aimatic.purchase_principal._apply_guessed_principal", return_value=None)
 	@patch("aimatic.purchase_principal.get_allowed_principals", return_value=["UNILEVER", "DETTOL"])
-	def test_validate_requires_principal_when_allowed(self, _allowed):
+	def test_validate_requires_principal_when_allowed(self, _allowed, _guess):
 		doc = SimpleNamespace(supplier="SUP-1", custom_principal="")
 		with self.assertRaises(frappe.ValidationError):
 			validate_purchase_principal(doc)
 
 	@patch("aimatic.purchase_principal.get_allowed_principals", return_value=["UNILEVER", "DETTOL"])
 	def test_validate_rejects_foreign_principal(self, _allowed):
-		doc = SimpleNamespace(supplier="SUP-1", custom_principal="RECKITT")
+		doc = SimpleNamespace(supplier="SUP-1", custom_principal="RECKITT", items=[])
 		with self.assertRaises(frappe.ValidationError):
 			validate_purchase_principal(doc)
 
+	@patch("aimatic.purchase_principal.validate_item_principals")
 	@patch("aimatic.purchase_principal.get_allowed_principals", return_value=["UNILEVER", "DETTOL"])
-	def test_validate_accepts_allowed_principal(self, _allowed):
-		doc = SimpleNamespace(supplier="SUP-1", custom_principal="UNILEVER")
+	def test_validate_accepts_allowed_principal(self, _allowed, _item):
+		doc = SimpleNamespace(supplier="SUP-1", custom_principal="UNILEVER", items=[])
 		validate_purchase_principal(doc)
 
 	@patch("aimatic.purchase_principal.get_allowed_principals", return_value=[])
 	def test_validate_rejects_principal_when_supplier_has_none(self, _allowed):
-		doc = SimpleNamespace(supplier="SUP-2", custom_principal="UNILEVER")
+		doc = SimpleNamespace(supplier="SUP-2", custom_principal="UNILEVER", items=[])
 		with self.assertRaises(frappe.ValidationError):
 			validate_purchase_principal(doc)
 
+	@patch("aimatic.purchase_principal._apply_guessed_principal", return_value=None)
 	@patch("aimatic.purchase_principal.get_allowed_principals", return_value=[])
-	def test_validate_allows_blank_when_supplier_has_none(self, _allowed):
+	def test_validate_allows_blank_when_supplier_has_none(self, _allowed, _guess):
 		doc = SimpleNamespace(supplier="SUP-2", custom_principal="")
 		validate_purchase_principal(doc)
 
@@ -121,3 +125,50 @@ class TestPurchasePrincipal(unittest.TestCase):
 		doc = SimpleNamespace(docstatus=0, custom_principal="", items=[])
 		prefill_purchase_invoice_principal(doc)
 		self.assertEqual(doc.custom_principal, "DETTOL")
+
+	@patch("aimatic.purchase_principal.get_allowed_principals", return_value=["ABBOTT", "SHIELD"])
+	@patch("aimatic.purchase_principal.frappe.get_all")
+	def test_guess_from_item_mapping_when_all_agree(self, get_all, _allowed):
+		get_all.return_value = [
+			SimpleNamespace(name="ITEM-1", custom_principal="ABBOTT"),
+			SimpleNamespace(name="ITEM-2", custom_principal="ABBOTT"),
+		]
+		doc = SimpleNamespace(
+			supplier="SUP-1",
+			company="CO",
+			items=[SimpleNamespace(item_code="ITEM-1"), SimpleNamespace(item_code="ITEM-2")],
+		)
+		self.assertEqual(guess_principal_from_items(doc), "ABBOTT")
+
+	@patch("aimatic.purchase_principal.get_allowed_principals", return_value=["ABBOTT", "SHIELD"])
+	@patch("aimatic.purchase_principal.frappe.get_all")
+	def test_guess_rejects_mixed_item_mapping(self, get_all, _allowed):
+		get_all.return_value = [
+			SimpleNamespace(name="ITEM-1", custom_principal="ABBOTT"),
+			SimpleNamespace(name="ITEM-2", custom_principal="SHIELD"),
+		]
+		doc = SimpleNamespace(
+			supplier="SUP-1",
+			company="CO",
+			items=[SimpleNamespace(item_code="ITEM-1"), SimpleNamespace(item_code="ITEM-2")],
+		)
+		self.assertIsNone(guess_principal_from_items(doc))
+
+	@patch("aimatic.purchase_principal.get_allowed_principals", return_value=["ABBOTT", "SHIELD"])
+	@patch("aimatic.purchase_principal._historical_principals_by_item")
+	@patch("aimatic.purchase_principal.frappe.get_all", return_value=[])
+	def test_guess_from_unique_item_history(self, _get_all, history, _allowed):
+		history.return_value = {"ITEM-1": {"ABBOTT"}, "ITEM-2": {"ABBOTT"}}
+		doc = SimpleNamespace(
+			supplier="SUP-1",
+			company="CO",
+			items=[SimpleNamespace(item_code="ITEM-1"), SimpleNamespace(item_code="ITEM-2")],
+		)
+		self.assertEqual(guess_principal_from_items(doc), "ABBOTT")
+
+	@patch("aimatic.purchase_principal.resolve_principal_for_receipt", return_value=None)
+	@patch("aimatic.purchase_principal.guess_principal_from_items", return_value="ABBOTT")
+	def test_receipt_prefill_falls_back_to_item_guess(self, _guess, _resolve):
+		doc = SimpleNamespace(docstatus=0, custom_principal="", items=[])
+		prefill_purchase_receipt_principal(doc)
+		self.assertEqual(doc.custom_principal, "ABBOTT")

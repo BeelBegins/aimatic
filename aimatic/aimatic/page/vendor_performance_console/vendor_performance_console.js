@@ -20,6 +20,9 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 				company: filters.company || undefined,
 				branch: filters.branch || undefined,
 				warehouse: filters.warehouse || undefined,
+				from_date: filters.from_date || undefined,
+				to_date: filters.to_date || undefined,
+				principal: filters.principal || undefined,
 			};
 			frappe.set_route("vendor-stock-positions-console");
 		});
@@ -37,7 +40,12 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 			fieldtype: "Link",
 			options: "Supplier",
 			reqd: 1,
-			change: () => this.refresh_if_ready(),
+			change: () => {
+				if (this.principal_field.get_value()) {
+					this.principal_field.set_value("");
+				}
+				this.refresh_if_ready();
+			},
 		});
 		this.company_field = this.page.add_field({
 			label: __("Company"),
@@ -47,6 +55,33 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 			default:
 				frappe.defaults.get_user_default("Company") ||
 				frappe.defaults.get_default("company"),
+			reqd: 1,
+			change: () => this.refresh_if_ready(),
+		});
+		this.principal_field = this.page.add_field({
+			label: __("Principal"),
+			fieldname: "principal",
+			fieldtype: "Link",
+			options: "Principal",
+			get_query: () => ({
+				query: "aimatic.purchase_principal.get_principal_query",
+				filters: { supplier: this.supplier_field.get_value() },
+			}),
+			change: () => this.refresh_if_ready(),
+		});
+		this.from_date_field = this.page.add_field({
+			label: __("From Date"),
+			fieldname: "from_date",
+			fieldtype: "Date",
+			default: frappe.datetime.month_start(),
+			reqd: 1,
+			change: () => this.refresh_if_ready(),
+		});
+		this.to_date_field = this.page.add_field({
+			label: __("To Date"),
+			fieldname: "to_date",
+			fieldtype: "Date",
+			default: frappe.datetime.get_today(),
 			reqd: 1,
 			change: () => this.refresh_if_ready(),
 		});
@@ -78,14 +113,6 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 				}
 				this.refresh_if_ready();
 			},
-		});
-		this.lookback_field = this.page.add_field({
-			label: __("Days"),
-			fieldname: "lookback_days",
-			fieldtype: "Int",
-			default: 30,
-			reqd: 1,
-			change: () => this.refresh_if_ready(),
 		});
 	}
 
@@ -124,6 +151,15 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 		if (route_options.warehouse && !this.warehouse_field.get_value()) {
 			this.warehouse_field.set_value(route_options.warehouse);
 		}
+		if (route_options.from_date) {
+			this.from_date_field.set_value(route_options.from_date);
+		}
+		if (route_options.to_date) {
+			this.to_date_field.set_value(route_options.to_date);
+		}
+		if (route_options.principal) {
+			this.principal_field.set_value(route_options.principal);
+		}
 		this.refresh_if_ready();
 	}
 
@@ -133,20 +169,22 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 			company: this.company_field.get_value(),
 			branch: this.branch_field.get_value(),
 			warehouse: this.warehouse_field.get_value(),
-			lookback_days: parseInt(this.lookback_field.get_value() || 30, 10) || 30,
+			from_date: this.from_date_field.get_value(),
+			to_date: this.to_date_field.get_value(),
+			principal: this.principal_field.get_value(),
 		};
 	}
 
 	refresh_if_ready() {
 		const filters = this.get_filters();
-		if (filters.supplier && filters.company) {
+		if (filters.supplier && filters.company && filters.from_date && filters.to_date) {
 			this.refresh();
 		}
 	}
 
 	async refresh() {
 		const filters = this.get_filters();
-		if (!filters.supplier || !filters.company) {
+		if (!filters.supplier || !filters.company || !filters.from_date || !filters.to_date) {
 			this.render_empty_state();
 			return;
 		}
@@ -230,6 +268,7 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 					supplier: filters.supplier,
 					company: filters.company,
 					item_limit: 15,
+					principal: filters.principal,
 					branch: filters.branch,
 					warehouse: filters.warehouse,
 				}),
@@ -240,7 +279,9 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 				get_args: () => ({
 					supplier: filters.supplier,
 					company: filters.company,
-					lookback_days: filters.lookback_days,
+					from_date: filters.from_date,
+					to_date: filters.to_date,
+					principal: filters.principal,
 					item_limit: 15,
 					branch: filters.branch,
 					warehouse: filters.warehouse,
@@ -253,6 +294,7 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 					supplier: filters.supplier,
 					company: filters.company,
 					limit: 3,
+					principal: filters.principal,
 					branch: filters.branch,
 					warehouse: filters.warehouse,
 				}),
@@ -263,7 +305,9 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 				get_args: () => ({
 					supplier: filters.supplier,
 					company: filters.company,
-					lookback_days: filters.lookback_days,
+					from_date: filters.from_date,
+					to_date: filters.to_date,
+					principal: filters.principal,
 					limit: 3,
 					branch: filters.branch,
 					warehouse: filters.warehouse,
@@ -275,7 +319,9 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 				get_args: () => ({
 					supplier: filters.supplier,
 					company: filters.company,
-					lookback_days: 90,
+					from_date: filters.from_date,
+					to_date: filters.to_date,
+					principal: filters.principal,
 					branch: filters.branch,
 					warehouse: filters.warehouse,
 				}),
@@ -420,7 +466,7 @@ aimatic.VendorPerformancePage = class VendorPerformancePage {
 				"ratios",
 				"alert-triangle",
 				__("Abnormal Sell-Through"),
-				`<span class="vp-badge">${__("Last 90 days")}</span>`,
+				`<span class="vp-badge">${__("Within selected window")}</span>`,
 				__(
 					"Flags supplier-linked SKUs selling slower than their own normal pace given how long ago they were received - a downstream signal for short deliveries or shrinkage that would not show up as a paperwork mismatch. Judged per item against its own sales history where available, otherwise against this vendor's other items - never a manually configured threshold."
 				),

@@ -77,11 +77,34 @@ def _resolve_context(supplier: str, company: str | None):
 	return supplier, company, supplier_meta, currency
 
 
-def _get_date_window(lookback_days: int):
+def _get_date_window(lookback_days: int = 30, from_date=None, to_date=None):
+	"""Resolve the analytics window.
+
+	Prefer explicit from_date/to_date (same pattern as Purchase by Supplier
+	Principal). Fall back to a capped lookback ending today for older callers.
+	"""
+	if from_date or to_date:
+		if not from_date or not to_date:
+			frappe.throw(_("From Date and To Date are both required."))
+		date_from = getdate(from_date)
+		date_to = getdate(to_date)
+		if date_from > date_to:
+			frappe.throw(_("From Date must be before To Date"))
+		lookback_days = (date_to - date_from).days + 1
+		return lookback_days, date_from, date_to
+
 	lookback_days = max(1, min(cint(lookback_days or 30), 365))
 	date_to = getdate(today())
 	date_from = getdate(add_days(date_to, -(lookback_days - 1)))
 	return lookback_days, date_from, date_to
+
+
+def _principal_doc_clause(alias: str | None = None, principal: str | None = None) -> str:
+	"""Optional document-level Principal filter (PO/PR/PI.custom_principal)."""
+	if not principal:
+		return ""
+	column = f"{alias}.custom_principal" if alias else "custom_principal"
+	return f"AND {column} = %(principal)s"
 
 
 def _resolve_branch_warehouse_scope(
@@ -129,6 +152,9 @@ def get_vendor_performance_summary(
 	supplier: str,
 	company: str | None = None,
 	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
 	branch: str | None = None,
 	warehouse: str | None = None,
 ):
@@ -136,11 +162,12 @@ def get_vendor_performance_summary(
 	no stock-ledger replay - those are fetched separately via the drill-through
 	endpoints below only when the user asks for them."""
 	supplier, company, supplier_meta, currency = _resolve_context(supplier, company)
-	lookback_days, date_from, date_to = _get_date_window(lookback_days)
+	lookback_days, date_from, date_to = _get_date_window(lookback_days, from_date, to_date)
+	principal = (principal or "").strip() or None
 	branch, warehouse_list = _resolve_branch_warehouse_scope(branch, warehouse)
 	_check_branch_permission(branch)
 
-	item_codes = _get_supplier_item_codes(supplier=supplier, company=company)
+	item_codes = _get_supplier_item_codes(supplier=supplier, company=company, principal=principal)
 	stock_summary, _rows = _get_stock_position(
 		item_codes=item_codes, company=company, item_limit=1, warehouse_list=warehouse_list
 	)
@@ -155,12 +182,24 @@ def get_vendor_performance_summary(
 		warehouse_list=warehouse_list,
 	)
 	purchase_summary = _get_purchase_summary(
-		supplier=supplier, company=company, date_from=date_from, date_to=date_to, branch=branch
+		supplier=supplier,
+		company=company,
+		date_from=date_from,
+		date_to=date_to,
+		branch=branch,
+		principal=principal,
 	)
 	purchase_receipt_summary = _get_purchase_receipt_summary(
-		supplier=supplier, company=company, date_from=date_from, date_to=date_to, branch=branch
+		supplier=supplier,
+		company=company,
+		date_from=date_from,
+		date_to=date_to,
+		branch=branch,
+		principal=principal,
 	)
-	outstanding_summary = _get_outstanding_summary(supplier=supplier, company=company, branch=branch)
+	outstanding_summary = _get_outstanding_summary(
+		supplier=supplier, company=company, branch=branch, principal=principal
+	)
 	last_payment = _get_last_payment(supplier=supplier, company=company, branch=branch)
 
 	sales_amount = flt(sales_summary.get("sales_amount"))
@@ -177,20 +216,33 @@ def get_vendor_performance_summary(
 		"date_from": str(date_from),
 		"date_to": str(date_to),
 		"lookback_days": lookback_days,
+		"principal": principal,
 		"stock_definition_note": _(
 			"Stock position shows current stock of supplier-linked SKUs valued at cost, not exact remaining units by supplier origin."
 		),
 		"origin_stock_definition_note": _(
 			"Exact vendor-origin stock (at cost) is computed by replaying stock ledger FIFO layers and attributing incoming Purchase Receipt and Purchase Invoice stock to the source supplier. Loaded on demand since it can be heavy for high-volume vendors."
 		),
-		"item_sources_note": _(
-			"Supplier-linked SKUs are resolved from Item Supplier, Item Default, and actual submitted purchase history."
+		"item_sources_note": (
+			_("Supplier-linked SKUs are resolved from Item Supplier, Item Default, and actual submitted purchase history, filtered to Item Principal {0}.").format(
+				principal
+			)
+			if principal
+			else _(
+				"Supplier-linked SKUs are resolved from Item Supplier, Item Default, and actual submitted purchase history."
+			)
 		),
 		"cogs_definition_note": _(
 			"Cost of goods sold is the cost-basis value (from stock ledger valuation) of supplier-linked SKUs consumed by submitted sales in the selected window - not the retail sales revenue."
 		),
-		"payable_definition_note": _(
-			"Outstanding payable is the supplier creditors balance from GL Entry (purchase invoices, payments, and opening-balance journal entries), not the sum of Purchase Invoice outstanding amounts alone."
+		"payable_definition_note": (
+			_(
+				"Outstanding payable for a Principal filter is the sum of open Purchase Invoice outstanding amounts tagged with that Principal (document-level), not the full GL creditors balance."
+			)
+			if principal
+			else _(
+				"Outstanding payable is the supplier creditors balance from GL Entry (purchase invoices, payments, and opening-balance journal entries), not the sum of Purchase Invoice outstanding amounts alone."
+			)
 		),
 		"summary": {
 			"linked_item_count": len(item_codes),
@@ -222,18 +274,22 @@ def get_vendor_stock_detail(
 	supplier: str,
 	company: str | None = None,
 	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
 	item_limit: int = 15,
 	branch: str | None = None,
 	warehouse: str | None = None,
 ):
 	"""Drill-through: current stock of supplier-linked SKUs, top N by value."""
 	supplier, company, _meta, currency = _resolve_context(supplier, company)
-	lookback_days, date_from, date_to = _get_date_window(lookback_days)
+	lookback_days, date_from, date_to = _get_date_window(lookback_days, from_date, to_date)
+	principal = (principal or "").strip() or None
 	item_limit = max(1, min(cint(item_limit or 15), 50))
 	branch, warehouse_list = _resolve_branch_warehouse_scope(branch, warehouse)
 	_check_branch_permission(branch)
 
-	item_codes = _get_supplier_item_codes(supplier=supplier, company=company)
+	item_codes = _get_supplier_item_codes(supplier=supplier, company=company, principal=principal)
 	stock_summary, stock_rows = _get_stock_position(
 		item_codes=item_codes, company=company, item_limit=item_limit, warehouse_list=warehouse_list
 	)
@@ -259,6 +315,7 @@ def get_vendor_stock_detail(
 			company=company,
 			item_codes=row_item_codes,
 			branch=branch,
+			principal=principal,
 		)
 		for row in stock_rows:
 			sales_item = sales_by_item.get(row["item_code"], {})
@@ -290,6 +347,7 @@ def get_vendor_origin_stock_detail(
 	supplier: str,
 	company: str | None = None,
 	item_limit: int = 15,
+	principal: str | None = None,
 	branch: str | None = None,
 	warehouse: str | None = None,
 ):
@@ -306,6 +364,7 @@ def get_vendor_origin_stock_detail(
 	"""
 	supplier, company, _meta, currency = _resolve_context(supplier, company)
 	item_limit = max(1, min(cint(item_limit or 15), 50))
+	principal = (principal or "").strip() or None
 	branch, warehouse_list = _resolve_branch_warehouse_scope(branch, warehouse)
 	_check_branch_permission(branch)
 
@@ -316,7 +375,7 @@ def get_vendor_origin_stock_detail(
 		"unattributed_qty": 0,
 		"unattributed_value": 0,
 	}
-	item_codes = _get_supplier_item_codes(supplier=supplier, company=company)
+	item_codes = _get_supplier_item_codes(supplier=supplier, company=company, principal=principal)
 	if not item_codes:
 		return {
 			"currency": currency,
@@ -381,17 +440,19 @@ def get_vendor_recent_purchases(
 	supplier: str,
 	company: str | None = None,
 	limit: int = 3,
+	principal: str | None = None,
 	branch: str | None = None,
 	warehouse: str | None = None,
 ):
 	"""Drill-through: most recent submitted purchase invoices for this supplier."""
 	supplier, company, _meta, _currency = _resolve_context(supplier, company)
 	limit = max(1, min(cint(limit or 3), 20))
+	principal = (principal or "").strip() or None
 	branch, _warehouse_list = _resolve_branch_warehouse_scope(branch, warehouse)
 	_check_branch_permission(branch)
 	return {
 		"recent_purchases": _get_recent_purchases(
-			supplier=supplier, company=company, limit=limit, branch=branch
+			supplier=supplier, company=company, limit=limit, branch=branch, principal=principal
 		)
 	}
 
@@ -401,18 +462,22 @@ def get_vendor_recent_sales(
 	supplier: str,
 	company: str | None = None,
 	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
 	limit: int = 3,
 	branch: str | None = None,
 	warehouse: str | None = None,
 ):
 	"""Drill-through: most recent sales of supplier-linked SKUs within the window."""
 	supplier, company, _meta, _currency = _resolve_context(supplier, company)
-	_lookback_days, date_from, date_to = _get_date_window(lookback_days)
+	_lookback_days, date_from, date_to = _get_date_window(lookback_days, from_date, to_date)
+	principal = (principal or "").strip() or None
 	limit = max(1, min(cint(limit or 3), 20))
 	branch, warehouse_list = _resolve_branch_warehouse_scope(branch, warehouse)
 	_check_branch_permission(branch)
 
-	item_codes = _get_supplier_item_codes(supplier=supplier, company=company)
+	item_codes = _get_supplier_item_codes(supplier=supplier, company=company, principal=principal)
 	recent_sales = _get_recent_sales(
 		item_codes=item_codes,
 		company=company,
@@ -440,6 +505,9 @@ def get_vendor_abnormal_ratios(
 	supplier: str,
 	company: str | None = None,
 	lookback_days: int = 90,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
 	branch: str | None = None,
 	warehouse: str | None = None,
 ):
@@ -483,11 +551,12 @@ def get_vendor_abnormal_ratios(
 	infeasible at 37,000+ SKUs sitewide either way.
 	"""
 	supplier, company, _meta, _currency = _resolve_context(supplier, company)
-	lookback_days, date_from, date_to = _get_date_window(lookback_days)
+	lookback_days, date_from, date_to = _get_date_window(lookback_days, from_date, to_date)
+	principal = (principal or "").strip() or None
 	branch, warehouse_list = _resolve_branch_warehouse_scope(branch, warehouse)
 	_check_branch_permission(branch)
 
-	item_codes = _get_supplier_item_codes(supplier=supplier, company=company)
+	item_codes = _get_supplier_item_codes(supplier=supplier, company=company, principal=principal)
 	if not item_codes:
 		return {"items": [], "lookback_days": lookback_days, "flagged_count": 0, "critical_count": 0}
 
@@ -628,10 +697,12 @@ def get_vendor_abnormal_ratios(
 	}
 
 
-def _get_supplier_item_codes(supplier: str, company: str) -> list[str]:
+def _get_supplier_item_codes(supplier: str, company: str, principal: str | None = None) -> list[str]:
+	principal = (principal or "").strip() or None
+	principal_clause = "AND i.custom_principal = %(principal)s" if principal else ""
 	rows = frappe.db.sql(
-		"""
-        SELECT DISTINCT item_code
+		f"""
+        SELECT DISTINCT item_pool.item_code
         FROM (
             SELECT isup.parent AS item_code
             FROM `tabItem Supplier` isup
@@ -654,6 +725,7 @@ def _get_supplier_item_codes(supplier: str, company: str) -> list[str]:
               AND pi.company = %(company)s
               AND pi.supplier = %(supplier)s
               AND IFNULL(pii.item_code, '') != ''
+              {_principal_doc_clause("pi", principal)}
 
             UNION
 
@@ -665,11 +737,14 @@ def _get_supplier_item_codes(supplier: str, company: str) -> list[str]:
               AND pr.company = %(company)s
               AND pr.supplier = %(supplier)s
               AND IFNULL(pri.item_code, '') != ''
+              {_principal_doc_clause("pr", principal)}
         ) item_pool
-        WHERE IFNULL(item_code, '') != ''
-        ORDER BY item_code
+        INNER JOIN `tabItem` i ON i.name = item_pool.item_code
+        WHERE IFNULL(item_pool.item_code, '') != ''
+          {principal_clause}
+        ORDER BY item_pool.item_code
         """,
-		{"supplier": supplier, "company": company},
+		{"supplier": supplier, "company": company, "principal": principal},
 		as_dict=True,
 	)
 	return [row.item_code for row in rows]
@@ -986,9 +1061,18 @@ def _get_cogs_summary(
 	}
 
 
-def _get_purchase_summary(supplier: str, company: str, date_from, date_to, branch: str | None = None):
+def _get_purchase_summary(
+	supplier: str,
+	company: str,
+	date_from,
+	date_to,
+	branch: str | None = None,
+	principal: str | None = None,
+):
 	branch_clause = "AND branch = %(branch)s" if branch else ""
 	branch_clause_pi = "AND pi.branch = %(branch)s" if branch else ""
+	principal_clause = _principal_doc_clause(principal=principal)
+	principal_clause_pi = _principal_doc_clause("pi", principal)
 	invoice_rows = frappe.db.sql(
 		f"""
         SELECT COUNT(*) AS doc_count, COALESCE(SUM(base_grand_total), 0) AS purchase_amount
@@ -999,6 +1083,7 @@ def _get_purchase_summary(supplier: str, company: str, date_from, date_to, branc
           AND supplier = %(supplier)s
           AND posting_date BETWEEN %(date_from)s AND %(date_to)s
           {branch_clause}
+          {principal_clause}
         """,
 		{
 			"supplier": supplier,
@@ -1006,6 +1091,7 @@ def _get_purchase_summary(supplier: str, company: str, date_from, date_to, branc
 			"date_from": date_from,
 			"date_to": date_to,
 			"branch": branch,
+			"principal": principal,
 		},
 		as_dict=True,
 	)
@@ -1020,6 +1106,7 @@ def _get_purchase_summary(supplier: str, company: str, date_from, date_to, branc
           AND pi.supplier = %(supplier)s
           AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
           {branch_clause_pi}
+          {principal_clause_pi}
         """,
 		{
 			"supplier": supplier,
@@ -1027,6 +1114,7 @@ def _get_purchase_summary(supplier: str, company: str, date_from, date_to, branc
 			"date_from": date_from,
 			"date_to": date_to,
 			"branch": branch,
+			"principal": principal,
 		},
 		as_dict=True,
 	)
@@ -1039,13 +1127,22 @@ def _get_purchase_summary(supplier: str, company: str, date_from, date_to, branc
 	}
 
 
-def _get_purchase_receipt_summary(supplier: str, company: str, date_from, date_to, branch: str | None = None):
+def _get_purchase_receipt_summary(
+	supplier: str,
+	company: str,
+	date_from,
+	date_to,
+	branch: str | None = None,
+	principal: str | None = None,
+):
 	"""Goods actually received (Purchase Receipt), separate from Purchase Invoice
 	billing - the two can diverge (received-not-billed, billed-without-receipt for
 	service/direct items), so this is tracked as its own card rather than folded
 	into the Purchase Invoice numbers."""
 	branch_clause = "AND branch = %(branch)s" if branch else ""
 	branch_clause_pr = "AND pr.branch = %(branch)s" if branch else ""
+	principal_clause = _principal_doc_clause(principal=principal)
+	principal_clause_pr = _principal_doc_clause("pr", principal)
 	receipt_rows = frappe.db.sql(
 		f"""
         SELECT COUNT(*) AS doc_count, COALESCE(SUM(base_grand_total), 0) AS purchase_amount
@@ -1056,6 +1153,7 @@ def _get_purchase_receipt_summary(supplier: str, company: str, date_from, date_t
           AND supplier = %(supplier)s
           AND posting_date BETWEEN %(date_from)s AND %(date_to)s
           {branch_clause}
+          {principal_clause}
         """,
 		{
 			"supplier": supplier,
@@ -1063,6 +1161,7 @@ def _get_purchase_receipt_summary(supplier: str, company: str, date_from, date_t
 			"date_from": date_from,
 			"date_to": date_to,
 			"branch": branch,
+			"principal": principal,
 		},
 		as_dict=True,
 	)
@@ -1077,6 +1176,7 @@ def _get_purchase_receipt_summary(supplier: str, company: str, date_from, date_t
           AND pr.supplier = %(supplier)s
           AND pr.posting_date BETWEEN %(date_from)s AND %(date_to)s
           {branch_clause_pr}
+          {principal_clause_pr}
         """,
 		{
 			"supplier": supplier,
@@ -1084,6 +1184,7 @@ def _get_purchase_receipt_summary(supplier: str, company: str, date_from, date_t
 			"date_from": date_from,
 			"date_to": date_to,
 			"branch": branch,
+			"principal": principal,
 		},
 		as_dict=True,
 	)
@@ -1096,13 +1197,42 @@ def _get_purchase_receipt_summary(supplier: str, company: str, date_from, date_t
 	}
 
 
-def _get_outstanding_summary(supplier: str, company: str, branch: str | None = None):
+def _get_outstanding_summary(
+	supplier: str, company: str, branch: str | None = None, principal: str | None = None
+):
 	"""Outstanding payable from GL Entry (party creditors balance), not Purchase
 	Invoice.outstanding_amount alone. Legacy iPOS migration opening balances land
 	as Journal Entries, so PI-only sums miss real debt (same bug fixed in
-	aimatic.ai.tools.get_outstanding_payables_overview)."""
+	aimatic.ai.tools.get_outstanding_payables_overview).
+
+	When a Principal filter is set, GL cannot split by Principal, so fall back to
+	open Purchase Invoice outstanding amounts tagged with that Principal.
+	"""
 	branch_clause = "AND branch = %(branch)s" if branch else ""
-	params = {"supplier": supplier, "company": company, "branch": branch}
+	principal = (principal or "").strip() or None
+	params = {"supplier": supplier, "company": company, "branch": branch, "principal": principal}
+
+	if principal:
+		pi_row = frappe.db.sql(
+			f"""
+	        SELECT COUNT(*) AS invoice_count,
+	               COALESCE(SUM(outstanding_amount), 0) AS outstanding_amount
+	        FROM `tabPurchase Invoice`
+	        WHERE docstatus = 1
+	          AND IFNULL(is_return, 0) = 0
+	          AND company = %(company)s
+	          AND supplier = %(supplier)s
+	          AND outstanding_amount > 0
+	          {branch_clause}
+	          {_principal_doc_clause(principal=principal)}
+	        """,
+			params,
+			as_dict=True,
+		)[0]
+		return {
+			"invoice_count": cint(pi_row.get("invoice_count")),
+			"outstanding_amount": max(flt(pi_row.get("outstanding_amount")), 0),
+		}
 
 	gl_row = frappe.db.sql(
 		f"""
@@ -1173,8 +1303,11 @@ def _get_last_payment(supplier: str, company: str, branch: str | None = None):
 	}
 
 
-def _get_recent_purchases(supplier: str, company: str, limit: int, branch: str | None = None):
+def _get_recent_purchases(
+	supplier: str, company: str, limit: int, branch: str | None = None, principal: str | None = None
+):
 	branch_clause = "AND pi.branch = %(branch)s" if branch else ""
+	principal_clause = _principal_doc_clause("pi", principal)
 	rows = frappe.db.sql(
 		f"""
         SELECT pi.name, pi.posting_date, pi.bill_no, pi.base_grand_total, pi.outstanding_amount, pi.status
@@ -1184,10 +1317,17 @@ def _get_recent_purchases(supplier: str, company: str, limit: int, branch: str |
           AND pi.company = %(company)s
           AND pi.supplier = %(supplier)s
           {branch_clause}
+          {principal_clause}
         ORDER BY pi.posting_date DESC, pi.modified DESC, pi.name DESC
         LIMIT %(limit)s
         """,
-		{"supplier": supplier, "company": company, "limit": cint(limit), "branch": branch},
+		{
+			"supplier": supplier,
+			"company": company,
+			"limit": cint(limit),
+			"branch": branch,
+			"principal": principal,
+		},
 		as_dict=True,
 	)
 	return [
@@ -1523,12 +1663,20 @@ def _get_cogs_by_voucher(
 	return {row.voucher_no: flt(row.cogs_amount) for row in rows}
 
 
-def _get_last_purchase_by_item(supplier: str, company: str, item_codes: list[str], branch: str | None = None):
+def _get_last_purchase_by_item(
+	supplier: str,
+	company: str,
+	item_codes: list[str],
+	branch: str | None = None,
+	principal: str | None = None,
+):
 	if not item_codes:
 		return {}
 
 	pi_branch_clause = "AND pi.branch = %(branch)s" if branch else ""
 	pr_branch_clause = "AND pr.branch = %(branch)s" if branch else ""
+	pi_principal_clause = _principal_doc_clause("pi", principal)
+	pr_principal_clause = _principal_doc_clause("pr", principal)
 	rows = frappe.db.sql(
 		f"""
         SELECT *
@@ -1549,6 +1697,7 @@ def _get_last_purchase_by_item(supplier: str, company: str, item_codes: list[str
               AND pi.supplier = %(supplier)s
               AND pii.item_code IN %(item_codes)s
               {pi_branch_clause}
+              {pi_principal_clause}
 
             UNION ALL
 
@@ -1568,10 +1717,17 @@ def _get_last_purchase_by_item(supplier: str, company: str, item_codes: list[str
               AND pr.supplier = %(supplier)s
               AND pri.item_code IN %(item_codes)s
               {pr_branch_clause}
+              {pr_principal_clause}
         ) purchase_rows
         ORDER BY posting_date DESC, modified DESC, document_name DESC
         """,
-		{"supplier": supplier, "company": company, "item_codes": tuple(item_codes), "branch": branch},
+		{
+			"supplier": supplier,
+			"company": company,
+			"item_codes": tuple(item_codes),
+			"branch": branch,
+			"principal": principal,
+		},
 		as_dict=True,
 	)
 	latest = {}
@@ -1594,6 +1750,7 @@ def _get_purchase_totals_by_item(
 	date_from,
 	date_to,
 	branch: str | None = None,
+	principal: str | None = None,
 ):
 	"""Window purchase qty/amount from this supplier.
 
@@ -1609,6 +1766,8 @@ def _get_purchase_totals_by_item(
 
 	pi_branch_clause = "AND pi.branch = %(branch)s" if branch else ""
 	pr_branch_clause = "AND pr.branch = %(branch)s" if branch else ""
+	pi_principal_clause = _principal_doc_clause("pi", principal)
+	pr_principal_clause = _principal_doc_clause("pr", principal)
 	tax_incl_expr = """(
                 IFNULL({alias}.base_net_amount, 0)
                 + IFNULL({alias}.custom_gst_amount, 0)
@@ -1644,6 +1803,7 @@ def _get_purchase_totals_by_item(
               AND pr.posting_date BETWEEN %(date_from)s AND %(date_to)s
               AND pri.item_code IN %(item_codes)s
               {pr_branch_clause}
+              {pr_principal_clause}
 
             UNION ALL
 
@@ -1663,6 +1823,7 @@ def _get_purchase_totals_by_item(
               AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
               AND pii.item_code IN %(item_codes)s
               {pi_branch_clause}
+              {pi_principal_clause}
         ) purchase_pool
         GROUP BY item_code
         """,
@@ -1673,6 +1834,7 @@ def _get_purchase_totals_by_item(
 			"date_to": date_to,
 			"item_codes": tuple(item_codes),
 			"branch": branch,
+			"principal": principal,
 		},
 		as_dict=True,
 	)
@@ -2007,6 +2169,7 @@ def _enrich_stock_position_rows(
 	warehouse_list: list[str] | None,
 	last_purchase_by_item: dict | None = None,
 	fbr_rates: dict[str, float] | None = None,
+	principal: str | None = None,
 ):
 	if not rows:
 		return rows
@@ -2033,6 +2196,7 @@ def _enrich_stock_position_rows(
 		date_from=date_from,
 		date_to=date_to,
 		branch=branch,
+		principal=principal,
 	)
 	adjustments_by_item = _get_adjustments_by_item(
 		item_codes=row_item_codes,
@@ -2047,6 +2211,7 @@ def _enrich_stock_position_rows(
 			company=company,
 			item_codes=row_item_codes,
 			branch=branch,
+			principal=principal,
 		)
 	if fbr_rates is None:
 		fbr_rates = _get_item_fbr_tax_rates(row_item_codes)
@@ -2097,18 +2262,22 @@ def _build_vendor_stock_positions(
 	supplier: str,
 	company: str | None = None,
 	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
 	branch: str | None = None,
 	warehouse: str | None = None,
 	group_by_warehouse: int | bool = 0,
 	row_limit: int | None = None,
 ):
 	supplier, company, supplier_meta, currency = _resolve_context(supplier, company)
-	lookback_days, date_from, date_to = _get_date_window(lookback_days)
+	lookback_days, date_from, date_to = _get_date_window(lookback_days, from_date, to_date)
+	principal = (principal or "").strip() or None
 	branch, warehouse_list = _resolve_branch_warehouse_scope(branch, warehouse)
 	_check_branch_permission(branch)
 	group_by_warehouse = bool(cint(group_by_warehouse))
 
-	item_codes = _get_supplier_item_codes(supplier=supplier, company=company)
+	item_codes = _get_supplier_item_codes(supplier=supplier, company=company, principal=principal)
 	stock_summary, stock_rows = _get_stock_positions(
 		item_codes=item_codes,
 		company=company,
@@ -2126,6 +2295,7 @@ def _build_vendor_stock_positions(
 			company=company,
 			item_codes=stock_item_codes,
 			branch=branch,
+			principal=principal,
 		)
 		if stock_item_codes
 		else {}
@@ -2151,6 +2321,7 @@ def _build_vendor_stock_positions(
 		warehouse_list=warehouse_list,
 		last_purchase_by_item=last_purchase_by_item,
 		fbr_rates=fbr_rates,
+		principal=principal,
 	)
 
 	sales_summary = _get_sales_summary(
@@ -2181,6 +2352,7 @@ def _build_vendor_stock_positions(
 		"date_from": str(date_from),
 		"date_to": str(date_to),
 		"lookback_days": lookback_days,
+		"principal": principal,
 		"group_by_warehouse": group_by_warehouse,
 		"stock_definition_note": _(
 			"Stock position shows current stock of supplier-linked SKUs valued at cost (Bin stock value), "
@@ -2190,8 +2362,14 @@ def _build_vendor_stock_positions(
 			"Stock Value (Incl Taxes) estimates tax-on-hand: prefer qty × last purchase rate incl tax from this "
 			"supplier; else scale Bin cost by that purchase tax factor; else apply Item FBR tax rate to Bin cost."
 		),
-		"item_sources_note": _(
-			"Supplier-linked SKUs are resolved from Item Supplier, Item Default, and actual submitted purchase history."
+		"item_sources_note": (
+			_("Supplier-linked SKUs are resolved from Item Supplier, Item Default, and actual submitted purchase history, filtered to Item Principal {0}.").format(
+				principal
+			)
+			if principal
+			else _(
+				"Supplier-linked SKUs are resolved from Item Supplier, Item Default, and actual submitted purchase history."
+			)
 		),
 		"cogs_definition_note": _(
 			"Cost of goods sold is the cost-basis value (from stock ledger valuation) of supplier-linked SKUs "
@@ -2225,6 +2403,9 @@ def get_vendor_stock_positions(
 	supplier: str,
 	company: str | None = None,
 	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
 	branch: str | None = None,
 	warehouse: str | None = None,
 	group_by_warehouse: int | bool = 0,
@@ -2235,6 +2416,9 @@ def get_vendor_stock_positions(
 		supplier=supplier,
 		company=company,
 		lookback_days=lookback_days,
+		from_date=from_date,
+		to_date=to_date,
+		principal=principal,
 		branch=branch,
 		warehouse=warehouse,
 		group_by_warehouse=group_by_warehouse,
@@ -2247,6 +2431,9 @@ def export_vendor_stock_positions(
 	supplier: str,
 	company: str | None = None,
 	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
 	branch: str | None = None,
 	warehouse: str | None = None,
 	group_by_warehouse: int | bool = 0,
@@ -2258,6 +2445,9 @@ def export_vendor_stock_positions(
 		supplier=supplier,
 		company=company,
 		lookback_days=lookback_days,
+		from_date=from_date,
+		to_date=to_date,
+		principal=principal,
 		branch=branch,
 		warehouse=warehouse,
 		group_by_warehouse=group_by_warehouse,

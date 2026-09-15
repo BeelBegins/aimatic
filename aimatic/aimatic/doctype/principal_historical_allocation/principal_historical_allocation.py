@@ -28,6 +28,12 @@ class PrincipalHistoricalAllocation(Document):
 		source = frappe.get_doc(self.voucher_type, self.voucher_no)
 		if source.docstatus != 1:
 			frappe.throw(_("Historical allocation is allowed only for submitted vouchers."))
+		if self.supplier and self.supplier != source.supplier:
+			frappe.throw(
+				_("Selected voucher belongs to supplier {0}, not {1}.").format(
+					frappe.bold(source.supplier), frappe.bold(self.supplier)
+				)
+			)
 		date_field, total_field = SOURCE_META[self.voucher_type]
 		self.company = source.company
 		self.supplier = source.supplier
