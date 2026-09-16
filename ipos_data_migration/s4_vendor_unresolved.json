@@ -1,0 +1,988 @@
+[
+  {
+    "code": "042",
+    "name": "AJB MARKETING SERVICES (CANBEBE)",
+    "ntn": "38520",
+    "reason": "no_clean_ntn",
+    "balance": -0.17,
+    "code_hits": [
+      "AJB MARKETING SERVICES (CANBEBE)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "067",
+    "name": "SHAN DISTRIBUTOR (OLPERS)",
+    "ntn": "787767",
+    "reason": "no_clean_ntn",
+    "balance": -41142.42,
+    "code_hits": [
+      "SHAN DISTRIBUTOR (OLPERS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "070",
+    "name": "QAM TRADERS (AMERICAN GARDEN)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.18,
+    "code_hits": [
+      "Q-A-M TRADERS (AMERICAN GARDEN)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "078",
+    "name": "MULLER & PHIPPS PAKISTAN PVT LTD(M&P)",
+    "ntn": "792320",
+    "reason": "no_clean_ntn",
+    "balance": -18.19,
+    "code_hits": [
+      "MULLER & PHIPPS PAKISTAN PVT LTD(M&P)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "1003",
+    "name": "SIEZAL SUPERMARKET DHA1",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -6901859.0,
+    "code_hits": [],
+    "ntn_hits": []
+  },
+  {
+    "code": "1005",
+    "name": "SIEZAL SUPERMARKET BAHRIA PH8",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -13796775.88,
+    "code_hits": [
+      "SIEZAL SUPERMARKET (BAHRIA TOWN PHASE 8)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "1006",
+    "name": "SIEZAL SUPERMARKET BAHRIA PH8 (S6)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -4537517.43,
+    "code_hits": [
+      "SIEZAL SUPERMARKET BAHRIA PH8 (S6)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "1007",
+    "name": "SIEZAL SUPERMARKET BAHRIA PH6 (S7)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -5560363.6,
+    "code_hits": [
+      "SIEZAL SUPERMARKET BAHRIA PH6 (S7)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "107",
+    "name": "SHAFI SONS (IMPORTED)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.34,
+    "code_hits": [
+      "SHAFI SONS (IMPORTED)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "108",
+    "name": "AM DISTRIBUTOR (IMPORTED)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.9,
+    "code_hits": [
+      "AM DISTRIBUTOR (IMPORTED)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "111",
+    "name": "DIAMOND IMPEX CORPORATION (IMPORTED)",
+    "ntn": "897578",
+    "reason": "no_clean_ntn",
+    "balance": 38869.11,
+    "code_hits": [
+      "DIAMOND IMPEX CORPORATION (IMPORTED)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "120",
+    "name": "MS TRADERS (IMPORTED)(AR)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -15033.11,
+    "code_hits": [
+      "MS TRADERS (IMPORTED)(AR)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "126",
+    "name": "PAKEEZA TRADERS (HAIR OIL)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 14373.47,
+    "code_hits": [
+      "PAKEEZA TRADERS (HAIR OIL)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "142",
+    "name": "AL RIZQ TRADERS (MEZAN)",
+    "ntn": "821390",
+    "reason": "no_clean_ntn",
+    "balance": 258189.63,
+    "code_hits": [
+      "AL RIZQ TRADERS (MEZAN)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "150",
+    "name": "OPEN PURCHASE",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.0,
+    "code_hits": [
+      "OPEN PURCHASE"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "154",
+    "name": "PAKISTAN FRUIT JUICE COMPANY PVT LTD (HICO)",
+    "ntn": "786106",
+    "reason": "no_clean_ntn",
+    "balance": -2065.56,
+    "code_hits": [
+      "PAKISTAN FRUIT JUICE COMPANY PVT LTD (HICO)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "175",
+    "name": "MOOSA TRADERS",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -1.01,
+    "code_hits": [
+      "MOOSA TRADERS"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "178",
+    "name": "SHAN DISTRIBUTORS (CADBURY)",
+    "ntn": "787767",
+    "reason": "no_clean_ntn",
+    "balance": 359.26,
+    "code_hits": [
+      "SHAN DISTRIBUTOR (OLPERS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "180",
+    "name": "SHAFAY FOOD PRODUCTS",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 219798.25,
+    "code_hits": [
+      "SHAFAY FOOD PRODUCTS"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "182",
+    "name": "NAFEES FLOUR & GENERAL MILLS",
+    "ntn": "692202",
+    "reason": "no_clean_ntn",
+    "balance": 320200.0,
+    "code_hits": [
+      "NAFEES FLOUR & GENERAL MILLS"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "183",
+    "name": "SHAN MARKETING SERVICES (NESTLE YOGURT)",
+    "ntn": "1",
+    "reason": "no_clean_ntn",
+    "balance": -708.74,
+    "code_hits": [
+      "SHAN MARKETING SERVICES (NESTLE YOGURT)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "189",
+    "name": "IBRAHIM TRADERS (CROCKERY)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 79570.0,
+    "code_hits": [
+      "IBRAHIM TRADERS (CROCKERY)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "201",
+    "name": "CAPITAL FOODS PVT LTD",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 68397.55,
+    "code_hits": [
+      "CAPITAL FOODS PVT LTD"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "204",
+    "name": "CONTINENTAL BAKERS",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 3723.87,
+    "code_hits": [
+      "CONTINENTAL BAKERS"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "243",
+    "name": "SHAN DISTRIBUTORS (OMORE)",
+    "ntn": "787767",
+    "reason": "no_clean_ntn",
+    "balance": 153.42,
+    "code_hits": [
+      "SHAN DISTRIBUTOR (OLPERS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "251",
+    "name": "HAIDRI BEVERAGE PVT LTD (AQUAFINA)",
+    "ntn": "656921",
+    "reason": "no_clean_ntn",
+    "balance": 499.81,
+    "code_hits": [
+      "HAIDRI BEVERAGE PVT LTD (AQUAFINA)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "301",
+    "name": "SHAN DISTRIBUTORS(LOREAL)",
+    "ntn": "787767",
+    "reason": "no_clean_ntn",
+    "balance": 2546.06,
+    "code_hits": [
+      "SHAN DISTRIBUTOR (OLPERS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "30617",
+    "name": "SIEZAL SUPERMARKET (BAHRIA PH 7)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 111.36,
+    "code_hits": [],
+    "ntn_hits": []
+  },
+  {
+    "code": "324",
+    "name": "STOCK ADJUSTMENT",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -337499.0,
+    "code_hits": [
+      "STOCK ADJUSTMENT"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "327",
+    "name": "NASIR TRADERS (VINCE)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.1,
+    "code_hits": [
+      "NASIR TRADERS (VINCE)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "361",
+    "name": "AMAN&SONS ENTERPRISES(AR)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.22,
+    "code_hits": [
+      "AMAN AND SONS ENTERPRISES(AR)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "368",
+    "name": "HA CROCKERY (AR)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.3,
+    "code_hits": [
+      "HA CROCKERY (AR)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "384",
+    "name": "MANZAR ONE STATIONERY ITEM(AR)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 389987.0,
+    "code_hits": [
+      "MANZAR ONE STATIONERY ITEM(AR)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "386",
+    "name": "SHAN DISTRIBUTOR (RED BULL)",
+    "ntn": "787767",
+    "reason": "no_clean_ntn",
+    "balance": -0.31,
+    "code_hits": [
+      "SHAN DISTRIBUTOR (OLPERS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "387",
+    "name": "SHAN DISTRIBUTORS (LIPTON)",
+    "ntn": "787767",
+    "reason": "no_clean_ntn",
+    "balance": -23129.78,
+    "code_hits": [
+      "SHAN DISTRIBUTOR (OLPERS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "395",
+    "name": "BILAL TOYS(AR)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -0.28,
+    "code_hits": [
+      "BILAL TOYS(AR)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "410",
+    "name": "NAQEB TRADER",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 32240.16,
+    "code_hits": [
+      "NAQEB TRADER"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "411",
+    "name": "ABBASI AND SONS (IMP ITEMS)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 199612.56,
+    "code_hits": [
+      "ABBASI AND SONS (IMP ITEMS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "422",
+    "name": "NOORI TRADERS(SEASON OIL)",
+    "ntn": "50075",
+    "reason": "no_clean_ntn",
+    "balance": 139371.68,
+    "code_hits": [
+      "NOORI TRADERS(SEASON OIL)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "424",
+    "name": "FAWAD MURAD(LIGHTERS)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 46755.0,
+    "code_hits": [
+      "FAWAD MURAD(LIGHTERS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "439",
+    "name": "ASWAR EGENCY (TIBET)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.0,
+    "code_hits": [
+      "ASWAR EGENCY (TIBET)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "454",
+    "name": "SIEZAL SUPERMARKET (MISRIAL ROAD)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -3431459.37,
+    "code_hits": [
+      "SIEZAL SUPERMARKET (MISRIAL ROAD)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "464",
+    "name": "MULLER & PHIPPS PAKISTAN (PVT) LTD (PHARMACY)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 19023.52,
+    "code_hits": [
+      "MULLER & PHIPPS PAKISTAN (PVT) LTD (PHARMACY)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "479",
+    "name": "CAPITAL BUSINESS SERVICES (PHARMACY)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.0,
+    "code_hits": [
+      "CAPITAL BUSINESS SERVICES (PHARMACY)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "485",
+    "name": "WILMAX PAKISTAN (CROCKERY)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 34793.1,
+    "code_hits": [
+      "WILMAX PAKISTAN (CROCKERY)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "501",
+    "name": "MINE CHOICE TOYS",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 124215.42,
+    "code_hits": [
+      "MINE CHOICE TOYS"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "509",
+    "name": "RB FARMS (EGGS)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 36435.83,
+    "code_hits": [
+      "RB FARMS (EGGS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "531",
+    "name": "AL HARAM (SPICE AND DRYFRUITS)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 178705.0,
+    "code_hits": [
+      "AL HARAM (SPICE AND DRYFRUITS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "544",
+    "name": "DANISH FRAME",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.04,
+    "code_hits": [
+      "DANISH FRAME"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "556",
+    "name": "AI ENTERPRISES (PAK EGGS)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 8992.63,
+    "code_hits": [
+      "AI ENTERPRISES (PAK EGGS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "559",
+    "name": "ZIZCON ENTERPRISES (FALAK RICE)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -53911.99,
+    "code_hits": [
+      "ZIZCON ENTERPRISES (FALAK RICE)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "575",
+    "name": "AFZAL INTERNATIONAL TRADING (CROCKERY)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.46,
+    "code_hits": [
+      "AFZAL INTERNATIONAL TRADING (CROCKERY)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "577",
+    "name": "MEEZAN INTERNATIONAL TRADING COMPANY",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.06,
+    "code_hits": [
+      "MEEZAN INTERNATIONAL TRADING COMPANY"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "584",
+    "name": "TOPS (MURREE BURERY)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.0,
+    "code_hits": [
+      "TOPS (MURREE BURERY)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "588",
+    "name": "SHERAZ (WALL CLOCK)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.01,
+    "code_hits": [
+      "SHERAZ (WALL CLOCK)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "599",
+    "name": "RAUF TRADING (DELI SOGA)",
+    "ntn": "5479929",
+    "reason": "unmatched_clean_ntn",
+    "balance": 2262.53,
+    "code_hits": [
+      "RAUF TRADING (DELI SOGA)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "608",
+    "name": "METRO PAKISTAN",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 6406.42,
+    "code_hits": [
+      "METRO PAKISTAN"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "614",
+    "name": "SIEZAL SUPERMARKET (KHANNA PULL)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -616586.56,
+    "code_hits": [
+      "SIEZAL SUPERMARKET (BAHRIA PH7)",
+      "SIEZAL SUPERMARKET (KHANNA PULL)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "616",
+    "name": "SIEZAL SUPERMARKET (DHA PHASE 1)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -11545723.92,
+    "code_hits": [
+      "USAMA TRADERS"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "617",
+    "name": "MELAMINE INDUSTRY (GUNGRAWALA)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 140461.08,
+    "code_hits": [
+      "MUKARRAM MARKETING SERVICES (HILAL)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "618",
+    "name": "NOMAN TRADERS (CROCKERY)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 65260.08,
+    "code_hits": [
+      "PREMIER SALES PVT LTD (ABBOTT)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "619",
+    "name": "HAJI MOEEN (COSMETICS)",
+    "ntn": "8135302",
+    "reason": "unmatched_clean_ntn",
+    "balance": 0.93,
+    "code_hits": [
+      "NOMAN TRADERS (WOODEN CROCKERY)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "621",
+    "name": "RC CUTLERY ENTERPRISES",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.1,
+    "code_hits": [
+      "BISMILLAH BEVERAGES (DASHI)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "622",
+    "name": "MT-HOME CLASSIC",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 217533.86,
+    "code_hits": [
+      "TRICO ENTERPRISES (WIPER)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "623",
+    "name": "GOOD LUCK TRADING CO. (SOYA SUPREME)",
+    "ntn": "55623",
+    "reason": "no_clean_ntn",
+    "balance": 94781.01,
+    "code_hits": [
+      "GHAMKOL FOOD TRADERS (LANGNESE)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "624",
+    "name": "SS TRADERS (COSMETICS)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 182.08,
+    "code_hits": [
+      "PREMIER SALES PVT LTD (ABBOTT)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "625",
+    "name": "AS MARKETING (BABY ITEM)",
+    "ntn": "1273632",
+    "reason": "unmatched_clean_ntn",
+    "balance": 48421.89,
+    "code_hits": [
+      "SHAN DISTRIBUTOR (OLPERS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "627",
+    "name": "PAK TRADERS (DELMONTE)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 16973.61,
+    "code_hits": [
+      "DECENT INTERNATIONAL (MEKEY COSMETICS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "630",
+    "name": "ABDULLAH ENTERPRISES (JAM-E-SHIRIN)",
+    "ntn": "4173369",
+    "reason": "unmatched_clean_ntn",
+    "balance": 3795.34,
+    "code_hits": [
+      "U.B TRADERS (SOYA SUPREME)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "636",
+    "name": "AL BAYAD DISTRIBUTION NETWORK",
+    "ntn": "646694",
+    "reason": "no_clean_ntn",
+    "balance": -0.2,
+    "code_hits": [
+      "AL BAYAD DISTRIBUTION NETWORK"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "650",
+    "name": "SHAFI AND SONS (SHANGRILA)",
+    "ntn": "56068",
+    "reason": "no_clean_ntn",
+    "balance": 68412.67,
+    "code_hits": [
+      "SHAFI AND SONS (SHANGRILA)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "651",
+    "name": "TRICO ENTERPRISES (WIPER)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 16487.94,
+    "code_hits": [],
+    "ntn_hits": []
+  },
+  {
+    "code": "657",
+    "name": "AM TRADERS (JUST FOR MEN)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.4,
+    "code_hits": [
+      "AM TRADERS (JUST FOR MEN)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "658",
+    "name": "SUN SHINE HOME PRODUCTS",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 21700.0,
+    "code_hits": [
+      "SUN SHINE HOME PRODUCTS"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "660",
+    "name": "AL BARKA TRADING (MATCH BOX)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.0,
+    "code_hits": [
+      "AL BARKA TRADING (MATCH BOX)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "664",
+    "name": "SIDDIQUE VENTURES (MEEZAN)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.0,
+    "code_hits": [
+      "SIDDIQUE VENTURES (MEEZAN)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "671",
+    "name": "IRFAN DUSTER (MURREE ROAD)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.36,
+    "code_hits": [
+      "IRFAN DUSTER (MURREE ROAD)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "676",
+    "name": "SHAN DISTIBUTORS (SUNRIDGE)",
+    "ntn": "787767",
+    "reason": "no_clean_ntn",
+    "balance": -85178.65,
+    "code_hits": [],
+    "ntn_hits": []
+  },
+  {
+    "code": "678",
+    "name": "ABDUL HAYEE COTTON ROLL",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 0.0,
+    "code_hits": [
+      "ABDUL HAYEE COTTON ROLL"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "680",
+    "name": "SABZI MANDI",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": 701046.39,
+    "code_hits": [
+      "SABZI MANDI"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "682",
+    "name": "SHARIF MILK PRODUCTS (PVT) LTD",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -22261.5,
+    "code_hits": [
+      "SHARIF MILK PRODUCTS (PVT) LTD"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "691",
+    "name": "ALI TRADERS (COLA NEXT)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -5897.31,
+    "code_hits": [
+      "ALI TRADERS (COLA NEXT)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "694",
+    "name": "VITA ORGANIC (GLUTON FREE ATTA)",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -10673.13,
+    "code_hits": [
+      "VITA ORGANIC (GLUTON FREE ATTA)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "696",
+    "name": "RH",
+    "ntn": "",
+    "reason": "no_clean_ntn",
+    "balance": -921388.53,
+    "code_hits": [
+      "RH"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "699",
+    "name": "MARGALLA DISTRIBUTION DAWNTOWN (DALDA)",
+    "ntn": "261458",
+    "reason": "no_clean_ntn",
+    "balance": 1.46,
+    "code_hits": [
+      "MARGALLA DISTRIBUTION DAWNTOWN (DALDA)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "700",
+    "name": "PRIME DISTRIBUTION NETWORK (ISLAMABAD TEA)",
+    "ntn": "I249921",
+    "reason": "unmatched_clean_ntn",
+    "balance": 56544.95,
+    "code_hits": [
+      "PRIME DISTRIBUTION NETWORK (ISLAMABAD TEA)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "708",
+    "name": "SHAN DISTRIBUTORS (UNILIVER)",
+    "ntn": "787767",
+    "reason": "no_clean_ntn",
+    "balance": 438819.49,
+    "code_hits": [
+      "SHAN DISTRIBUTOR (OLPERS)"
+    ],
+    "ntn_hits": []
+  },
+  {
+    "code": "724",
+    "name": "SIGMA DISTRIBUTORS (PVT) LTD (MITCHELLS)",
+    "ntn": "7325944",
+    "reason": "unmatched_clean_ntn",
+    "balance": 55786.38,
+    "code_hits": [],
+    "ntn_hits": []
+  },
+  {
+    "code": "725",
+    "name": "TALHA TRADERS (TAPAL)",
+    "ntn": "6798668",
+    "reason": "unmatched_clean_ntn",
+    "balance": 0.25,
+    "code_hits": [],
+    "ntn_hits": []
+  },
+  {
+    "code": "726",
+    "name": "MS SCOURER BRITE",
+    "ntn": "389674",
+    "reason": "no_clean_ntn",
+    "balance": 85378.21,
+    "code_hits": [],
+    "ntn_hits": []
+  },
+  {
+    "code": "727",
+    "name": "SKY TRADERS (POWER PLUS)",
+    "ntn": "8457266",
+    "reason": "unmatched_clean_ntn",
+    "balance": 35456.07,
+    "code_hits": [],
+    "ntn_hits": []
+  }
+]

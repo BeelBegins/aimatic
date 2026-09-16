@@ -1,0 +1,284 @@
+[
+  {
+    "row": 151,
+    "sku": "tclv-273",
+    "name": "Omore Candi Stick 55ml",
+    "barcode1": "08964000145586"
+  },
+  {
+    "row": 206,
+    "sku": "tclv-364",
+    "name": "Wall's Choc Bar 50ml",
+    "barcode1": "09876543210981"
+  },
+  {
+    "row": 720,
+    "sku": "tclv-1491",
+    "name": "Rafhan Strawberry Custard 275g",
+    "barcode1": ""
+  },
+  {
+    "row": 923,
+    "sku": "tclv-1940",
+    "name": "Knorr Barbecue Sauce Pouch 400g",
+    "barcode1": ""
+  },
+  {
+    "row": 1436,
+    "sku": "tclv-3125",
+    "name": "Sunsilk Shampoo Hair Fall Solution 200ml",
+    "barcode1": "08961014247893"
+  },
+  {
+    "row": 1495,
+    "sku": "tclv-3238",
+    "name": "Clear Men Cool Black Shampoo 185ml",
+    "barcode1": ""
+  },
+  {
+    "row": 1667,
+    "sku": "tclv-3642",
+    "name": "L'Oreal Paris Shampoo Fall Repair 3x 175ml",
+    "barcode1": "03610340184598"
+  },
+  {
+    "row": 1670,
+    "sku": "tclv-3646",
+    "name": "L'Oreal Dream Long Restoring Shampoo Elvive 175ml",
+    "barcode1": "03610340655357"
+  },
+  {
+    "row": 2180,
+    "sku": "tclv-5004",
+    "name": "Tapal Danedar Tea 100 Enveloped Teabag 200g Box",
+    "barcode1": "00815096001707"
+  },
+  {
+    "row": 2367,
+    "sku": "tclv-5373",
+    "name": "Sunsilk Shampoo Root Lock Hair Fall Solution 650ml",
+    "barcode1": "08961014248050"
+  },
+  {
+    "row": 2678,
+    "sku": "tclv-6027",
+    "name": "Seasons Corn Oil Bottle 4.5L",
+    "barcode1": "08964000069202"
+  },
+  {
+    "row": 2779,
+    "sku": "WHHPR0",
+    "name": "Lays Classic (Rs.50) 1 Unit",
+    "barcode1": "08964002346875"
+  },
+  {
+    "row": 3500,
+    "sku": "newmapping1496",
+    "name": "Omore Strawberry Brick 800ml",
+    "barcode1": "08964000144084"
+  },
+  {
+    "row": 3926,
+    "sku": "fmv103001",
+    "name": "Kingtox Mosquito Liquid Refill 1 Unit",
+    "barcode1": ""
+  },
+  {
+    "row": 4472,
+    "sku": "7IQC34",
+    "name": "Cola Next 1.5l",
+    "barcode1": "00000000202129"
+  },
+  {
+    "row": 5478,
+    "sku": "N6QJL9",
+    "name": "Golden Pearl Extra Care Skin Lightening Moisturizing Lotion 100ml",
+    "barcode1": "08964001753636"
+  },
+  {
+    "row": 5545,
+    "sku": "2XX8E6",
+    "name": "Tresemme Lamellar Gloss Conditioner 160ml",
+    "barcode1": "08961014264364"
+  },
+  {
+    "row": 5581,
+    "sku": "QEWA4H",
+    "name": "Nestle Pure Life Drinking Water 6 x 1.5L",
+    "barcode1": "08850124003843"
+  },
+  {
+    "row": 5624,
+    "sku": "tclv-1212",
+    "name": "Dawn Bran 340g",
+    "barcode1": "00850027875026"
+  },
+  {
+    "row": 6488,
+    "sku": "tclv-253",
+    "name": "Kurkure Toofani Masala 42g",
+    "barcode1": "08964002347285"
+  },
+  {
+    "row": 7413,
+    "sku": "tclv-2217",
+    "name": "Sensodyne Douceur Dents Sensibles 3D - 1 Piece",
+    "barcode1": "03094901410003"
+  },
+  {
+    "row": 7853,
+    "sku": "tclv-3287",
+    "name": "Knorr Tomato Ketchup Pouch 800g",
+    "barcode1": ""
+  },
+  {
+    "row": 8107,
+    "sku": "tclv-3953",
+    "name": "Harpic Power Plus Toilet Cleaner Original 500ml",
+    "barcode1": "00001106114626"
+  },
+  {
+    "row": 8800,
+    "sku": "tclv-6042",
+    "name": "Glucerna Chocolate Powder 400g",
+    "barcode1": ""
+  },
+  {
+    "row": 9211,
+    "sku": "newmapping1823",
+    "name": "Room Services Refuse Sacks 50 Pieces",
+    "barcode1": "06418349473418"
+  },
+  {
+    "row": 10124,
+    "sku": "K61W8J",
+    "name": "Saniplast Aqua Bandage 1 Unit",
+    "barcode1": ""
+  },
+  {
+    "row": 10504,
+    "sku": "I57G1J",
+    "name": "Similac Neosure 370g",
+    "barcode1": ""
+  },
+  {
+    "row": 11730,
+    "sku": "7U7H2C",
+    "name": "Sensodyne Sensitivity Protection Deep Clean Toothpaste 100g",
+    "barcode1": ""
+  },
+  {
+    "row": 11823,
+    "sku": "60P1L6",
+    "name": "Dalda Banaspati Ghee 5 x 1L",
+    "barcode1": "00000000200521"
+  },
+  {
+    "row": 11851,
+    "sku": "943NE9",
+    "name": "Dawn Open Top Rusk Large 1 Piece",
+    "barcode1": "00896000041707"
+  },
+  {
+    "row": 11865,
+    "sku": "6AWCSX",
+    "name": "Cadbury Perk Chocolate - 9.8g",
+    "barcode1": "07622210867056"
+  },
+  {
+    "row": 11915,
+    "sku": "T4E191",
+    "name": "Pepsi 6 Pieces x 1.5L",
+    "barcode1": "00000000203878"
+  },
+  {
+    "row": 12004,
+    "sku": "59H9FM",
+    "name": "Pepsi 2.25L",
+    "barcode1": "00000000214418"
+  },
+  {
+    "row": 12425,
+    "sku": "0D197F",
+    "name": "Shan Karahi Masala 45g",
+    "barcode1": "00788821021595"
+  },
+  {
+    "row": 12473,
+    "sku": "Z39Q4O",
+    "name": "Fusion Gum Watermelon 1 Packet",
+    "barcode1": "01156790068320"
+  },
+  {
+    "row": 12487,
+    "sku": "57GFWA",
+    "name": "Sensodyne Toothpaste Kids 3-5 Years 50g",
+    "barcode1": "01507000224980"
+  },
+  {
+    "row": 12729,
+    "sku": "5NR81J",
+    "name": "Brooke Bond Supreme Tea, 170g",
+    "barcode1": "05063305008787"
+  },
+  {
+    "row": 13266,
+    "sku": "1U85L6",
+    "name": "Tresemme Conditioner Bond Plex Sleek & Repair 160ml",
+    "barcode1": "08961014263527"
+  },
+  {
+    "row": 13959,
+    "sku": "G9939E",
+    "name": "Dove Dryness Care Shampoo 175ml",
+    "barcode1": "08961014235180"
+  },
+  {
+    "row": 14169,
+    "sku": "34A9Y6",
+    "name": "Kachri Powder 100g",
+    "barcode1": "08000333002766"
+  },
+  {
+    "row": 14180,
+    "sku": "N3479H",
+    "name": "Chia Seed 100g",
+    "barcode1": "08687786123486"
+  },
+  {
+    "row": 14181,
+    "sku": "RWX5U7",
+    "name": "Chat Masala 100g",
+    "barcode1": "02165379000001"
+  },
+  {
+    "row": 15161,
+    "sku": "6WIOE2",
+    "name": "Colgate Anticavity Toothpaste (Buy 1 + Get 1 Free) 275g",
+    "barcode1": ""
+  },
+  {
+    "row": 15213,
+    "sku": "K40478",
+    "name": "Everyday Kashmiri Chai 180g",
+    "barcode1": ""
+  },
+  {
+    "row": 15231,
+    "sku": "5IA125",
+    "name": "Wall's Cornetto Cookies 1 Unit",
+    "barcode1": ""
+  },
+  {
+    "row": 15310,
+    "sku": "96VPMR",
+    "name": "Treet Tidy Body Razor Disposable Promo Pack 3 Pieces",
+    "barcode1": ""
+  },
+  {
+    "row": 15723,
+    "sku": "9S20F7",
+    "name": "Kiwi Shoe Polish Dark Tan Promo Pack 45ml",
+    "barcode1": "00735745952740"
+  }
+]

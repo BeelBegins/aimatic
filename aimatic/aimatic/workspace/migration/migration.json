@@ -1,0 +1,134 @@
+{
+ "app": "aimatic",
+ "charts": [],
+ "content": "[{\"id\": \"migHeader\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Migration</b></span>\", \"col\": 12}}, {\"id\": \"migShortcutFolder\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"S7 Result Files\", \"col\": 4}}, {\"id\": \"migShortcutSource\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"S7 Source Itemonhand\", \"col\": 4}}, {\"id\": \"migShortcutMissing\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"S7 Missing Items Excel\", \"col\": 4}}, {\"id\": \"migShortcutAbsent\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"S7 Absent Barcodes Excel\", \"col\": 4}}, {\"id\": \"migShortcutOrphan\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"S7 Orphan Barcode2 Excel\", \"col\": 4}}, {\"id\": \"migShortcutSummary\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"S7 Audit Summary JSON\", \"col\": 4}}, {\"id\": \"migSpacer\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"migHeader2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Masters</b></span>\", \"col\": 12}}, {\"id\": \"migShortcutItems\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Item\", \"col\": 4}}, {\"id\": \"migShortcutBranch\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Branch\", \"col\": 4}}, {\"id\": \"migShortcutFiles\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"All Files\", \"col\": 4}}]",
+ "creation": "2026-09-04 02:40:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "upload-cloud",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Migration",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "S7 Empire Heights",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "S7 Result Folder",
+   "link_count": 0,
+   "link_to": "File",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Item",
+   "link_count": 0,
+   "link_to": "Item",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Branch",
+   "link_count": 0,
+   "link_to": "Branch",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-04 02:48:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "Migration",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "Aimatic",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [],
+ "sequence_id": 120.0,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "label": "S7 Result Files",
+   "type": "URL",
+   "url": "/app/file/view/home/Migrations/S7"
+  },
+  {
+   "color": "Grey",
+   "label": "S7 Source Itemonhand",
+   "type": "URL",
+   "url": "/app/file/0c7a4cfbc9"
+  },
+  {
+   "color": "Purple",
+   "label": "S7 Runbook",
+   "type": "URL",
+   "url": "/app/file/a79c4db10a"
+  },
+  {
+   "color": "Orange",
+   "label": "S7 Missing Items Excel",
+   "type": "URL",
+   "url": "/app/file/afe451cb1b"
+  },
+  {
+   "color": "Red",
+   "label": "S7 Absent Barcodes Excel",
+   "type": "URL",
+   "url": "/app/file/8d3aa4e56a"
+  },
+  {
+   "color": "Yellow",
+   "label": "S7 Orphan Barcode2 Excel",
+   "type": "URL",
+   "url": "/app/file/4341b520d2"
+  },
+  {
+   "color": "Green",
+   "label": "S7 Audit Summary JSON",
+   "type": "URL",
+   "url": "/app/file/dd4e6f04ee"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Item",
+   "link_to": "Item",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Branch",
+   "link_to": "Branch",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "All Files",
+   "link_to": "File",
+   "type": "DocType"
+  }
+ ],
+ "title": "Migration",
+ "type": "Workspace"
+}

@@ -10,14 +10,14 @@ Reusable mapping rules stay in `import.md`. This file records **S4-only
 verdicts, gates, file roles, and pass order**. Do not invent a second mapping
 system here.
 
-## Status (2026-09-13, live cutover including Foodpanda + NTN vendor JEs)
+## Status (2026-09-15, live cutover including Foodpanda + all vendor JEs)
 
 | Phase | Status |
 |---|---|
 | Branch / warehouse / cost center / price list masters | Already present on live `szl` (`S4 - Wallayat Complex`, warehouse `S4 - Wallayat Complex - SSM` + `Rejected` variant, cost center `S4 - Wallayat Complex - SSM`, Selling + Foodpanda Price Lists) — see `szl_reference_data.py` (`ledger_suffix=S4WC`, inter-branch payable account number `2142`) |
 | Account (`Cash in Hand - S4WC`), Mode of Payment, walk-in Customer, POS Profile | **Done** 2026-09-13 on live `szl` after backup `20260913_022758-szl-*`: `1113 - Cash in Hand - S4WC - SSM`, `Cash - S4WC`, `S4 Walk in Customer` (`default_price_list` = S4 selling list), `S4 Food Panda` customer, profiles `S4 Counter 1` (`S4WC-1`) and `S4 Food Panda` (`S4FP`). Two POS User accounts attached. First copy from S7 left `account_for_change_amount` on S7 cash; both S4 profiles now use `1113`. |
 | FBR Integration Settings | **Done** 2026-09-13 on live `szl`: copied from S7 (S5 has no FBR row) to `Siezal Supermarket-S4 - Wallayat Complex`, `branch_code=1004`. **`pos_id=184234`** (user updated 2026-09-13 05:20 PKT; unique vs S1 `176213` and S7 `196711`). |
-| Live `szl` S4 data | **Items, selling prices, opening stock, Foodpanda prices, vendor JEs (including sister-store), POS go-live, and unique FBR POS ID posted 2026-09-13.** Do not re-run Item create or opening-stock posting. Remaining: leftover no-NTN / unmapped vendor rows. |
+| Live `szl` S4 data | **Items, selling prices, opening stock, Foodpanda prices, vendor JEs (NTN, sister-store, and no-NTN), POS go-live, and unique FBR POS ID posted 2026-09-13.** Do not re-run Item create, opening-stock, or vendor-opening posting. No leftover vendor rows. |
 | Source files received | **Done** 2026-09-12: `Ho-MasterItemFiled5b674.xlsx` (master, File `9872249e71`), `1004stockposition.xls` (branch stock/price, File `3b594c134a`), `1004vendorbalances.xlsx` (vendor opening balances, File `16ee8a6a31`). "1004" is S4's own FBR-style branch code, same convention as S7's "1007" |
 | Mock restore of `szl` backup onto `siezal` | **Done** 2026-09-12 ~23:39 PKT — source `20260912_233859-szl-database.sql.gz` (+files/private-files tars), taken after the same-day cost-center GL fix and after the three S4 source files were uploaded, so the mock includes both. Verified: `siezal`'s GL missing-`cost_center` counts read 0 across all accounts (matches live `szl` post-fix), S4 branch/warehouse present, all three S4 files present on disk and in the `File` doctype |
 | Barcode gap audit vs catalog (mock `siezal`) | **Done** 2026-09-12 — see below |
@@ -28,8 +28,8 @@ system here.
 | Catalog duplicate check (mock `siezal`) | **Done** 2026-09-13 — 6 candidates found, **0 recommended for merge** (see below); differs from S7, which had 7 genuine merges |
 | Colgate Premier/Twister correction | **Done** 2026-09-13 on mock after `20260913_011949-siezal-*`, then on live after `20260913_013922-szl-*`. Premier remains `STO-ITEM-2026-09751`; barcode `8886950093352` moved to new `STO-ITEM-2026-22780` (`Colgate Twister M`). Existing Premier activity unchanged. |
 | S4 prices + opening stock | **Done on live `szl` 2026-09-13** (mock price/stock posting skipped by user). Dry-run 0 blockers: 13,219 prices, 7,485 positive and 801 negative stock rows. Posted those totals; SLE=Bin=8,286. |
-| Foodpanda prices | **Done** 2026-09-13 on live `szl` after `20260913_022924-szl-*`: File `c85110c253` `products (1).xlsx` (16,234 rows, 2,683 active). Applied **2,613** ready barcode-matched Item Prices to `S4 - Wallayat Complex Foodpanda Price List` (log `dn0pgmns62`). Skipped 52 active unmatched, 13 ambiguous other-barcode, 2 conflicting-price Items. First in-session apply rolled back on `frappe.destroy()`; re-applied with explicit commit. Unmatched list: `s4_foodpanda_unmatched_active.json`. |
-| Vendor balances | **Mostly done** 2026-09-13. **181** submitted `LEGACY-OB-S4-*` JEs (0 blank dimensions; 2 mistaken duplicate-supplier JEs cancelled). NTN-first; parenthetical brand is Principal. Duplicate RAUF/PRIME suffix Suppliers removed. Sister-store rows posted via S7-style name map. 1 new Supplier (`GOOD LUCK TRADING CO. (SOYA SUPREME)`). **56 no-NTN rows held.** |
+| Foodpanda prices | **Done** 2026-09-13 on live `szl`. File `products (1).xlsx` (16,234 rows, 2,683 active + 13,551 inactive). First pass active-only **2,618**. Then all barcode-matched ERPNext Items including inactive: **10,613** on `S4 - Wallayat Complex Foodpanda Price List` only (created 7,995, unchanged 2,617, updated 1). Active portal price wins when both exist. Unmatched/ambiguous skipped. |
+| Vendor balances | **Done.** **230** submitted `LEGACY-OB-S4-*` JEs on live `szl` (re-verified 2026-09-15). Excel 237 / 230 nonzero / 7 zeros skipped. NTN-first, then no-NTN posted onto existing Suppliers by name/code; sister-store via S7-style map. Duplicate RAUF/PRIME suffix Suppliers removed. `s4_vendor_unresolved.json` is a first-pass snapshot, not a live leftover. |
 
 ## Barcode gap audit (2026-09-12, on `siezal` mock)
 
@@ -212,14 +212,17 @@ vendor JEs only, `20260913_022924-szl-*` is the pre-apply backup (integrity
 checked). `20260913_023300-szl-*` has vendor JEs but not the committed
 Foodpanda prices. Do not re-run Item create or opening-stock posting.
 
-## Vendor rows left for manual resolution
+## Vendor openings (complete)
 
-NTN-first apply posted 146 unique `^[A-Z0-9]{7}$` matches to one enabled
-Supplier. Full leftover list: `s4_vendor_unresolved.json`.
+First NTN-only apply posted unique clean-NTN matches and wrote leftovers to
+`s4_vendor_unresolved.json` (91 rows: 83 `no_clean_ntn` + 8 unmatched clean
+NTN). That file is a **first-pass snapshot**. Later applies posted sister
+stores, created the unmatched-NTN Suppliers, and posted no-NTN openings onto
+**existing** Supplier names/codes. Re-verified 2026-09-15: 230 submitted
+`LEGACY-OB-S4-*` JEs; 0 nonzero snapshot codes missing a voucher; 7 Excel
+zeros have no JE by design. Do not treat the JSON as held work.
 
-**Unmatched clean NTN (8)** — NTN is well-formed but no enabled Supplier
-has that `tax_id`. Code-hits below are informational only; they were **not**
-used to link:
+**Unmatched clean NTN (8)** — later created/linked and posted (not leftover):
 
 | Code | Source name | NTN | Balance | Informational code-hits |
 |---|---|---|---:|---|
@@ -248,8 +251,9 @@ Bahria PH7; `616` → DHA PH 1 not USAMA TRADERS). Net ₨-46,390,174.40.
 | 614 | SIEZAL SUPERMARKET (KHANNA PULL) | SIEZAL SUPERMARKET (KHANNA PULL) | ACC-JV-2026-00977 | -616,586.56 |
 | 616 | SIEZAL SUPERMARKET (DHA PHASE 1) | SIEZAL SUPERMARKET (DHA PH 1) | ACC-JV-2026-00978 | -11,545,723.92 |
 
-**Unmatched clean NTN (8)** — later created as new Suppliers and posted
-(see vendor status row). Remaining held rows are other no-NTN vendors.
+**Unmatched clean NTN (8)** — later created as new Suppliers and posted.
+No-NTN rows were posted onto existing Suppliers; nothing from that snapshot
+remains held.
 
 Surprising NTN name collisions that **were** posted because the NTN was
 unique to one enabled Supplier (review if a product-line name hid a
@@ -271,9 +275,9 @@ with a different brand suffix (Premier Sales, Asian Kings, Tarseel, etc.).
 | `split_s4_colgate_twister.py` | User-approved Colgate product split — applied on mock and live (`STO-ITEM-2026-22780`) |
 | `import_s4_prices_and_stock.py` | S4 selling prices + opening stock — posted on live `szl`; `TARGET_SITE` is now `szl`. Do not re-post stock. |
 | `import_s4_foodpanda_prices.py` | Active barcode-matched Foodpanda prices — posted 2,613 on live `szl`. Re-runs need the explicit commit. |
-| `import_s4_vendor_balances.py` | NTN-first + S7-style sister-store map. 176 submitted `LEGACY-OB-S4-*` JEs on live `szl`. |
+| `import_s4_vendor_balances.py` | NTN-first, then no-NTN by existing name/code, plus S7-style sister-store map. **230** submitted `LEGACY-OB-S4-*` JEs on live `szl`. Do not re-post. |
 | `setup_s4_pos_golive.py` | Cash account / MoP / customers / POS Profiles — done, idempotent. |
-| `s4_vendor_unresolved.json` | 91 rows not auto-linked (no/malformed NTN or unmatched clean NTN). |
+| `s4_vendor_unresolved.json` | First-pass dump (91 rows). Not a live leftover — those openings are posted. |
 | `s4_foodpanda_unmatched_active.json` | 52 active portal rows with no catalog barcode. |
 | `import.md` | Canonical field mapping, tax-exclusive CurCost, stock GL rules |
 | `setup_szl.md` / `szl_reference_data.py` | S4 branch naming / accounts (already defines S4) |
