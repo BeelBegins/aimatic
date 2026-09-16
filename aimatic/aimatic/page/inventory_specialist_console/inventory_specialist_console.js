@@ -10,6 +10,7 @@ aimatic.InventorySpecialistPage = class InventorySpecialistPage {
 	constructor(wrapper) {
 		this.page = frappe.ui.make_app_page({ parent: wrapper, title: __("Inventory Specialist"), single_column: true });
 		this.page.set_primary_action(__("Refresh"), () => this.load());
+		this.target_cover_days = 7;
 		this.build_filters();
 		this.$body = $("<div class='inventory-specialist'></div>").appendTo(this.page.body);
 		this.render_empty();
@@ -20,9 +21,10 @@ aimatic.InventorySpecialistPage = class InventorySpecialistPage {
 			label: __("Branch"), fieldname: "branch", fieldtype: "Link", options: "Branch", reqd: 1,
 			default: frappe.defaults.get_user_default("Branch"), change: () => this.load_if_ready(),
 		});
-		this.cover = this.page.add_field({
-			label: __("Keep in stock for days"), fieldname: "cover", fieldtype: "Int",
-			default: 7, change: () => this.load_if_ready(),
+		this.history = this.page.add_field({
+			label: __("Sales history (days)"), fieldname: "history_days", fieldtype: "Int",
+			default: 28, description: __("Examples: 28 = 1 month; 90 = 3 months."),
+			change: () => this.load_if_ready(),
 		});
 		this.supplier = this.page.add_field({
 			label: __("Vendor"), fieldname: "supplier", fieldtype: "Link", options: "Supplier",
@@ -38,7 +40,8 @@ aimatic.InventorySpecialistPage = class InventorySpecialistPage {
 		this.$body.html(`<div class="is-empty">${__("Checking what needs attention…")}</div>`);
 		try {
 			this.data = await frappe.xcall("aimatic.inventory_specialist.engine.get_inventory_specialist", {
-				branch, supplier: this.supplier.get_value(), target_cover_days: parseInt(this.cover.get_value(), 10) || 7,
+				branch, supplier: this.supplier.get_value(), history_days: parseInt(this.history.get_value(), 10) || 28,
+				target_cover_days: this.target_cover_days,
 			});
 			this.render();
 		} catch (error) {
@@ -53,9 +56,11 @@ aimatic.InventorySpecialistPage = class InventorySpecialistPage {
 	render() {
 		const d = this.data;
 		this.$body.html(`
-			<div class="is-intro"><strong>${__("What should I buy today?")}</strong><span>${__("Based on the last {0} days of retail sales. No documents are created.", [d.history_days])}</span></div>
+			<div class="is-intro"><strong>${__("What should I buy today?")}</strong><span>${__("Sales history: last {0} days. No documents are created.", [d.history_days])}</span></div>
 			<div class="is-tabs">
-				<button class="active" data-is-tab="buy">${__("Buy today")}</button>
+				<button class="${this.target_cover_days === 7 ? "active" : ""}" data-is-cover="7">${__("Buy today — 1 week")}</button>
+				<button class="${this.target_cover_days === 14 ? "active" : ""}" data-is-cover="14">${__("Buy today — 2 weeks")}</button>
+				<button class="${this.target_cover_days === 30 ? "active" : ""}" data-is-cover="30">${__("Buy today — 1 month")}</button>
 				<button data-is-tab="cover">${__("Cover plan")}</button>
 				<button data-is-tab="checks">${__("Stock checks")} <em>${d.stock_checks.length}</em></button>
 				<button data-is-tab="timing">${__("Supplier timing")}</button>
@@ -65,6 +70,10 @@ aimatic.InventorySpecialistPage = class InventorySpecialistPage {
 			<div data-is-panel="checks" class="hide">${this.checks_panel(d.stock_checks)}</div>
 			<div data-is-panel="timing" class="hide">${this.timing_panel(d.supplier_timing)}</div>
 		`);
+		this.$body.find("[data-is-cover]").on("click", (event) => {
+			this.target_cover_days = parseInt($(event.currentTarget).data("is-cover"), 10) || 7;
+			this.load();
+		});
 		this.$body.find("[data-is-tab]").on("click", (event) => {
 			const tab = $(event.currentTarget).data("is-tab");
 			this.$body.find("[data-is-tab]").removeClass("active");
