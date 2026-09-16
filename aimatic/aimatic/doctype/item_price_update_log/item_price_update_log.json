@@ -20,14 +20,14 @@
  ],
  "fields": [
   {
+   "description": "Blank for standalone Selling Price Update engine writes. Cancel restore only uses rows that have a receipt.",
    "fieldname": "purchase_receipt",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Purchase Receipt",
    "options": "Purchase Receipt",
-   "read_only": 1,
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "item_code",
@@ -105,7 +105,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-14 00:00:00.000000",
+ "modified": "2026-09-15 06:10:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Item Price Update Log",

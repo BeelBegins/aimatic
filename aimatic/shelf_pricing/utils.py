@@ -194,21 +194,25 @@ def get_or_create_branch_foodpanda_price_list(branch):
 
 def log_price_update(purchase_receipt, item_code, price_list, branch, field_updated, old_value, new_value):
 	"""One audit row per changed field. restore_prices_on_cancel relies on
-	these to decide whether a cancel is still safe to roll back."""
-	frappe.get_doc(
-		{
-			"doctype": "Item Price Update Log",
-			"purchase_receipt": purchase_receipt,
-			"item_code": item_code,
-			"price_list": price_list,
-			"branch": branch,
-			"field_updated": field_updated,
-			"old_value": flt(old_value),
-			"new_value": flt(new_value),
-			"updated_by": frappe.session.user,
-			"update_datetime": now_datetime(),
-		}
-	).insert(ignore_permissions=True)
+	these to decide whether a cancel is still safe to roll back.
+
+	``purchase_receipt`` may be blank for standalone Selling Price Update
+	engine writes — cancel restore only matches logs that have a receipt.
+	"""
+	payload = {
+		"doctype": "Item Price Update Log",
+		"item_code": item_code,
+		"price_list": price_list,
+		"branch": branch,
+		"field_updated": field_updated,
+		"old_value": flt(old_value),
+		"new_value": flt(new_value),
+		"updated_by": frappe.session.user,
+		"update_datetime": now_datetime(),
+	}
+	if purchase_receipt:
+		payload["purchase_receipt"] = purchase_receipt
+	frappe.get_doc(payload).insert(ignore_permissions=True)
 
 
 def get_selling_item_price_rate(item_code, price_list, uom=None):
@@ -238,12 +242,19 @@ def get_selling_item_price_rate(item_code, price_list, uom=None):
 	return flt(rate)
 
 
-def upsert_item_price(item_code, price_list, purchase_receipt, branch=None, rate=None, mrp=None):
-	"""Create or update the Item Price row for (item_code, price_list),
-	logging every field that actually changes before overwriting it."""
-	existing_name = frappe.db.get_value(
-		"Item Price", {"item_code": item_code, "price_list": price_list, "selling": 1}, "name"
-	)
+def upsert_item_price(item_code, price_list, purchase_receipt, branch=None, rate=None, mrp=None, uom=None):
+	"""Create or update the Item Price row for (item_code, price_list, uom),
+	logging every field that actually changes before overwriting it.
+
+	UOM is required for dual-UOM items. When omitted, ``Item.stock_uom`` is
+	used so Pack vs Pcs rates are never crossed.
+	"""
+	resolved_uom = (uom or "").strip() or frappe.db.get_value("Item", item_code, "stock_uom")
+	filters = {"item_code": item_code, "price_list": price_list, "selling": 1}
+	if resolved_uom:
+		filters["uom"] = resolved_uom
+
+	existing_name = frappe.db.get_value("Item Price", filters, "name")
 
 	if existing_name:
 		current = frappe.db.get_value(
@@ -268,6 +279,7 @@ def upsert_item_price(item_code, price_list, purchase_receipt, branch=None, rate
 			"item_code": item_code,
 			"price_list": price_list,
 			"selling": 1,
+			"uom": resolved_uom,
 			"currency": _default_currency(),
 			"price_list_rate": rate or 0,
 			"custom_mrp": mrp or 0,

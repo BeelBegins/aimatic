@@ -1,0 +1,98 @@
+.selling-price-update-page {
+	font-size: 13px;
+	padding-bottom: 32px;
+}
+
+.selling-price-update-page .spu-help {
+	margin: 8px 0 16px;
+	color: var(--text-muted);
+}
+
+.selling-price-update-page .spu-meta {
+	margin-bottom: 10px;
+	color: var(--text-muted);
+}
+
+.selling-price-update-page .spu-table-wrap {
+	overflow: auto;
+	max-height: calc(100vh - 280px);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	background: var(--fg-color);
+}
+
+.selling-price-update-page table.spu-table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	min-width: 1100px;
+}
+
+.selling-price-update-page table.spu-table th,
+.selling-price-update-page table.spu-table td {
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--border-color);
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.selling-price-update-page table.spu-table th {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: var(--subtle-fg, var(--bg-color));
+	font-weight: 600;
+	text-align: left;
+}
+
+.selling-price-update-page table.spu-table td.spu-num,
+.selling-price-update-page table.spu-table th.spu-num {
+	text-align: right;
+}
+
+.selling-price-update-page table.spu-table input.form-control {
+	min-width: 90px;
+	height: 28px;
+	padding: 2px 8px;
+	text-align: right;
+}
+
+.selling-price-update-page .spu-item-code {
+	font-weight: 600;
+}
+
+.selling-price-update-page .spu-item-name {
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+.selling-price-update-page .spu-empty {
+	padding: 28px 16px;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.selling-price-update-page tr.spu-dirty {
+	background: var(--yellow-highlight-color, rgba(255, 193, 7, 0.08));
+}
+
+.selling-price-update-page .spu-warn {
+	color: var(--text-danger, #e24);
+}
+
+.spu-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 4px 12px;
+}
+
+.spu-filters .form-group {
+	min-width: 170px;
+	margin-bottom: 6px;
+}
+
+.spu-filters .form-group[data-fieldname="source_name"] {
+	min-width: 280px;
+	flex: 1 1 280px;
+}

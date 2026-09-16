@@ -1,7 +1,7 @@
 {
  "app": "aimatic",
  "charts": [],
- "content": "[{\"id\": \"aimHeader1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Aimatic</b></span>\", \"col\": 12}}, {\"id\": \"aimShortcut_VendorPerformance\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Vendor Performance\", \"col\": 4}}, {\"id\": \"aimShortcut_LabelPrinting\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Label Printing\", \"col\": 4}}, {\"id\": \"aimShortcut_GiftVouchers\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimShortcut_SalesDashboard\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sales Dashboard\", \"col\": 4}}, {\"id\": \"aimShortcut_AIAssistant\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"AI Assistant\", \"col\": 4}}, {\"id\": \"aimShortcut_Help\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Help\", \"col\": 4}}, {\"id\": \"aimShortcut_FinanceSetup\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Finance Setup\", \"col\": 4}}, {\"id\": \"aimShortcut_PriceCheck\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Price Check\", \"col\": 4}}, {\"id\": \"aimShortcut_FoodpandaCatalog\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Foodpanda Catalog\", \"col\": 4}}, {\"id\": \"aimShortcut_VendorStockPositions\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Vendor Stock Positions\", \"col\": 4}}, {\"id\": \"aimShortcut_Migration\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Migration\", \"col\": 4}}, {\"id\": \"aimSpacer1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"aimHeader2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Modules</b></span>\", \"col\": 12}}, {\"id\": \"aimCard1\", \"type\": \"card\", \"data\": {\"card_name\": \"POS & Devices\", \"col\": 4}}, {\"id\": \"aimCard2\", \"type\": \"card\", \"data\": {\"card_name\": \"Loyalty & Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimCard3\", \"type\": \"card\", \"data\": {\"card_name\": \"FBR / Tax\", \"col\": 4}}, {\"id\": \"aimCard4\", \"type\": \"card\", \"data\": {\"card_name\": \"Pricing\", \"col\": 4}}, {\"id\": \"aimCard5\", \"type\": \"card\", \"data\": {\"card_name\": \"Foodpanda\", \"col\": 4}}, {\"id\": \"aimCard6\", \"type\": \"card\", \"data\": {\"card_name\": \"Restaurant\", \"col\": 4}}, {\"id\": \"aimCard7\", \"type\": \"card\", \"data\": {\"card_name\": \"Shopping\", \"col\": 4}}, {\"id\": \"aimCard8\", \"type\": \"card\", \"data\": {\"card_name\": \"Mobile Sales\", \"col\": 4}}, {\"id\": \"aimCard9\", \"type\": \"card\", \"data\": {\"card_name\": \"Reports\", \"col\": 4}}, {\"id\": \"aimCard10\", \"type\": \"card\", \"data\": {\"card_name\": \"Customization\", \"col\": 4}}]",
+ "content": "[{\"id\": \"aimHeader1\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Aimatic</b></span>\", \"col\": 12}}, {\"id\": \"aimShortcut_VendorPerformance\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Vendor Performance\", \"col\": 4}}, {\"id\": \"aimShortcut_LabelPrinting\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Label Printing\", \"col\": 4}}, {\"id\": \"aimShortcut_GiftVouchers\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimShortcut_SalesDashboard\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Sales Dashboard\", \"col\": 4}}, {\"id\": \"aimShortcut_AIAssistant\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"AI Assistant\", \"col\": 4}}, {\"id\": \"aimShortcut_Help\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Help\", \"col\": 4}}, {\"id\": \"aimShortcut_FinanceSetup\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Finance Setup\", \"col\": 4}}, {\"id\": \"aimShortcut_PriceCheck\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Price Check\", \"col\": 4}}, {\"id\": \"aimShortcut_SellingPriceUpdate\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Selling Price Update\", \"col\": 4}}, {\"id\": \"aimShortcut_FoodpandaCatalog\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Foodpanda Catalog\", \"col\": 4}}, {\"id\": \"aimShortcut_VendorStockPositions\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Vendor Stock Positions\", \"col\": 4}}, {\"id\": \"aimShortcut_Migration\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Migration\", \"col\": 4}}, {\"id\": \"aimSpacer1\", \"type\": \"spacer\", \"data\": {\"col\": 12}}, {\"id\": \"aimHeader2\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\"><b>Modules</b></span>\", \"col\": 12}}, {\"id\": \"aimCard1\", \"type\": \"card\", \"data\": {\"card_name\": \"POS & Devices\", \"col\": 4}}, {\"id\": \"aimCard2\", \"type\": \"card\", \"data\": {\"card_name\": \"Loyalty & Gift Vouchers\", \"col\": 4}}, {\"id\": \"aimCard3\", \"type\": \"card\", \"data\": {\"card_name\": \"FBR / Tax\", \"col\": 4}}, {\"id\": \"aimCard4\", \"type\": \"card\", \"data\": {\"card_name\": \"Pricing\", \"col\": 4}}, {\"id\": \"aimCard5\", \"type\": \"card\", \"data\": {\"card_name\": \"Foodpanda\", \"col\": 4}}, {\"id\": \"aimCard6\", \"type\": \"card\", \"data\": {\"card_name\": \"Restaurant\", \"col\": 4}}, {\"id\": \"aimCard7\", \"type\": \"card\", \"data\": {\"card_name\": \"Shopping\", \"col\": 4}}, {\"id\": \"aimCard8\", \"type\": \"card\", \"data\": {\"card_name\": \"Mobile Sales\", \"col\": 4}}, {\"id\": \"aimCard9\", \"type\": \"card\", \"data\": {\"card_name\": \"Reports\", \"col\": 4}}, {\"id\": \"aimCard10\", \"type\": \"card\", \"data\": {\"card_name\": \"Customization\", \"col\": 4}}]",
  "creation": "2026-07-16 00:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -182,6 +182,16 @@
    "link_count": 0,
    "link_to": "Item Price Update Log",
    "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Selling Price Update",
+   "link_count": 0,
+   "link_to": "selling-price-update-console",
+   "link_type": "Page",
    "onboard": 0,
    "type": "Link"
   },
@@ -704,7 +714,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-15 04:20:00.000000",
+ "modified": "2026-09-15 06:10:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Aimatic",
@@ -765,6 +775,12 @@
    "label": "Price Check",
    "type": "URL",
    "url": "/app/price-check-console"
+  },
+  {
+   "color": "Blue",
+   "label": "Selling Price Update",
+   "type": "URL",
+   "url": "/app/selling-price-update-console"
   },
   {
    "color": "Pink",

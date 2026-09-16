@@ -59,6 +59,7 @@ def apply_branch_price_update(purchase_receipt):
 			branch=doc.branch,
 			rate=shelf_price,
 			mrp=row_mrp or None,
+			uom=row.uom,
 		)
 		_update_global_item_mrp(row.item_code, row_mrp, doc.name, posting_date)
 
@@ -193,6 +194,7 @@ def apply_foodpanda_price_update(purchase_receipt):
 			branch=doc.branch,
 			rate=fp_price,
 			mrp=fp_price,
+			uom=row.uom,
 		)
 
 	frappe.db.set_value("Purchase Receipt", doc.name, "custom_foodpanda_price_update_status", "Updated")

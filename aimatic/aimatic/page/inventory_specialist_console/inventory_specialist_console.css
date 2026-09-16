@@ -1,0 +1,18 @@
+.inventory-specialist { max-width: 1320px; padding: 8px 0 28px; }
+.is-intro { display:flex; align-items:baseline; gap:12px; margin:6px 0 18px; }
+.is-intro strong { font-size:20px; color:var(--heading-color); }
+.is-intro span, .is-card h4 span, .is-note, .is-empty { color:var(--text-muted); }
+.is-tabs { border-bottom:1px solid var(--border-color); margin-bottom:16px; display:flex; gap:4px; }
+.is-tabs button { border:0; background:transparent; padding:10px 14px; color:var(--text-muted); border-bottom:2px solid transparent; }
+.is-tabs button.active { color:var(--primary); border-bottom-color:var(--primary); font-weight:600; }
+.is-tabs em { background:var(--bg-color); border-radius:10px; font-size:11px; font-style:normal; margin-left:4px; padding:1px 6px; }
+.is-card { border:1px solid var(--border-color); border-radius:8px; background:var(--card-bg); margin:0 0 14px; overflow:hidden; }
+.is-card h4 { font-size:15px; margin:0; padding:14px 16px; border-bottom:1px solid var(--border-color); }
+.is-card h4 span { float:right; font-size:12px; font-weight:400; }
+.is-card table { width:100%; margin:0; }
+.is-card th { color:var(--text-muted); font-size:11px; font-weight:600; text-transform:uppercase; }
+.is-card th, .is-card td { border-top:1px solid var(--border-color); padding:10px 16px; }
+.is-card thead th { border-top:0; }
+.is-card td small { display:block; color:var(--text-muted); margin-top:2px; }
+.is-action { font-weight:600; color:var(--text-muted); }.is-action.urgent { color:var(--red-500); }
+.is-empty { padding:38px 20px; text-align:center; }.is-note { font-size:12px; margin:14px 16px; }.hide { display:none; }

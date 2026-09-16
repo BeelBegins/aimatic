@@ -208,6 +208,7 @@ override_whitelisted_methods = {
 # client script only. None of these doctypes are ever modified server-side.
 doctype_js = {
 	"Purchase Receipt": [
+		"public/js/selling_price_update_source_links.js",
 		"public/js/purchase_receipt_label_printing.js",
 		"public/js/purchase_items_excel_grid.js",
 		# Live preview only - see purchase_history_autofill/events.py for
@@ -252,7 +253,10 @@ doctype_js = {
 		"public/js/label_printing_source_buttons.js",
 		"public/js/relationship_manager.js",
 	],
-	"Stock Entry": "public/js/label_printing_source_buttons.js",
+	"Stock Entry": [
+		"public/js/selling_price_update_source_links.js",
+		"public/js/label_printing_source_buttons.js",
+	],
 	"Sales Invoice": [
 		"public/js/label_printing_source_buttons.js",
 		"public/js/relationship_manager.js",
@@ -289,6 +293,7 @@ jinja = {
 		"aimatic.purchase_printing.get_purchase_print_item_context",
 		"aimatic.pos_printing.get_pos_receipt_context",
 		"aimatic.print_layout_loader.render_print_layout",
+		"aimatic.stock_entry_printing.get_stock_entry_print_context",
 	],
 }
 

@@ -55,3 +55,4 @@ aimatic.patches.seed_help_topics
 aimatic.patches.move_foodpanda_sftp_to_settings
 aimatic.patches.unlock_purchase_receipt_gm_percent
 aimatic.patches.clear_pricecheck_role_home_page
+aimatic.patches.set_stock_entry_material_transfer_print_format
