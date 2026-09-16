@@ -95,16 +95,16 @@ def _check_context(company: str, branch: str):
 
 def _positions(company: str, branch: str, history_days: int) -> list[dict[str, Any]]:
 	date_from = add_days(getdate(today()), -(history_days - 1))
-	# Item Default is the authoritative preferred supplier.  When that is not
-	# set, an Item Supplier is usable only if exactly one exists.  Purchase
-	# history is intentionally not used: legacy sister-branch documents must
-	# never silently become an external-vendor recommendation.
+	# The latest submitted Purchase Receipt for this branch is the primary
+	# supply source. That includes sister-branch purchases without manually
+	# mapping thousands of Items. Item master mapping remains a fallback when
+	# a receipt history is not available.
 	return frappe.db.sql(
 		"""
 		SELECT b.item_code, MAX(i.item_name) AS item_name,
 		       SUM(b.actual_qty) AS stock_qty,
 		       COALESCE(s.sales_qty, 0) AS sales_qty,
-		       COALESCE(preferred.supplier, single_supplier.supplier) AS supplier,
+		       COALESCE(purchase_history.supplier, preferred.supplier, single_supplier.supplier) AS supplier,
 		       %(history_days)s AS history_days
 		FROM `tabBin` b
 		INNER JOIN `tabWarehouse` w ON w.name = b.warehouse
@@ -124,6 +124,22 @@ def _positions(company: str, branch: str, history_days: int) -> list[dict[str, A
 			HAVING COUNT(DISTINCT isup.supplier) = 1
 		) single_supplier ON single_supplier.item_code = b.item_code
 		LEFT JOIN (
+			SELECT item_code, supplier
+			FROM (
+				SELECT pri.item_code, pr.supplier,
+				       ROW_NUMBER() OVER (
+					       PARTITION BY pri.item_code
+					       ORDER BY pr.posting_date DESC, pr.modified DESC, pr.name DESC, pri.idx DESC
+				       ) AS row_num
+				FROM `tabPurchase Receipt Item` pri
+				INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
+				WHERE pr.docstatus = 1 AND IFNULL(pr.is_return, 0) = 0
+				  AND pr.company = %(company)s AND pr.branch = %(branch)s
+				  AND IFNULL(pr.supplier, '') != ''
+			) latest_purchase
+			WHERE row_num = 1
+		) purchase_history ON purchase_history.item_code = b.item_code
+		LEFT JOIN (
 			SELECT pii.item_code, SUM(pii.stock_qty) AS sales_qty
 			FROM `tabPOS Invoice Item` pii
 			INNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent
@@ -134,7 +150,7 @@ def _positions(company: str, branch: str, history_days: int) -> list[dict[str, A
 		) s ON s.item_code = b.item_code
 		WHERE w.company = %(company)s AND w.custom_branch = %(branch)s
 		  AND w.disabled = 0 AND i.disabled = 0
-		GROUP BY b.item_code, s.sales_qty, preferred.supplier, single_supplier.supplier
+		GROUP BY b.item_code, s.sales_qty, purchase_history.supplier, preferred.supplier, single_supplier.supplier
 		""",
 		{"company": company, "branch": branch, "date_from": date_from, "date_to": getdate(today()), "history_days": history_days},
 		as_dict=True,
