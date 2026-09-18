@@ -134,6 +134,15 @@ doc_events = {
 	"Stock Entry": {
 		"before_validate": "aimatic.branch_management.events.apply_branch_defaults",
 	},
+	# Stock Reconciliation: set_warehouse ("Default Warehouse") maps onto
+	# Branch.finished_goods_warehouse the same way Sales/Delivery docs do, and
+	# cost_center the same way every other doctype here does. Without this,
+	# core ERPNext defaults cost_center from Company.cost_center (Head Office)
+	# instead of the reconciled warehouse's own branch, so every branch's
+	# stock-adjustment GL entries were misposting to Head Office's cost center.
+	"Stock Reconciliation": {
+		"before_validate": "aimatic.branch_management.events.apply_branch_defaults",
+	},
 	# foodpanda_integration: pushes an item's Foodpanda availability whenever
 	# its Bin quantity changes at a branch with catalog sync enabled, so an
 	# item that sells out in ERPNext stops being orderable on Foodpanda
