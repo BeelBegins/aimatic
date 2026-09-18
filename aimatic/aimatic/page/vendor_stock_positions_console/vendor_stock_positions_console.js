@@ -348,7 +348,7 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 
 		const body = rows
 			.map((row) => {
-				const searchBits = [row.item_code, row.item_name, row.warehouse, row.branch]
+				const searchBits = [row.item_code, row.item_name, row.barcode1, row.barcode2, row.warehouse, row.branch]
 					.filter(Boolean)
 					.join(' ');
 				const warehouseCells = groupByWarehouse
@@ -360,6 +360,8 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 						<div class="vp-item-title">${frappe.utils.escape_html(row.item_code)}</div>
 						<div class="vp-item-meta">${frappe.utils.escape_html(row.item_name || '')}</div>
 					</td>
+					<td>${frappe.utils.escape_html(row.barcode1 || '')}</td>
+					<td>${frappe.utils.escape_html(row.barcode2 || '')}</td>
 					${warehouseCells}
 					<td class="vp-num">${this.number(row.stock_qty)}</td>
 					<td class="vp-num">${this.money(row.stock_value)}</td>
@@ -393,6 +395,8 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 					<thead>
 						<tr>
 							<th>${__('Item')}</th>
+							<th>${__('Barcode 1')}</th>
+							<th>${__('Barcode 2')}</th>
 							${warehouseHeaders}
 							<th class="vp-num">${__('Stock Qty')}</th>
 							<th class="vp-num">${__('Stock Value (at Cost)')}</th>

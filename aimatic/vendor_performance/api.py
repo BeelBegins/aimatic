@@ -2003,6 +2003,21 @@ def _get_item_fbr_tax_rates(item_codes: list[str]) -> dict[str, float]:
 	return {row.name: flt(row.custom_fbr_tax_rate) for row in rows}
 
 
+def _fetch_barcode_map(item_codes: list[str]) -> dict[str, list[str]]:
+	if not item_codes:
+		return {}
+	barcodes: dict[str, list[str]] = {}
+	for row in frappe.get_all(
+		"Item Barcode",
+		filters={"parent": ("in", item_codes)},
+		fields=["parent", "barcode", "idx"],
+		order_by="idx asc",
+	):
+		if row.barcode:
+			barcodes.setdefault(row.parent, []).append(row.barcode)
+	return barcodes
+
+
 def _get_stock_positions(
 	item_codes: list[str],
 	company: str,
@@ -2289,6 +2304,12 @@ def _build_vendor_stock_positions(
 	stock_item_codes = list((stock_summary.get("by_item") or {}).keys()) or [
 		row["item_code"] for row in stock_rows
 	]
+	barcode_map = _fetch_barcode_map(stock_item_codes)
+	for row in stock_rows:
+		bc = barcode_map.get(row["item_code"]) or []
+		row["barcode1"] = bc[0] if len(bc) > 0 else ""
+		row["barcode2"] = bc[1] if len(bc) > 1 else ""
+
 	last_purchase_by_item = (
 		_get_last_purchase_by_item(
 			supplier=supplier,
@@ -2459,6 +2480,8 @@ def export_vendor_stock_positions(
 	headers = [
 		"Item Code",
 		"Item Name",
+		"Barcode 1",
+		"Barcode 2",
 	]
 	if group_by_warehouse:
 		headers.extend(["Warehouse", "Branch"])
@@ -2490,7 +2513,12 @@ def export_vendor_stock_positions(
 
 	data = [headers]
 	for row in payload.get("stock_items") or []:
-		line = [row.get("item_code") or "", row.get("item_name") or ""]
+		line = [
+			row.get("item_code") or "",
+			row.get("item_name") or "",
+			row.get("barcode1") or "",
+			row.get("barcode2") or "",
+		]
 		if group_by_warehouse:
 			line.extend([row.get("warehouse") or "", row.get("branch") or ""])
 		line.extend(
