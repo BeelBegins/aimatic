@@ -298,6 +298,7 @@ jinja = {
 		"aimatic.pos_printing.get_pos_receipt_context",
 		"aimatic.print_layout_loader.render_print_layout",
 		"aimatic.stock_entry_printing.get_stock_entry_print_context",
+		"aimatic.stock_reconciliation_printing.get_stock_reconciliation_print_context",
 	],
 }
 

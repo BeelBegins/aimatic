@@ -1,0 +1,77 @@
+<style>
+@page { size: A4; margin: 8mm; }
+html, body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 8pt; }
+.print-format { width: 100% !important; max-width: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
+.title { text-align: center; font-size: 13pt; font-weight: 700; letter-spacing: .4px; margin-bottom: 3mm; }
+.meta { width: 100%; border-collapse: collapse; }
+.meta td { padding: 1mm 1.2mm; border: .2mm solid #333; vertical-align: top; }
+.label { display: block; font-size: 6.5pt; color: #555; text-transform: uppercase; }
+.route { font-weight: 700; font-size: 9pt; }
+.items { width: 100%; border-collapse: collapse; margin-top: 3mm; table-layout: fixed; }
+.print-format .items th { padding: .55mm .7mm !important; border-top: .25mm solid #111; border-bottom: .25mm solid #111; text-align: left; font-size: 5.8pt !important; line-height: 1.05; text-transform: uppercase; }
+.print-format .items td { padding: .55mm .7mm !important; border-bottom: .1mm solid #bbb; vertical-align: middle; font-size: 6pt; line-height: 1.05; }
+.items thead { display: table-header-group; }
+.items .center { text-align: center; }
+.items .amount { text-align: right; white-space: nowrap; }
+.barcode { font-family: monospace; font-weight: 700; white-space: nowrap; }
+.item-name { font-weight: 700; white-space: nowrap; }
+.item-code { display: block; color: #555; font-size: 6.5pt; margin-top: .4mm; }
+.qty-diff-pos { color: #0a7a2f; }
+.qty-diff-neg { color: #b3261e; }
+.total td { border-top: .35mm solid #111; font-weight: 700; }
+.signatures { width: 100%; border-collapse: collapse; margin-top: 6mm; }
+.signatures td { width: 33.33%; padding-top: 2mm; border-top: .25mm solid #333; text-align: center; font-size: 7pt; }
+</style>
+
+{% set totals = namespace(qty=0, current_qty=0, qty_diff=0, amount_diff=0) %}
+<div class="title">STOCK RECONCILIATION</div>
+<table class="meta"><tr>
+  <td style="width:20%"><span class="label">Reconciliation No.</span><strong>{{ doc.name }}</strong></td>
+  <td style="width:16%"><span class="label">Date</span>{{ frappe.utils.formatdate(doc.posting_date) }}</td>
+  <td style="width:16%"><span class="label">Purpose</span>{{ doc.purpose or '' }}</td>
+  <td style="width:48%"><span class="label">Warehouse</span><span class="route">{{ ctx.consolidated_warehouse or 'Multiple' }}{% if ctx.branch %} ({{ ctx.branch }}){% endif %}</span></td>
+</tr></table>
+<table class="items">
+  <thead><tr>
+    <th style="width:4%" class="center">#</th>
+    <th style="width:14%">Barcode</th>
+    <th style="width:{% if ctx.show_warehouse_column %}23{% else %}31{% endif %}%">Item</th>
+    {% if ctx.show_warehouse_column %}<th style="width:14%">Warehouse</th>{% endif %}
+    <th style="width:6%" class="center">UOM</th>
+    <th style="width:8%" class="amount">Before Qty</th>
+    <th style="width:8%" class="amount">Physical Qty</th>
+    <th style="width:8%" class="amount">Qty Diff</th>
+    <th style="width:9%" class="amount">Rate</th>
+    <th style="width:10%" class="amount">Amount Diff</th>
+  </tr></thead>
+  <tbody>{% for row in doc.items %}
+    {% set row_ctx = ctx.item_context.get(row.name, {}) %}
+    {% set qty_diff = frappe.utils.flt(row.quantity_difference) %}
+    {% set totals.qty = totals.qty + (row.qty or 0) %}
+    {% set totals.current_qty = totals.current_qty + (row.current_qty or 0) %}
+    {% set totals.qty_diff = totals.qty_diff + qty_diff %}
+    {% set totals.amount_diff = totals.amount_diff + (row.amount_difference or 0) %}
+    <tr>
+      <td class="center">{{ loop.index }}</td>
+      <td class="barcode">{{ row_ctx.barcode or '—' }}</td>
+      <td><span class="item-name">{{ row.item_name or row.item_code }}</span><span class="item-code">{{ row.item_code }}</span></td>
+      {% if ctx.show_warehouse_column %}<td>{{ row.warehouse or '' }}</td>{% endif %}
+      <td class="center">{{ row.stock_uom or '' }}</td>
+      <td class="amount">{{ frappe.utils.flt(row.current_qty, 3) }}</td>
+      <td class="amount">{{ frappe.utils.flt(row.qty, 3) }}</td>
+      <td class="amount {{ 'qty-diff-pos' if qty_diff > 0 else ('qty-diff-neg' if qty_diff < 0 else '') }}">{{ frappe.utils.flt(qty_diff, 3) }}</td>
+      <td class="amount">{{ frappe.utils.fmt_money(row.valuation_rate or 0, currency=doc.currency) }}</td>
+      <td class="amount">{{ frappe.utils.fmt_money(row.amount_difference or 0, currency=doc.currency) }}</td>
+    </tr>
+  {% endfor %}</tbody>
+  <tfoot><tr class="total">
+    <td colspan="{% if ctx.show_warehouse_column %}5{% else %}4{% endif %}">Total</td>
+    <td class="amount">{{ frappe.utils.flt(totals.current_qty, 3) }}</td>
+    <td class="amount">{{ frappe.utils.flt(totals.qty, 3) }}</td>
+    <td class="amount">{{ frappe.utils.flt(totals.qty_diff, 3) }}</td>
+    <td></td>
+    <td class="amount">{{ frappe.utils.fmt_money(doc.difference_amount or totals.amount_diff, currency=doc.currency) }}</td>
+  </tr></tfoot>
+</table>
+{% if doc.expense_account or doc.cost_center %}<div class="remarks" style="margin-top:3mm; font-size:7.5pt;"><strong>Difference Account:</strong> {{ doc.expense_account or '' }}{% if doc.cost_center %} &nbsp;|&nbsp; <strong>Cost Center:</strong> {{ doc.cost_center }}{% endif %}</div>{% endif %}
+<table class="signatures"><tr><td>Counted By</td><td>Checked By</td><td>Approved By</td></tr></table>

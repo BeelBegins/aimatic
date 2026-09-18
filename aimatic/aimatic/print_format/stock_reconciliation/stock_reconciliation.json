@@ -1,0 +1,7 @@
+{
+ "absolute_value": 0, "align_labels_right": 0, "creation": "2026-09-18 00:00:00.000000", "css": "", "custom_format": 1, "default_print_language": "en", "disabled": 0,
+ "doc_type": "Stock Reconciliation", "docstatus": 0, "doctype": "Print Format", "font_size": 8,
+ "html": "{% set ctx = get_stock_reconciliation_print_context(doc) %}\n{{ render_print_layout(\"stock_reconciliation\", doc, ctx=ctx) }}\n",
+ "idx": 0, "line_breaks": 0, "margin_bottom": 5.0, "margin_left": 5.0, "margin_right": 5.0, "margin_top": 5.0,
+ "modified": "2026-09-18 00:00:00.000000", "modified_by": "Administrator", "module": "Aimatic", "name": "Stock Reconciliation Compact", "owner": "Administrator", "page_number": "Hide", "pdf_generator": "chrome", "print_format_builder": 0, "print_format_builder_beta": 0, "print_format_for": "DocType", "print_format_type": "Jinja", "raw_printing": 0, "show_section_headings": 0, "standard": "No"
+}
