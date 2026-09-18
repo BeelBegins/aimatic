@@ -257,6 +257,10 @@ doctype_js = {
 		"public/js/selling_price_update_source_links.js",
 		"public/js/label_printing_source_buttons.js",
 	],
+	# Retries a failed scan against UPC-A/EAN-13 leading-zero barcode
+	# variants (aimatic.barcode_utils.barcode_variants) instead of the exact
+	# match core's scan_barcode does alone. See stock_reconciliation_barcode.py.
+	"Stock Reconciliation": "public/js/stock_reconciliation_barcode_scan.js",
 	"Sales Invoice": [
 		"public/js/label_printing_source_buttons.js",
 		"public/js/relationship_manager.js",
