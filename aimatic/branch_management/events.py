@@ -190,6 +190,37 @@ def apply_branch_defaults(doc, method=None):
 	_apply_item_row_defaults(doc, branch_defaults, can_override, has_set_warehouse)
 
 
+def apply_stock_reconciliation_branch_defaults(doc, method=None):
+	"""
+	Stock Reconciliation needs stricter enforcement than apply_branch_defaults
+	gives override-capable users (Stock/Accounts/System Managers): core
+	ERPNext's client-side add_fetch("company", "cost_center", "cost_center")
+	pre-fills cost_center with the Company's default (Head Office) the moment
+	Company is set - in the browser, before this hook ever runs server-side.
+	So it's never blank by save time, and the "only fill in blanks, never
+	overwrite a deliberate choice" rule in apply_branch_defaults silently lets
+	Head Office through, because there is no way to tell "the user deliberately
+	chose this" apart from "core auto-filled it and nobody looked."
+
+	Unlike Purchase Order/Invoice (a manager legitimately buys on behalf of
+	another branch), there is no equivalent legitimate reason for a branch's
+	own stock count to post its adjustment to a different cost center - so
+	cost_center is always forced to match the resolved branch here, for every
+	role. set_warehouse and item rows still follow apply_branch_defaults'
+	normal fill-in-blanks behavior, since those have no such client-side
+	auto-fetch and staff do deliberately pick the warehouse they're counting.
+	"""
+
+	apply_branch_defaults(doc, method)
+
+	if not doc.branch:
+		return
+
+	correct_cost_center = frappe.get_cached_value("Branch", doc.branch, "cost_center")
+	if correct_cost_center and doc.cost_center != correct_cost_center:
+		doc.cost_center = correct_cost_center
+
+
 _BRANCH_COMPANY_SCOPED_FIELDS = {
 	"cost_center": ("Cost Center", "Cost Center"),
 	"finished_goods_warehouse": ("Warehouse", "Finished Goods Warehouse"),
