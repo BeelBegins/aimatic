@@ -1,6 +1,8 @@
 import frappe
 from frappe.utils import flt, now_datetime
 
+from aimatic.item_pricing.uom_guard import assert_uom_price_sane
+
 # Legacy single global Foodpanda Item Price list name. No longer created by
 # app code - Foodpanda pricing is per-branch now (see
 # get_or_create_branch_foodpanda_price_list). Kept only so
@@ -144,9 +146,7 @@ def get_or_create_branch_price_list(branch):
 
 
 def _validate_selling_only_price_list(price_list):
-	details = frappe.db.get_value(
-		"Price List", price_list, ["selling", "buying", "enabled"], as_dict=True
-	)
+	details = frappe.db.get_value("Price List", price_list, ["selling", "buying", "enabled"], as_dict=True)
 	if not details:
 		frappe.throw(f"Branch Price List {price_list} does not exist.")
 	if not details.selling or details.buying or not details.enabled:
@@ -269,6 +269,10 @@ def upsert_item_price(item_code, price_list, purchase_receipt, branch=None, rate
 		if mrp is not None and flt(current.custom_mrp) != flt(mrp):
 			log_price_update(purchase_receipt, item_code, price_list, branch, "MRP", current.custom_mrp, mrp)
 			updates["custom_mrp"] = mrp
+		if "price_list_rate" in updates:
+			# db.set_value skips Item Price validation, so run the UOM price
+			# check here or a Pcs shelf price can land on a Box row.
+			assert_uom_price_sane(item_code, resolved_uom, price_list, rate)
 		if updates:
 			frappe.db.set_value("Item Price", existing_name, updates)
 		return existing_name

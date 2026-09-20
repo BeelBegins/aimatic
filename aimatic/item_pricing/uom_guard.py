@@ -72,34 +72,38 @@ def validate_pos_uom_pricing(doc, method=None):
 			)
 
 
-def validate_item_price_uom(doc, method=None):
-	"""Block saving a larger-UOM selling price far below stock-UOM price x conversion."""
-	if not cint(doc.selling) or not doc.item_code or not doc.uom or not doc.price_list:
-		return
-
-	stock_uom = frappe.db.get_value("Item", doc.item_code, "stock_uom")
-	if not stock_uom or doc.uom == stock_uom:
-		return
-
+def _get_uom_facts(item_code, uom):
+	"""(stock UOM, conversion factor of ``uom`` to stock UOM) for the item."""
+	stock_uom = frappe.db.get_value("Item", item_code, "stock_uom")
 	conversion_factor = flt(
-		frappe.db.get_value(
-			"UOM Conversion Detail", {"parent": doc.item_code, "uom": doc.uom}, "conversion_factor"
-		)
+		frappe.db.get_value("UOM Conversion Detail", {"parent": item_code, "uom": uom}, "conversion_factor")
 	)
+	return stock_uom, conversion_factor
+
+
+def assert_uom_price_sane(item_code, uom, price_list, rate, as_of=None):
+	"""Throw when a larger-UOM selling price is below half of stock-UOM price x conversion.
+
+	Single check shared by the Item Price form/import (validate hook) and by
+	writers that skip validation (frappe.db.set_value), so no route can store it.
+	"""
+	stock_uom, conversion_factor = _get_uom_facts(item_code, uom)
+	if not uom or not stock_uom or uom == stock_uom:
+		return
+
 	if conversion_factor <= 1:
 		return
 
-	as_of = getdate(doc.valid_from) if doc.valid_from else getdate()
-	stock_price = get_stock_uom_price(doc.item_code, stock_uom, doc.price_list, as_of)
-	if _is_below_floor(flt(doc.price_list_rate), stock_price, conversion_factor):
+	stock_price = get_stock_uom_price(item_code, stock_uom, price_list, getdate(as_of))
+	if _is_below_floor(flt(rate), stock_price, conversion_factor):
 		frappe.throw(
 			_(
-				"{0} price {1} for {2} is below half of {3} x {4} = {5} ({6} price {3} x conversion factor). "
+				"{0} price {1} for {2} is below half of {3} x {4} = {5} ({6} price x conversion factor). "
 				"It looks like a {6} price entered against {0}."
 			).format(
-				doc.uom,
-				_fmt(flt(doc.price_list_rate)),
-				frappe.bold(doc.item_code),
+				uom,
+				_fmt(rate),
+				frappe.bold(item_code),
 				_fmt(stock_price),
 				conversion_factor,
 				_fmt(stock_price * conversion_factor),
@@ -107,3 +111,10 @@ def validate_item_price_uom(doc, method=None):
 			),
 			title=_("UOM price mismatch"),
 		)
+
+
+def validate_item_price_uom(doc, method=None):
+	"""Block saving a larger-UOM selling price far below stock-UOM price x conversion."""
+	if not cint(doc.selling) or not doc.item_code or not doc.price_list:
+		return
+	assert_uom_price_sane(doc.item_code, doc.uom, doc.price_list, doc.price_list_rate, doc.valid_from)

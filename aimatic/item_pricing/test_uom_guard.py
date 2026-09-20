@@ -81,5 +81,24 @@ class TestUomPriceGuard(unittest.TestCase):
 		uom_guard.validate_pos_uom_pricing(self._doc(uom="Box", conversion_factor=28, rate=99))
 
 
+class TestItemPriceGuard(unittest.TestCase):
+	def _assert(self, rate, uom="Box"):
+		with (
+			patch.object(uom_guard, "_get_uom_facts", return_value=("Pcs", 28 if uom == "Box" else 1)),
+			patch.object(uom_guard, "get_stock_uom_price", return_value=99),
+		):
+			uom_guard.assert_uom_price_sane("ITEM-1", uom, "S1 List", rate)
+
+	def test_box_priced_as_pcs_blocked(self):
+		with self.assertRaises(frappe.ValidationError):
+			self._assert(99)
+
+	def test_real_box_price_allowed(self):
+		self._assert(2689)
+
+	def test_stock_uom_never_checked(self):
+		self._assert(1, uom="Pcs")
+
+
 if __name__ == "__main__":
 	unittest.main()
