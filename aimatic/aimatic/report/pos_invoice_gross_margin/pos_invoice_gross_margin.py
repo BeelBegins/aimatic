@@ -93,6 +93,15 @@ def get_rows(filters):
 			pii.`qty`,
 			pii.`stock_qty`,
 			pii.`base_net_amount` AS sales,
+			pii.`amount` AS gross_amount,
+			EXISTS (
+				SELECT 1 FROM `tabPOS Invoice Item` bad
+				WHERE bad.`parent` = `tabPOS Invoice`.`name`
+					AND bad.`parenttype` = 'POS Invoice'
+					AND bad.`amount` != 0
+					AND bad.`custom_fbr_sales_tax` != 0
+					AND ABS(bad.`custom_fbr_sales_tax`) >= ABS(bad.`amount`)
+			) AS tax_invalid,
 			pii.`custom_fbr_tax_category` AS tax_category,
 			pii.`custom_fbr_tax_rate` AS tax_rate,
 			pii.`custom_fbr_sales_tax` AS sales_tax,
@@ -145,8 +154,34 @@ def get_branch_expression():
 	return "NULL"
 
 
+def _apply_tax_correction(row):
+	"""Rebuild Sales from the amount charged when the FBR tax snapshot is invalid.
+
+	ERPNext backs one blended GST rate out of every line of an invoice. When a
+	single line's stored FBR tax reaches or exceeds the amount charged (a UOM or
+	price error, e.g. Box sold at the Pcs price) that rate explodes and
+	base_net_amount is wrong on every line of the invoice. For those invoices
+	Sales is the amount charged minus the line's own tax; the offending line's
+	tax is recomputed from its rate on the amount charged. Other invoices are
+	untouched.
+	"""
+	if not cint(row.get("tax_invalid")):
+		return
+
+	gross = flt(row.get("gross_amount"))
+	tax = flt(row.sales_tax)
+	if gross and abs(tax) >= abs(gross):
+		rate = flt(row.tax_rate)
+		tax = gross * rate / (100 + rate) if rate > 0 else 0
+
+	row.sales_tax = tax
+	row.sales = gross - tax
+	row.tax_adjusted = 1
+
+
 def _set_margin_values(row, precision):
 	row = frappe._dict(row)
+	_apply_tax_correction(row)
 	row.sales = flt(row.sales, precision)
 	row.tax_rate = flt(row.tax_rate, precision)
 	row.sales_tax = flt(row.sales_tax, precision)
@@ -251,7 +286,9 @@ def get_report_summary(data, currency, precision):
 
 def get_message():
 	return _(
-		"Sales is the POS item net amount excluding item-level FBR sales tax. Sales Incl. Tax "
+		"Sales is the POS item net amount excluding item-level FBR sales tax; on an invoice "
+		"whose stored FBR tax reaches the amount charged on any line, Sales is the amount charged "
+		"minus that line's tax instead. Sales Incl. Tax "
 		"adds the stored FBR sales-tax snapshot. COGS is the signed "
 		"stock-value change posted by the consolidated Sales Invoice, including "
 		"packed items. Returns reverse Sales and COGS. Blank margin values mean "
