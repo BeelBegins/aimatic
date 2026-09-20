@@ -13,7 +13,10 @@ app_home = "/desk/aimatic"
 
 doc_events = {
 	"POS Invoice": {
-		"validate": "aimatic.fbr_pos.events.validate_pos_invoice",
+		"validate": [
+			"aimatic.item_pricing.uom_guard.validate_pos_uom_pricing",
+			"aimatic.fbr_pos.events.validate_pos_invoice",
+		],
 		"before_submit": "aimatic.fbr_pos.events.before_submit_pos_invoice",
 		"on_submit": [
 			# Runs after POS Invoice.clear_unallocated_mode_of_payments deletes
@@ -45,6 +48,7 @@ doc_events = {
 	},
 	"Item Price": {
 		"before_validate": "aimatic.item_pricing.barcodes.set_item_price_barcodes",
+		"validate": "aimatic.item_pricing.uom_guard.validate_item_price_uom",
 	},
 	# Auto-assigns a new Account's account_number (when left blank) to the
 	# next free number in the numeric block implied by its parent account -

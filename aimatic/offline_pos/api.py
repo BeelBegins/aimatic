@@ -10,8 +10,8 @@ from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime, now
 from frappe.utils.data import sha256_hash
 from frappe.utils.password import check_password
 
-from aimatic.pos_shared import returned_qty_by_row
 from aimatic.aimatic.offline_pos.device_auth import hash_device_token, validate_device_proof
+from aimatic.pos_shared import returned_qty_by_row
 
 _MAX_PAGE_SIZE = 1000
 _ALLOWED_POS_ADMIN_ACTIONS = {
@@ -1555,10 +1555,13 @@ def preview_cart(
         pos, cust, items, coupon_code, redeem_loyalty_points, loyalty_points
     )
 
-    from aimatic.fbr_pos.accounting import apply_fbr_accounting_rows
-    from aimatic.fbr_pos.payload_builder import build_pos_payload
     from erpnext.accounts.doctype.pricing_rule.utils import get_applied_pricing_rules
 
+    from aimatic.fbr_pos.accounting import apply_fbr_accounting_rows
+    from aimatic.fbr_pos.payload_builder import build_pos_payload
+    from aimatic.item_pricing.uom_guard import validate_pos_uom_pricing
+
+    validate_pos_uom_pricing(doc)
     build_pos_payload(doc)
     apply_fbr_accounting_rows(doc)
     doc.run_method("calculate_taxes_and_totals")

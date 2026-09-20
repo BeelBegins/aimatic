@@ -128,6 +128,27 @@ def calculate_fbr_item(row, config):
 
 		value_excluding_tax = money(inclusive_value - sales_tax)
 
+		# Tax on the MRP base can never legitimately reach the price charged. If
+		# it does, the row's UOM/qty/price is wrong (for example a Pcs price
+		# keyed against a Box) and the negative ex-tax value would skew the
+		# blended GST rate and shrink every other line on the invoice.
+		if sales_tax >= inclusive_value:
+			frappe.throw(
+				_(
+					"Item {0}: sales tax {1} on MRP {2} x {3} {4} (conversion factor {5}) is not less than the "
+					"amount charged {6}. Check the UOM, quantity and price of this row."
+				).format(
+					frappe.bold(row.item_code),
+					sales_tax,
+					mrp,
+					qty,
+					getattr(row, "uom", "") or "",
+					conversion_factor,
+					inclusive_value,
+				),
+				title=_("Invalid FBR row"),
+			)
+
 		return {
 			"quantity": qty,
 			"inclusive_value": inclusive_value,
