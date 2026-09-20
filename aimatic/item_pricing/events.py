@@ -15,6 +15,11 @@ def update_latest_price_incl_taxes(doc, method=None):
 	link, so already-existing Item Price rows are updated explicitly here
 	rather than relying on fetch_from to propagate the change.
 	"""
+	# A return sends stock back out (often to another branch); its rate is not a
+	# fresh purchase cost and must not replace the item's latest cost.
+	if getattr(doc, "is_return", 0):
+		return
+
 	posting_date = getdate(doc.posting_date)
 
 	for row in doc.items:
@@ -36,9 +41,12 @@ def update_latest_price_incl_taxes(doc, method=None):
 			},
 		)
 
+		# Cost refresh only: leave `modified` alone so price rows do not look
+		# recently edited (a 586-row bump on 18 Sep hid the real price writers).
 		frappe.db.set_value(
 			"Item Price",
 			{"item_code": item_code},
 			"custom_latest_price_incl_taxes",
 			price,
+			update_modified=False,
 		)

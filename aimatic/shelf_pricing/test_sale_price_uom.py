@@ -57,3 +57,33 @@ class TestGetSellingItemPriceRate(unittest.TestCase):
 
 if __name__ == "__main__":
 	unittest.main()
+
+
+class TestUpsertItemPriceUom(unittest.TestCase):
+	"""Regression: a Pcs shelf price must never land on a Box row (szl, Sep 2026)."""
+
+	@patch("aimatic.shelf_pricing.utils.log_price_update")
+	@patch("aimatic.shelf_pricing.utils.assert_uom_price_sane")
+	@patch("aimatic.shelf_pricing.utils.frappe")
+	def test_lookup_is_scoped_to_row_uom(self, frappe, _guard, _log):
+		from aimatic.shelf_pricing.utils import upsert_item_price
+
+		frappe.db.get_value.side_effect = ["PCS-ROW", frappe._dict(price_list_rate=90, custom_mrp=100)]
+
+		upsert_item_price("ITEM-1", "S1 List", "MAT-PRE-1", rate=99, uom="Pcs")
+
+		row_lookup = frappe.db.get_value.call_args_list[0]
+		self.assertEqual(row_lookup.args[1]["uom"], "Pcs")
+		frappe.db.set_value.assert_called_once_with("Item Price", "PCS-ROW", {"price_list_rate": 99})
+
+	@patch("aimatic.shelf_pricing.utils.log_price_update")
+	@patch("aimatic.shelf_pricing.utils.assert_uom_price_sane")
+	@patch("aimatic.shelf_pricing.utils.frappe")
+	def test_guard_runs_before_a_rate_write(self, frappe, guard, _log):
+		from aimatic.shelf_pricing.utils import upsert_item_price
+
+		frappe.db.get_value.side_effect = ["BOX-ROW", frappe._dict(price_list_rate=2660, custom_mrp=0)]
+
+		upsert_item_price("ITEM-1", "S1 List", "MAT-PRE-1", rate=99, uom="Box")
+
+		guard.assert_called_once_with("ITEM-1", "Box", "S1 List", 99)
