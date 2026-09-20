@@ -9,18 +9,24 @@ MIN_UOM_PRICE_RATIO = 0.5
 
 
 def get_stock_uom_price(item_code, stock_uom, price_list, as_of):
-	"""Latest valid selling price of the item in its stock UOM, or 0."""
-	rows = frappe.db.sql(
-		"""
+	"""Selling price of the item in its stock UOM, or 0.
+
+	Prefers the price valid on ``as_of``; when none is (the larger-UOM price
+	was entered before the stock-UOM one, or after it expired) falls back to the
+	latest stock-UOM price so the comparison can never be skipped by dating.
+	"""
+	base = """
 		select price_list_rate from `tabItem Price`
-		where item_code = %(item)s and price_list = %(pl)s and selling = 1
-			and uom = %(uom)s
-			and (valid_from is null or valid_from <= %(d)s)
+		where item_code = %(item)s and price_list = %(pl)s and selling = 1 and uom = %(uom)s
+	"""
+	args = {"item": item_code, "pl": price_list, "uom": stock_uom, "d": as_of}
+	rows = frappe.db.sql(
+		base
+		+ """ and (valid_from is null or valid_from <= %(d)s)
 			and (valid_upto is null or valid_upto >= %(d)s)
-		order by valid_from desc, modified desc limit 1
-		""",
-		{"item": item_code, "pl": price_list, "uom": stock_uom, "d": as_of},
-	)
+		order by valid_from desc, modified desc limit 1""",
+		args,
+	) or frappe.db.sql(base + " order by valid_from desc, modified desc limit 1", args)
 	return flt(rows[0][0]) if rows else 0
 
 
