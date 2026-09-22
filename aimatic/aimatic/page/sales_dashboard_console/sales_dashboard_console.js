@@ -247,6 +247,13 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
 					)} - ${frappe.datetime.str_to_user(data.date_to)}`
 				)}
                 ${this.card(
+					"delivery",
+					"truck",
+					__("Food Panda Sales"),
+					this.money(kpis.food_panda_sales),
+					`${this.number(kpis.food_panda_txn_count)} ${__("invoice(s), after returns")}`
+				)}
+                ${this.card(
 					"stock",
 					"shopping-bag",
 					__("Transactions"),

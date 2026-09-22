@@ -258,6 +258,8 @@ def _get_range_kpis(company: str, date_from, date_to, branch_filter: list[str] |
 	if branch_filter is not None and not branch_filter:
 		return {
 			"net_sales": 0,
+			"food_panda_sales": 0,
+			"food_panda_txn_count": 0,
 			"gross_sales": 0,
 			"returns_amount": 0,
 			"returns_count": 0,
@@ -269,6 +271,8 @@ def _get_range_kpis(company: str, date_from, date_to, branch_filter: list[str] |
 		f"""
         SELECT
             COALESCE(SUM(pi.grand_total), 0) AS net_sales,
+            COALESCE(SUM(CASE WHEN pp.custom_is_foodpanda_profile = 1 THEN pi.grand_total ELSE 0 END), 0) AS food_panda_sales,
+            COALESCE(SUM(CASE WHEN pp.custom_is_foodpanda_profile = 1 THEN 1 ELSE 0 END), 0) AS food_panda_txn_count,
             COALESCE(SUM(CASE WHEN pi.is_return = 0 THEN pi.grand_total END), 0) AS gross_sales,
             COALESCE(SUM(CASE WHEN pi.is_return = 1 THEN -pi.grand_total END), 0) AS returns_amount,
             COALESCE(SUM(CASE WHEN pi.is_return = 1 THEN 1 ELSE 0 END), 0) AS returns_count,
@@ -294,6 +298,8 @@ def _get_range_kpis(company: str, date_from, date_to, branch_filter: list[str] |
 	gross_sales = flt(row.get("gross_sales"))
 	return {
 		"net_sales": flt(row.get("net_sales")),
+		"food_panda_sales": flt(row.get("food_panda_sales")),
+		"food_panda_txn_count": cint(row.get("food_panda_txn_count")),
 		"gross_sales": gross_sales,
 		"returns_amount": flt(row.get("returns_amount")),
 		"returns_count": cint(row.get("returns_count")),
