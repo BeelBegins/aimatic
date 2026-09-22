@@ -624,10 +624,17 @@ def _get_payment_split(
 	where_clause = " AND ".join(conditions)
 	rows = frappe.db.sql(
 		f"""
-        SELECT pay.mode_of_payment AS mode_of_payment, COALESCE(SUM(pay.amount), 0) AS amount
+        SELECT
+               pay.mode_of_payment AS mode_of_payment,
+               COALESCE(
+                   SUM(pay.amount)
+                   - SUM(CASE WHEN mop.type = 'Cash' THEN COALESCE(pi.change_amount, 0) ELSE 0 END),
+                   0
+               ) AS amount
         FROM `tabSales Invoice Payment` pay
         INNER JOIN `tabPOS Invoice` pi ON pi.name = pay.parent AND pay.parenttype = 'POS Invoice'
         LEFT JOIN `tabPOS Profile` pp ON pp.name = pi.pos_profile
+        LEFT JOIN `tabMode of Payment` mop ON mop.name = pay.mode_of_payment
         WHERE {where_clause}
         GROUP BY pay.mode_of_payment
         ORDER BY amount DESC

@@ -1,6 +1,7 @@
 import json
 import secrets
 import time
+from math import ceil
 from random import uniform
 
 import frappe
@@ -28,6 +29,15 @@ _ALLOWED_REFUND_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_CLOSE_SHIFT_ROLES = {"POS Supervisor", "System Manager"}
 _ALLOWED_CASHIER_ROLES = {"POS User", "POS Supervisor", "System Manager"}
 _CASHIER_OFFLINE_LOGIN_VALID_DAYS = 7
+_MAX_PKR_CASH_NOTE = 5000
+
+
+def _max_cash_tender(payable):
+	"""Allow up to the next Rs 5,000-note ceiling, never an arbitrary excess."""
+	payable = flt(payable, 2)
+	return ceil(payable / _MAX_PKR_CASH_NOTE) * _MAX_PKR_CASH_NOTE if payable > 0 else 0
+
+
 # A slow FBR gateway call inside doc.submit() holds the POS Invoice naming
 # series row lock (tabSeries FOR UPDATE, taken during doc.insert()) for the
 # rest of the request, since Frappe doesn't commit mid-request. Any other
@@ -2020,8 +2030,10 @@ def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
     grand_total = flt(doc.grand_total, 2)
     loyalty_amount = flt(getattr(doc, "loyalty_amount", 0) or 0, 2)
     payable = flt(grand_total - loyalty_amount - flt(gift_voucher_amount, 2), 2)
+    max_cash_tender = _max_cash_tender(payable)
 
     total_paid = 0.0
+    cash_tendered = 0.0
 
     for p in payments_data:
         mode = (p.get("mode_of_payment") or "").strip()
@@ -2059,7 +2071,15 @@ def _validate_and_set_payments(doc, pos, payments_data, gift_voucher_amount=0):
                 _("Payment amount must be greater than zero (mode: {0})").format(mode)
             )
 
-        if not _is_cash(mode):
+        if _is_cash(mode):
+            cash_tendered = flt(cash_tendered + amount, 2)
+            if cash_tendered > flt(max_cash_tender + 0.005, 2):
+                frappe.throw(
+                    _("Cash tender {0} exceeds the maximum allowed {1} for payable {2}").format(
+                        cash_tendered, max_cash_tender, payable
+                    )
+                )
+        else:
             remaining = flt(payable - total_paid, 2)
             if amount > flt(remaining + 0.005, 2):
                 frappe.throw(

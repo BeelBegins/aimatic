@@ -1745,7 +1745,7 @@ class TestClosePosSessionCashier(_AimTestCase):
 				opening_entry=opening.name,
 				customer=_CUSTOMER_NAME,
 				items=[{"item_code": _STOCKED_ITEM_CODE, "qty": 1}],
-				payments=[{"mode_of_payment": "Cash", "amount": 999999}],
+				payments=[{"mode_of_payment": "Cash", "amount": 5000}],
 				cashier_user=cashier,
 			)
 
@@ -2203,6 +2203,40 @@ class TestLockWaitTimeoutHelpers(unittest.TestCase):
             delay = _lock_wait_retry_backoff(attempt)
             self.assertGreaterEqual(delay, 0.3 * (attempt + 1))
             self.assertLessEqual(delay, 1.0 * (attempt + 1))
+
+
+class TestCashTenderHelpers(unittest.TestCase):
+	def test_max_cash_tender_uses_pk5000_ceiling(self):
+		from aimatic.offline_pos.api import _max_cash_tender
+
+		self.assertEqual(_max_cash_tender(500), 5000)
+		self.assertEqual(_max_cash_tender(2500), 5000)
+		self.assertEqual(_max_cash_tender(5000), 5000)
+		self.assertEqual(_max_cash_tender(5001), 10000)
+
+	def test_payment_validation_accepts_valid_change_but_rejects_absurd_cash(self):
+		from unittest.mock import patch
+
+		from aimatic.offline_pos.api import _validate_and_set_payments
+
+		def make_doc(amount):
+			doc = frappe._dict(customer="Walk In Customer", grand_total=500, payments=[])
+			doc.set = lambda field, value: setattr(doc, field, value)
+			doc.append = lambda field, values: doc.payments.append(frappe._dict(values)) or doc.payments[-1]
+			profile = frappe._dict(
+				name="Counter 1",
+				customer="Walk In Customer",
+				custom_is_foodpanda_profile=0,
+				payments=[frappe._dict(mode_of_payment="Cash", default=1)],
+			)
+			with patch("aimatic.offline_pos.api.frappe.db.get_value", return_value="Cash"):
+				_validate_and_set_payments(doc, profile, [{"mode_of_payment": "Cash", "amount": amount}])
+			return doc
+
+		doc = make_doc(5000)
+		self.assertEqual(doc.change_amount, 4500)
+		with self.assertRaises(frappe.ValidationError):
+			make_doc(10000)
 
 
 class TestFoodPandaCreditProfileConfiguration(unittest.TestCase):
