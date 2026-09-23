@@ -87,6 +87,39 @@ def _get_submitted_source(source_doctype, source_name):
 	return source_doctype, doc
 
 
+def _stock_transfer_target_branch(doc):
+	"""Receiving branch of a Material Transfer.
+
+	Stock Entry.branch is the *sending* branch (defaulted from the source
+	warehouse/user), so prices must follow the target warehouse's branch.
+	"""
+	branches = []
+	for row in doc.items:
+		if not row.t_warehouse:
+			continue
+		branch = frappe.db.get_value("Warehouse", row.t_warehouse, "custom_branch")
+		if branch and branch not in branches:
+			branches.append(branch)
+	if not branches:
+		frappe.throw(
+			_("Target warehouse of {0} has no Branch, so its price lists cannot be resolved.").format(doc.name)
+		)
+	if len(branches) > 1:
+		frappe.throw(
+			_("{0} transfers to more than one branch ({1}); split it before updating prices.").format(
+				doc.name, ", ".join(branches)
+			)
+		)
+	return branches[0]
+
+
+def _resolve_update_branch(source_doctype, source_doc, branch):
+	"""Branch whose price lists a source document updates."""
+	if source_doctype == SOURCE_STOCK_TRANSFER:
+		return _stock_transfer_target_branch(source_doc)
+	return branch
+
+
 @frappe.whitelist()
 def get_branch_console_context(branch):
 	"""Branch → warehouse + linked price lists for the console header."""
@@ -145,9 +178,23 @@ def get_vendor_source_documents(branch, vendor=None, source_doctype=None, limit=
 			)
 
 	if source_doctype == SOURCE_STOCK_TRANSFER:
+		# Stock Entry.branch is the sender; list transfers *received* by this branch.
+		received = frappe.db.sql_list(
+			"""
+			select distinct sed.parent
+			from `tabStock Entry Detail` sed
+			join `tabWarehouse` wh on wh.name = sed.t_warehouse
+			where sed.docstatus = 1 and wh.custom_branch = %s
+			""",
+			branch,
+		)
 		for row in frappe.get_all(
 			"Stock Entry",
-			filters={"docstatus": 1, "purpose": "Material Transfer", "branch": branch},
+			filters={
+				"docstatus": 1,
+				"purpose": "Material Transfer",
+				"name": ["in", received or [""]],
+			},
 			fields=["name", "posting_date", "modified"],
 			order_by="posting_date desc, modified desc",
 			limit=limit,
@@ -190,8 +237,7 @@ def get_source_document_context(source_doctype, source_name):
 		warehouses = [row.t_warehouse for row in doc.items if row.t_warehouse]
 		if warehouses:
 			context["warehouse"] = warehouses[0]
-			if not context["branch"]:
-				context["branch"] = frappe.db.get_value("Warehouse", warehouses[0], "custom_branch")
+		context["branch"] = _stock_transfer_target_branch(doc)
 
 	return context
 
@@ -351,8 +397,8 @@ def get_selling_price_update_rows(
 	if not source_doc:
 		frappe.throw(_("Select a source Purchase Receipt or Stock Transfer Note."))
 
+	branch = _resolve_update_branch(source_doctype, source_doc, branch)
 	ctx = get_source_document_context(source_doctype, source_doc.name)
-	branch = branch or ctx.get("branch")
 
 	target_price_list = _resolve_price_list(mode, branch, create=False)
 	if not target_price_list:
@@ -403,6 +449,7 @@ def apply_selling_price_updates(mode, branch, rows, source_doctype=None, source_
 		frappe.throw(_("Branch is required to apply price updates."))
 
 	source_doctype, source_doc = _get_submitted_source(source_doctype, source_name)
+	branch = _resolve_update_branch(source_doctype, source_doc, branch)
 	audit_ref = source_doc.name if source_doctype == SOURCE_PURCHASE_RECEIPT and source_doc else None
 	posting_date = getdate(source_doc.posting_date) if source_doc else None
 

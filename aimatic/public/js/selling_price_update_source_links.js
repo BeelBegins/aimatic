@@ -28,7 +28,8 @@
 			mode: mode,
 			source_doctype: frm.doctype,
 			source_name: frm.doc.name,
-			branch: frm.doc.branch,
+			// Stock Entry.branch is the sender; the console resolves the receiving branch.
+			branch: frm.doctype === "Stock Entry" ? "" : frm.doc.branch,
 			vendor: frm.doc.supplier || "",
 			warehouse: warehouse,
 			posting_date: frm.doc.posting_date,

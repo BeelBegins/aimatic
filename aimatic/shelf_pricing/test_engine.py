@@ -60,3 +60,37 @@ class TestFoodpandaFloorValidation(unittest.TestCase):
 		)
 		self.assertEqual(result["updated"], 1)
 		upsert.assert_called_once()
+
+
+class TestStockTransferTargetBranch(unittest.TestCase):
+	def _doc(self, *warehouses):
+		from types import SimpleNamespace
+
+		return SimpleNamespace(
+			name="MAT-STE-1",
+			branch="Sender",
+			items=[SimpleNamespace(t_warehouse=w) for w in warehouses],
+		)
+
+	@patch("aimatic.shelf_pricing.engine.frappe")
+	def test_price_update_branch_is_receiving_branch_not_stock_entry_branch(self, frappe):
+		from aimatic.shelf_pricing.engine import SOURCE_STOCK_TRANSFER, _resolve_update_branch
+
+		frappe.db.get_value.return_value = "Receiver"
+		doc = self._doc("Receiver WH")
+		self.assertEqual(_resolve_update_branch(SOURCE_STOCK_TRANSFER, doc, "Sender"), "Receiver")
+
+	@patch("aimatic.shelf_pricing.engine.frappe")
+	def test_purchase_receipt_keeps_requested_branch(self, frappe):
+		from aimatic.shelf_pricing.engine import SOURCE_PURCHASE_RECEIPT, _resolve_update_branch
+
+		self.assertEqual(_resolve_update_branch(SOURCE_PURCHASE_RECEIPT, object(), "Branch A"), "Branch A")
+
+	@patch("aimatic.shelf_pricing.engine.frappe")
+	def test_multi_branch_transfer_is_rejected(self, frappe):
+		from aimatic.shelf_pricing.engine import _stock_transfer_target_branch
+
+		frappe.db.get_value.side_effect = ["B1", "B2"]
+		frappe.throw.side_effect = Exception("blocked")
+		with self.assertRaises(Exception):
+			_stock_transfer_target_branch(self._doc("W1", "W2"))
