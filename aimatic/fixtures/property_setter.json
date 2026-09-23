@@ -2071,13 +2071,13 @@
   "doctype_or_field": "DocField",
   "field_name": "item_code",
   "is_system_generated": 1,
-  "modified": "2026-08-03 12:28:25.902665",
+  "modified": "2026-09-21 02:11:13.468260",
   "module": null,
   "name": "Item Price-item_code-in_list_view",
   "property": "in_list_view",
   "property_type": "Check",
   "row_name": null,
-  "value": "1"
+  "value": "0"
  },
  {
   "default_value": null,
@@ -6935,13 +6935,13 @@
   "doctype_or_field": "DocField",
   "field_name": "item_description",
   "is_system_generated": 1,
-  "modified": "2026-08-03 12:28:26.025568",
+  "modified": "2026-09-21 02:11:13.356828",
   "module": null,
   "name": "Item Price-item_description-in_list_view",
   "property": "in_list_view",
   "property_type": "Check",
   "row_name": null,
-  "value": "1"
+  "value": "0"
  },
  {
   "default_value": null,
