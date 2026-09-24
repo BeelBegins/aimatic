@@ -156,23 +156,32 @@ def adjust_cash_payment_to_grand_total(doc):
 			return
 
 	grand_total = flt(doc.grand_total, 2)
+	# A loyalty redemption is a discount at the till: the customer owes
+	# grand_total less loyalty_amount. Comparing against grand_total stretched a
+	# correctly reduced cash row back to the full bill, so every redemption
+	# looked like it collected full price and no points were ever debited.
+	loyalty_amount = flt(doc.get("loyalty_amount"), 2) if cint(doc.get("redeem_loyalty_points")) else 0.0
+	payable = flt(max(0.0, grand_total - loyalty_amount), 2)
 	total_paid = flt(sum(flt(p.amount) for p in payments), 2)
 
-	if total_paid > 0 and total_paid >= flt(grand_total - 0.005, 2):
+	# ERPNext's own convention (calculate_paid_amount) is paid_amount = payments +
+	# loyalty_amount, and validate_full_payment rejects a submit whose paid_amount
+	# is below grand_total (417 PartialPaymentValidationError).
+	if total_paid > 0 and total_paid >= flt(payable - 0.005, 2):
 		# Payments were explicitly set (multi-payment or exact match from submission API).
 		# Preserve the individual amounts; compute change from any excess.
-		doc.paid_amount = total_paid
-		doc.base_paid_amount = total_paid
-		change = flt(max(0.0, total_paid - grand_total), 2)
+		doc.paid_amount = flt(total_paid + loyalty_amount, 2)
+		doc.base_paid_amount = doc.paid_amount
+		change = flt(max(0.0, total_paid - payable), 2)
 		doc.change_amount = change
 		doc.base_change_amount = change
 	else:
-		# Single implicit payment (e.g. added by set_missing_values): align it to grand_total.
+		# Single implicit payment (e.g. added by set_missing_values): align it to the payable.
 		primary = payments[0]
-		primary.amount = grand_total
-		primary.base_amount = grand_total
-		doc.paid_amount = grand_total
-		doc.base_paid_amount = grand_total
+		primary.amount = payable
+		primary.base_amount = payable
+		doc.paid_amount = flt(payable + loyalty_amount, 2)
+		doc.base_paid_amount = doc.paid_amount
 		doc.change_amount = 0
 		doc.base_change_amount = 0
 

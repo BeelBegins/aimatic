@@ -124,7 +124,11 @@ def _redemption_was_actually_honored(doc):
 	and reversed 2026-09-15). Only debit when the arithmetic proves the
 	discount was genuinely taken off what was collected, so this can't repeat.
 	"""
-	real_kept = flt(doc.paid_amount, 2) - flt(doc.change_amount, 2)
+	# ERPNext's paid_amount already includes loyalty_amount, so measure what was
+	# really tendered from the payment rows (POS Invoice and consolidated Sales
+	# Invoice both carry them), less change handed back.
+	tendered = sum(flt(p.amount) for p in (doc.get("payments") or []))
+	real_kept = flt(tendered - flt(doc.change_amount, 2), 2)
 	discounted = flt(flt(doc.grand_total, 2) - flt(doc.loyalty_amount, 2), 2)
 	return abs(real_kept - discounted) <= 0.5
 

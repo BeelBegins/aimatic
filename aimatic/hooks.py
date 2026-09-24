@@ -17,6 +17,9 @@ doc_events = {
 			"aimatic.item_pricing.uom_guard.validate_pos_uom_pricing",
 			"aimatic.fbr_pos.events.validate_pos_invoice",
 		],
+		# Runs after core's own before_save -> set_paid_amount, which resets
+		# paid_amount to the payment rows alone.
+		"before_save": "aimatic.loyalty.paid_amount.include_loyalty_in_paid_amount",
 		"before_submit": "aimatic.fbr_pos.events.before_submit_pos_invoice",
 		"on_submit": [
 			# Runs after POS Invoice.clear_unallocated_mode_of_payments deletes
