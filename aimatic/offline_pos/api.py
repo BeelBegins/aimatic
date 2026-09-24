@@ -3049,17 +3049,19 @@ def _require_refund_permission(pos, user=None, supervisor_token=None):
             frappe.PermissionError,
         )
 
+    # A user with no refund role or allow-list entry and no supervisor token
+    # is a permission denial, whatever the profile's terminal setup.
+    if not supervisor_token:
+        frappe.throw(
+            _("Supervisor authorization is required to refund."),
+            frappe.PermissionError,
+        )
     terminal_id = pos.get("custom_terminal_id")
     if not terminal_id:
         frappe.throw(
             _(
                 "POS Profile {0} has no Terminal ID assigned - supervisor authorization cannot be verified."
             ).format(pos.name)
-        )
-    if not supervisor_token:
-        frappe.throw(
-            _("Supervisor authorization is required to refund."),
-            frappe.PermissionError,
         )
     _require_https_for_pos_admin_authorization()
     _consume_pos_admin_authorization_token(

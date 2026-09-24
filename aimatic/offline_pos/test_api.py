@@ -479,15 +479,18 @@ class TestGetItemBarcodes(_AimTestCase):
 	def test_inactive_item_excluded(self):
 		"""Disabled items and non-sales items must not appear in results."""
 
-		# Create test items inline so we can assert precisely
-		def _item(code, is_sales=1, disabled=0, barcode=None):
-			if not frappe.db.exists("Item", code):
+		# Create test items inline so we can assert precisely. item_naming
+		# always assigns item_code from the STO-ITEM series, so look items up
+		# by item_name and assert on the returned document name.
+		def _item(label, is_sales=1, disabled=0, barcode=None):
+			name = frappe.db.get_value("Item", {"item_name": label}, "name")
+			if not name:
 				ig = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "All Item Groups"
 				doc = frappe.get_doc(
 					{
 						"doctype": "Item",
-						"item_code": code,
-						"item_name": code,
+						"item_code": label,
+						"item_name": label,
 						"item_group": ig,
 						"stock_uom": "Nos",
 						"is_sales_item": is_sales,
@@ -496,23 +499,24 @@ class TestGetItemBarcodes(_AimTestCase):
 				)
 				doc.insert(ignore_permissions=True)
 			else:
-				doc = frappe.get_doc("Item", code)
+				doc = frappe.get_doc("Item", name)
 			if barcode and not frappe.db.exists("Item Barcode", {"barcode": barcode}):
 				doc.append("barcodes", {"barcode": barcode, "uom": "Nos"})
 				doc.save(ignore_permissions=True)
+			return doc.name
 
-		_item("_BC Active AIM", barcode="BC-AIM-ACTIVE001")
-		_item("_BC Inactive AIM", disabled=1, barcode="BC-AIM-INACT001")
-		_item("_BC NonSales AIM", is_sales=0, barcode="BC-AIM-NSALE001")
+		active = _item("_BC Active AIM", barcode="BC-AIM-ACTIVE001")
+		inactive = _item("_BC Inactive AIM", disabled=1, barcode="BC-AIM-INACT001")
+		non_sales = _item("_BC NonSales AIM", is_sales=0, barcode="BC-AIM-NSALE001")
 
 		from aimatic.offline_pos.api import get_item_barcodes
 
 		result = get_item_barcodes(limit_start=0, limit_page_length=1000)
 		codes = {r["item_code"] for r in result["rows"]}
 
-		self.assertIn("_BC Active AIM", codes)
-		self.assertNotIn("_BC Inactive AIM", codes)
-		self.assertNotIn("_BC NonSales AIM", codes)
+		self.assertIn(active, codes)
+		self.assertNotIn(inactive, codes)
+		self.assertNotIn(non_sales, codes)
 
 	def test_has_more_and_next_start(self):
 		"""When a second page exists, has_more is True and next_start is set."""
