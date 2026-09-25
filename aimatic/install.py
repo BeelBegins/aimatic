@@ -30,5 +30,44 @@ def before_tests():
 		except Exception:
 			frappe.log_error(title="aimatic before_tests: ERPNext BootStrapTestData failed")
 
+	_ensure_default_selling_price_list()
 	setup_pos_master_data_permissions()
 	create_shopping_oauth_client()
+
+
+def _ensure_default_selling_price_list():
+	"""Guarantee a selling Price List and Selling Settings default for tests.
+
+	A partial BootStrapTestData (see before_tests) can leave the site without
+	either, which breaks every test that relies on the Selling Settings
+	default (e.g. Customer default_price_list validation).
+	"""
+	import frappe
+
+	price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
+	if price_list and frappe.db.exists("Price List", price_list):
+		return
+
+	price_list = frappe.db.get_value("Price List", {"selling": 1, "enabled": 1}, "name")
+	if not price_list:
+		currency = frappe.db.get_default("currency") or "PKR"
+		if not frappe.db.exists("Currency", currency):
+			frappe.get_doc({"doctype": "Currency", "currency_name": currency, "enabled": 1}).insert(
+				ignore_permissions=True
+			)
+		price_list = (
+			frappe.get_doc(
+				{
+					"doctype": "Price List",
+					"price_list_name": "Standard Selling",
+					"currency": currency,
+					"selling": 1,
+					"enabled": 1,
+				}
+			)
+			.insert(ignore_permissions=True, ignore_if_duplicate=True)
+			.name
+		)
+
+	frappe.db.set_single_value("Selling Settings", "selling_price_list", price_list)
+	frappe.db.commit()  # nosemgrep: before_tests runs outside a request transaction

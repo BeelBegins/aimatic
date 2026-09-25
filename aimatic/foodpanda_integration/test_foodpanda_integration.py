@@ -227,14 +227,15 @@ class TestCatalogSync(unittest.TestCase):
 		outlet = Mock(catalog_sync_enabled=1, branch="Branch 1", vendor_id="vendor-1")
 		mock_branch_defaults.return_value = {"finished_goods_warehouse": "WH-1"}
 		mock_price_list.return_value = "Branch 1 Foodpanda Price List"
-		# build_update_payload's call order: Item, Item Price, Bin, Item Barcode
-		# (get_or_create_foodpanda_product's name lookup happens first).
+		# build_update_payload's call order: Item, Item Price, Bin,
+		# Foodpanda Product.portal_active (get_or_create_foodpanda_product's
+		# name lookup happens first).
 		mock_frappe.db.get_value.side_effect = [
 			"existing-fp-product-name",  # Foodpanda Product name lookup
 			_item_row(),  # Item
 			15.0,  # Item Price rate
 			{"actual_qty": 5, "reserved_qty": 0},  # Bin
-			None,  # Item Barcode - none on file
+			None,  # Foodpanda Product.portal_active not set - no override
 		]
 		expected_payload = {
 			"sku": "ITEM-1",
@@ -601,6 +602,7 @@ class TestOrdersStockCheck(unittest.TestCase):
 			_item_row(),
 			15.0,
 			{"actual_qty": 8, "reserved_qty": 0},
+			None,  # Foodpanda Product.portal_active not set - no override
 		]
 		mock_frappe.get_all.return_value = ["6281001234567"]
 		payload = catalog.build_update_payload("STO-ITEM-1", Mock(branch="Branch 1"))
@@ -621,6 +623,7 @@ class TestOrdersStockCheck(unittest.TestCase):
 			_item_row(),
 			15.0,
 			{"actual_qty": 3.4, "reserved_qty": 0},
+			None,  # Foodpanda Product.portal_active not set - no override
 		]
 		mock_frappe.get_all.return_value = ["6281001234567"]
 		payload = catalog.build_update_payload("STO-ITEM-1", Mock(branch="Branch 1"), foodpanda_sku="fmv1")
@@ -641,6 +644,7 @@ class TestOrdersStockCheck(unittest.TestCase):
 			_item_row(),
 			15.0,
 			{"actual_qty": 8, "reserved_qty": 0},
+			None,  # Foodpanda Product.portal_active not set - no override
 		]
 		mock_frappe.get_all.return_value = ["SM1500", "NC2"]
 		payload = catalog.build_update_payload("STO-ITEM-1", Mock(branch="Branch 1"), foodpanda_sku="fmv900")
@@ -662,6 +666,7 @@ class TestOrdersStockCheck(unittest.TestCase):
 			_item_row(),
 			15.0,
 			{"actual_qty": 8, "reserved_qty": 0},
+			None,  # Foodpanda Product.portal_active not set - no override
 		]
 		mock_frappe.get_all.return_value = ["6281001234567"]
 		payload = catalog.build_update_payload(
