@@ -180,8 +180,8 @@ def submit_receiving(source_type: str, name: str, items, remarks="", idempotency
 			if received["batch_no"] and row.meta.has_field("batch_no"):
 				row.batch_no = received["batch_no"]
 			_ensure_batch(received["item_code"], received["batch_no"], received["expiry_date"])
+		# Receiving verifies the draft quantities; Purchase Manager owns final PR submission.
 		doc.save()
-		doc.submit()
 	status = "Received" if all(flt(row["received_qty"]) >= flt(row["expected_qty"]) and not flt(row["damaged_qty"]) for row in normalised) else "Disputed"
 	receiving = frappe.get_doc({"doctype": "Stock Receiving", "source_type": source_type, "source_name": name, "receiving_branch": branch, "receiving_warehouse": warehouse, "status": status, "receiver": user, "received_at": now_datetime(), "idempotency_key": key or None, "remarks": str(remarks or "")[:1000], "items": normalised})
 	receiving.insert()
