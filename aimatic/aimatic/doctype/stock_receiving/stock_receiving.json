@@ -25,11 +25,11 @@
  "module": "Aimatic",
  "name": "Stock Receiving",
  "permissions": [
-  {"create":1,"read":1,"write":1,"role":"Stock User"},
-  {"create":1,"read":1,"write":1,"role":"Purchase User"},
-  {"create":1,"read":1,"write":1,"role":"Stock Manager"},
-  {"create":1,"read":1,"write":1,"role":"Purchase Manager"},
-  {"create":1,"delete":1,"read":1,"write":1,"role":"System Manager"}
+  {"create":1,"read":1,"submit":1,"write":1,"role":"Stock User"},
+  {"create":1,"read":1,"submit":1,"write":1,"role":"Purchase User"},
+  {"create":1,"read":1,"submit":1,"write":1,"role":"Stock Manager"},
+  {"create":1,"read":1,"submit":1,"write":1,"role":"Purchase Manager"},
+  {"create":1,"delete":1,"read":1,"submit":1,"write":1,"role":"System Manager"}
  ],
  "sort_field": "creation",
  "sort_order": "DESC",
