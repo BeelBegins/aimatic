@@ -70,3 +70,16 @@ class TestInsightsWorkbookTemplates(unittest.TestCase):
 		self.assertIn("pending_work", BUILDERS)
 		self.assertIn("ABC", BUILDERS["goods_abc"]()["doc"]["title"])
 		self.assertIn("Liabilit", BUILDERS["accounts_liabilities"]()["doc"]["title"])
+		self.assertIn("branch_transfers", BUILDERS)
+		transfers = BUILDERS["branch_transfers"]()
+		self.assertEqual(transfers["doc"]["title"], "Branch Stock Transfers")
+		queries = transfers["dependencies"]["queries"]
+		transfer_sql = queries["tq-branch-transfers"]["operations"][0]["raw_sql"]
+		self.assertIn("se.purpose = 'Material Transfer'", transfer_sql)
+		self.assertIn("wf.custom_branch != wt.custom_branch", transfer_sql)
+		plan_sql = queries["tq-branch-rebalancing"]["operations"][0]["raw_sql"]
+		# Joining derived CTEs to each other made MariaDB run >5 minutes on live
+		# data; positions are merged with UNION ALL + GROUP BY instead.
+		self.assertIn("UNION ALL", plan_sql)
+		self.assertNotIn("LEFT JOIN sales", plan_sql)
+		self.assertNotRegex(plan_sql, r"(?m)^keys AS")

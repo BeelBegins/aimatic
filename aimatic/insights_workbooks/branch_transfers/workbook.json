@@ -1,0 +1,1069 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-branch-transfers",
+	"doc": {
+		"name": "aimatic-branch-transfers",
+		"title": "Branch Stock Transfers"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-branch-transfers": {
+				"name": "tq-branch-transfers",
+				"title": "Branch to branch transfer lines",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tse.posting_date,\n\tse.company,\n\tse.name AS stock_entry,\n\twf.custom_branch AS from_branch,\n\twt.custom_branch AS to_branch,\n\tsed.s_warehouse AS from_warehouse,\n\tsed.t_warehouse AS to_warehouse,\n\tsed.item_code,\n\tsed.item_name,\n\ti.item_group,\n\tsed.uom,\n\tsed.qty,\n\tsed.transfer_qty,\n\tsed.amount\nFROM `tabStock Entry` se\nINNER JOIN `tabStock Entry Detail` sed ON sed.parent = se.name\nINNER JOIN `tabWarehouse` wf ON wf.name = sed.s_warehouse\nINNER JOIN `tabWarehouse` wt ON wt.name = sed.t_warehouse\nINNER JOIN `tabItem` i ON i.name = sed.item_code\nWHERE se.docstatus = 1\n\tAND se.purpose = 'Material Transfer'\n\tAND IFNULL(wf.custom_branch, '') != ''\n\tAND IFNULL(wt.custom_branch, '') != ''\n\tAND wf.custom_branch != wt.custom_branch"
+					}
+				]
+			},
+			"tq-branch-rebalancing": {
+				"name": "tq-branch-rebalancing",
+				"title": "Branch stock rebalancing suggestions",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 1,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "WITH sales AS (\n\tSELECT pii.item_code, pi.branch, SUM(pii.stock_qty) AS sales_qty\n\tFROM `tabPOS Invoice Item` pii\n\tINNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent\n\tWHERE pi.docstatus = 1 AND IFNULL(pi.is_return, 0) = 0\n\t\tAND IFNULL(pi.branch, '') != ''\n\t\tAND pi.posting_date >= DATE_SUB(CURDATE(), INTERVAL 27 DAY)\n\tGROUP BY pii.item_code, pi.branch\n),\nstock AS (\n\tSELECT b.item_code, w.custom_branch AS branch,\n\t\tGREATEST(SUM(b.actual_qty), 0) AS stock_qty,\n\t\tSUM(b.stock_value) AS stock_value\n\tFROM `tabBin` b\n\tINNER JOIN `tabWarehouse` w ON w.name = b.warehouse\n\tWHERE w.disabled = 0 AND w.is_group = 0 AND IFNULL(w.custom_branch, '') != ''\n\t\tAND b.item_code IN (SELECT item_code FROM sales)\n\tGROUP BY b.item_code, w.custom_branch\n),\nmerged AS (\n\tSELECT item_code, branch,\n\t\tSUM(sales_qty) AS sales_qty, SUM(stock_qty) AS stock_qty, SUM(stock_value) AS stock_value\n\tFROM (\n\t\tSELECT item_code, branch, sales_qty, 0 AS stock_qty, 0 AS stock_value FROM sales\n\t\tUNION ALL\n\t\tSELECT item_code, branch, 0, stock_qty, stock_value FROM stock\n\t) u\n\tGROUP BY item_code, branch\n),\npos AS (\n\tSELECT m.item_code, m.branch, br.company,\n\t\ti.item_name, i.item_group, i.stock_uom,\n\t\tm.stock_qty, m.stock_value, m.sales_qty / 28 AS daily_demand\n\tFROM merged m\n\tINNER JOIN `tabItem` i ON i.name = m.item_code AND i.is_stock_item = 1 AND i.disabled = 0\n\tINNER JOIN `tabBranch` br ON br.name = m.branch\n),\nreceivers AS (\n\tSELECT *, 7 * daily_demand - stock_qty AS need, stock_qty / daily_demand AS days_left\n\tFROM pos\n\tWHERE daily_demand > 0 AND stock_qty < 7 * daily_demand\n),\ndonors AS (\n\tSELECT *, stock_qty - 30 * daily_demand AS surplus\n\tFROM pos\n\tWHERE stock_qty - 30 * daily_demand > 0\n),\npaired AS (\n\tSELECT\n\t\tr.company, r.item_code, r.item_name, r.item_group, r.stock_uom,\n\t\tr.branch AS receiver_branch, r.stock_qty AS receiver_stock,\n\t\tr.daily_demand AS receiver_daily_demand, r.days_left AS receiver_days_left, r.need AS receiver_need,\n\t\td.branch AS donor_branch, d.stock_qty AS donor_stock, d.daily_demand AS donor_daily_demand,\n\t\td.surplus AS donor_surplus,\n\t\td.stock_value / NULLIF(d.stock_qty, 0) AS donor_rate,\n\t\tCOALESCE(SUM(d.surplus) OVER (\n\t\t\tPARTITION BY r.item_code, r.branch\n\t\t\tORDER BY d.surplus DESC, d.branch\n\t\t\tROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING\n\t\t), 0) AS taken_before\n\tFROM receivers r\n\tINNER JOIN donors d ON d.item_code = r.item_code AND d.branch != r.branch\n),\nsized AS (\n\tSELECT *,\n\t\tGREATEST(LEAST(donor_surplus, receiver_need - taken_before), 0) AS raw_qty\n\tFROM paired\n)\nSELECT\n\tcompany, item_code, item_name, item_group, stock_uom,\n\tCASE WHEN receiver_stock <= 0 THEN 'Stock-out' WHEN receiver_days_left <= 3 THEN 'Urgent' ELSE 'Top up' END AS priority,\n\treceiver_branch, receiver_stock, ROUND(receiver_daily_demand, 3) AS receiver_daily_demand,\n\tROUND(receiver_days_left, 1) AS receiver_days_left, ROUND(receiver_need, 3) AS receiver_need,\n\tdonor_branch, donor_stock, ROUND(donor_daily_demand, 3) AS donor_daily_demand,\n\tCASE WHEN stock_uom IN ('Kg', 'Gram', 'Litre', 'Ml', 'Meter', 'Cm', 'Foot', 'Inch')\n\t\tTHEN ROUND(raw_qty, 3) ELSE FLOOR(raw_qty) END AS suggested_qty,\n\tROUND((CASE WHEN stock_uom IN ('Kg', 'Gram', 'Litre', 'Ml', 'Meter', 'Cm', 'Foot', 'Inch')\n\t\tTHEN raw_qty ELSE FLOOR(raw_qty) END) * COALESCE(donor_rate, 0), 2) AS est_value\nFROM sized\nWHERE (CASE WHEN stock_uom IN ('Kg', 'Gram', 'Litre', 'Ml', 'Meter', 'Cm', 'Foot', 'Inch')\n\tTHEN raw_qty ELSE FLOOR(raw_qty) END) > 0"
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-transfer-kpis": {
+				"name": "tc-transfer-kpis",
+				"title": "Branch transfers",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-branch-transfers",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Transfers",
+							"column_name": "stock_entry",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						},
+						{
+							"measure_name": "Items",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						},
+						{
+							"measure_name": "Qty",
+							"column_name": "transfer_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Value",
+							"column_name": "amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-transfer-summary": {
+				"name": "tc-transfer-summary",
+				"title": "Branch to branch stock movement summary",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-branch-transfers",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "From branch",
+							"column_name": "from_branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "To branch",
+							"column_name": "to_branch",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Transfers",
+							"column_name": "stock_entry",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						},
+						{
+							"measure_name": "Items",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						},
+						{
+							"measure_name": "Qty",
+							"column_name": "transfer_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Value",
+							"column_name": "amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Value"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 50,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-transfer-to": {
+				"name": "tc-transfer-to",
+				"title": "Transfer value by receiving branch",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-branch-transfers",
+				"chart_type": "Donut",
+				"config": {
+					"label_column": {
+						"dimension_name": "to_branch",
+						"column_name": "to_branch",
+						"data_type": "String"
+					},
+					"value_column": {
+						"measure_name": "Value",
+						"column_name": "amount",
+						"data_type": "Decimal",
+						"aggregation": "sum",
+						"format": "currency"
+					},
+					"legend_position": "bottom",
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-transfer-detail": {
+				"name": "tc-transfer-detail",
+				"title": "Branch to branch stock movement detail",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-branch-transfers",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Date",
+							"column_name": "posting_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Stock entry",
+							"column_name": "stock_entry",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "From branch",
+							"column_name": "from_branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "To branch",
+							"column_name": "to_branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Item",
+							"column_name": "item_name",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Qty",
+							"column_name": "transfer_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Value",
+							"column_name": "amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Value"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-rebalance-kpis": {
+				"name": "tc-rebalance-kpis",
+				"title": "Stock that can move between branches",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 4,
+				"query": "tq-branch-rebalancing",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Suggested moves",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count"
+						},
+						{
+							"measure_name": "Items",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						},
+						{
+							"measure_name": "Qty to move",
+							"column_name": "suggested_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Est. value",
+							"column_name": "est_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"shorten_numbers": false
+						},
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-rebalance-flow": {
+				"name": "tc-rebalance-flow",
+				"title": "Where stock can move from and to",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 5,
+				"query": "tq-branch-rebalancing",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Move from",
+							"column_name": "donor_branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Move to",
+							"column_name": "receiver_branch",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Suggested moves",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count"
+						},
+						{
+							"measure_name": "Qty to move",
+							"column_name": "suggested_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Est. value",
+							"column_name": "est_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Est. value"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 50,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-rebalance": {
+				"name": "tc-rebalance",
+				"title": "Potential stock moves (in demand at one branch, spare at another)",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 6,
+				"query": "tq-branch-rebalancing",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Priority",
+							"column_name": "priority",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Item",
+							"column_name": "item_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Move from",
+							"column_name": "donor_branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Move to",
+							"column_name": "receiver_branch",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Stock there",
+							"column_name": "receiver_stock",
+							"data_type": "Decimal",
+							"aggregation": "max"
+						},
+						{
+							"measure_name": "Sales/day there",
+							"column_name": "receiver_daily_demand",
+							"data_type": "Decimal",
+							"aggregation": "max"
+						},
+						{
+							"measure_name": "Stock here",
+							"column_name": "donor_stock",
+							"data_type": "Decimal",
+							"aggregation": "max"
+						},
+						{
+							"measure_name": "Qty to move",
+							"column_name": "suggested_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						},
+						{
+							"measure_name": "Est. value",
+							"column_name": "est_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Est. value"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-transfer-kpis-transfers": {
+				"name": "tc-transfer-kpis-transfers",
+				"title": "Transfers",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-branch-transfers",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Transfers",
+							"column_name": "stock_entry",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-transfer-kpis-items": {
+				"name": "tc-transfer-kpis-items",
+				"title": "Items",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-branch-transfers",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Items",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-transfer-kpis-qty": {
+				"name": "tc-transfer-kpis-qty",
+				"title": "Qty",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-branch-transfers",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Qty",
+							"column_name": "transfer_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-transfer-kpis-value": {
+				"name": "tc-transfer-kpis-value",
+				"title": "Value",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 3,
+				"query": "tq-branch-transfers",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Value",
+							"column_name": "amount",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-rebalance-kpis-suggested-moves": {
+				"name": "tc-rebalance-kpis-suggested-moves",
+				"title": "Suggested moves",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 400,
+				"query": "tq-branch-rebalancing",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Suggested moves",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-rebalance-kpis-items": {
+				"name": "tc-rebalance-kpis-items",
+				"title": "Items",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 401,
+				"query": "tq-branch-rebalancing",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Items",
+							"column_name": "item_code",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-rebalance-kpis-qty-to-move": {
+				"name": "tc-rebalance-kpis-qty-to-move",
+				"title": "Qty to move",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 402,
+				"query": "tq-branch-rebalancing",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Qty to move",
+							"column_name": "suggested_qty",
+							"data_type": "Decimal",
+							"aggregation": "sum"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-rebalance-kpis-est-value": {
+				"name": "tc-rebalance-kpis-est-value",
+				"title": "Est. value",
+				"workbook": "aimatic-branch-transfers",
+				"folder": null,
+				"sort_order": 403,
+				"query": "tq-branch-rebalancing",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Est. value",
+							"column_name": "est_value",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": false,
+					"sparkline": false,
+					"order_by": [],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-branch-transfers": {
+				"name": "td-branch-transfers",
+				"title": "Branch Stock Transfers",
+				"workbook": "aimatic-branch-transfers",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Date Range",
+						"filter_type": "Date",
+						"icon": "calendar",
+						"links": {
+							"tc-transfer-kpis-transfers": "`tq-branch-transfers`.`posting_date`",
+							"tc-transfer-kpis-items": "`tq-branch-transfers`.`posting_date`",
+							"tc-transfer-kpis-qty": "`tq-branch-transfers`.`posting_date`",
+							"tc-transfer-kpis-value": "`tq-branch-transfers`.`posting_date`",
+							"tc-transfer-summary": "`tq-branch-transfers`.`posting_date`",
+							"tc-transfer-to": "`tq-branch-transfers`.`posting_date`",
+							"tc-transfer-detail": "`tq-branch-transfers`.`posting_date`"
+						},
+						"layout": {
+							"i": "filter-date-range",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						},
+						"default_operator": "within",
+						"default_value": "Last 30 days"
+					},
+					{
+						"type": "filter",
+						"filter_name": "From Branch",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-transfer-kpis-transfers": "`tq-branch-transfers`.`from_branch`",
+							"tc-transfer-kpis-items": "`tq-branch-transfers`.`from_branch`",
+							"tc-transfer-kpis-qty": "`tq-branch-transfers`.`from_branch`",
+							"tc-transfer-kpis-value": "`tq-branch-transfers`.`from_branch`",
+							"tc-transfer-summary": "`tq-branch-transfers`.`from_branch`",
+							"tc-transfer-to": "`tq-branch-transfers`.`from_branch`",
+							"tc-transfer-detail": "`tq-branch-transfers`.`from_branch`"
+						},
+						"layout": {
+							"i": "filter-from-branch",
+							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "To Branch",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-transfer-kpis-transfers": "`tq-branch-transfers`.`to_branch`",
+							"tc-transfer-kpis-items": "`tq-branch-transfers`.`to_branch`",
+							"tc-transfer-kpis-qty": "`tq-branch-transfers`.`to_branch`",
+							"tc-transfer-kpis-value": "`tq-branch-transfers`.`to_branch`",
+							"tc-transfer-summary": "`tq-branch-transfers`.`to_branch`",
+							"tc-transfer-to": "`tq-branch-transfers`.`to_branch`",
+							"tc-transfer-detail": "`tq-branch-transfers`.`to_branch`"
+						},
+						"layout": {
+							"i": "filter-to-branch",
+							"x": 8,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Move To Branch",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-rebalance-kpis-suggested-moves": "`tq-branch-rebalancing`.`receiver_branch`",
+							"tc-rebalance-kpis-items": "`tq-branch-rebalancing`.`receiver_branch`",
+							"tc-rebalance-kpis-qty-to-move": "`tq-branch-rebalancing`.`receiver_branch`",
+							"tc-rebalance-kpis-est-value": "`tq-branch-rebalancing`.`receiver_branch`",
+							"tc-rebalance-flow": "`tq-branch-rebalancing`.`receiver_branch`",
+							"tc-rebalance": "`tq-branch-rebalancing`.`receiver_branch`"
+						},
+						"layout": {
+							"i": "filter-move-to-branch",
+							"x": 12,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Move From Branch",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-rebalance-kpis-suggested-moves": "`tq-branch-rebalancing`.`donor_branch`",
+							"tc-rebalance-kpis-items": "`tq-branch-rebalancing`.`donor_branch`",
+							"tc-rebalance-kpis-qty-to-move": "`tq-branch-rebalancing`.`donor_branch`",
+							"tc-rebalance-kpis-est-value": "`tq-branch-rebalancing`.`donor_branch`",
+							"tc-rebalance-flow": "`tq-branch-rebalancing`.`donor_branch`",
+							"tc-rebalance": "`tq-branch-rebalancing`.`donor_branch`"
+						},
+						"layout": {
+							"i": "filter-move-from-branch",
+							"x": 16,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-transfer-kpis-transfers",
+						"layout": {
+							"i": "item-transfer-kpis-1",
+							"x": 0,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-transfer-kpis-items",
+						"layout": {
+							"i": "item-transfer-kpis-2",
+							"x": 5,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-transfer-kpis-qty",
+						"layout": {
+							"i": "item-transfer-kpis-3",
+							"x": 10,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-transfer-kpis-value",
+						"layout": {
+							"i": "item-transfer-kpis-4",
+							"x": 15,
+							"y": 1,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-transfer-summary",
+						"layout": {
+							"i": "item-transfer-summary",
+							"x": 0,
+							"y": 4,
+							"w": 12,
+							"h": 9
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-transfer-to",
+						"layout": {
+							"i": "item-transfer-to",
+							"x": 12,
+							"y": 4,
+							"w": 8,
+							"h": 9
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-transfer-detail",
+						"layout": {
+							"i": "item-transfer-detail",
+							"x": 0,
+							"y": 13,
+							"w": 20,
+							"h": 10
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-rebalance-kpis-suggested-moves",
+						"layout": {
+							"i": "item-rebalance-kpis-1",
+							"x": 0,
+							"y": 23,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-rebalance-kpis-items",
+						"layout": {
+							"i": "item-rebalance-kpis-2",
+							"x": 5,
+							"y": 23,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-rebalance-kpis-qty-to-move",
+						"layout": {
+							"i": "item-rebalance-kpis-3",
+							"x": 10,
+							"y": 23,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-rebalance-kpis-est-value",
+						"layout": {
+							"i": "item-rebalance-kpis-4",
+							"x": 15,
+							"y": 23,
+							"w": 5,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-rebalance-flow",
+						"layout": {
+							"i": "item-rebalance-flow",
+							"x": 0,
+							"y": 26,
+							"w": 20,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-rebalance",
+						"layout": {
+							"i": "item-rebalance",
+							"x": 0,
+							"y": 34,
+							"w": 20,
+							"h": 11
+						}
+					}
+				]
+			}
+		}
+	}
+}

@@ -1,0 +1,20 @@
+{
+	"version": 1,
+	"title": "Branch Stock Transfers",
+	"description": "Branch to branch stock movement summary and line detail from submitted Material Transfers, plus items in demand at one branch that another branch holds in surplus.",
+	"notes": "Movement counts submitted Material Transfer lines whose source and target warehouses belong to different branches (Warehouse.custom_branch); value is Stock Entry Detail amount. Suggestions use the last 28 days of submitted non-return POS sales per branch: a branch is short under 7 days of cover, a donor keeps 30 days of its own sales and offers the rest, and counted items move in whole units. A donor's surplus is not reduced across different receiving branches here, and unit rounding can differ by a unit or two; the Branch Stock Rebalancing Desk report allocates each donor once. Suggestions only: no stock document is created.",
+	"module": "Stock",
+	"required_apps": [
+		"erpnext",
+		"aimatic"
+	],
+	"source_doctypes": [
+		"Stock Entry",
+		"Stock Entry Detail",
+		"POS Invoice",
+		"POS Invoice Item",
+		"Bin",
+		"Item",
+		"Warehouse"
+	]
+}

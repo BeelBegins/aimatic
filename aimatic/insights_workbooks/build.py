@@ -2437,6 +2437,269 @@ def build_basket_relevance() -> dict:
 	)
 
 
+BRANCH_TRANSFER_SQL = """
+SELECT
+	se.posting_date,
+	se.company,
+	se.name AS stock_entry,
+	wf.custom_branch AS from_branch,
+	wt.custom_branch AS to_branch,
+	sed.s_warehouse AS from_warehouse,
+	sed.t_warehouse AS to_warehouse,
+	sed.item_code,
+	sed.item_name,
+	i.item_group,
+	sed.uom,
+	sed.qty,
+	sed.transfer_qty,
+	sed.amount
+FROM `tabStock Entry` se
+INNER JOIN `tabStock Entry Detail` sed ON sed.parent = se.name
+INNER JOIN `tabWarehouse` wf ON wf.name = sed.s_warehouse
+INNER JOIN `tabWarehouse` wt ON wt.name = sed.t_warehouse
+INNER JOIN `tabItem` i ON i.name = sed.item_code
+WHERE se.docstatus = 1
+	AND se.purpose = 'Material Transfer'
+	AND IFNULL(wf.custom_branch, '') != ''
+	AND IFNULL(wt.custom_branch, '') != ''
+	AND wf.custom_branch != wt.custom_branch
+"""
+
+# Mirrors aimatic.branch_transfer_planner (28 days of POS sales, 7 days target
+# cover, donors keep 30 days).  A receiver's need is filled from donors in
+# descending surplus order via a running total; a donor's surplus is not
+# reduced across different receivers (the Desk report does that).
+BRANCH_REBALANCING_SQL = """
+WITH sales AS (
+	SELECT pii.item_code, pi.branch, SUM(pii.stock_qty) AS sales_qty
+	FROM `tabPOS Invoice Item` pii
+	INNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent
+	WHERE pi.docstatus = 1 AND IFNULL(pi.is_return, 0) = 0
+		AND IFNULL(pi.branch, '') != ''
+		AND pi.posting_date >= DATE_SUB(CURDATE(), INTERVAL 27 DAY)
+	GROUP BY pii.item_code, pi.branch
+),
+stock AS (
+	SELECT b.item_code, w.custom_branch AS branch,
+		GREATEST(SUM(b.actual_qty), 0) AS stock_qty,
+		SUM(b.stock_value) AS stock_value
+	FROM `tabBin` b
+	INNER JOIN `tabWarehouse` w ON w.name = b.warehouse
+	WHERE w.disabled = 0 AND w.is_group = 0 AND IFNULL(w.custom_branch, '') != ''
+		AND b.item_code IN (SELECT item_code FROM sales)
+	GROUP BY b.item_code, w.custom_branch
+),
+merged AS (
+	SELECT item_code, branch,
+		SUM(sales_qty) AS sales_qty, SUM(stock_qty) AS stock_qty, SUM(stock_value) AS stock_value
+	FROM (
+		SELECT item_code, branch, sales_qty, 0 AS stock_qty, 0 AS stock_value FROM sales
+		UNION ALL
+		SELECT item_code, branch, 0, stock_qty, stock_value FROM stock
+	) u
+	GROUP BY item_code, branch
+),
+pos AS (
+	SELECT m.item_code, m.branch, br.company,
+		i.item_name, i.item_group, i.stock_uom,
+		m.stock_qty, m.stock_value, m.sales_qty / 28 AS daily_demand
+	FROM merged m
+	INNER JOIN `tabItem` i ON i.name = m.item_code AND i.is_stock_item = 1 AND i.disabled = 0
+	INNER JOIN `tabBranch` br ON br.name = m.branch
+),
+receivers AS (
+	SELECT *, 7 * daily_demand - stock_qty AS need, stock_qty / daily_demand AS days_left
+	FROM pos
+	WHERE daily_demand > 0 AND stock_qty < 7 * daily_demand
+),
+donors AS (
+	SELECT *, stock_qty - 30 * daily_demand AS surplus
+	FROM pos
+	WHERE stock_qty - 30 * daily_demand > 0
+),
+paired AS (
+	SELECT
+		r.company, r.item_code, r.item_name, r.item_group, r.stock_uom,
+		r.branch AS receiver_branch, r.stock_qty AS receiver_stock,
+		r.daily_demand AS receiver_daily_demand, r.days_left AS receiver_days_left, r.need AS receiver_need,
+		d.branch AS donor_branch, d.stock_qty AS donor_stock, d.daily_demand AS donor_daily_demand,
+		d.surplus AS donor_surplus,
+		d.stock_value / NULLIF(d.stock_qty, 0) AS donor_rate,
+		COALESCE(SUM(d.surplus) OVER (
+			PARTITION BY r.item_code, r.branch
+			ORDER BY d.surplus DESC, d.branch
+			ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+		), 0) AS taken_before
+	FROM receivers r
+	INNER JOIN donors d ON d.item_code = r.item_code AND d.branch != r.branch
+),
+sized AS (
+	SELECT *,
+		GREATEST(LEAST(donor_surplus, receiver_need - taken_before), 0) AS raw_qty
+	FROM paired
+)
+SELECT
+	company, item_code, item_name, item_group, stock_uom,
+	CASE WHEN receiver_stock <= 0 THEN 'Stock-out' WHEN receiver_days_left <= 3 THEN 'Urgent' ELSE 'Top up' END AS priority,
+	receiver_branch, receiver_stock, ROUND(receiver_daily_demand, 3) AS receiver_daily_demand,
+	ROUND(receiver_days_left, 1) AS receiver_days_left, ROUND(receiver_need, 3) AS receiver_need,
+	donor_branch, donor_stock, ROUND(donor_daily_demand, 3) AS donor_daily_demand,
+	CASE WHEN stock_uom IN ('Kg', 'Gram', 'Litre', 'Ml', 'Meter', 'Cm', 'Foot', 'Inch')
+		THEN ROUND(raw_qty, 3) ELSE FLOOR(raw_qty) END AS suggested_qty,
+	ROUND((CASE WHEN stock_uom IN ('Kg', 'Gram', 'Litre', 'Ml', 'Meter', 'Cm', 'Foot', 'Inch')
+		THEN raw_qty ELSE FLOOR(raw_qty) END) * COALESCE(donor_rate, 0), 2) AS est_value
+FROM sized
+WHERE (CASE WHEN stock_uom IN ('Kg', 'Gram', 'Litre', 'Ml', 'Meter', 'Cm', 'Foot', 'Inch')
+	THEN raw_qty ELSE FLOOR(raw_qty) END) > 0
+"""
+
+
+def build_branch_transfers() -> dict:
+	wb = "aimatic-branch-transfers"
+	moves = _native_query("tq-branch-transfers", "Branch to branch transfer lines", wb, BRANCH_TRANSFER_SQL, 0)
+	plan = _native_query("tq-branch-rebalancing", "Branch stock rebalancing suggestions", wb, BRANCH_REBALANCING_SQL, 1)
+
+	transfers = {
+		"measure_name": "Transfers",
+		"column_name": "stock_entry",
+		"data_type": "Integer",
+		"aggregation": "count_distinct",
+	}
+	items = {
+		"measure_name": "Items",
+		"column_name": "item_code",
+		"data_type": "Integer",
+		"aggregation": "count_distinct",
+	}
+	qty = {"measure_name": "Qty", "column_name": "transfer_qty", "data_type": "Decimal", "aggregation": "sum"}
+	value = _cur("Value", "amount")
+	moves_count = {
+		"measure_name": "Suggested moves",
+		"column_name": "item_code",
+		"data_type": "Integer",
+		"aggregation": "count",
+	}
+	plan_items = {
+		"measure_name": "Items",
+		"column_name": "item_code",
+		"data_type": "Integer",
+		"aggregation": "count_distinct",
+	}
+	plan_qty = {"measure_name": "Qty to move", "column_name": "suggested_qty", "data_type": "Decimal", "aggregation": "sum"}
+	plan_value = _cur("Est. value", "est_value")
+
+	charts = {
+		"tc-transfer-kpis": _number_chart(
+			"tc-transfer-kpis", "Branch transfers", wb, "tq-branch-transfers", [transfers, items, qty, value], "posting_date", 0
+		),
+		"tc-transfer-summary": _table(
+			"tc-transfer-summary",
+			"Branch to branch stock movement summary",
+			wb,
+			"tq-branch-transfers",
+			[_dim("From branch", "from_branch"), _dim("To branch", "to_branch")],
+			[transfers, items, qty, value],
+			1,
+			50,
+			"Value",
+			"desc",
+		),
+		"tc-transfer-to": _donut("tc-transfer-to", "Transfer value by receiving branch", wb, "tq-branch-transfers", "to_branch", value, 2),
+		"tc-transfer-detail": _table(
+			"tc-transfer-detail",
+			"Branch to branch stock movement detail",
+			wb,
+			"tq-branch-transfers",
+			[
+				_dim("Date", "posting_date", "Date"),
+				_dim("Stock entry", "stock_entry"),
+				_dim("From branch", "from_branch"),
+				_dim("To branch", "to_branch"),
+				_dim("Item", "item_name"),
+			],
+			[qty, value],
+			3,
+			100,
+			"Value",
+			"desc",
+		),
+		"tc-rebalance-kpis": _snapshot_chart(
+			"tc-rebalance-kpis",
+			"Stock that can move between branches",
+			wb,
+			"tq-branch-rebalancing",
+			[moves_count, plan_items, plan_qty, plan_value],
+			4,
+		),
+		"tc-rebalance-flow": _table(
+			"tc-rebalance-flow",
+			"Where stock can move from and to",
+			wb,
+			"tq-branch-rebalancing",
+			[_dim("Move from", "donor_branch"), _dim("Move to", "receiver_branch")],
+			[moves_count, plan_qty, plan_value],
+			5,
+			50,
+			"Est. value",
+			"desc",
+		),
+		"tc-rebalance": _table(
+			"tc-rebalance",
+			"Potential stock moves (in demand at one branch, spare at another)",
+			wb,
+			"tq-branch-rebalancing",
+			[
+				_dim("Priority", "priority"),
+				_dim("Item", "item_name"),
+				_dim("Move from", "donor_branch"),
+				_dim("Move to", "receiver_branch"),
+			],
+			[
+				{"measure_name": "Stock there", "column_name": "receiver_stock", "data_type": "Decimal", "aggregation": "max"},
+				{"measure_name": "Sales/day there", "column_name": "receiver_daily_demand", "data_type": "Decimal", "aggregation": "max"},
+				{"measure_name": "Stock here", "column_name": "donor_stock", "data_type": "Decimal", "aggregation": "max"},
+				plan_qty,
+				plan_value,
+			],
+			6,
+			100,
+			"Est. value",
+			"desc",
+		),
+	}
+	transfer_charts = ("tc-transfer-kpis", "tc-transfer-summary", "tc-transfer-to", "tc-transfer-detail")
+	plan_charts = ("tc-rebalance-kpis", "tc-rebalance-flow", "tc-rebalance")
+	dash = {
+		"td-branch-transfers": {
+			"name": "td-branch-transfers",
+			"title": "Branch Stock Transfers",
+			"workbook": wb,
+			"items": [
+				_filter_item(
+					"Date Range",
+					"Date",
+					"calendar",
+					{c: "`tq-branch-transfers`.`posting_date`" for c in transfer_charts},
+					0,
+					{"default_operator": "within", "default_value": "Last 30 days"},
+				),
+				_filter_item("From Branch", "String", "building-2", {c: "`tq-branch-transfers`.`from_branch`" for c in transfer_charts}, 4),
+				_filter_item("To Branch", "String", "building-2", {c: "`tq-branch-transfers`.`to_branch`" for c in transfer_charts}, 8),
+				_filter_item("Move To Branch", "String", "building-2", {c: "`tq-branch-rebalancing`.`receiver_branch`" for c in plan_charts}, 12),
+				_filter_item("Move From Branch", "String", "building-2", {c: "`tq-branch-rebalancing`.`donor_branch`" for c in plan_charts}, 16),
+				_chart_item("tc-transfer-kpis", "item-transfer-kpis", 0, 1, 20, 3),
+				_chart_item("tc-transfer-summary", "item-transfer-summary", 0, 4, 12, 9),
+				_chart_item("tc-transfer-to", "item-transfer-to", 12, 4, 8, 9),
+				_chart_item("tc-transfer-detail", "item-transfer-detail", 0, 13, 20, 10),
+				_chart_item("tc-rebalance-kpis", "item-rebalance-kpis", 0, 23, 20, 3),
+				_chart_item("tc-rebalance-flow", "item-rebalance-flow", 0, 26, 20, 8),
+				_chart_item("tc-rebalance", "item-rebalance", 0, 34, 20, 11),
+			],
+		}
+	}
+	return _workbook(wb, "Branch Stock Transfers", {"tq-branch-transfers": moves, "tq-branch-rebalancing": plan}, charts, dash)
+
+
 MANIFESTS = {
 	"owner_flash": {
 		"version": 4,
@@ -2522,6 +2785,15 @@ MANIFESTS = {
 		"required_apps": ["erpnext", "aimatic"],
 		"source_doctypes": ["POS Invoice Item", "POS Invoice", "Bin", "Item"],
 	},
+	"branch_transfers": {
+		"version": 1,
+		"title": "Branch Stock Transfers",
+		"description": "Branch to branch stock movement summary and line detail from submitted Material Transfers, plus items in demand at one branch that another branch holds in surplus.",
+		"notes": "Movement counts submitted Material Transfer lines whose source and target warehouses belong to different branches (Warehouse.custom_branch); value is Stock Entry Detail amount. Suggestions use the last 28 days of submitted non-return POS sales per branch: a branch is short under 7 days of cover, a donor keeps 30 days of its own sales and offers the rest, and counted items move in whole units. A donor's surplus is not reduced across different receiving branches here, and unit rounding can differ by a unit or two; the Branch Stock Rebalancing Desk report allocates each donor once. Suggestions only: no stock document is created.",
+		"module": "Stock",
+		"required_apps": ["erpnext", "aimatic"],
+		"source_doctypes": ["Stock Entry", "Stock Entry Detail", "POS Invoice", "POS Invoice Item", "Bin", "Item", "Warehouse"],
+	},
 	"inventory_kpis": {
 		"version": 3,
 		"title": "Inventory KPIs",
@@ -2544,6 +2816,7 @@ BUILDERS = {
 	"pending_work": build_pending_work,
 	"goods_abc": build_goods_abc,
 	"inventory_kpis": build_inventory_productivity,
+	"branch_transfers": build_branch_transfers,
 }
 
 
