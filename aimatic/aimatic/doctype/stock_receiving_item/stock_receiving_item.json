@@ -1,0 +1,25 @@
+{
+ "actions": [],
+ "creation": "2026-09-25 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "istable": 1,
+ "module": "Aimatic",
+ "name": "Stock Receiving Item",
+ "field_order": ["source_row", "item_code", "item_name", "uom", "expected_qty", "received_qty", "damaged_qty", "batch_no", "expiry_date", "remarks"],
+ "fields": [
+  {"fieldname":"source_row","fieldtype":"Data","label":"Source Row","read_only":1},
+  {"fieldname":"item_code","fieldtype":"Link","in_list_view":1,"label":"Item","options":"Item","read_only":1,"reqd":1},
+  {"fieldname":"item_name","fieldtype":"Data","in_list_view":1,"label":"Item Name","read_only":1},
+  {"fieldname":"uom","fieldtype":"Link","in_list_view":1,"label":"UOM","options":"UOM","read_only":1},
+  {"fieldname":"expected_qty","fieldtype":"Float","in_list_view":1,"label":"Expected Qty","read_only":1,"reqd":1},
+  {"fieldname":"received_qty","fieldtype":"Float","in_list_view":1,"label":"Received Qty","reqd":1},
+  {"default":"0","fieldname":"damaged_qty","fieldtype":"Float","in_list_view":1,"label":"Damaged Qty"},
+  {"fieldname":"batch_no","fieldtype":"Data","label":"Batch No"},
+  {"fieldname":"expiry_date","fieldtype":"Date","label":"Expiry Date"},
+  {"fieldname":"remarks","fieldtype":"Small Text","label":"Remarks"}
+ ],
+ "permissions": [],
+ "states": []
+}

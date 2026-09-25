@@ -1,0 +1,37 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:STK-REC-.#####",
+ "creation": "2026-09-25 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["source_type", "source_name", "receiving_branch", "receiving_warehouse", "column_break_1", "status", "receiver", "received_at", "idempotency_key", "remarks", "items"],
+ "fields": [
+  {"fieldname":"source_type","fieldtype":"Select","in_list_view":1,"in_standard_filter":1,"label":"Source Type","options":"Stock Entry\nPurchase Receipt","read_only":1,"reqd":1},
+  {"fieldname":"source_name","fieldtype":"Data","in_list_view":1,"label":"Source Document","read_only":1,"reqd":1},
+  {"fieldname":"receiving_branch","fieldtype":"Link","in_list_view":1,"in_standard_filter":1,"label":"Receiving Branch","options":"Branch","read_only":1,"reqd":1},
+  {"fieldname":"receiving_warehouse","fieldtype":"Link","label":"Receiving Warehouse","options":"Warehouse","read_only":1},
+  {"fieldname":"column_break_1","fieldtype":"Column Break"},
+  {"default":"Received","fieldname":"status","fieldtype":"Select","in_list_view":1,"in_standard_filter":1,"label":"Status","options":"Received\nDisputed","read_only":1,"reqd":1},
+  {"fieldname":"receiver","fieldtype":"Link","in_list_view":1,"label":"Receiver","options":"User","read_only":1,"reqd":1},
+  {"fieldname":"received_at","fieldtype":"Datetime","in_list_view":1,"label":"Received At","read_only":1,"reqd":1},
+  {"fieldname":"idempotency_key","fieldtype":"Data","label":"Idempotency Key","read_only":1,"unique":1},
+  {"fieldname":"remarks","fieldtype":"Small Text","label":"Remarks","read_only":1},
+  {"fieldname":"items","fieldtype":"Table","label":"Received Items","options":"Stock Receiving Item","reqd":1}
+ ],
+ "index_web_pages_for_search": 0,
+ "is_submittable": 1,
+ "links": [],
+ "module": "Aimatic",
+ "name": "Stock Receiving",
+ "permissions": [
+  {"create":1,"read":1,"write":1,"role":"Stock User"},
+  {"create":1,"read":1,"write":1,"role":"Purchase User"},
+  {"create":1,"read":1,"write":1,"role":"Stock Manager"},
+  {"create":1,"read":1,"write":1,"role":"Purchase Manager"},
+  {"create":1,"delete":1,"read":1,"write":1,"role":"System Manager"}
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
