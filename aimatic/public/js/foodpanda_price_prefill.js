@@ -10,6 +10,10 @@
 function aimatic_register_foodpanda_price_prefill(doctype, child_doctype) {
 	const helpers = {
 		refresh_row(frm, cdt, cdn) {
+			if (frm.doc.docstatus !== 0) {
+				return;
+			}
+
 			const row = locals[cdt][cdn];
 			if (!row || !frm.doc.branch || !row.item_code) {
 				return;
@@ -43,6 +47,12 @@ function aimatic_register_foodpanda_price_prefill(doctype, child_doctype) {
 	};
 
 	frappe.ui.form.on(doctype, {
+		refresh(frm) {
+			helpers.refresh_all_rows(frm);
+		},
+		items_add(frm, cdt, cdn) {
+			setTimeout(() => helpers.refresh_row(frm, cdt, cdn), 0);
+		},
 		branch(frm) {
 			helpers.refresh_all_rows(frm);
 		},
