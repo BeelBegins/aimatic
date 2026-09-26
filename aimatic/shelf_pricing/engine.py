@@ -113,6 +113,28 @@ def _stock_transfer_target_branch(doc):
 	return branches[0]
 
 
+def _stock_transfer_is_inter_branch(doc, target_branch):
+	"""Return whether a Material Transfer crosses branch boundaries."""
+	source_branches = []
+	for row in doc.items:
+		if not row.s_warehouse:
+			continue
+		branch = frappe.db.get_value("Warehouse", row.s_warehouse, "custom_branch")
+		if branch and branch not in source_branches:
+			source_branches.append(branch)
+
+	# Stock Entry.branch is normally the sender, but the warehouse-derived value
+	# is the reliable fallback for older or imported entries.
+	sender_branch = (doc.get("branch") or "").strip()
+	return bool(
+		target_branch
+		and (
+			(sender_branch and sender_branch != target_branch)
+			or any(branch != target_branch for branch in source_branches)
+		)
+	)
+
+
 def _resolve_update_branch(source_doctype, source_doc, branch):
 	"""Branch whose price lists a source document updates."""
 	if source_doctype == SOURCE_STOCK_TRANSFER:
@@ -240,6 +262,40 @@ def get_source_document_context(source_doctype, source_name):
 		context["branch"] = _stock_transfer_target_branch(doc)
 
 	return context
+
+
+@frappe.whitelist()
+def get_stock_transfer_price_review_context(source_name):
+	"""Return whether a submitted inter-branch transfer needs price review."""
+	_require_price_update_permission()
+	source_doctype, source_doc = _get_submitted_source(SOURCE_STOCK_TRANSFER, source_name)
+	if not source_doc:
+		return {"needs_review": False}
+
+	target_branch = _stock_transfer_target_branch(source_doc)
+	if not _stock_transfer_is_inter_branch(source_doc, target_branch):
+		return {"needs_review": False, "branch": target_branch}
+
+	target_price_list = _resolve_price_list("Store Selling", target_branch, create=False)
+	if not target_price_list:
+		return {"needs_review": False, "branch": target_branch}
+
+	rows, _ = _rows_from_source(
+		SOURCE_STOCK_TRANSFER,
+		source_doc,
+		"Store Selling",
+		target_branch,
+		target_price_list,
+	)
+	zero_price_count = sum(1 for row in rows if flt(row["current_selling_price"]) <= 0)
+	negative_margin_count = sum(1 for row in rows if flt(row["current_gm_percent"]) < 0)
+
+	return {
+		"needs_review": bool(zero_price_count or negative_margin_count),
+		"branch": target_branch,
+		"zero_price_count": zero_price_count,
+		"negative_margin_count": negative_margin_count,
+	}
 
 
 def _fetch_barcode_map(item_codes):

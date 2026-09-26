@@ -53,6 +53,22 @@
 		frm.add_custom_button(__("Review Foodpanda Prices"), () => open_console(frm, "Foodpanda"), __("Selling Price Update"));
 	}
 
+	function review_inter_branch_prices_after_submit(frm) {
+		if (frm.doc.docstatus !== 1 || frm.doc.purpose !== "Material Transfer") {
+			return;
+		}
+
+		frappe.call({
+			method: "aimatic.shelf_pricing.engine.get_stock_transfer_price_review_context",
+			args: { source_name: frm.doc.name },
+			callback: (r) => {
+				if (r.message && r.message.needs_review) {
+					open_console(frm, "Store Selling");
+				}
+			},
+		});
+	}
+
 	frappe.ui.form.on("Purchase Receipt", {
 		refresh(frm) {
 			add_pr_buttons(frm);
@@ -62,6 +78,9 @@
 	frappe.ui.form.on("Stock Entry", {
 		refresh(frm) {
 			add_stn_buttons(frm);
+		},
+		on_submit(frm) {
+			review_inter_branch_prices_after_submit(frm);
 		},
 	});
 })();

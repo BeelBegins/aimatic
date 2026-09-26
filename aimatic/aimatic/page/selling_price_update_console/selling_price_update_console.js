@@ -110,12 +110,20 @@ aimatic.SellingPriceUpdatePage = class SellingPriceUpdatePage {
 					)}
 				</p>
 				<div class="spu-meta"></div>
+				<div class="spu-warnings"></div>
+				<style>
+					.spu-warnings { margin: 8px 0; }
+					.spu-warning { display: inline-block; margin-right: 8px; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
+					.spu-warning-zero, .spu-zero-price .spu-flagged-price { background: #fff1f0; color: #b42318; }
+					.spu-warning-negative, .spu-negative-margin .spu-flagged-price, .spu-negative-margin .spu-flagged-margin { background: #fff4e5; color: #b54708; font-weight: 600; }
+				</style>
 				<div class="spu-table-wrap">
 					<div class="spu-empty">${__("Select Branch, source document, then Load.")}</div>
 				</div>
 			</div>
 		`).appendTo(this.page.body);
 		this.$meta = this.$body.find(".spu-meta");
+		this.$warnings = this.$body.find(".spu-warnings");
 		this.$wrap = this.$body.find(".spu-table-wrap");
 	}
 
@@ -348,6 +356,7 @@ aimatic.SellingPriceUpdatePage = class SellingPriceUpdatePage {
 		this.rows = [];
 		this.meta = {};
 		this.$meta.empty();
+		this.$warnings.empty();
 		this.$wrap.html(
 			`<div class="spu-empty">${frappe.utils.escape_html(message || __("Select Branch, source document, then Load."))}</div>`
 		);
@@ -396,6 +405,16 @@ aimatic.SellingPriceUpdatePage = class SellingPriceUpdatePage {
 			meta = __("Source: {0} · ", [doc_label]) + meta;
 		}
 		this.$meta.text(meta);
+		const zeroPriceCount = this.rows.filter((row) => flt(row.current_selling_price) <= 0).length;
+		const negativeMarginCount = this.rows.filter((row) => flt(row.current_gm_percent) < 0).length;
+		const warnings = [];
+		if (zeroPriceCount) {
+			warnings.push("<span class=\"spu-warning spu-warning-zero\">" + __("0 selling price: {0}", [zeroPriceCount]) + "</span>");
+		}
+		if (negativeMarginCount) {
+			warnings.push("<span class=\"spu-warning spu-warning-negative\">" + __("Negative margin: {0}", [negativeMarginCount]) + "</span>");
+		}
+		this.$warnings.html(warnings.join(" "));
 
 		if (!count) {
 			this.$wrap.html(`<div class="spu-empty">${__("No items on this source document.")}</div>`);
@@ -422,8 +441,13 @@ aimatic.SellingPriceUpdatePage = class SellingPriceUpdatePage {
 			.map((row, idx) => {
 				const barcodes = [row.barcode1, row.barcode2, row.barcode3].filter(Boolean).join(", ");
 				const gm = row.current_gm_percent != null ? flt(row.current_gm_percent, 2) : "";
+				const zeroPrice = flt(row.current_selling_price) <= 0;
+				const negativeMargin = flt(row.current_gm_percent) < 0;
+				const rowFlags = [zeroPrice ? "spu-zero-price" : "", negativeMargin ? "spu-negative-margin" : ""]
+					.filter(Boolean)
+					.join(" ");
 				return `
-				<tr data-idx="${idx}" class="${row._dirty ? "spu-dirty" : ""}">
+				<tr data-idx="${idx}" class="${row._dirty ? "spu-dirty" : ""} ${rowFlags}">
 					<td>
 						<div class="spu-item-code">${frappe.utils.escape_html(row.item_code)}</div>
 						<div class="spu-item-name">${frappe.utils.escape_html(row.item_name || "")}</div>
@@ -437,12 +461,12 @@ aimatic.SellingPriceUpdatePage = class SellingPriceUpdatePage {
 							? `<td class="spu-num">${format_currency(row.store_selling_price || 0)}</td>`
 							: ""
 					}
-					<td class="spu-num">${format_currency(row.current_selling_price || 0)}</td>
+					<td class="spu-num ${zeroPrice || negativeMargin ? "spu-flagged-price" : ""}">${format_currency(row.current_selling_price || 0)}</td>
 					<td class="spu-num">
 						<input type="number" step="1" min="0" class="form-control spu-new-price"
 							value="${flt(row.new_selling_price || 0, 2)}" data-idx="${idx}">
 					</td>
-					<td class="spu-num spu-gm-cell">${gm}</td>
+					<td class="spu-num spu-gm-cell ${negativeMargin ? "spu-flagged-margin" : ""}">${gm}</td>
 					<td class="spu-num">
 						<input type="number" step="0.01" min="0" max="99.99" class="form-control spu-gm-helper"
 							placeholder="%" data-idx="${idx}">
