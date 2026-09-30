@@ -1,0 +1,426 @@
+{
+	"version": "1.0",
+	"type": "Workbook",
+	"name": "aimatic-withholding-tax",
+	"doc": {
+		"name": "aimatic-withholding-tax",
+		"title": "Withholding Tax by Store"
+	},
+	"dependencies": {
+		"folders": [],
+		"queries": {
+			"tq-wht-pi": {
+				"name": "tq-wht-pi",
+				"title": "Purchase withholding tax",
+				"workbook": "aimatic-withholding-tax",
+				"folder": null,
+				"sort_order": 0,
+				"use_live_connection": 1,
+				"is_script_query": 0,
+				"is_builder_query": 0,
+				"is_native_query": 1,
+				"operations": [
+					{
+						"type": "sql",
+						"data_source": "Site DB",
+						"raw_sql": "SELECT\n\tpi.posting_date,\n\tpi.company,\n\tCOALESCE(NULLIF(pi.branch, ''), 'Unassigned') AS branch,\n\tpi.supplier,\n\tpi.supplier_name,\n\tpi.name AS invoice,\n\tpi.bill_no,\n\tptc.account_head,\n\tptc.tax_amount AS withholding_tax,\n\tpi.base_net_total,\n\tIF(IFNULL(pi.is_return, 0) = 1, 'Return', 'Invoice') AS doc_kind\nFROM `tabPurchase Taxes and Charges` ptc\nINNER JOIN `tabPurchase Invoice` pi ON pi.name = ptc.parent\nWHERE pi.docstatus = 1\n\tAND ptc.parenttype = 'Purchase Invoice'\n\tAND IFNULL(ptc.is_tax_withholding_account, 0) = 1"
+					}
+				]
+			}
+		},
+		"charts": {
+			"tc-wht-kpis": {
+				"name": "tc-wht-kpis",
+				"title": "Withholding tax this period",
+				"workbook": "aimatic-withholding-tax",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-wht-pi",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Withholding tax",
+							"column_name": "withholding_tax",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Invoices",
+							"column_name": "invoice",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						},
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-wht-stores": {
+				"name": "tc-wht-stores",
+				"title": "Withholding tax by store",
+				"workbook": "aimatic-withholding-tax",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-wht-pi",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Withholding tax",
+							"column_name": "withholding_tax",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Invoices",
+							"column_name": "invoice",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						},
+						{
+							"measure_name": "Net total",
+							"column_name": "base_net_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Withholding tax"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 20,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-wht-table": {
+				"name": "tc-wht-table",
+				"title": "Withholding tax invoices",
+				"workbook": "aimatic-withholding-tax",
+				"folder": null,
+				"sort_order": 2,
+				"query": "tq-wht-pi",
+				"chart_type": "Table",
+				"config": {
+					"rows": [
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Date",
+							"column_name": "posting_date",
+							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Supplier",
+							"column_name": "supplier_name",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Invoice",
+							"column_name": "invoice",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Bill no",
+							"column_name": "bill_no",
+							"data_type": "String"
+						},
+						{
+							"dimension_name": "Kind",
+							"column_name": "doc_kind",
+							"data_type": "String"
+						}
+					],
+					"columns": [],
+					"values": [
+						{
+							"measure_name": "Withholding tax",
+							"column_name": "withholding_tax",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						},
+						{
+							"measure_name": "Net total",
+							"column_name": "base_net_total",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "Date"
+							},
+							"direction": "desc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-wht-kpis-withholding-tax": {
+				"name": "tc-wht-kpis-withholding-tax",
+				"title": "Withholding tax",
+				"workbook": "aimatic-withholding-tax",
+				"folder": null,
+				"sort_order": 0,
+				"query": "tq-wht-pi",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Withholding tax",
+							"column_name": "withholding_tax",
+							"data_type": "Decimal",
+							"aggregation": "sum",
+							"format": "currency"
+						}
+					],
+					"number_column_options": [
+						{
+							"decimal": 2,
+							"shorten_numbers": true
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			},
+			"tc-wht-kpis-invoices": {
+				"name": "tc-wht-kpis-invoices",
+				"title": "Invoices",
+				"workbook": "aimatic-withholding-tax",
+				"folder": null,
+				"sort_order": 1,
+				"query": "tq-wht-pi",
+				"chart_type": "Number",
+				"config": {
+					"number_columns": [
+						{
+							"measure_name": "Invoices",
+							"column_name": "invoice",
+							"data_type": "Integer",
+							"aggregation": "count_distinct"
+						}
+					],
+					"number_column_options": [
+						{
+							"shorten_numbers": false
+						}
+					],
+					"comparison": true,
+					"sparkline": true,
+					"date_column": {
+						"dimension_name": "posting_date",
+						"column_name": "posting_date",
+						"data_type": "Date",
+						"granularity": "month"
+					},
+					"order_by": [
+						{
+							"column": {
+								"type": "column",
+								"column_name": "posting_date"
+							},
+							"direction": "asc"
+						}
+					],
+					"limit": 100,
+					"filters": {
+						"logical_operator": "And",
+						"filters": []
+					}
+				}
+			}
+		},
+		"dashboards": {
+			"td-wht": {
+				"name": "td-wht",
+				"title": "Withholding Tax by Store",
+				"workbook": "aimatic-withholding-tax",
+				"items": [
+					{
+						"type": "filter",
+						"filter_name": "Date Range",
+						"filter_type": "Date",
+						"icon": "calendar",
+						"links": {
+							"tc-wht-kpis-withholding-tax": "`tq-wht-pi`.`posting_date`",
+							"tc-wht-kpis-invoices": "`tq-wht-pi`.`posting_date`",
+							"tc-wht-stores": "`tq-wht-pi`.`posting_date`",
+							"tc-wht-table": "`tq-wht-pi`.`posting_date`"
+						},
+						"layout": {
+							"i": "filter-date-range",
+							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						},
+						"default_operator": "within",
+						"default_value": "Last 12 months"
+					},
+					{
+						"type": "filter",
+						"filter_name": "Company",
+						"filter_type": "String",
+						"icon": "building-2",
+						"links": {
+							"tc-wht-kpis-withholding-tax": "`tq-wht-pi`.`company`",
+							"tc-wht-kpis-invoices": "`tq-wht-pi`.`company`",
+							"tc-wht-stores": "`tq-wht-pi`.`company`",
+							"tc-wht-table": "`tq-wht-pi`.`company`"
+						},
+						"layout": {
+							"i": "filter-company",
+							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Branch",
+						"filter_type": "String",
+						"icon": "store",
+						"links": {
+							"tc-wht-kpis-withholding-tax": "`tq-wht-pi`.`branch`",
+							"tc-wht-kpis-invoices": "`tq-wht-pi`.`branch`",
+							"tc-wht-stores": "`tq-wht-pi`.`branch`",
+							"tc-wht-table": "`tq-wht-pi`.`branch`"
+						},
+						"layout": {
+							"i": "filter-branch",
+							"x": 8,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-wht-kpis-withholding-tax",
+						"layout": {
+							"i": "item-kpis-1",
+							"x": 0,
+							"y": 1,
+							"w": 10,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-wht-kpis-invoices",
+						"layout": {
+							"i": "item-kpis-2",
+							"x": 10,
+							"y": 1,
+							"w": 10,
+							"h": 3
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-wht-stores",
+						"layout": {
+							"i": "item-stores",
+							"x": 0,
+							"y": 4,
+							"w": 20,
+							"h": 8
+						}
+					},
+					{
+						"type": "chart",
+						"chart": "tc-wht-table",
+						"layout": {
+							"i": "item-table",
+							"x": 0,
+							"y": 12,
+							"w": 20,
+							"h": 10
+						}
+					}
+				]
+			}
+		}
+	}
+}

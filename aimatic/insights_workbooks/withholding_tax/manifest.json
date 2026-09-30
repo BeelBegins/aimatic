@@ -1,0 +1,14 @@
+{
+	"version": 2,
+	"title": "Withholding Tax by Store",
+	"description": "Purchase Invoice withholding tax by branch, from tax rows flagged as withholding accounts.",
+	"notes": "Store is Purchase Invoice.branch. The store table is one row per branch. Invoice lines are newest first so smaller stores are not buried under S1 amounts. Amounts match GL on Withholding Tax Payable when those rows post. Returns are negative. Older invoices without branch would appear as Unassigned. Insights apply_user_permissions still hides other branches for users with a Branch User Permission.",
+	"module": "Accounts",
+	"required_apps": [
+		"erpnext"
+	],
+	"source_doctypes": [
+		"Purchase Invoice",
+		"Purchase Taxes and Charges"
+	]
+}

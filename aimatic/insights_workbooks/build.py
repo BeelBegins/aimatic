@@ -706,6 +706,107 @@ def build_tax_compliance() -> dict:
 	return _workbook(wb, "Tax Compliance", {"tq-tax-pos": pos, "tq-tax-rows": taxes}, charts, dash)
 
 
+WHT_PI_SQL = """
+SELECT
+	pi.posting_date,
+	pi.company,
+	COALESCE(NULLIF(pi.branch, ''), 'Unassigned') AS branch,
+	pi.supplier,
+	pi.supplier_name,
+	pi.name AS invoice,
+	pi.bill_no,
+	ptc.account_head,
+	ptc.tax_amount AS withholding_tax,
+	pi.base_net_total,
+	IF(IFNULL(pi.is_return, 0) = 1, 'Return', 'Invoice') AS doc_kind
+FROM `tabPurchase Taxes and Charges` ptc
+INNER JOIN `tabPurchase Invoice` pi ON pi.name = ptc.parent
+WHERE pi.docstatus = 1
+	AND ptc.parenttype = 'Purchase Invoice'
+	AND IFNULL(ptc.is_tax_withholding_account, 0) = 1
+"""
+
+
+def build_withholding_tax() -> dict:
+	wb = "aimatic-withholding-tax"
+	rows = _native_query("tq-wht-pi", "Purchase withholding tax", wb, WHT_PI_SQL, 0)
+	wht = _cur("Withholding tax", "withholding_tax")
+	invs = {
+		"measure_name": "Invoices",
+		"column_name": "invoice",
+		"data_type": "Integer",
+		"aggregation": "count_distinct",
+	}
+	charts = {
+		"tc-wht-kpis": _number_chart(
+			"tc-wht-kpis",
+			"Withholding tax this period",
+			wb,
+			"tq-wht-pi",
+			[wht, invs],
+			"posting_date",
+			0,
+		),
+		"tc-wht-stores": _table(
+			"tc-wht-stores",
+			"Withholding tax by store",
+			wb,
+			"tq-wht-pi",
+			[_dim("Branch", "branch")],
+			[wht, invs, _cur("Net total", "base_net_total")],
+			1,
+			20,
+			"Withholding tax",
+			"desc",
+		),
+		"tc-wht-table": _table(
+			"tc-wht-table",
+			"Withholding tax invoices",
+			wb,
+			"tq-wht-pi",
+			[
+				_dim("Branch", "branch"),
+				_dim("Date", "posting_date", "Date"),
+				_dim("Supplier", "supplier_name"),
+				_dim("Invoice", "invoice"),
+				_dim("Bill no", "bill_no"),
+				_dim("Kind", "doc_kind"),
+			],
+			[wht, _cur("Net total", "base_net_total")],
+			2,
+			100,
+			"Date",
+			"desc",
+		),
+	}
+	date_links = {name: "`tq-wht-pi`.`posting_date`" for name in charts}
+	co_links = {name: "`tq-wht-pi`.`company`" for name in charts}
+	br_links = {name: "`tq-wht-pi`.`branch`" for name in charts}
+	dash = {
+		"td-wht": {
+			"name": "td-wht",
+			"title": "Withholding Tax by Store",
+			"workbook": wb,
+			"items": [
+				_filter_item(
+					"Date Range",
+					"Date",
+					"calendar",
+					date_links,
+					0,
+					{"default_operator": "within", "default_value": "Last 12 months"},
+				),
+				_filter_item("Company", "String", "building-2", co_links, 4),
+				_filter_item("Branch", "String", "store", br_links, 8),
+				_chart_item("tc-wht-kpis", "item-kpis", 0, 1, 20, 3),
+				_chart_item("tc-wht-stores", "item-stores", 0, 4, 20, 8),
+				_chart_item("tc-wht-table", "item-table", 0, 12, 20, 10),
+			],
+		}
+	}
+	return _workbook(wb, "Withholding Tax by Store", {"tq-wht-pi": rows}, charts, dash)
+
+
 def build_accounts_pnl() -> dict:
 	wb = "aimatic-accounts-pnl"
 	gl = _query(
@@ -934,6 +1035,7 @@ SELECT
 	posting_date,
 	due_date,
 	company,
+	COALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,
 	supplier_name,
 	name AS invoice,
 	bill_no,
@@ -949,6 +1051,7 @@ DRAFT_PI_SQL = """
 SELECT
 	posting_date,
 	company,
+	COALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,
 	supplier_name,
 	name AS invoice,
 	bill_no,
@@ -963,6 +1066,7 @@ SELECT
 	transaction_date,
 	schedule_date,
 	company,
+	COALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,
 	supplier_name,
 	name AS purchase_order,
 	status,
@@ -978,6 +1082,7 @@ SELECT
 	posting_date,
 	due_date,
 	company,
+	COALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,
 	customer_name,
 	name AS invoice,
 	status,
@@ -1057,6 +1162,7 @@ def build_accounts_liabilities() -> dict:
 			"tq-pending-pi",
 			[
 				_dim("Due", "due_date", "Date"),
+				_dim("Branch", "branch"),
 				_dim("Supplier", "supplier_name"),
 				_dim("Invoice", "invoice"),
 				_dim("Status", "status"),
@@ -1080,6 +1186,7 @@ def build_accounts_liabilities() -> dict:
 		"tc-liab-snap": "`tq-liab-snap`.`company`",
 		"tc-pending-pi": "`tq-pending-pi`.`company`",
 	}
+	br_links = {"tc-pending-pi": "`tq-pending-pi`.`branch`"}
 	dash = {
 		"td-liab": {
 			"name": "td-liab",
@@ -1095,6 +1202,7 @@ def build_accounts_liabilities() -> dict:
 					{"default_operator": "within", "default_value": "Last 12 months"},
 				),
 				_filter_item("Company", "String", "building-2", co_links, 4),
+				_filter_item("Branch", "String", "store", br_links, 8),
 				_chart_item("tc-liab-kpis", "item-kpis", 0, 1, 20, 3),
 				_chart_item("tc-liab-type", "item-type", 0, 4, 8, 8),
 				_chart_item("tc-liab-acct", "item-acct", 8, 4, 12, 8),
@@ -1128,6 +1236,7 @@ def build_pending_work() -> dict:
 			"tq-draft-pi",
 			[
 				_dim("Date", "posting_date", "Date"),
+				_dim("Branch", "branch"),
 				_dim("Supplier", "supplier_name"),
 				_dim("Invoice", "invoice"),
 				_dim("Bill no", "bill_no"),
@@ -1145,6 +1254,7 @@ def build_pending_work() -> dict:
 			"tq-open-po",
 			[
 				_dim("Date", "transaction_date", "Date"),
+				_dim("Branch", "branch"),
 				_dim("Supplier", "supplier_name"),
 				_dim("PO", "purchase_order"),
 				_dim("Status", "status"),
@@ -1170,6 +1280,7 @@ def build_pending_work() -> dict:
 			"tq-unpaid-pi",
 			[
 				_dim("Due", "due_date", "Date"),
+				_dim("Branch", "branch"),
 				_dim("Supplier", "supplier_name"),
 				_dim("Invoice", "invoice"),
 				_dim("Status", "status"),
@@ -1195,6 +1306,7 @@ def build_pending_work() -> dict:
 			"tq-open-si",
 			[
 				_dim("Due", "due_date", "Date"),
+				_dim("Branch", "branch"),
 				_dim("Customer", "customer_name"),
 				_dim("Invoice", "invoice"),
 				_dim("Status", "status"),
@@ -1220,6 +1332,7 @@ def build_pending_work() -> dict:
 		"tc-pi": "`tq-unpaid-pi`.`company`",
 		"tc-si": "`tq-open-si`.`company`",
 	}
+	br_links = {k: v.replace("company", "branch") for k, v in co_links.items()}
 	dash = {
 		"td-pending": {
 			"name": "td-pending",
@@ -1227,6 +1340,7 @@ def build_pending_work() -> dict:
 			"workbook": wb,
 			"items": [
 				_filter_item("Company", "String", "building-2", co_links, 0),
+				_filter_item("Branch", "String", "store", br_links, 4),
 				_chart_item("tc-draft", "item-draft", 0, 1, 10, 9),
 				_chart_item("tc-po", "item-po", 10, 1, 10, 9),
 				_chart_item("tc-pi", "item-pi", 0, 10, 10, 9),
@@ -2749,6 +2863,15 @@ MANIFESTS = {
 		"required_apps": ["erpnext", "aimatic"],
 		"source_doctypes": ["POS Invoice", "Sales Taxes and Charges"],
 	},
+	"withholding_tax": {
+		"version": 2,
+		"title": "Withholding Tax by Store",
+		"description": "Purchase Invoice withholding tax by branch, from tax rows flagged as withholding accounts.",
+		"notes": "Store is Purchase Invoice.branch. The store table is one row per branch. Invoice lines are newest first so smaller stores are not buried under S1 amounts. Amounts match GL on Withholding Tax Payable when those rows post. Returns are negative. Older invoices without branch would appear as Unassigned. Insights apply_user_permissions still hides other branches for users with a Branch User Permission.",
+		"module": "Accounts",
+		"required_apps": ["erpnext"],
+		"source_doctypes": ["Purchase Invoice", "Purchase Taxes and Charges"],
+	},
 	"accounts_pnl": {
 		"version": 3,
 		"title": "Merchandise P&L",
@@ -2759,19 +2882,19 @@ MANIFESTS = {
 		"source_doctypes": ["GL Entry", "Account"],
 	},
 	"accounts_liabilities": {
-		"version": 2,
+		"version": 3,
 		"title": "Liabilities and Payables",
 		"description": "Period liability movement (tax payable, trade creditors, POS service fee) plus current outstanding snapshot and unpaid supplier invoices.",
-		"notes": "Snapshot is as-of-now (all uncancelled GL). Date filter applies only to period movement charts. Complements bundled AR/AP/Cash.",
+		"notes": "Snapshot is as-of-now (all uncancelled GL). Date filter applies only to period movement charts. Unpaid supplier invoices include Branch. Complements bundled AR/AP/Cash.",
 		"module": "Accounts",
 		"required_apps": ["erpnext", "aimatic"],
 		"source_doctypes": ["GL Entry", "Account", "Purchase Invoice"],
 	},
 	"pending_work": {
-		"version": 1,
+		"version": 2,
 		"title": "Pending Invoices and Orders",
 		"description": "Draft supplier invoices, POs still to receive or bill, unpaid purchase invoices, unpaid non-POS sales invoices.",
-		"notes": "Work queues for accounts and receiving. POS tickets are cash-complete and are not listed here.",
+		"notes": "Work queues for accounts and receiving. Each table shows Branch. POS tickets are cash-complete and are not listed here.",
 		"module": "Accounts",
 		"required_apps": ["erpnext"],
 		"source_doctypes": ["Purchase Invoice", "Purchase Order", "Sales Invoice"],
@@ -2811,6 +2934,7 @@ BUILDERS = {
 	"basket_relevance": build_basket_relevance,
 	"pos_retail": build_pos_retail,
 	"tax_compliance": build_tax_compliance,
+	"withholding_tax": build_withholding_tax,
 	"accounts_pnl": build_accounts_pnl,
 	"accounts_liabilities": build_accounts_liabilities,
 	"pending_work": build_pending_work,

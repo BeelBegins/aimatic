@@ -23,7 +23,7 @@
 					{
 						"type": "sql",
 						"data_source": "Site DB",
-						"raw_sql": "SELECT\n\tposting_date,\n\tcompany,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tgrand_total,\n\tstatus\nFROM `tabPurchase Invoice`\nWHERE docstatus = 0"
+						"raw_sql": "SELECT\n\tposting_date,\n\tcompany,\n\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tgrand_total,\n\tstatus\nFROM `tabPurchase Invoice`\nWHERE docstatus = 0"
 					}
 				]
 			},
@@ -41,7 +41,7 @@
 					{
 						"type": "sql",
 						"data_source": "Site DB",
-						"raw_sql": "SELECT\n\ttransaction_date,\n\tschedule_date,\n\tcompany,\n\tsupplier_name,\n\tname AS purchase_order,\n\tstatus,\n\tper_received,\n\tgrand_total\nFROM `tabPurchase Order`\nWHERE docstatus = 1\n\tAND status IN ('To Receive', 'To Receive and Bill', 'To Bill')"
+						"raw_sql": "SELECT\n\ttransaction_date,\n\tschedule_date,\n\tcompany,\n\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\tsupplier_name,\n\tname AS purchase_order,\n\tstatus,\n\tper_received,\n\tgrand_total\nFROM `tabPurchase Order`\nWHERE docstatus = 1\n\tAND status IN ('To Receive', 'To Receive and Bill', 'To Bill')"
 					}
 				]
 			},
@@ -59,7 +59,7 @@
 					{
 						"type": "sql",
 						"data_source": "Site DB",
-						"raw_sql": "SELECT\n\tposting_date,\n\tdue_date,\n\tcompany,\n\tcustomer_name,\n\tname AS invoice,\n\tstatus,\n\toutstanding_amount,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabSales Invoice`\nWHERE docstatus = 1\n\tAND outstanding_amount > 0.005\n\tAND IFNULL(is_pos, 0) = 0"
+						"raw_sql": "SELECT\n\tposting_date,\n\tdue_date,\n\tcompany,\n\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\tcustomer_name,\n\tname AS invoice,\n\tstatus,\n\toutstanding_amount,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabSales Invoice`\nWHERE docstatus = 1\n\tAND outstanding_amount > 0.005\n\tAND IFNULL(is_pos, 0) = 0"
 					}
 				]
 			},
@@ -77,7 +77,7 @@
 					{
 						"type": "sql",
 						"data_source": "Site DB",
-						"raw_sql": "SELECT\n\tposting_date,\n\tdue_date,\n\tcompany,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tstatus,\n\toutstanding_amount,\n\tbase_grand_total,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabPurchase Invoice`\nWHERE docstatus = 1 AND outstanding_amount > 0.005"
+						"raw_sql": "SELECT\n\tposting_date,\n\tdue_date,\n\tcompany,\n\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tstatus,\n\toutstanding_amount,\n\tbase_grand_total,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabPurchase Invoice`\nWHERE docstatus = 1 AND outstanding_amount > 0.005"
 					}
 				]
 			}
@@ -97,6 +97,11 @@
 							"dimension_name": "Date",
 							"column_name": "posting_date",
 							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
 						},
 						{
 							"dimension_name": "Supplier",
@@ -154,6 +159,11 @@
 							"dimension_name": "Date",
 							"column_name": "transaction_date",
 							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
 						},
 						{
 							"dimension_name": "Supplier",
@@ -219,6 +229,11 @@
 							"data_type": "Date"
 						},
 						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
+						},
+						{
 							"dimension_name": "Supplier",
 							"column_name": "supplier_name",
 							"data_type": "String"
@@ -280,6 +295,11 @@
 							"dimension_name": "Due",
 							"column_name": "due_date",
 							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
 						},
 						{
 							"dimension_name": "Customer",
@@ -350,6 +370,25 @@
 						"layout": {
 							"i": "filter-company",
 							"x": 0,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Branch",
+						"filter_type": "String",
+						"icon": "store",
+						"links": {
+							"tc-draft": "`tq-draft-pi`.`branch`",
+							"tc-po": "`tq-open-po`.`branch`",
+							"tc-pi": "`tq-unpaid-pi`.`branch`",
+							"tc-si": "`tq-open-si`.`branch`"
+						},
+						"layout": {
+							"i": "filter-branch",
+							"x": 4,
 							"y": 0,
 							"w": 4,
 							"h": 1

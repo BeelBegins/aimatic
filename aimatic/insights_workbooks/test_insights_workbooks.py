@@ -68,6 +68,37 @@ class TestInsightsWorkbookTemplates(unittest.TestCase):
 		self.assertIn("basket_lift", relevance_sql)
 		self.assertIn("accounts_liabilities", BUILDERS)
 		self.assertIn("pending_work", BUILDERS)
+		self.assertIn("withholding_tax", BUILDERS)
+		wht = BUILDERS["withholding_tax"]()
+		self.assertEqual(wht["doc"]["title"], "Withholding Tax by Store")
+		wht_sql = wht["dependencies"]["queries"]["tq-wht-pi"]["operations"][0]["raw_sql"]
+		self.assertIn("is_tax_withholding_account", wht_sql)
+		self.assertIn(" AS branch", wht_sql)
+		wht_items = next(iter(wht["dependencies"]["dashboards"].values()))["items"]
+		self.assertTrue(any(i.get("filter_name") == "Branch" for i in wht_items))
+		store_rows = wht["dependencies"]["charts"]["tc-wht-stores"]["config"]["rows"]
+		self.assertEqual([row.get("column_name") for row in store_rows], ["branch"])
+		self.assertTrue(
+			any(row.get("column_name") == "branch" for row in wht["dependencies"]["charts"]["tc-wht-table"]["config"]["rows"])
+		)
+		self.assertEqual(
+			wht["dependencies"]["charts"]["tc-wht-table"]["config"]["order_by"][0]["column"]["column_name"],
+			"Date",
+		)
+		pending = BUILDERS["pending_work"]()
+		pending_items = next(iter(pending["dependencies"]["dashboards"].values()))["items"]
+		self.assertTrue(any(i.get("filter_name") == "Branch" for i in pending_items))
+		for query in pending["dependencies"]["queries"].values():
+			self.assertIn(" AS branch", query["operations"][0]["raw_sql"])
+		for chart in pending["dependencies"]["charts"].values():
+			self.assertTrue(any(row.get("column_name") == "branch" for row in chart["config"]["rows"]))
+		liab = BUILDERS["accounts_liabilities"]()
+		liab_items = next(iter(liab["dependencies"]["dashboards"].values()))["items"]
+		self.assertTrue(any(i.get("filter_name") == "Branch" for i in liab_items))
+		self.assertIn(" AS branch", liab["dependencies"]["queries"]["tq-pending-pi"]["operations"][0]["raw_sql"])
+		self.assertTrue(
+			any(row.get("column_name") == "branch" for row in liab["dependencies"]["charts"]["tc-pending-pi"]["config"]["rows"])
+		)
 		self.assertIn("ABC", BUILDERS["goods_abc"]()["doc"]["title"])
 		self.assertIn("Liabilit", BUILDERS["accounts_liabilities"]()["doc"]["title"])
 		self.assertIn("branch_transfers", BUILDERS)

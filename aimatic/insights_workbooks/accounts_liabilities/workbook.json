@@ -145,7 +145,7 @@
 					{
 						"type": "sql",
 						"data_source": "Site DB",
-						"raw_sql": "SELECT\n\tposting_date,\n\tdue_date,\n\tcompany,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tstatus,\n\toutstanding_amount,\n\tbase_grand_total,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabPurchase Invoice`\nWHERE docstatus = 1 AND outstanding_amount > 0.005"
+						"raw_sql": "SELECT\n\tposting_date,\n\tdue_date,\n\tcompany,\n\tCOALESCE(NULLIF(branch, ''), 'Unassigned') AS branch,\n\tsupplier_name,\n\tname AS invoice,\n\tbill_no,\n\tstatus,\n\toutstanding_amount,\n\tbase_grand_total,\n\tDATEDIFF(CURDATE(), due_date) AS days_overdue\nFROM `tabPurchase Invoice`\nWHERE docstatus = 1 AND outstanding_amount > 0.005"
 					}
 				]
 			}
@@ -366,6 +366,11 @@
 							"dimension_name": "Due",
 							"column_name": "due_date",
 							"data_type": "Date"
+						},
+						{
+							"dimension_name": "Branch",
+							"column_name": "branch",
+							"data_type": "String"
 						},
 						{
 							"dimension_name": "Supplier",
@@ -655,6 +660,22 @@
 						"layout": {
 							"i": "filter-company",
 							"x": 4,
+							"y": 0,
+							"w": 4,
+							"h": 1
+						}
+					},
+					{
+						"type": "filter",
+						"filter_name": "Branch",
+						"filter_type": "String",
+						"icon": "store",
+						"links": {
+							"tc-pending-pi": "`tq-pending-pi`.`branch`"
+						},
+						"layout": {
+							"i": "filter-branch",
+							"x": 8,
 							"y": 0,
 							"w": 4,
 							"h": 1
