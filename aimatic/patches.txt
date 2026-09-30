@@ -57,3 +57,4 @@ aimatic.patches.unlock_purchase_receipt_gm_percent
 aimatic.patches.clear_pricecheck_role_home_page
 aimatic.patches.set_stock_entry_material_transfer_print_format
 aimatic.patches.create_stock_receiving_oauth_client
+aimatic.patches.grant_accounts_branch_select

@@ -13,7 +13,7 @@
  "is_hidden": 0,
  "label": "Vendor Performance",
  "links": [],
- "modified": "2026-08-22 20:00:00.000000",
+ "modified": "2026-09-30 16:55:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Vendor Performance",
@@ -23,19 +23,28 @@
  "public": 1,
  "quick_lists": [],
  "restrict_to_domain": "",
- "roles": [],
+ "roles": [
+  {"role": "System Manager"},
+  {"role": "Accounts Manager"},
+  {"role": "Accounts User"},
+  {"role": "Purchase Manager"},
+  {"role": "Purchase User"},
+  {"role": "Purchase Master Manager"},
+  {"role": "Vendor Performance Manager"},
+  {"role": "Stock Manager"}
+ ],
  "sequence_id": 110.0,
  "shortcuts": [
   {
    "label": "Open Vendor Performance",
-   "type": "URL",
-   "url": "/app/vendor-performance-console",
+   "type": "Page",
+   "link_to": "vendor-performance-console",
    "color": "Blue"
   },
   {
    "label": "Vendor Stock Positions",
-   "type": "URL",
-   "url": "/app/vendor-stock-positions-console",
+   "type": "Page",
+   "link_to": "vendor-stock-positions-console",
    "color": "Orange"
   },
   {

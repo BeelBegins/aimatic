@@ -28,6 +28,19 @@ _VELOCITY_BASELINE_DAYS = 180
 # meaningful "pace") - falls back to peer comparison instead.
 _VELOCITY_MIN_BASELINE_SOLD_QTY = 3
 
+# Desk Page roles for Vendor Performance / Vendor Stock Positions. Who uses the
+# consoles: accounts, purchasing, and stock managers — not cashiers.
+_ALLOWED_ROLES = {
+	"System Manager",
+	"Accounts Manager",
+	"Accounts User",
+	"Purchase Manager",
+	"Purchase User",
+	"Purchase Master Manager",
+	"Vendor Performance Manager",
+	"Stock Manager",
+}
+
 # One-off, szl-only historical correction (2026-07-11): these Stock Entries backfill
 # the stock/COGS impact of POS Invoices submitted with update_stock=0 before that bug
 # was fixed in offline_pos._build_pos_invoice_doc. The originals were deliberately never
@@ -53,6 +66,8 @@ _HISTORICAL_POS_STOCK_CORRECTION_ENTRIES = (
 def _resolve_context(supplier: str, company: str | None):
 	if frappe.session.user == "Guest":
 		frappe.throw(_("Login required."))
+	if not (set(frappe.get_roles()) & _ALLOWED_ROLES):
+		frappe.throw(_("Not permitted to view vendor performance."), frappe.PermissionError)
 
 	if not supplier:
 		frappe.throw(_("Supplier is required."))

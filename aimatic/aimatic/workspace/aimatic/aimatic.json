@@ -714,7 +714,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-15 06:10:00.000000",
+ "modified": "2026-09-30 16:55:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "Aimatic",
@@ -730,8 +730,8 @@
   {
    "color": "Blue",
    "label": "Vendor Performance",
-   "type": "URL",
-   "url": "/app/vendor-performance"
+   "link_to": "vendor-performance-console",
+   "type": "Page"
   },
   {
    "color": "Grey",
@@ -749,14 +749,14 @@
   {
    "color": "Orange",
    "label": "Sales Dashboard",
-   "type": "URL",
-   "url": "/app/sales-dashboard-console"
+   "link_to": "sales-dashboard-console",
+   "type": "Page"
   },
   {
    "color": "Purple",
    "label": "AI Assistant",
-   "type": "URL",
-   "url": "/app/ai-assistant-console"
+   "link_to": "ai-assistant-console",
+   "type": "Page"
   },
   {
    "color": "Teal",
@@ -767,32 +767,32 @@
   {
    "color": "Red",
    "label": "Finance Setup",
-   "type": "URL",
-   "url": "/app/retail-finance-setup-console"
+   "link_to": "retail-finance-setup-console",
+   "type": "Page"
   },
   {
    "color": "Yellow",
    "label": "Price Check",
-   "type": "URL",
-   "url": "/app/price-check-console"
+   "link_to": "price-check-console",
+   "type": "Page"
   },
   {
    "color": "Blue",
    "label": "Selling Price Update",
-   "type": "URL",
-   "url": "/app/selling-price-update-console"
+   "link_to": "selling-price-update-console",
+   "type": "Page"
   },
   {
    "color": "Pink",
    "label": "Foodpanda Catalog",
-   "type": "URL",
-   "url": "/app/foodpanda-catalog-console"
+   "link_to": "foodpanda-catalog-console",
+   "type": "Page"
   },
   {
    "color": "Orange",
    "label": "Vendor Stock Positions",
-   "type": "URL",
-   "url": "/app/vendor-stock-positions-console"
+   "link_to": "vendor-stock-positions-console",
+   "type": "Page"
   },
   {
    "color": "Purple",

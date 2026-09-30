@@ -36,12 +36,36 @@ def validate_filters(filters):
 		frappe.throw(_("From Date must be before To Date"))
 
 
+# Correction documents created by the 21 Sep server-side fix carry this tag in
+# custom_terminal_refund_id (returns) / custom_terminal_invoice_id (re-issues),
+# followed by the corrected invoice's name. They are reported on that invoice's
+# date so the original day nets out, without changing any accounting date.
+CORRECTION_TAG = "server-correction-"
+
+
+def get_report_date_expression():
+	refund = "`tabPOS Invoice`.`custom_terminal_refund_id`"
+	invoice = "`tabPOS Invoice`.`custom_terminal_invoice_id`"
+	return f"""COALESCE(
+		(
+			SELECT corrected.`posting_date` FROM `tabPOS Invoice` corrected
+			WHERE corrected.`name` = CASE
+				WHEN {refund} LIKE '{CORRECTION_TAG}%%' THEN `tabPOS Invoice`.`return_against`
+				WHEN {invoice} LIKE '{CORRECTION_TAG}%%'
+					THEN SUBSTRING({invoice}, LOCATE('ACC-PSINV-', {invoice}))
+			END
+		),
+		`tabPOS Invoice`.`posting_date`
+	)"""
+
+
 def get_rows(filters):
 	branch_expression = get_branch_expression()
+	report_date = get_report_date_expression()
 	conditions = [
 		"`tabPOS Invoice`.`docstatus` = 1",
 		"`tabPOS Invoice`.`company` = %(company)s",
-		"`tabPOS Invoice`.`posting_date` BETWEEN %(from_date)s AND %(to_date)s",
+		f"{report_date} BETWEEN %(from_date)s AND %(to_date)s",
 	]
 
 	for fieldname, sql_field in (
@@ -74,7 +98,7 @@ def get_rows(filters):
 	return frappe.db.sql(
 		f"""
 		SELECT
-			`tabPOS Invoice`.`posting_date`,
+			{report_date} AS posting_date,
 			`tabPOS Invoice`.`posting_time`,
 			`tabPOS Invoice`.`name` AS pos_invoice,
 			`tabPOS Invoice`.`is_return`,
@@ -131,7 +155,7 @@ def get_rows(filters):
 		WHERE {where_clause}
 			{permission_condition}
 		ORDER BY
-			`tabPOS Invoice`.`posting_date`,
+			{report_date},
 			`tabPOS Invoice`.`posting_time`,
 			`tabPOS Invoice`.`name`,
 			pii.`idx`
@@ -288,7 +312,8 @@ def get_message():
 	return _(
 		"Sales is the POS item net amount excluding item-level FBR sales tax; on an invoice "
 		"whose stored FBR tax reaches the amount charged on any line, Sales is the amount charged "
-		"minus that line's tax instead. Sales Incl. Tax "
+		"minus that line's tax instead. Documents that corrected a mistaken invoice (tag "
+		"server-correction-) are shown on the date of the invoice they correct. Sales Incl. Tax "
 		"adds the stored FBR sales-tax snapshot. COGS is the signed "
 		"stock-value change posted by the consolidated Sales Invoice, including "
 		"packed items. Returns reverse Sales and COGS. Blank margin values mean "

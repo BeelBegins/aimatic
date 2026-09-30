@@ -89,6 +89,7 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 			fieldname: 'branch',
 			fieldtype: 'Link',
 			options: 'Branch',
+			default: frappe.defaults.get_user_default('Branch'),
 			change: () => this.refresh_if_ready(),
 		});
 		this.warehouse_field = this.page.add_field({

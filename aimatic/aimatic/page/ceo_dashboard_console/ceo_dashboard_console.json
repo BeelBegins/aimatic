@@ -4,13 +4,26 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-09-09 03:30:00.000000",
+ "modified": "2026-09-30 16:20:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "ceo-dashboard-console",
  "owner": "Administrator",
  "page_name": "ceo-dashboard-console",
- "roles": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Stock Manager"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,
