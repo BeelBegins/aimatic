@@ -11,8 +11,14 @@
   "label_type",
   "template",
   "status",
+  "replacement_status",
+  "replacement_confirmed_by",
+  "replacement_confirmed_on",
   "column_break_header",
   "source_type",
+  "branch",
+  "price_change_from_date",
+  "price_change_to_date",
   "purchase_receipt",
   "purchase_order",
   "delivery_note",
@@ -73,6 +79,29 @@
    "read_only": 1
   },
   {
+   "default": "Not Applicable",
+   "fieldname": "replacement_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Shelf Replacement",
+   "options": "Not Applicable\nPending Replacement\nReplacement Confirmed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "replacement_confirmed_by",
+   "fieldtype": "Link",
+   "label": "Replacement Confirmed By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "replacement_confirmed_on",
+   "fieldtype": "Datetime",
+   "label": "Replacement Confirmed On",
+   "read_only": 1
+  },
+  {
    "fieldname": "column_break_header",
    "fieldtype": "Column Break"
   },
@@ -82,7 +111,29 @@
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Source Type",
-   "options": "Purchase Receipt\nPurchase Order\nDelivery Note\nStock Entry\nSales Invoice\nManual",
+   "options": "Purchase Receipt\nPurchase Order\nDelivery Note\nStock Entry\nSales Invoice\nChanged Selling Prices\nManual",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.source_type=='Changed Selling Prices'",
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.source_type=='Changed Selling Prices'",
+   "fieldname": "price_change_from_date",
+   "fieldtype": "Date",
+   "label": "Price Change From Date",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.source_type=='Changed Selling Prices'",
+   "fieldname": "price_change_to_date",
+   "fieldtype": "Date",
+   "label": "Price Change To Date",
    "reqd": 1
   },
   {

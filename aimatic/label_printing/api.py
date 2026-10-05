@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import cint
+from frappe.utils import cint, get_datetime, getdate, now_datetime
 
 from aimatic.label_printing.tspl import generate_tspl_for_job
 from aimatic.label_printing.utils import build_item_row
@@ -58,6 +58,8 @@ _SOURCE_LINK_FIELDS = {
 	"Stock Entry": "stock_entry",
 }
 
+SOURCE_CHANGED_SELLING_PRICES = "Changed Selling Prices"
+
 _SOURCE_DESCRIPTION_FIELD = {
 	"Purchase Receipt": "supplier",
 	"Purchase Order": "supplier",
@@ -102,6 +104,90 @@ def _resolve_price_list(doc, price_list=None):
 	return frappe.db.get_single_value("Selling Settings", "selling_price_list")
 
 
+def _validate_changed_price_window(branch, from_date, to_date):
+	branch = (branch or "").strip()
+	if not branch:
+		frappe.throw(_("Select a Branch."))
+	if not frappe.db.exists("Branch", branch):
+		frappe.throw(_("Branch {0} does not exist.").format(branch))
+	if not frappe.has_permission("Branch", ptype="read", doc=branch):
+		frappe.throw(_("Not permitted to view this branch."), frappe.PermissionError)
+
+	from_date = getdate(from_date) if from_date else None
+	to_date = getdate(to_date) if to_date else None
+	if not from_date or not to_date:
+		frappe.throw(_("From Date and To Date are required."))
+	if from_date > to_date:
+		frappe.throw(_("From Date cannot be after To Date."))
+
+	price_list = frappe.db.get_value("Branch", branch, "default_selling_price_list")
+	if not price_list:
+		frappe.throw(_("Branch {0} has no default Selling Price List.").format(branch))
+
+	return branch, from_date, to_date, price_list
+
+
+def _get_changed_price_label_rows(branch, from_date, to_date):
+	"""Return one current-price shelf-label row per SKU changed in the window.
+
+	Only Rate changes in the branch's normal Selling Price List qualify. This
+	deliberately excludes MRP-only and Foodpanda/cost-only changes. When an item
+	changed more than once, the current price is printed once using the latest
+	change as the audit note.
+	"""
+	branch, from_date, to_date, price_list = _validate_changed_price_window(
+		branch, from_date, to_date
+	)
+	start = get_datetime(f"{from_date} 00:00:00")
+	end = get_datetime(f"{to_date} 23:59:59.999999")
+	logs = frappe.get_all(
+		"Item Price Update Log",
+		filters={
+			"branch": branch,
+			"price_list": price_list,
+			"field_updated": "Rate",
+			"update_datetime": ["between", [start, end]],
+		},
+		fields=["item_code", "old_value", "new_value", "update_datetime"],
+		order_by="update_datetime desc, creation desc",
+		ignore_permissions=True,
+	)
+
+	latest_by_item = {}
+	for log in logs:
+		latest_by_item.setdefault(log.item_code, log)
+
+	rows = []
+	for log in latest_by_item.values():
+		row = build_item_row(
+			item_code=log.item_code,
+			label_type="Shelf Label",
+			price_list=price_list,
+		)
+		row["remarks"] = _("Selling price changed on {0}: {1} → {2}").format(
+			str(log.update_datetime)[:19], log.old_value, log.new_value
+		)
+		rows.append(row)
+
+	rows.sort(key=lambda row: (row.get("item_name") or "", row.get("item_code") or ""))
+	return {
+		"items": rows,
+		"branch": branch,
+		"price_list": price_list,
+		"price_change_from_date": str(from_date),
+		"price_change_to_date": str(to_date),
+		"template": get_default_template("Shelf Label"),
+		"changed_item_count": len(rows),
+	}
+
+
+@frappe.whitelist()
+def get_changed_price_label_items(branch, from_date, to_date):
+	"""Load branch shelf-label rows for selling-price changes in a date range."""
+	frappe.has_permission("AIM Label Print Job", ptype="create", throw=True)
+	return _get_changed_price_label_rows(branch, from_date, to_date)
+
+
 def _build_rows_from_source_doc(doc, config, label_type, price_list=None):
 	"""Build label rows from a source document's items, plus the first
 	warehouse found on those items (used as the job's default warehouse)."""
@@ -142,6 +228,9 @@ def create_from_source_document(source_type, source_name, template=None, price_l
 	"""Create a Draft AIM Label Print Job pre-filled from a source document's
 	items (Purchase Receipt/Order, Delivery Note, Sales Invoice, or a
 	Material Transfer Stock Entry). Does not modify the source document."""
+	if source_type == SOURCE_CHANGED_SELLING_PRICES:
+		frappe.throw(_("Use the changed-price label loader for this source."))
+
 	frappe.has_permission(source_type, doc=source_name, ptype="read", throw=True)
 	frappe.has_permission("AIM Label Print Job", ptype="create", throw=True)
 
@@ -179,6 +268,9 @@ def get_items_from_source_document(source_type, source_name, label_type="Barcode
 	document, to populate an AIM Label Print Job form when a source document
 	is picked directly on the job (rather than via the source doc's own
 	button). Respects a price_list already set on the job if passed in."""
+	if source_type == SOURCE_CHANGED_SELLING_PRICES:
+		frappe.throw(_("Use the changed-price label loader for this source."))
+
 	frappe.has_permission(source_type, doc=source_name, ptype="read", throw=True)
 	doc, config = _get_submitted_source_doc(source_type, source_name)
 	rows, warehouse, resolved_price_list = _build_rows_from_source_doc(doc, config, label_type, price_list)
@@ -311,4 +403,20 @@ def mark_printed(label_print_job):
 	doc = frappe.get_doc("AIM Label Print Job", label_print_job)
 	doc.check_permission("write")
 	doc.db_set("status", "Printed")
+	if doc.source_type == SOURCE_CHANGED_SELLING_PRICES and doc.replacement_status == "Not Applicable":
+		doc.db_set("replacement_status", "Pending Replacement")
+	return {"ok": True}
+
+
+@frappe.whitelist()
+def mark_replacement_confirmed(label_print_job):
+	doc = frappe.get_doc("AIM Label Print Job", label_print_job)
+	doc.check_permission("write")
+	if doc.source_type != SOURCE_CHANGED_SELLING_PRICES:
+		frappe.throw(_("Replacement confirmation is only available for changed-price labels."))
+	if doc.status != "Printed":
+		frappe.throw(_("Print the changed-price labels before confirming shelf replacement."))
+	doc.db_set("replacement_status", "Replacement Confirmed")
+	doc.db_set("replacement_confirmed_by", frappe.session.user)
+	doc.db_set("replacement_confirmed_on", now_datetime())
 	return {"ok": True}

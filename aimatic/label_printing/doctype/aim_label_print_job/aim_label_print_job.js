@@ -40,9 +40,22 @@ frappe.ui.form.on("AIM Label Print Job", {
 
 			frm.add_custom_button(__("Generate TSC TSPL"), () => generate_tspl(frm));
 		}
+
+		if (frm.doc.source_type === "Changed Selling Prices") {
+			if (frm.doc.status !== "Printed") {
+				frm.add_custom_button(__("Load Changed Price Labels"), () => load_changed_price_labels(frm));
+			}
+			if (frm.doc.status === "Printed" && frm.doc.replacement_status === "Pending Replacement") {
+				frm.add_custom_button(__("Confirm Shelf Replacement"), () => confirm_shelf_replacement(frm));
+			}
+		}
 	},
 
 	label_type(frm) {
+		if (frm.doc.source_type === "Changed Selling Prices" && frm.doc.label_type !== "Shelf Label") {
+			frm.set_value("label_type", "Shelf Label");
+			return;
+		}
 		frm.set_value("template", null);
 	},
 
@@ -50,6 +63,13 @@ frappe.ui.form.on("AIM Label Print Job", {
 		Object.values(SOURCE_LINK_FIELDS).forEach((fieldname) => {
 			if (frm.doc[fieldname]) frm.set_value(fieldname, null);
 		});
+		if (frm.doc.source_type === "Changed Selling Prices") {
+			frm.set_value("label_type", "Shelf Label");
+			frm.set_value("replacement_status", "Pending Replacement");
+			frm.set_value("template", null);
+		} else if (frm.doc.__islocal) {
+			frm.set_value("replacement_status", "Not Applicable");
+		}
 	},
 
 	purchase_receipt(frm) {
@@ -119,6 +139,57 @@ function populate_items_from_source(frm, source_type, source_name) {
 					source_name,
 				]),
 				indicator: "green",
+			});
+		},
+	});
+}
+
+function load_changed_price_labels(frm) {
+	if (!frm.doc.branch || !frm.doc.price_change_from_date || !frm.doc.price_change_to_date) {
+		frappe.msgprint(__("Select Branch, From Date, and To Date first."));
+		return;
+	}
+
+	frappe.call({
+		method: "aimatic.label_printing.api.get_changed_price_label_items",
+		args: {
+			branch: frm.doc.branch,
+			from_date: frm.doc.price_change_from_date,
+			to_date: frm.doc.price_change_to_date,
+		},
+		freeze: true,
+		freeze_message: __("Finding changed selling prices..."),
+		callback: (r) => {
+			if (!r.message) return;
+
+			frm.clear_table("items");
+			(r.message.items || []).forEach((row_values) => {
+				const row = frappe.model.add_child(frm.doc, "AIM Label Print Job Item", "items");
+				Object.entries(row_values).forEach(([key, value]) => {
+					row[key] = value;
+				});
+			});
+			frm.set_value("price_list", r.message.price_list);
+			if (r.message.template) frm.set_value("template", r.message.template);
+			frm.set_value(
+				"job_title",
+				__("Changed Shelf Labels - {0} - {1} to {2}", [
+					r.message.branch,
+					r.message.price_change_from_date,
+					r.message.price_change_to_date,
+				])
+			);
+			frm.set_value(
+				"notes",
+				__("{0} SKU(s) had a selling-price Rate change in this branch/date window.", [
+					r.message.changed_item_count,
+				])
+			);
+			frm.refresh_field("items");
+			render_totals(frm);
+			frappe.show_alert({
+				message: __("Loaded {0} changed SKU(s).", [r.message.changed_item_count]),
+				indicator: r.message.changed_item_count ? "green" : "orange",
 			});
 		},
 	});
@@ -417,4 +488,21 @@ function do_generate_tspl(frm) {
 			window.URL.revokeObjectURL(url);
 		},
 	});
+}
+
+
+function confirm_shelf_replacement(frm) {
+	frappe.confirm(
+		__("Confirm that the printed shelf labels have been replaced at this branch?"),
+		() => {
+			frappe.call({
+				method: "aimatic.label_printing.api.mark_replacement_confirmed",
+				args: { label_print_job: frm.doc.name },
+				freeze: true,
+				callback: (r) => {
+					if (r.message && r.message.ok) frm.reload_doc();
+				},
+			});
+		}
+	);
 }

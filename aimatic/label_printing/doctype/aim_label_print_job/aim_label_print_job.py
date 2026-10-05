@@ -8,11 +8,38 @@ from aimatic.label_printing.utils import compute_job_totals, resolve_final_date
 
 class AIMLabelPrintJob(Document):
 	def validate(self):
+		self.validate_changed_price_source()
 		self.validate_template()
 		self.resolve_dates_and_defaults()
 		self.validate_items()
 		self.apply_totals()
 		self.set_meta()
+
+	def validate_changed_price_source(self):
+		if self.source_type != "Changed Selling Prices":
+			if not self.replacement_status:
+				self.replacement_status = "Not Applicable"
+			return
+
+		if self.label_type != "Shelf Label":
+			frappe.throw(_("Changed Selling Prices can only create Shelf Labels."))
+		if not self.branch:
+			frappe.throw(_("Branch is required for changed-price labels."))
+		if not frappe.has_permission("Branch", ptype="read", doc=self.branch):
+			frappe.throw(_("Not permitted to view this branch."), frappe.PermissionError)
+		if not self.price_change_from_date or not self.price_change_to_date:
+			frappe.throw(_("From Date and To Date are required for changed-price labels."))
+		if getdate(self.price_change_from_date) > getdate(self.price_change_to_date):
+			frappe.throw(_("Price Change From Date cannot be after To Date."))
+
+		branch_price_list = frappe.db.get_value("Branch", self.branch, "default_selling_price_list")
+		if not branch_price_list:
+			frappe.throw(_("Branch {0} has no default Selling Price List.").format(self.branch))
+		if self.price_list and self.price_list != branch_price_list:
+			frappe.throw(_("Changed-price labels must use the selected Branch's Selling Price List."))
+		self.price_list = branch_price_list
+		if not self.replacement_status or self.replacement_status == "Not Applicable":
+			self.replacement_status = "Pending Replacement"
 
 	def validate_template(self):
 		if not self.template:
@@ -65,7 +92,10 @@ class AIMLabelPrintJob(Document):
 					frappe.throw(_("Row #{0}: Barcode Label Qty must be greater than 0.").format(row.idx))
 				row.shelf_label_qty = 0
 
-			row.remarks = "" if row.barcode else _("No barcode found")
+			if not row.barcode:
+				row.remarks = _("No barcode found")
+			elif self.source_type != "Changed Selling Prices":
+				row.remarks = ""
 
 	def apply_totals(self):
 		totals = compute_job_totals(self)

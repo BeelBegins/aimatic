@@ -43,15 +43,19 @@ def resolve_final_date(manual_date, system_date):
 	return manual_date or system_date
 
 
-def get_item_price(item_code, price_list=None, company=None):
+def get_item_price(item_code, price_list=None, company=None, uom=None):
 	"""Best-effort selling price for an item: Item Price on the given price
-	list, else the item's standard_rate, else 0."""
+	list and matching UOM, else the item's standard_rate, else 0."""
 	price = 0
 
 	if price_list:
+		resolved_uom = uom or frappe.db.get_value("Item", item_code, "stock_uom")
+		filters = {"item_code": item_code, "price_list": price_list, "selling": 1}
+		if resolved_uom:
+			filters["uom"] = resolved_uom
 		price_list_rate = frappe.db.get_value(
 			"Item Price",
-			{"item_code": item_code, "price_list": price_list, "selling": 1},
+			filters,
 			"price_list_rate",
 		)
 		if price_list_rate:
@@ -109,7 +113,7 @@ def build_item_row(
 		"system_expiry_date": system_expiry_date,
 		"final_mfg_date": system_mfg_date,
 		"final_expiry_date": system_expiry_date,
-		"price": get_item_price(item_code, price_list, company),
+		"price": get_item_price(item_code, price_list, company, uom=row_uom),
 		"mrp": get_item_mrp(item_code),
 		"purchase_receipt_item": purchase_receipt_item,
 		"purchase_qty": purchase_qty,
