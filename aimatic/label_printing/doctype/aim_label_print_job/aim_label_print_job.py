@@ -6,6 +6,18 @@ from frappe.utils import flt, getdate, now_datetime
 from aimatic.label_printing.utils import compute_job_totals, resolve_final_date
 
 
+def deduplicate_changed_price_items(rows):
+	"""Keep one shelf-label row per SKU in a changed-price job."""
+	seen = set()
+	unique = []
+	for row in rows:
+		if row.item_code in seen:
+			continue
+		seen.add(row.item_code)
+		unique.append(row)
+	return unique
+
+
 class AIMLabelPrintJob(Document):
 	def validate(self):
 		self.validate_changed_price_source()
@@ -80,6 +92,9 @@ class AIMLabelPrintJob(Document):
 					frappe.throw(_("Row #{0}: Expiry Date cannot be before MFG Date.").format(row.idx))
 
 	def validate_items(self):
+		if self.source_type == "Changed Selling Prices":
+			self.set("items", deduplicate_changed_price_items(self.items))
+
 		for row in self.items:
 			if not row.item_code:
 				frappe.throw(_("Row #{0}: Item Code is required.").format(row.idx))

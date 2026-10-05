@@ -4,6 +4,23 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
+class TestChangedPriceItemDeduplication(unittest.TestCase):
+    def test_keeps_one_row_per_sku(self):
+        from aimatic.label_printing.doctype.aim_label_print_job.aim_label_print_job import (
+            deduplicate_changed_price_items,
+        )
+
+        rows = [
+            SimpleNamespace(item_code="ITEM-1"),
+            SimpleNamespace(item_code="ITEM-1"),
+            SimpleNamespace(item_code="ITEM-2"),
+        ]
+
+        result = deduplicate_changed_price_items(rows)
+
+        self.assertEqual([row.item_code for row in result], ["ITEM-1", "ITEM-2"])
+
+
 class TestChangedPriceLabelRows(unittest.TestCase):
     @patch("aimatic.label_printing.api.build_item_row")
     @patch("aimatic.label_printing.api._validate_changed_price_window")
