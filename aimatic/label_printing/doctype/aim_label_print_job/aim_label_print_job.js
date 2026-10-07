@@ -52,24 +52,37 @@ frappe.ui.form.on("AIM Label Print Job", {
 	},
 
 	label_type(frm) {
-		if (frm.doc.source_type === "Changed Selling Prices" && frm.doc.label_type !== "Shelf Label") {
-			frm.set_value("label_type", "Shelf Label");
-			return;
-		}
 		frm.set_value("template", null);
+		sync_changed_price_mode(frm);
 	},
 
 	source_type(frm) {
 		Object.values(SOURCE_LINK_FIELDS).forEach((fieldname) => {
 			if (frm.doc[fieldname]) frm.set_value(fieldname, null);
 		});
+		frm.clear_table("items");
+		frm.refresh_field("items");
 		if (frm.doc.source_type === "Changed Selling Prices") {
-			frm.set_value("label_type", "Shelf Label");
-			frm.set_value("replacement_status", "Pending Replacement");
 			frm.set_value("template", null);
-		} else if (frm.doc.__islocal) {
+			sync_changed_price_mode(frm);
+		} else {
+			frm.set_value("branch", null);
+			frm.set_value("price_change_from_date", null);
+			frm.set_value("price_change_to_date", null);
 			frm.set_value("replacement_status", "Not Applicable");
 		}
+	},
+
+	branch(frm) {
+		clear_changed_price_items(frm);
+	},
+
+	price_change_from_date(frm) {
+		clear_changed_price_items(frm);
+	},
+
+	price_change_to_date(frm) {
+		clear_changed_price_items(frm);
 	},
 
 	purchase_receipt(frm) {
@@ -144,6 +157,22 @@ function populate_items_from_source(frm, source_type, source_name) {
 	});
 }
 
+function sync_changed_price_mode(frm) {
+	if (frm.doc.source_type !== "Changed Selling Prices") return;
+	const is_shelf = frm.doc.label_type === "Shelf Label";
+	const replacement_status = is_shelf ? "Pending Replacement" : "Not Applicable";
+	if (frm.doc.replacement_status !== replacement_status) {
+		frm.set_value("replacement_status", replacement_status);
+	}
+}
+
+function clear_changed_price_items(frm) {
+	if (frm.doc.source_type !== "Changed Selling Prices" || !(frm.doc.items || []).length) return;
+	frm.clear_table("items");
+	frm.refresh_field("items");
+	render_totals(frm);
+}
+
 function load_changed_price_labels(frm) {
 	if (!frm.doc.branch || !frm.doc.price_change_from_date || !frm.doc.price_change_to_date) {
 		frappe.msgprint(__("Select Branch, From Date, and To Date first."));
@@ -156,6 +185,7 @@ function load_changed_price_labels(frm) {
 			branch: frm.doc.branch,
 			from_date: frm.doc.price_change_from_date,
 			to_date: frm.doc.price_change_to_date,
+			label_type: frm.doc.label_type,
 		},
 		freeze: true,
 		freeze_message: __("Finding changed selling prices..."),
@@ -173,7 +203,8 @@ function load_changed_price_labels(frm) {
 			if (r.message.template) frm.set_value("template", r.message.template);
 			frm.set_value(
 				"job_title",
-				__("Changed Shelf Labels - {0} - {1} to {2}", [
+				__("Changed {0} Labels - {1} - {2} to {3}", [
+					frm.doc.label_type,
 					r.message.branch,
 					r.message.price_change_from_date,
 					r.message.price_change_to_date,

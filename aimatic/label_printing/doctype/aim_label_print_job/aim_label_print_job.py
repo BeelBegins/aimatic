@@ -33,8 +33,8 @@ class AIMLabelPrintJob(Document):
 				self.replacement_status = "Not Applicable"
 			return
 
-		if self.label_type != "Shelf Label":
-			frappe.throw(_("Changed Selling Prices can only create Shelf Labels."))
+		if self.label_type not in ("Shelf Label", "Barcode Label"):
+			frappe.throw(_("Select a valid label type."))
 		if not self.branch:
 			frappe.throw(_("Branch is required for changed-price labels."))
 		if not frappe.has_permission("Branch", ptype="read", doc=self.branch):
@@ -50,8 +50,11 @@ class AIMLabelPrintJob(Document):
 		if self.price_list and self.price_list != branch_price_list:
 			frappe.throw(_("Changed-price labels must use the selected Branch's Selling Price List."))
 		self.price_list = branch_price_list
-		if not self.replacement_status or self.replacement_status == "Not Applicable":
-			self.replacement_status = "Pending Replacement"
+		if self.label_type == "Shelf Label":
+			if not self.replacement_status or self.replacement_status == "Not Applicable":
+				self.replacement_status = "Pending Replacement"
+		else:
+			self.replacement_status = "Not Applicable"
 
 	def validate_template(self):
 		if not self.template:

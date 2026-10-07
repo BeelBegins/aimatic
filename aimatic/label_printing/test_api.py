@@ -1,5 +1,7 @@
+import json
 import unittest
 from datetime import date
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -71,6 +73,44 @@ class TestChangedPriceLabelRows(unittest.TestCase):
         self.assertEqual(filters["field_updated"], "Rate")
         self.assertEqual(filters["branch"], "S1 - Branch")
         self.assertEqual(filters["price_list"], "S1 Selling Price List")
+
+        _get_changed_price_label_rows(
+            "S1 - Branch", "2026-10-01", "2026-10-05", label_type="Barcode Label"
+        )
+        self.assertEqual(build_item_row.call_args.kwargs["label_type"], "Barcode Label")
+
+
+class TestLabelPrintJobValidation(unittest.TestCase):
+    def test_manual_source_does_not_validate_changed_price_dates(self):
+        from aimatic.label_printing.doctype.aim_label_print_job.aim_label_print_job import (
+            AIMLabelPrintJob,
+        )
+
+        doc = SimpleNamespace(source_type="Manual", replacement_status=None)
+
+        AIMLabelPrintJob.validate_changed_price_source(doc)
+
+        self.assertEqual(doc.replacement_status, "Not Applicable")
+
+
+class TestChangedPriceFieldDependencies(unittest.TestCase):
+    def test_branch_and_dates_are_only_mandatory_for_changed_prices(self):
+        path = (
+            Path(__file__).parent
+            / "doctype"
+            / "aim_label_print_job"
+            / "aim_label_print_job.json"
+        )
+        schema = json.loads(path.read_text())
+        fields = {field["fieldname"]: field for field in schema["fields"]}
+
+        for fieldname in ("branch", "price_change_from_date", "price_change_to_date"):
+            field = fields[fieldname]
+            self.assertNotIn("reqd", field)
+            self.assertEqual(
+                field["mandatory_depends_on"],
+                "eval:doc.source_type=='Changed Selling Prices'",
+            )
 
 
 if __name__ == "__main__":

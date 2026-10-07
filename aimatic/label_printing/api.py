@@ -127,7 +127,7 @@ def _validate_changed_price_window(branch, from_date, to_date):
 	return branch, from_date, to_date, price_list
 
 
-def _get_changed_price_label_rows(branch, from_date, to_date):
+def _get_changed_price_label_rows(branch, from_date, to_date, label_type="Shelf Label"):
 	"""Return one current-price shelf-label row per SKU changed in the window.
 
 	Only Rate changes in the branch's normal Selling Price List qualify. This
@@ -135,6 +135,9 @@ def _get_changed_price_label_rows(branch, from_date, to_date):
 	changed more than once, the current price is printed once using the latest
 	change as the audit note.
 	"""
+	if label_type not in ("Shelf Label", "Barcode Label"):
+		frappe.throw(_("Select a valid label type."))
+
 	branch, from_date, to_date, price_list = _validate_changed_price_window(
 		branch, from_date, to_date
 	)
@@ -161,7 +164,7 @@ def _get_changed_price_label_rows(branch, from_date, to_date):
 	for log in latest_by_item.values():
 		row = build_item_row(
 			item_code=log.item_code,
-			label_type="Shelf Label",
+			label_type=label_type,
 			price_list=price_list,
 		)
 		row["remarks"] = _("Selling price changed on {0}: {1} → {2}").format(
@@ -176,16 +179,16 @@ def _get_changed_price_label_rows(branch, from_date, to_date):
 		"price_list": price_list,
 		"price_change_from_date": str(from_date),
 		"price_change_to_date": str(to_date),
-		"template": get_default_template("Shelf Label"),
+		"template": get_default_template(label_type),
 		"changed_item_count": len(rows),
 	}
 
 
 @frappe.whitelist()
-def get_changed_price_label_items(branch, from_date, to_date):
-	"""Load branch shelf-label rows for selling-price changes in a date range."""
+def get_changed_price_label_items(branch, from_date, to_date, label_type="Shelf Label"):
+	"""Load branch label rows for selling-price changes in a date range."""
 	frappe.has_permission("AIM Label Print Job", ptype="create", throw=True)
-	return _get_changed_price_label_rows(branch, from_date, to_date)
+	return _get_changed_price_label_rows(branch, from_date, to_date, label_type)
 
 
 def _build_rows_from_source_doc(doc, config, label_type, price_list=None):
@@ -403,8 +406,10 @@ def mark_printed(label_print_job):
 	doc = frappe.get_doc("AIM Label Print Job", label_print_job)
 	doc.check_permission("write")
 	doc.db_set("status", "Printed")
-	if doc.source_type == SOURCE_CHANGED_SELLING_PRICES and doc.replacement_status == "Not Applicable":
-		doc.db_set("replacement_status", "Pending Replacement")
+	if doc.source_type == SOURCE_CHANGED_SELLING_PRICES:
+		replacement_status = "Pending Replacement" if doc.label_type == "Shelf Label" else "Not Applicable"
+		if doc.replacement_status != replacement_status:
+			doc.db_set("replacement_status", replacement_status)
 	return {"ok": True}
 
 
@@ -412,8 +417,8 @@ def mark_printed(label_print_job):
 def mark_replacement_confirmed(label_print_job):
 	doc = frappe.get_doc("AIM Label Print Job", label_print_job)
 	doc.check_permission("write")
-	if doc.source_type != SOURCE_CHANGED_SELLING_PRICES:
-		frappe.throw(_("Replacement confirmation is only available for changed-price labels."))
+	if doc.source_type != SOURCE_CHANGED_SELLING_PRICES or doc.label_type != "Shelf Label":
+		frappe.throw(_("Replacement confirmation is only available for changed-price Shelf Labels."))
 	if doc.status != "Printed":
 		frappe.throw(_("Print the changed-price labels before confirming shelf replacement."))
 	doc.db_set("replacement_status", "Replacement Confirmed")

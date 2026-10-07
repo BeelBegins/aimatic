@@ -116,25 +116,25 @@
   },
   {
    "depends_on": "eval:doc.source_type=='Changed Selling Prices'",
+   "mandatory_depends_on": "eval:doc.source_type=='Changed Selling Prices'",
    "fieldname": "branch",
    "fieldtype": "Link",
    "label": "Branch",
-   "options": "Branch",
-   "reqd": 1
+   "options": "Branch"
   },
   {
    "depends_on": "eval:doc.source_type=='Changed Selling Prices'",
+   "mandatory_depends_on": "eval:doc.source_type=='Changed Selling Prices'",
    "fieldname": "price_change_from_date",
    "fieldtype": "Date",
-   "label": "Price Change From Date",
-   "reqd": 1
+   "label": "Price Change From Date"
   },
   {
    "depends_on": "eval:doc.source_type=='Changed Selling Prices'",
+   "mandatory_depends_on": "eval:doc.source_type=='Changed Selling Prices'",
    "fieldname": "price_change_to_date",
    "fieldtype": "Date",
-   "label": "Price Change To Date",
-   "reqd": 1
+   "label": "Price Change To Date"
   },
   {
    "depends_on": "eval:doc.source_type=='Purchase Receipt'",
@@ -282,7 +282,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-07 15:51:00.000000",
+ "modified": "2026-10-07 16:24:25.000000",
  "modified_by": "Administrator",
  "module": "Label Printing",
  "name": "AIM Label Print Job",
