@@ -183,6 +183,7 @@ doc_events = {
 	# User.custom_branch so it's visible as a column on the User list view.
 	"User Permission": {
 		"after_insert": "aimatic.branch_management.events.sync_branch_to_user",
+		"on_update": "aimatic.branch_management.events.sync_branch_to_user",
 		"after_delete": "aimatic.branch_management.events.sync_branch_to_user",
 	},
 	# Record enable/disable changes. The Android auth hook below enforces the
