@@ -14,6 +14,7 @@ def execute(filters=None):
 	precision = cint(frappe.db.get_default("currency_precision") or 2)
 	rows = get_rows(filters)
 	data = [_set_margin_values(row, precision) for row in rows]
+	_allocate_invoice_sales_incl_tax(data, precision)
 	for row in data:
 		row.currency = currency
 	total_row = get_total_row(data, precision)
@@ -118,6 +119,7 @@ def get_rows(filters):
 			pii.`stock_qty`,
 			pii.`base_net_amount` AS sales,
 			pii.`amount` AS gross_amount,
+			`tabPOS Invoice`.`grand_total` AS invoice_grand_total,
 			EXISTS (
 				SELECT 1 FROM `tabPOS Invoice Item` bad
 				WHERE bad.`parent` = `tabPOS Invoice`.`name`
@@ -209,7 +211,10 @@ def _set_margin_values(row, precision):
 	row.sales = flt(row.sales, precision)
 	row.tax_rate = flt(row.tax_rate, precision)
 	row.sales_tax = flt(row.sales_tax, precision)
-	row.sales_incl_tax = flt(row.sales + row.sales_tax, precision)
+	# Replaced with the submitted POS Invoice grand total after all its item
+	# rows have been evaluated. This makes the report's Sales Incl. Tax reconcile
+	# with Sales Dashboard, which totals POS Invoice.grand_total.
+	row.sales_incl_tax = 0
 	row.selling_rate = flt(abs(row.sales / row.qty), precision) if flt(row.qty) else 0
 
 	if row.direct_cogs is not None:
@@ -236,6 +241,34 @@ def _set_margin_values(row, precision):
 
 	row.transaction_type = _("Return") if cint(row.is_return) else _("Sale")
 	return row
+
+
+def _allocate_invoice_sales_incl_tax(data, precision):
+	"""Allocate each submitted POS Invoice grand total across its item rows.
+
+	FBR item-tax snapshots can differ from a document's final tax/rounding total.
+	Using ``sales + item tax`` therefore gives a different monthly value from
+	Sales Dashboard.  The allocation retains an item-level column while ensuring
+	the total is exactly the submitted POS Invoice grand total (including returns).
+	"""
+	rows_by_invoice = {}
+	for row in data:
+		rows_by_invoice.setdefault(row.pos_invoice, []).append(row)
+
+	for rows in rows_by_invoice.values():
+		target = flt(rows[0].invoice_grand_total, precision)
+		weights = [abs(flt(row.sales)) for row in rows]
+		total_weight = sum(weights)
+		allocated = 0
+
+		for index, row in enumerate(rows):
+			if index == len(rows) - 1:
+				row.sales_incl_tax = flt(target - allocated, precision)
+			elif total_weight:
+				row.sales_incl_tax = flt(target * weights[index] / total_weight, precision)
+				allocated = flt(allocated + row.sales_incl_tax, precision)
+			else:
+				row.sales_incl_tax = 0
 
 
 def get_total_row(data, precision):
@@ -267,6 +300,7 @@ def get_report_summary(data, currency, precision):
 	rows = [row for row in data if not row.get("is_total")]
 	covered = [row for row in rows if row.get("has_ledger_cogs")]
 	total_sales = flt(sum(row.sales for row in covered), precision)
+	total_sales_incl_tax = flt(sum(row.sales_incl_tax for row in covered), precision)
 	total_cogs = flt(sum(row.cogs for row in covered), precision)
 	total_margin = flt(total_sales - total_cogs, precision)
 	missing = len(rows) - len(covered)
@@ -275,6 +309,13 @@ def get_report_summary(data, currency, precision):
 		{
 			"label": _("Sales (COGS-covered)"),
 			"value": total_sales,
+			"indicator": "Blue",
+			"datatype": "Currency",
+			"currency": currency,
+		},
+		{
+			"label": _("Sales Incl. Tax (COGS-covered)"),
+			"value": total_sales_incl_tax,
 			"indicator": "Blue",
 			"datatype": "Currency",
 			"currency": currency,
@@ -314,7 +355,7 @@ def get_message():
 		"whose stored FBR tax reaches the amount charged on any line, Sales is the amount charged "
 		"minus that line's tax instead. Documents that corrected a mistaken invoice (tag "
 		"server-correction-) are shown on the date of the invoice they correct. Sales Incl. Tax "
-		"adds the stored FBR sales-tax snapshot. COGS is the signed "
+		"is allocated from the submitted POS Invoice grand total so it reconciles to Sales Dashboard. COGS is the signed "
 		"stock-value change posted by the consolidated Sales Invoice, including "
 		"packed items. Returns reverse Sales and COGS. Blank margin values mean "
 		"ledger COGS is not yet available; pending POS Closing rows are excluded by default."
