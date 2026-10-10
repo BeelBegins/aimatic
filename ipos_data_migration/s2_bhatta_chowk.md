@@ -57,6 +57,7 @@ user, not by these scripts.
 | Hold rows | `import_s2_hold_rows.py` | 125 Items stock (`MAT-STE-2026-00547/00548`), 129 prices, 11 barcodes, GST `ACC-JV-2026-01756` ₨88,945.94 | `20261011_030956` |
 | S4/S5/S6 GST back-fill | `import_s4_s5_s6_gst_opening.py` | `ACC-JV-2026-01757/58/59` ₨4,079,288.07 | `20261011_032309` |
 | Foodpanda prices | `import_s2_foodpanda_prices.py` | 10,145 PKR prices on the S2 Foodpanda list | `20261011_033527` |
+| Wrong-list rows cleared one by one | `import_s2_hold_rows_cleared.py` | 9 Items, `MAT-STE-2026-00549`, GST `ACC-JV-2026-01760` ₨18,371.41, 6 prices; incl ₨122,131.81 (Shahtaj pouch+carton net 214 pouch, JAR pieces folded into Aamrus boxes) | `20261011_040721` |
 
 Rollback per step: cancel the tagged Stock Entries (`S2-ONHAND-*`) and Journal
 Entries (`LEGACY-OB-S2-*`, `S2-ONHAND-*GST-OPENING*`), delete the S2 Item
@@ -66,11 +67,14 @@ erase live sales after the backup, so avoid it.
 ## Held and not posted
 
 - **Hold rows** (barcode conflicts and Items hit by two file rows) were posted
-  by name similarity (`import_s2_hold_rows.py`, thresholds in the script).
-  27 plainly wrong rows plus `ItemCode 22` were **not** posted: ₨114,069.42
-  inclusive, listed in `Home/Migrations/S2/S2_wrong_rows_not_posted.xlsx`.
-  Three cost-mismatch merges (`…08042`, `…02406`, `…12632`) are in that list;
-  `…05390` (Rasasi, net 0 qty, ₨75.38) was left out.
+  by name similarity (`import_s2_hold_rows.py`). The rows that looked wrong
+  were then reviewed one by one with the user: 11 of them were posted by
+  explicit decision (`import_s2_hold_rows_cleared.py`). **17 rows remain
+  unposted (net -₨2,595.20 inclusive):** STUNT CAR 1129 (no szl Item), the
+  second TOY DOLL SET (-4), FIT ME HIGH DEFINATION -120, HAIR ACCESSORIES code 20,
+  BARBIE SET, HILAL PANBAHAR RS=10, T. SULTAN AIR FRESHNER, DINKY, `ItemCode 22`
+  and 8 zero-qty barcode collisions. File `Home/Migrations/S2/S2_wrong_rows_not_posted.xlsx`
+  is the original 28-row list (before the 11 were cleared).
 - `STO-ITEM-2026-10014`: orphan barcode not attached (mixed Box/Pcs barcode UOMs).
 - 580 junk-SubCat rows, TEST vendors (`1001`, `1103`), zero-balance vendors.
 - Foodpanda: 4,746 unmatched portal rows, 20 ambiguous other-barcode, 3 ambiguous
