@@ -3,9 +3,10 @@
 Adapted from import_s2_foodpanda_prices.py; same rules.
 
 Barcode-matched rows that already exist in ERPNext, **active or inactive**.
-Unmatched / ambiguous / zero-price / disabled / non-sales rows are reported,
-not priced. If an Item has both active and inactive portal rows, the active
-price wins. Conflicting prices among the chosen source are skipped.
+Every barcode column participates in matching and a source row is applied to
+every matched Item. Unmatched / zero-price / disabled / non-sales rows are
+reported, not priced. If an Item has both active and inactive portal rows, the
+active price wins. Conflicting prices among the chosen source are skipped.
 Writes only ``S2 - Bhatta Chowk Foodpanda Price List``. Hard-targets
 ``szl``. PKR only. SHA256-locked source. Dry-run by default.
 
@@ -162,15 +163,11 @@ def _resolve_row(row, barcode_exact, variant):
 	all_matches = set(primary)
 	for code in row["barcodes"][1:]:
 		all_matches |= _resolve_code(code, barcode_exact, variant)
-	if len(primary) == 1:
-		return next(iter(primary)), "barcode1", None
-	if len(primary) > 1:
-		return None, "ambiguous_barcode1", sorted(primary)
-	if len(all_matches) == 1:
-		return next(iter(all_matches)), "other_barcode", None
-	if len(all_matches) > 1:
-		return None, "ambiguous_other_barcodes", sorted(all_matches)
-	return None, "unmatched", None
+	if not all_matches:
+		return [], "unmatched", None
+	if primary:
+		return sorted(all_matches), "barcode1", None
+	return sorted(all_matches), "other_barcode", None
 
 
 def build_plan(rows):
@@ -191,21 +188,10 @@ def build_plan(rows):
 		if row["price"] <= 0:
 			stats["zero_price"] += 1
 			continue
-		item_code, resolution, extra = _resolve_row(row, barcode_exact, variant)
-		if item_code is None:
+		item_codes, resolution, extra = _resolve_row(row, barcode_exact, variant)
+		if not item_codes:
 			stats[resolution] += 1
-			if resolution != "unmatched":
-				issues.append(
-					{
-						"row": row["row"],
-						"sku": row["sku"],
-						"name": row["name"],
-						"reason": resolution,
-						"items": extra,
-						"active": row["active"],
-					}
-				)
-			elif len(unmatched_sample) < 15:
+			if len(unmatched_sample) < 15:
 				unmatched_sample.append(
 					{
 						"row": row["row"],
@@ -217,32 +203,35 @@ def build_plan(rows):
 				)
 			continue
 		stats[resolution] += 1
-		if item_code in disabled:
-			stats["disabled"] += 1
-			issues.append({"row": row["row"], "sku": row["sku"], "reason": "disabled", "items": [item_code]})
-			continue
-		if item_code in not_sales:
-			stats["not_sales_item"] += 1
-			issues.append({"row": row["row"], "sku": row["sku"], "reason": "not_sales_item", "items": [item_code]})
-			continue
-		rec = by_item.setdefault(
-			item_code,
-			{
-				"item_code": item_code,
-				"active_prices": set(),
-				"inactive_prices": set(),
-				"rows": [],
-				"skus": [],
-			},
-		)
-		if row["active"]:
-			rec["active_prices"].add(row["price"])
-			stats["matched_active"] += 1
-		else:
-			rec["inactive_prices"].add(row["price"])
-			stats["matched_inactive"] += 1
-		rec["rows"].append(row["row"])
-		rec["skus"].append(row["sku"])
+		if len(item_codes) > 1:
+			stats["multi_item_rows"] += 1
+		for item_code in item_codes:
+			if item_code in disabled:
+				stats["disabled"] += 1
+				issues.append({"row": row["row"], "sku": row["sku"], "reason": "disabled", "items": [item_code]})
+				continue
+			if item_code in not_sales:
+				stats["not_sales_item"] += 1
+				issues.append({"row": row["row"], "sku": row["sku"], "reason": "not_sales_item", "items": [item_code]})
+				continue
+			rec = by_item.setdefault(
+				item_code,
+				{
+					"item_code": item_code,
+					"active_prices": set(),
+					"inactive_prices": set(),
+					"rows": [],
+					"skus": [],
+				},
+			)
+			if row["active"]:
+				rec["active_prices"].add(row["price"])
+				stats["matched_active"] += 1
+			else:
+				rec["inactive_prices"].add(row["price"])
+				stats["matched_inactive"] += 1
+			rec["rows"].append(row["row"])
+			rec["skus"].append(row["sku"])
 
 	prices = []
 	for item_code, rec in by_item.items():
