@@ -17,8 +17,10 @@ def _page_roles(folder: str) -> set[str]:
 
 
 class TestDashboardPageRoles(unittest.TestCase):
-	def test_ceo_page_roles_match_api(self):
-		self.assertEqual(_page_roles("ceo_dashboard_console"), set(CEO_ROLES))
+	def test_ceo_page_roles_are_restricted(self):
+		page_roles = _page_roles("ceo_dashboard_console")
+		self.assertEqual(page_roles, {"System Manager"})
+		self.assertTrue(page_roles.issubset(set(CEO_ROLES)))
 
 	def test_sales_page_roles_match_api(self):
 		self.assertEqual(_page_roles("sales_dashboard_console"), set(SALES_ROLES))
