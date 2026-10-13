@@ -171,11 +171,10 @@ def _get_purchase_withholding_rate(doc) -> float:
 	return flt(rate[0].tax_withholding_rate) if rate else 0.0
 
 
-def _get_posted_withholding_amount(doc) -> float:
-	"""Return actual posted WHT, including a PI linked to a Purchase Receipt."""
+def _get_posted_withholding_rows(doc) -> list[dict]:
+	"""Return actual posted WHT rows, including a linked Purchase Invoice."""
 	if doc.doctype == "Purchase Invoice":
-		rows = [row for row in (doc.get("taxes") or []) if row.get("is_tax_withholding_account")]
-		return sum(abs(flt(row.get("tax_amount"))) for row in rows)
+		return [row for row in (doc.get("taxes") or []) if row.get("is_tax_withholding_account")]
 
 	linked_invoices = frappe.get_all(
 		"Purchase Invoice Item",
@@ -183,7 +182,7 @@ def _get_posted_withholding_amount(doc) -> float:
 		pluck="parent",
 	)
 	if not linked_invoices:
-		return 0.0
+		return []
 
 	posted_invoices = frappe.get_all(
 		"Purchase Invoice",
@@ -191,7 +190,7 @@ def _get_posted_withholding_amount(doc) -> float:
 		pluck="name",
 	)
 	if not posted_invoices:
-		return 0.0
+		return []
 
 	rows = frappe.get_all(
 		"Purchase Taxes and Charges",
@@ -199,21 +198,33 @@ def _get_posted_withholding_amount(doc) -> float:
 			"parent": ["in", posted_invoices],
 			"is_tax_withholding_account": 1,
 		},
-		fields=["tax_amount"],
+		fields=["description", "account_head", "rate", "tax_amount"],
 	)
-	return sum(abs(flt(row.tax_amount)) for row in rows)
+	return rows
 
 
 def get_purchase_withholding_context(doc) -> dict[str, object]:
-	"""Expose the full-and-final WHT amount used by purchase print formats."""
+	"""Expose the posted WHT row used by purchase print formats."""
 	rate = _get_purchase_withholding_rate(doc)
-	posted_amount = _get_posted_withholding_amount(doc)
+	posted_rows = _get_posted_withholding_rows(doc)
+	posted_amount = sum(abs(flt(row.get("tax_amount"))) for row in posted_rows)
+	posted_label = next(
+		(
+			row.get("description") or row.get("account_head")
+			for row in posted_rows
+			if row.get("description") or row.get("account_head")
+		),
+		None,
+	)
+	posted_rate = next((flt(row.get("rate")) for row in posted_rows if row.get("rate") is not None), None)
 	amount = posted_amount or flt(doc.total) * rate / 100
+	effective_rate = posted_rate if posted_rate is not None else rate
 
 	return {
 		"amount": flt(amount, 2),
-		"rate": flt(rate, 2),
-		"label": "Withholding Tax (Full & Final)",
-		"has_rate": bool(rate),
+		"rate": flt(effective_rate, 2),
+		"rate_label": f"{effective_rate:g}",
+		"label": posted_label or "Withholding Tax Payable",
+		"has_rate": bool(rate) or bool(posted_rows),
 		"is_posted": bool(posted_amount),
 	}

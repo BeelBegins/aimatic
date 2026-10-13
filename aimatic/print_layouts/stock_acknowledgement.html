@@ -120,7 +120,7 @@ html, body { width: 200mm; margin: 0; padding: 0; }
     <tr><td class="summary-label">Advance Tax Amount</td><td class="summary-value">{{ frappe.utils.fmt_money(advance_tax_total, currency=doc.currency) }}</td></tr>
     <tr><td class="summary-label">Trade Offer</td><td class="summary-value">{{ frappe.utils.fmt_money(trade_offer, currency=doc.currency) }}</td></tr>
     <tr class="grand-total"><td class="summary-label">Grand Total</td><td class="summary-value">{{ frappe.utils.fmt_money(grand_line_total, currency=doc.currency) }}</td></tr>
-    {% if withholding.has_rate %}<tr><td class="summary-label">{{ withholding.label }} ({{ "%.2f"|format(withholding.rate) }}%)</td><td class="summary-value">{{ frappe.utils.fmt_money(withholding.amount, currency=doc.currency) }}</td></tr>{% endif %}
+    {% if withholding.has_rate %}<tr><td class="summary-label">{{ withholding.label }} ({{ withholding.rate_label }}%)</td><td class="summary-value">{{ frappe.utils.fmt_money(withholding.amount, currency=doc.currency) }}</td></tr>{% endif %}
    </table>
   </td>
  </tr>

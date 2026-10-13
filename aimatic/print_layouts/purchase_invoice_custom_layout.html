@@ -65,7 +65,7 @@
   <td class="aim-label">Reference</td><td colspan="2">{{ doc.remarks or doc.instructions or '' }}</td>
   <td class="aim-summary">Trade Offer</td><td class="aim-summary">{{ frappe.utils.fmt_money(trade_offer, currency=doc.currency) }}</td>
  </tr>
- <tr><td></td><td></td><td></td><td class="aim-summary">{{ withholding.label }} ({{ "%.2f"|format(withholding.rate) }}%)</td><td class="aim-summary">{{ frappe.utils.fmt_money(withholding.amount, currency=doc.currency) }}</td></tr>
+ <tr><td></td><td></td><td></td><td class="aim-summary">{{ withholding.label }} ({{ withholding.rate_label }}%)</td><td class="aim-summary">{{ frappe.utils.fmt_money(withholding.amount, currency=doc.currency) }}</td></tr>
 </table>
 <table class="aim-grid">
  <thead><tr>
