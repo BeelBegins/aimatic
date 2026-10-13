@@ -119,7 +119,7 @@ def populate_old_purchase_snapshot(doc, method=None):
 def get_purchase_print_item_context(doc) -> dict[str, dict]:
 	item_codes = [row.item_code for row in (doc.items or []) if row.item_code]
 	if not item_codes:
-		return {}
+		return {"_withholding": get_purchase_withholding_context(doc)}
 
 	barcodes = _get_primary_barcodes(item_codes)
 	latest_history = _build_latest_history_map(item_codes, doc.doctype, doc.name)
@@ -141,5 +141,79 @@ def get_purchase_print_item_context(doc) -> dict[str, dict]:
 				history.get("custom_shelf_price") or history.get("custom_mrp") or history.get("rate")
 			),
 		}
+	context["_withholding"] = get_purchase_withholding_context(doc)
 
 	return context
+
+
+def _get_purchase_withholding_rate(doc) -> float:
+	category = frappe.db.get_value("Supplier", doc.supplier, "tax_withholding_category")
+	group = doc.get("tax_withholding_group") or frappe.db.get_value(
+		"Supplier", doc.supplier, "tax_withholding_group"
+	)
+	if not category or not group:
+		return 0.0
+
+	rate = frappe.db.sql(
+		"""
+		SELECT tax_withholding_rate
+		FROM `tabTax Withholding Rate`
+		WHERE parent = %s
+		  AND tax_withholding_group = %s
+		  AND from_date <= %s
+		  AND to_date >= %s
+		ORDER BY idx
+		LIMIT 1
+		""",
+		(category, group, doc.posting_date, doc.posting_date),
+		as_dict=True,
+	)
+	return flt(rate[0].tax_withholding_rate) if rate else 0.0
+
+
+def _get_posted_withholding_amount(doc) -> float:
+	"""Return actual posted WHT, including a PI linked to a Purchase Receipt."""
+	if doc.doctype == "Purchase Invoice":
+		rows = [row for row in (doc.get("taxes") or []) if row.get("is_tax_withholding_account")]
+		return sum(abs(flt(row.get("tax_amount"))) for row in rows)
+
+	linked_invoices = frappe.get_all(
+		"Purchase Invoice Item",
+		filters={"purchase_receipt": doc.name},
+		pluck="parent",
+	)
+	if not linked_invoices:
+		return 0.0
+
+	posted_invoices = frappe.get_all(
+		"Purchase Invoice",
+		filters={"name": ["in", linked_invoices], "docstatus": 1},
+		pluck="name",
+	)
+	if not posted_invoices:
+		return 0.0
+
+	rows = frappe.get_all(
+		"Purchase Taxes and Charges",
+		filters={
+			"parent": ["in", posted_invoices],
+			"is_tax_withholding_account": 1,
+		},
+		fields=["tax_amount"],
+	)
+	return sum(abs(flt(row.tax_amount)) for row in rows)
+
+
+def get_purchase_withholding_context(doc) -> dict[str, object]:
+	"""Expose the full-and-final WHT amount used by purchase print formats."""
+	rate = _get_purchase_withholding_rate(doc)
+	posted_amount = _get_posted_withholding_amount(doc)
+	amount = posted_amount or flt(doc.total) * rate / 100
+
+	return {
+		"amount": flt(amount, 2),
+		"rate": flt(rate, 2),
+		"label": "Withholding Tax (Full & Final)",
+		"has_rate": bool(rate),
+		"is_posted": bool(posted_amount),
+	}
