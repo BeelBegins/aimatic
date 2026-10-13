@@ -303,6 +303,7 @@ doctype_list_js = {
 	"Item": "public/js/barcode_list_search.js",
 	"Item Price": "public/js/barcode_list_search.js",
 	"Principal Historical Allocation": "public/js/principal_historical_allocation.js",
+	"Supplier": "public/js/supplier_list_search.js",
 }
 
 jinja = {
