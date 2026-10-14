@@ -117,9 +117,10 @@ def populate_old_purchase_snapshot(doc, method=None):
 
 
 def get_purchase_print_item_context(doc) -> dict[str, dict]:
+	include_withholding = doc.doctype in ("Purchase Receipt", "Purchase Invoice")
 	item_codes = [row.item_code for row in (doc.items or []) if row.item_code]
 	if not item_codes:
-		return {"_withholding": get_purchase_withholding_context(doc)}
+		return {"_withholding": get_purchase_withholding_context(doc)} if include_withholding else {}
 
 	barcodes = _get_primary_barcodes(item_codes)
 	latest_history = _build_latest_history_map(item_codes, doc.doctype, doc.name)
@@ -141,7 +142,8 @@ def get_purchase_print_item_context(doc) -> dict[str, dict]:
 				history.get("custom_shelf_price") or history.get("custom_mrp") or history.get("rate")
 			),
 		}
-	context["_withholding"] = get_purchase_withholding_context(doc)
+	if include_withholding:
+		context["_withholding"] = get_purchase_withholding_context(doc)
 
 	return context
 
