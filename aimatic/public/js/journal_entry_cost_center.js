@@ -25,10 +25,25 @@ function aimatic_show_je_cost_center(frm) {
 	if (!grid) {
 		return;
 	}
-	grid.update_docfield_property("cost_center", "in_list_view", 1);
-	grid.update_docfield_property("cost_center", "columns", 2);
-	grid.update_docfield_property("branch", "in_list_view", 1);
-	grid.update_docfield_property("branch", "columns", 2);
+	// Keep the existing accounting/dimension fields alongside per-line remarks.
+	// Ten data columns leave room for Frappe's row controls without overflowing.
+	const widths = {
+		account: 2,
+		party_type: 1,
+		party: 1,
+		cost_center: 1,
+		branch: 1,
+		debit_in_account_currency: 1,
+		credit_in_account_currency: 1,
+		user_remark: 2,
+	};
+	for (const [fieldname, columns] of Object.entries(widths)) {
+		grid.update_docfield_property(fieldname, "columns", columns);
+	}
+	for (const fieldname of ["cost_center", "branch", "user_remark"]) {
+		grid.update_docfield_property(fieldname, "in_list_view", 1);
+	}
+	grid.update_docfield_property("user_remark", "label", "Remarks");
 	if (grid.header_row) {
 		grid.reset_grid();
 	}

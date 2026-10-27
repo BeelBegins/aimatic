@@ -1,13 +1,18 @@
 import frappe
-
+from aimatic.journal_entry_remarks import setup_journal_entry_remarks
 from aimatic.label_printing.setup import after_install as setup_label_printing
-from aimatic.patches.create_pos_supervisor_role import execute as create_pos_supervisor_role
+from aimatic.patches.create_pos_supervisor_role import (
+	execute as create_pos_supervisor_role,
+)
 from aimatic.patches.create_pos_user_role import execute as create_pos_user_role
-from aimatic.patches.repair_item_custom_docperms import execute as repair_item_custom_docperms
+from aimatic.patches.repair_item_custom_docperms import (
+	execute as repair_item_custom_docperms,
+)
 from aimatic.restaurant.setup import create_roles as create_restaurant_roles
 
 
 def after_install():
+	setup_journal_entry_remarks()
 	setup_label_printing()
 	create_restaurant_roles()
 	if frappe.db.table_exists("tabItem"):
