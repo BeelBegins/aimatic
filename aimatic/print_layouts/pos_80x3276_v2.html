@@ -404,8 +404,8 @@ html, body {
   margin: 3px 0;
 }
 .rc-fbr-qr img {
-  width: 55px;
-  height: 55px;
+  width: 45px;
+  height: 45px;
 }
 
 /* ── terms (darkened for thermal printing) ── */
@@ -523,11 +523,6 @@ html, body {
     {%- if doc.discount_amount -%}
     <div class="rc-tot-row disc"><span>Discount{% if doc.additional_discount_percentage %} ({{ doc.additional_discount_percentage }}%){% endif %}</span><span class="rc-tot-amt">-{{ doc.get_formatted("discount_amount", doc) }}</span></div>
     {%- endif -%}
-    {%- if ns.fbr_sales_tax -%}
-    <div class="rc-tot-row tax-total"><span>FBR Sales Tax</span><span class="rc-tot-amt">{{ frappe.utils.fmt_money(ns.fbr_sales_tax, currency=doc.currency) }}</span></div>
-    {%- elif ns.fbr_tax_total -%}
-    <div class="rc-tot-row tax-total"><span>Total GST (FBR)</span><span class="rc-tot-amt">{{ frappe.utils.fmt_money(ns.fbr_tax_total, currency=doc.currency) }}</span></div>
-    {%- endif -%}
     {%- if ns.fbr_pos_fee -%}
     <div class="rc-tot-row tax-total"><span>FBR POS Service Fee</span><span class="rc-tot-amt">{{ frappe.utils.fmt_money(ns.fbr_pos_fee, currency=doc.currency) }}</span></div>
     {%- endif -%}
@@ -595,6 +590,12 @@ html, body {
     <div class="rc-gv-row"><span>Valid Until</span><span>{{ frappe.utils.format_date(gv_issued.expiry_date) }}</span></div>
     <div class="rc-gv-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&amp;data={{ gv_issued.voucher_code | urlencode }}" alt="Gift Voucher QR"></div>
     <div class="rc-gv-note">Show this code or QR on your next visit to redeem.</div>
+    {%- if ctx.gift_voucher_terms -%}
+    <div class="rc-terms">
+      <div class="rc-terms-lbl">Gift Vouchers Terms &amp; Conditions</div>
+      {{ ctx.gift_voucher_terms }}
+    </div>
+    {%- endif -%}
   </div>
   {%- endif -%}
 
@@ -604,9 +605,21 @@ html, body {
     {% if doc.custom_fbr_status %}<div class="rc-fbr-row"><span>Status</span><span>{{ doc.custom_fbr_status }}</span></div>{% endif %}
     <div class="rc-fbr-inv"><b>FBR Invoice No.</b>{{ doc.custom_fbr_invoice_number }}</div>
     <div class="rc-fbr-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&amp;data={{ doc.custom_fbr_invoice_number | urlencode }}" alt="FBR QR"></div>
+    {%- set gst = ns.fbr_sales_tax or ns.fbr_tax_total -%}
+    {%- if gst -%}
+    <hr class="d-dash">
+    <div class="rc-tot-row tax-total"><span>Gst</span><span class="rc-tot-amt">{{ frappe.utils.fmt_money(gst, currency=doc.currency) }}</span></div>
+    <hr class="d-dash">
+    {%- endif -%}
     {% if doc.custom_fbr_usin %}<div class="rc-fbr-row"><span>USIN</span><span style="word-break:break-all; text-align:right; max-width:60%;">{{ doc.custom_fbr_usin }}</span></div>{% endif %}
   </div>
   {% endif %}
+
+  {%- if not doc.custom_fbr_invoice_number and (ns.fbr_sales_tax or ns.fbr_tax_total) -%}
+  <hr class="d-dash">
+  <div class="rc-tot-row tax-total"><span>Gst</span><span class="rc-tot-amt">{{ frappe.utils.fmt_money(ns.fbr_sales_tax or ns.fbr_tax_total, currency=doc.currency) }}</span></div>
+  <hr class="d-dash">
+  {%- endif -%}
 
   <div class="rc-footer">
     {% if receipt_terms %}

@@ -177,6 +177,21 @@ def get_pos_receipt_context(doc):
 	# Voucher issuance/redemption again - it's not new, and re-showing the
 	# "You've Earned a Gift Voucher!" block on every reprint is misleading.
 	is_duplicate_print = bool(frappe.form_dict.get("is_duplicate"))
+	gift_voucher_issued = (
+		None
+		if is_duplicate_print
+		else frappe.db.get_value(
+			"Gift Voucher",
+			{"issued_against_invoice": doc.name},
+			["voucher_code", "amount", "expiry_date"],
+			as_dict=True,
+		)
+	)
+	gift_voucher_terms = (
+		frappe.db.get_value("Terms and Conditions", "Gift Vouchers T&C:", "terms")
+		if gift_voucher_issued
+		else None
+	)
 
 	return {
 		"item_barcodes": item_barcodes,
@@ -203,12 +218,6 @@ def get_pos_receipt_context(doc):
 			["voucher_code", "amount"],
 			as_dict=True,
 		),
-		"gift_voucher_issued": None
-		if is_duplicate_print
-		else frappe.db.get_value(
-			"Gift Voucher",
-			{"issued_against_invoice": doc.name},
-			["voucher_code", "amount", "expiry_date"],
-			as_dict=True,
-		),
+		"gift_voucher_issued": gift_voucher_issued,
+		"gift_voucher_terms": gift_voucher_terms,
 	}
