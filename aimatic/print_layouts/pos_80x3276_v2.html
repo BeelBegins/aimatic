@@ -403,9 +403,10 @@ html, body {
   text-align: center;
   margin: 3px 0;
 }
-.rc-fbr-qr img {
-  width: 45px;
-  height: 45px;
+/* Keep the fiscal QR size when POS clients append their print styles. */
+.pos-receipt .rc-fbr-qr img {
+  width: 45px !important;
+  height: 45px !important;
 }
 
 /* ── terms (darkened for thermal printing) ── */
