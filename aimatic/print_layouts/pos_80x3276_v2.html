@@ -445,9 +445,37 @@ html, body {
 }
 /* Keep the fiscal QR size when POS clients append their print styles. */
 .pos-receipt .rc-fbr-qr img {
-  width: 45px !important;
-  height: 45px !important;
+  width: 96px !important;
+  height: 96px !important;
+  display: block;
+  margin: 0 auto;
+  image-rendering: pixelated;
 }
+
+/* Reserve the existing fiscal-strip space for a clear QR, not extra heading lines. */
+.pos-receipt .rc-fbr-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 10px !important;
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: nowrap;
+  margin-bottom: 2px;
+  padding-bottom: 2px;
+}
+.rc-fbr-status { font-size: 9px; text-transform: none; }
+.pos-receipt .rc-fbr hr.d-dash { margin: 3px 0; }
+.pos-receipt .rc-fbr-inv {
+  font-size: 10px !important;
+  line-height: 1.2;
+  margin: 2px 0;
+  white-space: nowrap;
+  word-break: normal;
+}
+.rc-fbr-inv b { display: inline; margin: 0; }
+.rc-fbr-qr { margin: 0; line-height: 0; }
 
 /* ── terms (darkened for thermal printing) ── */
 .rc-terms {
@@ -647,10 +675,9 @@ html, body {
 
   {% if doc.custom_fbr_invoice_number %}
   <div class="rc-fbr">
-    <div class="rc-fbr-title">FBR POS Fiscal Invoice</div>
-    {% if doc.custom_fbr_status %}<div class="rc-fbr-row"><span>Status</span><span>{{ doc.custom_fbr_status }}</span></div>{% endif %}
-    <div class="rc-fbr-inv"><b>FBR Invoice No.</b>{{ doc.custom_fbr_invoice_number }}</div>
-    <div class="rc-fbr-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&amp;data={{ doc.custom_fbr_invoice_number | urlencode }}" alt="FBR QR"></div>
+    <div class="rc-fbr-title"><span>FBR POS Fiscal Invoice</span>{% if doc.custom_fbr_status %}<span class="rc-fbr-status">{{ doc.custom_fbr_status }}</span>{% endif %}</div>
+    <div class="rc-fbr-inv"><b>FBR Inv#</b> {{ doc.custom_fbr_invoice_number }}</div>
+    <div class="rc-fbr-qr"><img src="{{ ctx.fbr_qr_data_uri }}" alt="FBR QR"></div>
     {%- set gst = ns.fbr_sales_tax or ns.fbr_tax_total -%}
     {%- if gst or doc.custom_fbr_usin -%}
     <hr class="d-dash">

@@ -4,6 +4,17 @@ import frappe
 from frappe.utils import flt
 
 
+def _fiscal_qr_data_uri(invoice_number):
+	"""Sharp black/white fiscal QR with a four-module white quiet zone."""
+	if not invoice_number:
+		return None
+
+	from pyqrcode import create
+
+	qr = create(str(invoice_number), error="M")
+	return "data:image/png;base64," + qr.png_as_base64_str(scale=8, quiet_zone=4)
+
+
 def _get_primary_barcodes(item_codes):
 	"""First Item Barcode row per item code, same convention as
 	purchase_printing._get_primary_barcodes."""
@@ -198,6 +209,7 @@ def get_pos_receipt_context(doc):
 		"ntn": frappe.db.get_value("Company", doc.company, "tax_id"),
 		"branch_info": _get_receipt_branch_context(doc),
 		"receipt_terms": receipt_terms,
+		"fbr_qr_data_uri": _fiscal_qr_data_uri(doc.custom_fbr_invoice_number),
 		"fbr_sales_tax": fbr_sales_tax,
 		"fbr_pos_fee": fbr_pos_fee,
 		"fbr_excl_total": fbr_excl_total,
