@@ -417,6 +417,18 @@ html, body {
   color: #000;
   font-weight: 700;
 }
+.rc-fiscal-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.rc-fiscal-gst { flex-shrink: 0; }
+.rc-fiscal-usin { margin-left: auto; text-align: right; }
 .rc-fbr-inv {
   text-align: center;
   margin: 4px 0;
@@ -640,12 +652,14 @@ html, body {
     <div class="rc-fbr-inv"><b>FBR Invoice No.</b>{{ doc.custom_fbr_invoice_number }}</div>
     <div class="rc-fbr-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&amp;data={{ doc.custom_fbr_invoice_number | urlencode }}" alt="FBR QR"></div>
     {%- set gst = ns.fbr_sales_tax or ns.fbr_tax_total -%}
-    {%- if gst -%}
+    {%- if gst or doc.custom_fbr_usin -%}
     <hr class="d-dash">
-    <div class="rc-tot-row tax-total"><span>Gst</span><span class="rc-tot-amt">{{ frappe.utils.fmt_money(gst, currency=doc.currency) }}</span></div>
+    <div class="rc-fiscal-summary">
+      {% if gst %}<span class="rc-fiscal-gst">Gst {{ frappe.utils.fmt_money(gst, currency=doc.currency) }}</span>{% endif %}
+      {% if doc.custom_fbr_usin %}<span class="rc-fiscal-usin">USIN {{ doc.custom_fbr_usin }}</span>{% endif %}
+    </div>
     <hr class="d-dash">
     {%- endif -%}
-    {% if doc.custom_fbr_usin %}<div class="rc-fbr-row"><span>USIN</span><span style="word-break:break-all; text-align:right; max-width:60%;">{{ doc.custom_fbr_usin }}</span></div>{% endif %}
   </div>
   {% endif %}
 
