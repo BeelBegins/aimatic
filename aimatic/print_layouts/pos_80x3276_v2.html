@@ -363,6 +363,34 @@ html, body {
   line-height: 1.4;
 }
 
+/* Share the voucher's existing QR space with details; keep saved terms compact. */
+.rc-gv-body {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.rc-gv-details { flex: 1; min-width: 0; }
+.rc-gv-body .rc-gv-qr { flex: 0 0 70px; margin: 0; }
+.rc-gv-details .rc-gv-row { font-size: 10px; line-height: 1.3; }
+.rc-gv-details .rc-gv-code { font-size: 11px; letter-spacing: 0; }
+.rc-gv-terms {
+  border-top: 1px dashed #999;
+  margin-top: 3px;
+  padding-top: 3px;
+  text-align: left;
+}
+.pos-receipt .rc-gv-terms,
+.pos-receipt .rc-gv-terms * {
+  font-size: 9px !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #000 !important;
+  font-weight: 600 !important;
+  min-height: 0 !important;
+}
+.rc-gv-terms-label { text-transform: uppercase; }
+
 /* ═══════════════  FBR STRIP  ═══════════════ */
 .rc-fbr {
   border: 1px solid #888;
@@ -586,16 +614,21 @@ html, body {
   {%- if gv_issued -%}
   <div class="rc-gift-voucher">
     <div class="rc-gv-title">You've Earned a Gift Voucher!</div>
-    <div class="rc-gv-row"><span>Code</span><span class="rc-gv-code">{{ gv_issued.voucher_code }}</span></div>
-    <div class="rc-gv-row"><span>Amount</span><span>{{ frappe.utils.fmt_money(gv_issued.amount, currency=doc.currency) }}</span></div>
-    <div class="rc-gv-row"><span>Valid Until</span><span>{{ frappe.utils.format_date(gv_issued.expiry_date) }}</span></div>
-    <div class="rc-gv-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&amp;data={{ gv_issued.voucher_code | urlencode }}" alt="Gift Voucher QR"></div>
-    <div class="rc-gv-note">Show this code or QR on your next visit to redeem.</div>
+    <div class="rc-gv-body">
+      <div class="rc-gv-details">
+        <div class="rc-gv-row"><span>Code</span><span class="rc-gv-code">{{ gv_issued.voucher_code }}</span></div>
+        <div class="rc-gv-row"><span>Amount</span><span>{{ frappe.utils.fmt_money(gv_issued.amount, currency=doc.currency) }}</span></div>
+        <div class="rc-gv-row"><span>Valid Until</span><span>{{ frappe.utils.format_date(gv_issued.expiry_date) }}</span></div>
+      </div>
+      <div class="rc-gv-qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&amp;data={{ gv_issued.voucher_code | urlencode }}" alt="Gift Voucher QR"></div>
+    </div>
     {%- if ctx.gift_voucher_terms -%}
-    <div class="rc-terms">
-      <div class="rc-terms-lbl">Gift Vouchers Terms &amp; Conditions</div>
+    <div class="rc-gv-terms">
+      <div class="rc-gv-terms-label">Terms &amp; Conditions</div>
       {{ ctx.gift_voucher_terms }}
     </div>
+    {%- else -%}
+    <div class="rc-gv-note">Show this code or QR on your next visit to redeem.</div>
     {%- endif -%}
   </div>
   {%- endif -%}
