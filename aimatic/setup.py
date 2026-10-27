@@ -1,4 +1,5 @@
 import frappe
+
 from aimatic.journal_entry_remarks import setup_journal_entry_remarks
 from aimatic.label_printing.setup import after_install as setup_label_printing
 from aimatic.patches.create_pos_supervisor_role import (
