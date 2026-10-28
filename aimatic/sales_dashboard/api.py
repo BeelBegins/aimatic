@@ -17,6 +17,21 @@ _ALLOWED_ROLES = {"System Manager", "Sales Manager", "Accounts Manager", "POS Su
 _TREND_DAYS = 14
 _TOP_CUSTOMER_LIMIT = 20
 
+# A redemption claim is only a real redemption when the saved payment
+# arithmetic proves that the customer paid grand_total - loyalty_amount.
+# This protects dashboard totals from the historical client bug where a
+# cashier selected points but the terminal still collected the full amount.
+_HONORED_LOYALTY_CONDITION = """
+    COALESCE(pi.is_return, 0) = 0
+    AND COALESCE(pi.redeem_loyalty_points, 0) = 1
+    AND COALESCE(pi.loyalty_points, 0) > 0
+    AND COALESCE(pi.loyalty_amount, 0) > 0
+    AND ABS(
+        (COALESCE(pi.paid_amount, 0) - COALESCE(pi.loyalty_amount, 0) - COALESCE(pi.change_amount, 0))
+        - (pi.grand_total - pi.loyalty_amount)
+    ) <= 0.5
+"""
+
 
 def _check_dashboard_role():
 	if not (set(frappe.get_roles()) & _ALLOWED_ROLES):
@@ -265,6 +280,9 @@ def _get_range_kpis(company: str, date_from, date_to, branch_filter: list[str] |
 			"returns_count": 0,
 			"txn_count": 0,
 			"average_basket": 0,
+			"loyalty_amount_redeemed": 0,
+			"loyalty_points_redeemed": 0,
+			"loyalty_redemption_count": 0,
 		}
 
 	rows = frappe.db.sql(
@@ -277,6 +295,9 @@ def _get_range_kpis(company: str, date_from, date_to, branch_filter: list[str] |
             COALESCE(SUM(CASE WHEN pi.is_return = 1 THEN -pi.grand_total END), 0) AS returns_amount,
             COALESCE(SUM(CASE WHEN pi.is_return = 1 THEN 1 ELSE 0 END), 0) AS returns_count,
             COALESCE(SUM(CASE WHEN pi.is_return = 0 THEN 1 ELSE 0 END), 0) AS sales_txn_count,
+            COALESCE(SUM(CASE WHEN {_HONORED_LOYALTY_CONDITION} THEN pi.loyalty_amount ELSE 0 END), 0) AS loyalty_amount_redeemed,
+            COALESCE(SUM(CASE WHEN {_HONORED_LOYALTY_CONDITION} THEN pi.loyalty_points ELSE 0 END), 0) AS loyalty_points_redeemed,
+            COALESCE(SUM(CASE WHEN {_HONORED_LOYALTY_CONDITION} THEN 1 ELSE 0 END), 0) AS loyalty_redemption_count,
             COUNT(*) AS txn_count
         FROM `tabPOS Invoice` pi
         LEFT JOIN `tabPOS Profile` pp ON pp.name = pi.pos_profile
@@ -305,6 +326,9 @@ def _get_range_kpis(company: str, date_from, date_to, branch_filter: list[str] |
 		"returns_count": cint(row.get("returns_count")),
 		"txn_count": cint(row.get("txn_count")),
 		"average_basket": (gross_sales / sales_txn_count) if sales_txn_count else 0,
+		"loyalty_amount_redeemed": flt(row.get("loyalty_amount_redeemed")),
+		"loyalty_points_redeemed": cint(row.get("loyalty_points_redeemed")),
+		"loyalty_redemption_count": cint(row.get("loyalty_redemption_count")),
 	}
 
 
@@ -430,16 +454,19 @@ def _get_today_branch_profile_grid(company: str, branch_filter: list[str] | None
 	totals_by_profile = {}
 	if profile_names:
 		rows = frappe.db.sql(
-			"""
-            SELECT pos_profile,
-                   COALESCE(SUM(grand_total), 0) AS today_sales,
-                   COUNT(*) AS txn_count,
-                   MAX(TIMESTAMP(posting_date, posting_time)) AS last_sale_at
-            FROM `tabPOS Invoice`
-            WHERE docstatus = 1
-              AND posting_date = %(today)s
-              AND pos_profile IN %(profile_names)s
-            GROUP BY pos_profile
+			f"""
+			SELECT pi.pos_profile,
+			       COALESCE(SUM(pi.grand_total), 0) AS today_sales,
+			       COUNT(*) AS txn_count,
+			       MAX(TIMESTAMP(pi.posting_date, pi.posting_time)) AS last_sale_at,
+			       COALESCE(SUM(CASE WHEN {_HONORED_LOYALTY_CONDITION} THEN pi.loyalty_amount ELSE 0 END), 0) AS loyalty_amount_redeemed,
+			       COALESCE(SUM(CASE WHEN {_HONORED_LOYALTY_CONDITION} THEN pi.loyalty_points ELSE 0 END), 0) AS loyalty_points_redeemed,
+			       COALESCE(SUM(CASE WHEN {_HONORED_LOYALTY_CONDITION} THEN 1 ELSE 0 END), 0) AS loyalty_redemption_count
+			FROM `tabPOS Invoice` pi
+			WHERE pi.docstatus = 1
+			  AND pi.posting_date = %(today)s
+			  AND pi.pos_profile IN %(profile_names)s
+			GROUP BY pi.pos_profile
             """,
 			{"today": today_date, "profile_names": tuple(profile_names)},
 			as_dict=True,
@@ -482,6 +509,9 @@ def _build_branch_section(branch_name: str | None, profiles, totals_by_profile, 
 				"today_sales": flt(totals.today_sales) if totals else 0,
 				"txn_count": cint(totals.txn_count) if totals else 0,
 				"last_sale_at": str(totals.last_sale_at) if totals and totals.last_sale_at else None,
+				"loyalty_amount_redeemed": flt(totals.loyalty_amount_redeemed) if totals else 0,
+				"loyalty_points_redeemed": cint(totals.loyalty_points_redeemed) if totals else 0,
+				"loyalty_redemption_count": cint(totals.loyalty_redemption_count) if totals else 0,
 				"shift": shift_by_profile.get(profile.name),
 			}
 		)

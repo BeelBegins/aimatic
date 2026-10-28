@@ -2654,6 +2654,75 @@ def _build_closing_session_response(closing, opening_entry):
     }
 
 
+def _get_closing_loyalty_summary(closing_entry):
+	"""Return an auditable loyalty-vs-payment reconciliation for one shift.
+
+	POS Closing Entry's ``grand_total`` is the system sale value, while its
+	payment reconciliation is the amount actually collected. A redeemed-points
+	discount is therefore expected to appear as the difference between the two.
+	Only count a redemption when the saved payment arithmetic proves that the
+	discount was actually honoured; old invoices can contain a redemption claim
+	without having reduced what the customer paid.
+	"""
+	invoice_names = [
+		row.pos_invoice
+		for row in (closing_entry.get("pos_invoices") or [])
+		if getattr(row, "pos_invoice", None)
+	]
+	if not invoice_names:
+		return {
+			"loyalty_amount": 0,
+			"loyalty_points": 0,
+			"loyalty_redemption_count": 0,
+			"unhonored_loyalty_amount": 0,
+			"unhonored_loyalty_points": 0,
+			"unhonored_loyalty_count": 0,
+		}
+
+	rows = frappe.db.sql(
+		"""
+		SELECT name, grand_total, loyalty_amount, loyalty_points,
+		       redeem_loyalty_points, paid_amount, change_amount, is_return
+		FROM `tabPOS Invoice`
+		WHERE name IN %(invoice_names)s
+		""",
+		{"invoice_names": tuple(invoice_names)},
+		as_dict=True,
+	)
+	result = {
+		"loyalty_amount": 0.0,
+		"loyalty_points": 0,
+		"loyalty_redemption_count": 0,
+		"unhonored_loyalty_amount": 0.0,
+		"unhonored_loyalty_points": 0,
+		"unhonored_loyalty_count": 0,
+	}
+	for row in rows:
+		if cint(row.is_return) or not cint(row.redeem_loyalty_points):
+			continue
+		claimed_amount = flt(row.loyalty_amount, 2)
+		claimed_points = cint(row.loyalty_points)
+		if claimed_amount <= 0 or claimed_points <= 0:
+			continue
+
+		# paid_amount includes loyalty_amount on a correctly saved POS Invoice;
+		# remove it before comparing the real tendered amount with the payable.
+		real_kept = flt(flt(row.paid_amount, 2) - claimed_amount - flt(row.change_amount, 2), 2)
+		payable = flt(flt(row.grand_total, 2) - claimed_amount, 2)
+		if abs(real_kept - payable) <= 0.5:
+			result["loyalty_amount"] += claimed_amount
+			result["loyalty_points"] += claimed_points
+			result["loyalty_redemption_count"] += 1
+		else:
+			result["unhonored_loyalty_amount"] += claimed_amount
+			result["unhonored_loyalty_points"] += claimed_points
+			result["unhonored_loyalty_count"] += 1
+
+	result["loyalty_amount"] = flt(result["loyalty_amount"], 2)
+	result["unhonored_loyalty_amount"] = flt(result["unhonored_loyalty_amount"], 2)
+	return result
+
+
 def _get_open_pos_opening_entry_for_cashier(opening_entry, cashier_user):
     if not opening_entry:
         frappe.throw(_("opening_entry is required"))
@@ -2730,6 +2799,20 @@ def get_pos_closing_summary(opening_entry, cashier_user):
             closing_entry.get("sales_invoices") or []
         )
 
+    loyalty = _get_closing_loyalty_summary(closing_entry)
+    system_sales = flt(closing_entry.grand_total, 2)
+    collected_sales = flt(
+        sum(
+            flt(p.expected_amount) - flt(p.opening_amount)
+            for p in closing_entry.get("payment_reconciliation") or []
+        ),
+        2,
+    )
+    reconciliation_gap = flt(system_sales - collected_sales, 2)
+    other_adjustment = flt(reconciliation_gap - loyalty["loyalty_amount"], 2)
+    if abs(other_adjustment) <= 0.01:
+        other_adjustment = 0.0
+
     return {
         "openingEntry": closing_entry.pos_opening_entry,
         "posProfile": closing_entry.pos_profile,
@@ -2749,6 +2832,16 @@ def get_pos_closing_summary(opening_entry, cashier_user):
             for p in closing_entry.get("payment_reconciliation") or []
         ],
         "invoiceCount": invoice_count,
+        "systemSales": system_sales,
+        "collectedSales": collected_sales,
+        "loyaltyAmount": loyalty["loyalty_amount"],
+        "loyaltyPointsRedeemed": loyalty["loyalty_points"],
+        "loyaltyRedemptionCount": loyalty["loyalty_redemption_count"],
+        "unhonoredLoyaltyAmount": loyalty["unhonored_loyalty_amount"],
+        "unhonoredLoyaltyPoints": loyalty["unhonored_loyalty_points"],
+        "unhonoredLoyaltyCount": loyalty["unhonored_loyalty_count"],
+        "reconciliationGap": reconciliation_gap,
+        "otherAdjustment": other_adjustment,
         "totalOpening": flt(
             sum(
                 flt(p.opening_amount)

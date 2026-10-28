@@ -118,6 +118,7 @@
 .sales-dashboard-page .sd-card.sd-accent-payable { --sd-accent: var(--text-on-red, #ef4444); --sd-accent-bg: var(--bg-red, var(--subtle-fg)); }
 .sales-dashboard-page .sd-card.sd-accent-payment { --sd-accent: var(--text-on-cyan, #06b6d4); --sd-accent-bg: var(--bg-cyan, var(--subtle-fg)); }
 .sales-dashboard-page .sd-card.sd-accent-margin { --sd-accent: var(--text-on-green, #16a34a); --sd-accent-bg: var(--bg-green, var(--subtle-fg)); }
+.sales-dashboard-page .sd-card.sd-accent-loyalty { --sd-accent: #d97706; --sd-accent-bg: #fef3c7; }
 
 .sales-dashboard-page .sd-value-positive { color: var(--text-on-green, #16a34a); }
 .sales-dashboard-page .sd-value-negative { color: var(--text-on-red, #ef4444); }
@@ -501,6 +502,12 @@
 .sales-dashboard-page .sd-profile-shift-line {
     font-size: 12px;
     color: var(--text-color);
+}
+
+.sales-dashboard-page .sd-profile-loyalty-line {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
 .sales-dashboard-page .sd-profile-status {

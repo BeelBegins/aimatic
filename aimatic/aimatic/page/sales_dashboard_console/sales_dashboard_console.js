@@ -267,6 +267,15 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
 					this.money(kpis.average_basket),
 					__("Per sale, selected range")
 				)}
+				${this.card(
+					"loyalty",
+					"award",
+					__("Loyalty Redeemed"),
+					this.money(kpis.loyalty_amount_redeemed),
+					`${this.number(kpis.loyalty_points_redeemed)} ${__("points")} · ${this.number(
+						kpis.loyalty_redemption_count
+					)} ${__("redemption(s)")}`
+				)}
                 ${this.card(
 					"payable",
 					"rotate-ccw",
@@ -512,6 +521,9 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
 					shift.running_total
 			  )}</strong></div>`
 			: "";
+		const loyaltyLine = `<div class="sd-profile-loyalty-line">${__("Loyalty redeemed")}: <strong>${this.money(
+			profile.loyalty_amount_redeemed
+		)}</strong> · ${this.number(profile.loyalty_points_redeemed)} ${__("points")}</div>`;
 		return `
             <div class="sd-profile-card" data-sd-profile="${frappe.utils.escape_html(
 				profile.pos_profile
@@ -525,6 +537,7 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
                 <div class="sd-profile-meta">${this.number(profile.txn_count)} ${__(
 			"transactions"
 		)} · ${lastSale}</div>
+                ${loyaltyLine}
                 ${shiftLine}
                 <div class="sd-profile-status">${statusBadge}</div>
             </div>
