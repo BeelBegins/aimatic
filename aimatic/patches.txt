@@ -60,3 +60,4 @@ aimatic.patches.create_stock_receiving_oauth_client
 aimatic.patches.grant_accounts_branch_select
 aimatic.patches.show_journal_entry_remarks
 aimatic.patches.fix_purchase_receipt_quantity_race
+aimatic.patches.grant_pos_margin_cache_read
