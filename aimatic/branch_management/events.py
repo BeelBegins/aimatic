@@ -10,6 +10,16 @@ from aimatic.branch_management.utils import (
 	user_can_override,
 )
 
+# Purchase docs where Company.cost_center (Head Office) is stamped onto every
+# item by get_item_details before save. KPOs hold Purchase/Accounts/Stock
+# Manager roles, so can_override leaves those non-blank HO values alone and
+# stock/GRNI GL posts to Head Office while Branch/warehouse stay correct.
+PURCHASE_BRANCH_COST_CENTER_DOCTYPES = {
+	"Purchase Order",
+	"Purchase Receipt",
+	"Purchase Invoice",
+}
+
 
 def _infer_stock_entry_branch(doc):
 	"""Fallback for when the acting user has no default Branch (e.g.
@@ -175,6 +185,7 @@ def apply_branch_defaults(doc, method=None):
 		if doc.doctype in REJECTED_WAREHOUSE_DOCTYPES:
 			doc.rejected_warehouse = branch_defaults["rejected_warehouse"]
 		_apply_item_row_defaults(doc, branch_defaults, can_override, has_set_warehouse)
+		_force_purchase_branch_cost_centers(doc, branch_defaults)
 		return
 
 	if not doc.cost_center:
@@ -188,6 +199,32 @@ def apply_branch_defaults(doc, method=None):
 	):
 		doc.rejected_warehouse = branch_defaults["rejected_warehouse"]
 	_apply_item_row_defaults(doc, branch_defaults, can_override, has_set_warehouse)
+	_force_purchase_branch_cost_centers(doc, branch_defaults)
+
+
+def _force_purchase_branch_cost_centers(doc, branch_defaults):
+	"""Align PO/PR/PI header and item cost centers to the document Branch.
+
+	Same HO auto-fill class as Stock Reconciliation: Company.cost_center is
+	pre-filled on lines before this hook runs, and override-capable roles
+	cannot be told apart from a deliberate Head Office choice. Managers who
+	buy for another store change Branch; cost centers must follow that Branch.
+	Silent — no form change, no throw — so KPO entry stays undisturbed.
+	"""
+
+	if doc.doctype not in PURCHASE_BRANCH_COST_CENTER_DOCTYPES:
+		return
+
+	correct = branch_defaults.get("cost_center")
+	if not correct:
+		return
+
+	if doc.get("cost_center") != correct:
+		doc.cost_center = correct
+
+	for row in doc.get("items") or []:
+		if row.meta.has_field("cost_center") and row.get("cost_center") != correct:
+			row.cost_center = correct
 
 
 def apply_stock_reconciliation_branch_defaults(doc, method=None):

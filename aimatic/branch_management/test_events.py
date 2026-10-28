@@ -3,6 +3,20 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
+class _Row:
+	def __init__(self, cost_center=None, warehouse=None):
+		self.cost_center = cost_center
+		self.warehouse = warehouse
+		self.rejected_qty = 0
+		self.rejected_warehouse = None
+		self.meta = SimpleNamespace(
+			has_field=lambda fieldname: fieldname in {"cost_center", "warehouse", "rejected_warehouse"}
+		)
+
+	def get(self, fieldname, default=None):
+		return getattr(self, fieldname, default)
+
+
 class _Document:
 	def __init__(self, doctype):
 		self.doctype = doctype
@@ -59,6 +73,84 @@ class TestAdministratorBranchSelection(unittest.TestCase):
 		self.assertIn("multiple Branches", message)
 		self.assertIn("Select a Branch", message)
 		self.assertIn("Purchase Order", message)
+
+
+class TestPurchaseBranchCostCenterForce(unittest.TestCase):
+	@patch("aimatic.branch_management.events.get_branch_defaults")
+	@patch("aimatic.branch_management.events.get_user_default_branch", return_value="S5 - Sector C")
+	@patch("aimatic.branch_management.events.user_can_override", return_value=True)
+	def test_override_role_replaces_company_head_office_on_purchase_items(
+		self, _can_override, _default_branch, get_defaults
+	):
+		from aimatic.branch_management.events import apply_branch_defaults
+
+		get_defaults.return_value = {
+			"cost_center": "S5 - Sector C - SSM",
+			"finished_goods_warehouse": "S5 - Sector C - SSM",
+			"rejected_warehouse": "S5 Rejected - SSM",
+		}
+		doc = _Document("Purchase Receipt")
+		doc.branch = "S5 - Sector C"
+		doc.cost_center = "S5 - Sector C - SSM"
+		doc.items = [
+			_Row(cost_center="Head Office - SSM"),
+			_Row(cost_center="Head Office - SSM"),
+		]
+
+		apply_branch_defaults(doc)
+
+		self.assertEqual(doc.cost_center, "S5 - Sector C - SSM")
+		self.assertEqual(doc.items[0].cost_center, "S5 - Sector C - SSM")
+		self.assertEqual(doc.items[1].cost_center, "S5 - Sector C - SSM")
+
+	@patch("aimatic.branch_management.events.get_branch_defaults")
+	@patch("aimatic.branch_management.events.get_user_default_branch", return_value="S1 - Ghouri Town VIP")
+	@patch("aimatic.branch_management.events.user_can_override", return_value=True)
+	def test_override_role_replaces_head_office_header_on_purchase_order(
+		self, _can_override, _default_branch, get_defaults
+	):
+		from aimatic.branch_management.events import apply_branch_defaults
+
+		get_defaults.return_value = {
+			"cost_center": "S1 - Ghouri Town VIP - SSM",
+			"finished_goods_warehouse": "S1 - Ghouri Town VIP - SSM",
+			"rejected_warehouse": None,
+		}
+		doc = _Document("Purchase Order")
+		doc.branch = "S1 - Ghouri Town VIP"
+		doc.cost_center = "Head Office - SSM"
+		doc.items = [_Row(cost_center="Head Office - SSM")]
+
+		apply_branch_defaults(doc)
+
+		self.assertEqual(doc.cost_center, "S1 - Ghouri Town VIP - SSM")
+		self.assertEqual(doc.items[0].cost_center, "S1 - Ghouri Town VIP - SSM")
+
+	@patch("aimatic.branch_management.events.get_branch_defaults")
+	@patch("aimatic.branch_management.events.get_user_default_branch", return_value="S5 - Sector C")
+	@patch("aimatic.branch_management.events.user_can_override", return_value=True)
+	def test_stock_entry_keeps_fill_blanks_only_for_override_roles(
+		self, _can_override, _default_branch, get_defaults
+	):
+		from aimatic.branch_management.events import apply_branch_defaults
+
+		get_defaults.return_value = {
+			"cost_center": "S5 - Sector C - SSM",
+			"finished_goods_warehouse": None,
+			"rejected_warehouse": None,
+		}
+		doc = _Document("Stock Entry")
+		doc.meta = SimpleNamespace(has_field=lambda fieldname: False)
+		doc.branch = "S5 - Sector C"
+		doc.cost_center = "Head Office - SSM"
+		doc.items = [_Row(cost_center="Head Office - SSM")]
+		doc.items[0].meta = SimpleNamespace(has_field=lambda fieldname: fieldname == "cost_center")
+
+		apply_branch_defaults(doc)
+
+		# Stock Entry is outside the purchase force; override path keeps HO.
+		self.assertEqual(doc.cost_center, "Head Office - SSM")
+		self.assertEqual(doc.items[0].cost_center, "Head Office - SSM")
 
 
 if __name__ == "__main__":
