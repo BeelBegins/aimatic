@@ -31,10 +31,30 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 		this.build_filters();
 		this.build_layout();
 		this.bind_events();
+		this.sync_mode_fields();
 		this.apply_route_options();
 	}
 
 	build_filters() {
+		this.mode_field = this.page.add_field({
+			label: __('Mode'),
+			fieldname: 'report_mode',
+			fieldtype: 'Select',
+			options: ['Single Vendor', 'All Vendors', 'By Barcodes'],
+			default: 'Single Vendor',
+			change: () => {
+				this.sync_mode_fields();
+				this.refresh_if_ready();
+			},
+		});
+		this.stock_basis_field = this.page.add_field({
+			label: __('Stock Basis'),
+			fieldname: 'stock_basis',
+			fieldtype: 'Select',
+			options: ['Bin', 'FIFO Origin', 'Both'],
+			default: 'Bin',
+			change: () => this.refresh_if_ready(),
+		});
 		this.supplier_field = this.page.add_field({
 			label: __('Supplier'),
 			fieldname: 'supplier',
@@ -62,10 +82,15 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 			fieldname: 'principal',
 			fieldtype: 'Link',
 			options: 'Principal',
-			get_query: () => ({
-				query: 'aimatic.purchase_principal.get_principal_query',
-				filters: { supplier: this.supplier_field.get_value() },
-			}),
+			get_query: () => {
+				const supplier = this.supplier_field.get_value();
+				return supplier
+					? {
+							query: 'aimatic.purchase_principal.get_principal_query',
+							filters: { supplier },
+					  }
+					: {};
+			},
 			change: () => this.refresh_if_ready(),
 		});
 		this.from_date_field = this.page.add_field({
@@ -126,7 +151,57 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 
 	build_layout() {
 		this.$container = $('<div class="vendor-stock-positions-page"></div>').appendTo(this.page.body);
+		this.$barcode_wrap = $(`
+			<div class="vsp-barcode-wrap" style="display:none;">
+				<label class="control-label">${__('Barcodes / Item Codes')}</label>
+				<textarea class="form-control vsp-barcode-input" rows="5"
+					placeholder="${__('Paste barcodes or item codes from Excel (one per line, or comma / tab separated)')}"></textarea>
+				<div class="vsp-barcode-hint text-muted">${__('Resolves via Item Barcode, then exact Item code. Unmatched values are listed after refresh.')}</div>
+			</div>
+		`).appendTo(this.page.body);
+		this.$barcode_input = this.$barcode_wrap.find('textarea');
+		this.$barcode_input.on('change', () => this.refresh_if_ready());
 		this.render_empty_state();
+	}
+
+	sync_mode_fields() {
+		const mode = this.get_mode();
+		const $supplier = this.supplier_field.$wrapper;
+		if (mode === 'single') {
+			$supplier.show();
+			this.supplier_field.df.reqd = 1;
+			this.$barcode_wrap.hide();
+		} else if (mode === 'all') {
+			$supplier.hide();
+			this.supplier_field.df.reqd = 0;
+			this.$barcode_wrap.hide();
+		} else {
+			$supplier.hide();
+			this.supplier_field.df.reqd = 0;
+			this.$barcode_wrap.show();
+		}
+	}
+
+	get_mode() {
+		const label = this.mode_field.get_value() || 'Single Vendor';
+		if (label === 'All Vendors') {
+			return 'all';
+		}
+		if (label === 'By Barcodes') {
+			return 'barcodes';
+		}
+		return 'single';
+	}
+
+	get_stock_basis() {
+		const label = this.stock_basis_field.get_value() || 'Bin';
+		if (label === 'FIFO Origin') {
+			return 'fifo';
+		}
+		if (label === 'Both') {
+			return 'both';
+		}
+		return 'bin';
 	}
 
 	bind_events() {
@@ -142,7 +217,26 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 
 	apply_route_options() {
 		const route_options = frappe.route_options || {};
+		if (route_options.mode) {
+			const modeMap = {
+				single: 'Single Vendor',
+				all: 'All Vendors',
+				barcodes: 'By Barcodes',
+			};
+			this.mode_field.set_value(modeMap[route_options.mode] || route_options.mode);
+		}
+		if (route_options.stock_basis) {
+			const basisMap = {
+				bin: 'Bin',
+				fifo: 'FIFO Origin',
+				both: 'Both',
+			};
+			this.stock_basis_field.set_value(
+				basisMap[route_options.stock_basis] || route_options.stock_basis
+			);
+		}
 		if (route_options.supplier) {
+			this.mode_field.set_value('Single Vendor');
 			this.supplier_field.set_value(route_options.supplier);
 			frappe.route_options = null;
 		}
@@ -164,12 +258,17 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 		if (route_options.principal) {
 			this.principal_field.set_value(route_options.principal);
 		}
+		if (route_options.barcodes_text) {
+			this.mode_field.set_value('By Barcodes');
+			this.$barcode_input.val(route_options.barcodes_text);
+		}
+		this.sync_mode_fields();
 		this.refresh_if_ready();
 	}
 
 	get_filters() {
-		return {
-			supplier: this.supplier_field.get_value(),
+		const mode = this.get_mode();
+		const filters = {
 			company: this.company_field.get_value(),
 			branch: this.branch_field.get_value(),
 			warehouse: this.warehouse_field.get_value(),
@@ -177,29 +276,64 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 			to_date: this.to_date_field.get_value(),
 			principal: this.principal_field.get_value(),
 			group_by_warehouse: this.group_field.get_value() === 'Warehouse' ? 1 : 0,
+			stock_basis: this.get_stock_basis(),
 		};
+		if (mode === 'single') {
+			filters.supplier = this.supplier_field.get_value();
+		}
+		if (mode === 'barcodes') {
+			filters.barcodes_text = (this.$barcode_input.val() || '').trim();
+		}
+		return filters;
+	}
+
+	filters_ready() {
+		const filters = this.get_filters();
+		const mode = this.get_mode();
+		if (!filters.company || !filters.from_date || !filters.to_date) {
+			return false;
+		}
+		if (mode === 'single' && !filters.supplier) {
+			return false;
+		}
+		if (mode === 'barcodes' && !filters.barcodes_text) {
+			return false;
+		}
+		return true;
 	}
 
 	refresh_if_ready() {
-		const filters = this.get_filters();
-		if (filters.supplier && filters.company && filters.from_date && filters.to_date) {
+		if (this.filters_ready()) {
 			this.refresh();
 		}
 	}
 
+	api_method(kind) {
+		const mode = this.get_mode();
+		if (mode === 'all') {
+			return kind === 'export'
+				? 'aimatic.vendor_performance.api.export_all_vendor_stock_positions'
+				: 'aimatic.vendor_performance.api.get_all_vendor_stock_positions';
+		}
+		if (mode === 'barcodes') {
+			return kind === 'export'
+				? 'aimatic.vendor_performance.api.export_stock_positions_by_barcodes'
+				: 'aimatic.vendor_performance.api.get_stock_positions_by_barcodes';
+		}
+		return kind === 'export'
+			? 'aimatic.vendor_performance.api.export_vendor_stock_positions'
+			: 'aimatic.vendor_performance.api.get_vendor_stock_positions';
+	}
+
 	async refresh() {
-		const filters = this.get_filters();
-		if (!filters.supplier || !filters.company || !filters.from_date || !filters.to_date) {
+		if (!this.filters_ready()) {
 			this.render_empty_state();
 			return;
 		}
 
 		this.render_loading();
 		try {
-			const data = await frappe.xcall(
-				'aimatic.vendor_performance.api.get_vendor_stock_positions',
-				filters
-			);
+			const data = await frappe.xcall(this.api_method('get'), this.get_filters());
 			this.currency = data.currency;
 			this.render_report(data);
 		} catch (error) {
@@ -209,25 +343,28 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 	}
 
 	export_excel() {
-		const filters = this.get_filters();
-		if (!filters.supplier || !filters.company || !filters.from_date || !filters.to_date) {
+		if (!this.filters_ready()) {
 			frappe.show_alert({
-				message: __('Choose a supplier, company, and date range first.'),
+				message: __('Set the required filters for this mode first.'),
 				indicator: 'orange',
 			});
 			return;
 		}
-		open_url_post(
-			'/api/method/aimatic.vendor_performance.api.export_vendor_stock_positions',
-			filters
-		);
+		open_url_post('/api/method/' + this.api_method('export'), this.get_filters());
 	}
 
 	render_empty_state() {
+		const mode = this.get_mode();
+		let message = __('Choose a supplier and company to load vendor stock positions.');
+		if (mode === 'all') {
+			message = __('Choose a company and date range to load all-vendor stock positions.');
+		} else if (mode === 'barcodes') {
+			message = __('Paste barcodes or item codes, then refresh.');
+		}
 		this.$container.html(`
 			<div class="vp-empty">
 				<div class="vp-state-icon">${frappe.utils.icon('package', 'md')}</div>
-				${__('Choose a supplier and company to load vendor stock positions.')}
+				${message}
 			</div>
 		`);
 	}
@@ -256,12 +393,35 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 	render_report(data) {
 		const summary = data.summary || {};
 		const groupByWarehouse = !!data.group_by_warehouse;
+		const includeSupplier = !!data.include_supplier_columns;
+		const includeOrigin = !!data.include_origin_columns;
 		const rows = data.stock_items || [];
 		const truncatedNote = summary.truncated
 			? `<div class="vp-item-meta">${__(
 					'Showing {0} of {1} rows (Excel export uses the same cap). Narrow branch or warehouse if needed.',
 					[this.number(summary.row_count), this.number(summary.total_row_count)]
 			  )}</div>`
+			: '';
+		const fifoNote = data.fifo_note
+			? `<div class="vp-item-meta text-danger">${frappe.utils.escape_html(data.fifo_note)}</div>`
+			: '';
+		const unresolved = data.unresolved_barcodes || [];
+		const unresolvedBlock = unresolved.length
+			? `<div class="vsp-unresolved">
+					<strong>${__('Unresolved barcodes / item codes')} (${unresolved.length}):</strong>
+					${unresolved.map((token) => `<code>${frappe.utils.escape_html(token)}</code>`).join(' ')}
+				</div>`
+			: '';
+
+		const modeLabel =
+			data.mode === 'all_vendors'
+				? __('All Vendors')
+				: data.mode === 'by_barcodes'
+					? __('By Barcodes')
+					: frappe.utils.escape_html(data.supplier_name || data.supplier || '');
+
+		const supplierCountMeta = summary.linked_supplier_count
+			? ` · ${this.number(summary.linked_supplier_count)} ${__('vendors')}`
 			: '';
 
 		this.$container.html(`
@@ -272,14 +432,17 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 					<div><strong>${__('Incl. taxes')}:</strong> ${frappe.utils.escape_html(data.stock_incl_tax_note || '')}</div>
 					<div><strong>${__('Cost of goods sold')}:</strong> ${frappe.utils.escape_html(data.cogs_definition_note || '')}</div>
 					<div class="vp-item-meta">${frappe.utils.escape_html(data.item_sources_note || '')}</div>
-					<div class="vp-item-meta">${__('Window')}: ${frappe.datetime.str_to_user(data.date_from)} → ${frappe.datetime.str_to_user(data.date_to)}${data.principal ? ` · ${__('Principal')}: ${frappe.utils.escape_html(data.principal)}` : ''} · ${frappe.utils.escape_html(data.supplier_name || data.supplier || '')}</div>
+					<div class="vp-item-meta">${__('Window')}: ${frappe.datetime.str_to_user(data.date_from)} → ${frappe.datetime.str_to_user(data.date_to)}${data.principal ? ` · ${__('Principal')}: ${frappe.utils.escape_html(data.principal)}` : ''} · ${modeLabel}${supplierCountMeta} · ${__('Basis')}: ${frappe.utils.escape_html(data.stock_basis || 'bin')}</div>
 					${truncatedNote}
+					${fifoNote}
+					${unresolvedBlock}
 				</div>
 			</div>
 			<div class="vp-grid">
 				${this.card('stock', 'package', __('Stock Value (at Cost)'), this.money(summary.stock_value), `${this.number(summary.stock_qty)} ${__('qty')} · ${this.number(summary.stock_item_count)} ${__('items')}`)}
 				${this.card('receipt', 'tag', __('Stock Value (Incl Taxes)'), this.money(summary.stock_value_incl_tax), `${this.number(summary.stock_qty)} ${__('qty')} · ${__('estimated')}`)}
 				${this.card('payable', 'percent', __('Tax on Stock'), this.money(summary.stock_tax_amount), __('Incl taxes − at cost'))}
+				${includeOrigin ? this.card('origin', 'layers', __('Origin Stock Value'), this.money(summary.origin_stock_value), `${this.number(summary.origin_stock_qty)} ${__('qty')} · ${__('FIFO')}`) : ''}
 				${this.card('purchase', 'layers', __('Linked SKUs'), this.number(summary.linked_item_count), groupByWarehouse ? `${this.number(summary.warehouse_count)} ${__('warehouses with stock')}` : `${this.number(summary.row_count)} ${__('stock rows')}`)}
 				${this.card('revenue', 'trending-up', __('Sales Revenue (Window)'), this.money(summary.sales_amount), `${this.number(summary.sales_qty)} ${__('qty')} · ${this.number(summary.sales_doc_count)} ${__('docs')}`)}
 				${this.card('cogs', 'shopping-bag', __('Cost of Goods Sold (Window)'), this.money(summary.cogs_amount), `${this.number(summary.cogs_qty)} ${__('qty')}`)}
@@ -294,10 +457,10 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 					<span class="vp-badge">${groupByWarehouse ? __('By warehouse') : __('By item')}</span>
 				</div>
 				<div class="vsp-toolbar">
-					<input type="search" class="form-control input-xs vsp-search" data-vsp-search placeholder="${__('Search item / warehouse...')}" />
+					<input type="search" class="form-control input-xs vsp-search" data-vsp-search placeholder="${__('Search item / supplier / warehouse...')}" />
 					<div class="vsp-meta">${__('Rows')}: <strong data-vsp-visible-count>${this.number(rows.length)}</strong></div>
 				</div>
-				${this.render_stock_table(rows, groupByWarehouse)}
+				${this.render_stock_table(rows, groupByWarehouse, includeSupplier, includeOrigin)}
 			</div>
 		`);
 	}
@@ -333,30 +496,55 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 		`;
 	}
 
-	render_stock_table(rows, groupByWarehouse) {
+	render_stock_table(rows, groupByWarehouse, includeSupplier, includeOrigin) {
 		if (!rows.length) {
 			return `
 				<div class="vp-empty">
 					<div class="vp-state-icon">${frappe.utils.icon('package', 'md')}</div>
-					${__('No current stock found for this supplier-linked SKU set.')}
+					${__('No stock rows found for the current filters.')}
 				</div>
 			`;
 		}
 
+		const supplierHeaders = includeSupplier
+			? `<th>${__('Supplier')}</th>`
+			: '';
 		const warehouseHeaders = groupByWarehouse
 			? `<th>${__('Warehouse')}</th><th>${__('Branch')}</th>`
+			: '';
+		const originHeaders = includeOrigin
+			? `<th class="vp-num">${__('Origin Stock Qty')}</th><th class="vp-num">${__('Origin Stock Value')}</th>`
 			: '';
 
 		const body = rows
 			.map((row) => {
-				const searchBits = [row.item_code, row.item_name, row.barcode1, row.barcode2, row.warehouse, row.branch]
+				const searchBits = [
+					row.supplier,
+					row.supplier_name,
+					row.item_code,
+					row.item_name,
+					row.barcode1,
+					row.barcode2,
+					row.warehouse,
+					row.branch,
+				]
 					.filter(Boolean)
 					.join(' ');
+				const supplierCells = includeSupplier
+					? `<td>
+							<div class="vp-item-title">${frappe.utils.escape_html(row.supplier || '')}</div>
+							<div class="vp-item-meta">${frappe.utils.escape_html(row.supplier_name || '')}</div>
+						</td>`
+					: '';
 				const warehouseCells = groupByWarehouse
 					? `<td>${frappe.utils.escape_html(row.warehouse || '')}</td><td>${frappe.utils.escape_html(row.branch || '')}</td>`
 					: '';
+				const originCells = includeOrigin
+					? `<td class="vp-num">${this.number(row.origin_stock_qty)}</td><td class="vp-num">${this.money(row.origin_stock_value)}</td>`
+					: '';
 				return `
 				<tr data-vsp-row="${frappe.utils.escape_html(searchBits)}">
+					${supplierCells}
 					<td>
 						<div class="vp-item-title">${frappe.utils.escape_html(row.item_code)}</div>
 						<div class="vp-item-meta">${frappe.utils.escape_html(row.item_name || '')}</div>
@@ -368,6 +556,7 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 					<td class="vp-num">${this.money(row.stock_value)}</td>
 					<td class="vp-num">${this.money(row.stock_value_incl_tax)}</td>
 					<td class="vp-num">${this.money(row.stock_tax_amount)}</td>
+					${originCells}
 					<td class="vp-num">${this.number(row.purchase_qty_in_window)}</td>
 					<td class="vp-num">${this.money(row.purchase_amount_in_window)}</td>
 					<td class="vp-num">${this.money(row.purchase_tax_amount_in_window)}</td>
@@ -395,6 +584,7 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 				<table class="vp-table">
 					<thead>
 						<tr>
+							${supplierHeaders}
 							<th>${__('Item')}</th>
 							<th>${__('Barcode 1')}</th>
 							<th>${__('Barcode 2')}</th>
@@ -403,6 +593,7 @@ aimatic.VendorStockPositionsPage = class VendorStockPositionsPage {
 							<th class="vp-num">${__('Stock Value (at Cost)')}</th>
 							<th class="vp-num">${__('Stock Value (Incl Taxes)')}</th>
 							<th class="vp-num">${__('Tax on Stock')}</th>
+							${originHeaders}
 							<th class="vp-num">${__('Total Purchase Qty')}</th>
 							<th class="vp-num">${__('Purchase Amount (Excl Tax)')}</th>
 							<th class="vp-num">${__('Purchase Tax / GST')}</th>

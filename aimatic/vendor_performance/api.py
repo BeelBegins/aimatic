@@ -17,6 +17,18 @@ _MAX_ORIGIN_STOCK_SLE_ROWS = 150_000
 # pathological supplier-linked SKU set can't blow up the response or Excel export.
 _MAX_STOCK_POSITION_ROWS = 5_000
 
+# All-vendors / barcode modes fan out to vendor×item rows; allow a higher cap than
+# the single-supplier console while still bounding Desk/Excel payload size.
+_MAX_ALL_STOCK_POSITION_ROWS = 10_000
+
+# Paste size for By Barcodes mode (unique tokens after normalize).
+_MAX_BARCODE_TOKENS = 2_000
+
+_STOCK_BASIS_BIN = "bin"
+_STOCK_BASIS_FIFO = "fifo"
+_STOCK_BASIS_BOTH = "both"
+_STOCK_BASIS_CHOICES = {_STOCK_BASIS_BIN, _STOCK_BASIS_FIFO, _STOCK_BASIS_BOTH}
+
 # Trailing window used to establish each item's own "normal" daily sell-through
 # pace, independent of the (shorter) evaluation window used elsewhere on this page.
 # Deliberately long and fixed so a single recent purchase/sale spike can't skew an
@@ -765,6 +777,203 @@ def _get_supplier_item_codes(supplier: str, company: str, principal: str | None 
 	return [row.item_code for row in rows]
 
 
+def _normalize_stock_basis(stock_basis: str | None) -> str:
+	basis = (stock_basis or _STOCK_BASIS_BIN).strip().lower()
+	if basis not in _STOCK_BASIS_CHOICES:
+		frappe.throw(
+			_("Stock Basis must be one of: Bin, FIFO Origin, Both."),
+		)
+	return basis
+
+
+def _resolve_company_context(company: str | None):
+	"""Roles + company + currency without requiring a supplier (all/barcode modes)."""
+	if frappe.session.user == "Guest":
+		frappe.throw(_("Login required."))
+	if not (set(frappe.get_roles()) & _ALLOWED_ROLES):
+		frappe.throw(_("Not permitted to view vendor performance."), frappe.PermissionError)
+
+	company = company or frappe.defaults.get_user_default("Company")
+	if not company:
+		frappe.throw(_("Company is required."))
+	if not frappe.db.exists("Company", company):
+		frappe.throw(_("Company {0} was not found.").format(frappe.bold(company)))
+
+	currency = frappe.db.get_value("Company", company, "default_currency")
+	return company, currency
+
+
+def _filter_readable_suppliers(suppliers: list[str]) -> list[str]:
+	readable = []
+	for supplier in suppliers:
+		if frappe.has_permission("Supplier", ptype="read", doc=supplier):
+			readable.append(supplier)
+	return readable
+
+
+def _get_supplier_item_links(
+	company: str,
+	principal: str | None = None,
+	supplier: str | None = None,
+	item_codes: list[str] | None = None,
+) -> list[dict]:
+	"""Distinct supplier×item links from Item Supplier, Item Default, and PI/PR history.
+
+	Optional `supplier` narrows to one vendor (same sources as `_get_supplier_item_codes`).
+	`item_codes=None` means no item filter (all linked SKUs). `item_codes=[]` means
+	no matches (used when a barcode paste resolved nothing).
+	"""
+	if item_codes is not None and not item_codes:
+		return []
+
+	principal = (principal or "").strip() or None
+	principal_clause = "AND i.custom_principal = %(principal)s" if principal else ""
+	supplier_isup = "AND isup.supplier = %(supplier)s" if supplier else ""
+	supplier_idef = "AND idef.default_supplier = %(supplier)s" if supplier else ""
+	supplier_pi = "AND pi.supplier = %(supplier)s" if supplier else ""
+	supplier_pr = "AND pr.supplier = %(supplier)s" if supplier else ""
+	item_filter_isup = "AND isup.parent IN %(item_codes)s" if item_codes is not None else ""
+	item_filter_idef = "AND idef.parent IN %(item_codes)s" if item_codes is not None else ""
+	item_filter_pii = "AND pii.item_code IN %(item_codes)s" if item_codes is not None else ""
+	item_filter_pri = "AND pri.item_code IN %(item_codes)s" if item_codes is not None else ""
+
+	rows = frappe.db.sql(
+		f"""
+        SELECT DISTINCT link_pool.supplier, link_pool.item_code
+        FROM (
+            SELECT isup.supplier AS supplier, isup.parent AS item_code
+            FROM `tabItem Supplier` isup
+            WHERE IFNULL(isup.supplier, '') != ''
+              AND IFNULL(isup.parent, '') != ''
+              {supplier_isup}
+              {item_filter_isup}
+
+            UNION
+
+            SELECT idef.default_supplier AS supplier, idef.parent AS item_code
+            FROM `tabItem Default` idef
+            WHERE IFNULL(idef.default_supplier, '') != ''
+              AND IFNULL(idef.parent, '') != ''
+              AND (idef.company = %(company)s OR idef.company IS NULL OR idef.company = '')
+              {supplier_idef}
+              {item_filter_idef}
+
+            UNION
+
+            SELECT pi.supplier AS supplier, pii.item_code AS item_code
+            FROM `tabPurchase Invoice Item` pii
+            INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+            WHERE pi.docstatus = 1
+              AND IFNULL(pi.is_return, 0) = 0
+              AND pi.company = %(company)s
+              AND IFNULL(pi.supplier, '') != ''
+              AND IFNULL(pii.item_code, '') != ''
+              {supplier_pi}
+              {item_filter_pii}
+              {_principal_doc_clause("pi", principal)}
+
+            UNION
+
+            SELECT pr.supplier AS supplier, pri.item_code AS item_code
+            FROM `tabPurchase Receipt Item` pri
+            INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
+            WHERE pr.docstatus = 1
+              AND IFNULL(pr.is_return, 0) = 0
+              AND pr.company = %(company)s
+              AND IFNULL(pr.supplier, '') != ''
+              AND IFNULL(pri.item_code, '') != ''
+              {supplier_pr}
+              {item_filter_pri}
+              {_principal_doc_clause("pr", principal)}
+        ) link_pool
+        INNER JOIN `tabItem` i ON i.name = link_pool.item_code
+        WHERE IFNULL(link_pool.item_code, '') != ''
+          AND IFNULL(link_pool.supplier, '') != ''
+          {principal_clause}
+        ORDER BY link_pool.supplier, link_pool.item_code
+        """,
+		{
+			"supplier": supplier,
+			"company": company,
+			"principal": principal,
+			"item_codes": tuple(item_codes) if item_codes else (),
+		},
+		as_dict=True,
+	)
+
+	readable = set(_filter_readable_suppliers(list({row.supplier for row in rows})))
+	return [
+		{"supplier": row.supplier, "item_code": row.item_code}
+		for row in rows
+		if row.supplier in readable
+	]
+
+
+def _parse_barcode_tokens(barcodes_text: str | list | None) -> list[str]:
+	"""Normalize Excel paste / CSV / list into ordered unique tokens."""
+	if barcodes_text is None:
+		return []
+	if isinstance(barcodes_text, (list, tuple)):
+		raw_parts = [str(part) for part in barcodes_text]
+	else:
+		raw_parts = str(barcodes_text).replace("\r", "\n").replace("\t", "\n").replace(",", "\n").split("\n")
+
+	seen = set()
+	tokens = []
+	for part in raw_parts:
+		token = part.strip()
+		if not token or token in seen:
+			continue
+		seen.add(token)
+		tokens.append(token)
+
+	if len(tokens) > _MAX_BARCODE_TOKENS:
+		frappe.throw(
+			_("Too many barcodes ({0}). Paste at most {1} unique values.").format(
+				len(tokens), _MAX_BARCODE_TOKENS
+			)
+		)
+	return tokens
+
+
+def _resolve_barcodes_to_items(tokens: list[str]) -> tuple[dict[str, str], list[str]]:
+	"""Map paste token -> item_code. Unresolved tokens returned separately.
+
+	Resolution order per token: Item Barcode match, then exact Item.name.
+	"""
+	if not tokens:
+		return {}, []
+
+	barcode_rows = frappe.db.sql(
+		"""
+        SELECT barcode, parent AS item_code
+        FROM `tabItem Barcode`
+        WHERE barcode IN %(tokens)s
+        ORDER BY idx ASC, name ASC
+        """,
+		{"tokens": tuple(tokens)},
+		as_dict=True,
+	)
+	barcode_to_item: dict[str, str] = {}
+	for row in barcode_rows:
+		if row.barcode and row.barcode not in barcode_to_item:
+			barcode_to_item[row.barcode] = row.item_code
+
+	remaining = [token for token in tokens if token not in barcode_to_item]
+	if remaining:
+		existing_items = {
+			name
+			for name in frappe.get_all("Item", filters={"name": ["in", remaining]}, pluck="name")
+		}
+		for token in remaining:
+			if token in existing_items:
+				barcode_to_item[token] = token
+
+	resolved = {token: barcode_to_item[token] for token in tokens if token in barcode_to_item}
+	unresolved = [token for token in tokens if token not in barcode_to_item]
+	return resolved, unresolved
+
+
 def _get_stock_position(
 	item_codes: list[str], company: str, item_limit: int, warehouse_list: list[str] | None = None
 ):
@@ -815,21 +1024,39 @@ def _get_stock_position(
 	return summary, rows
 
 
-def _get_exact_vendor_origin_stock(
-	supplier: str,
+def _count_sle_rows(
+	company: str, item_codes: list[str], warehouse_list: list[str] | None = None
+) -> int:
+	if not item_codes:
+		return 0
+	warehouse_clause = "AND warehouse IN %(warehouse_list)s" if warehouse_list else ""
+	return cint(
+		frappe.db.sql(
+			f"""
+            SELECT COUNT(*)
+            FROM `tabStock Ledger Entry`
+            WHERE is_cancelled = 0
+              AND company = %(company)s
+              AND item_code IN %(item_codes)s
+              {warehouse_clause}
+            """,
+			{
+				"company": company,
+				"item_codes": tuple(item_codes),
+				"warehouse_list": tuple(warehouse_list) if warehouse_list else (),
+			},
+		)[0][0]
+	)
+
+
+def _replay_fifo_remaining_layers(
 	company: str,
 	item_codes: list[str],
-	item_limit: int,
 	warehouse_list: list[str] | None = None,
-):
+) -> tuple[dict[str, list[dict]], float, float]:
+	"""Replay SLE FIFO layers for the item set; return remaining layers + unattributed totals."""
 	if not item_codes:
-		return {
-			"item_count": 0,
-			"stock_qty": 0,
-			"stock_value": 0,
-			"unattributed_qty": 0,
-			"unattributed_value": 0,
-		}, []
+		return {}, 0.0, 0.0
 
 	attribution_map = _get_purchase_supplier_map(company=company, item_codes=item_codes)
 	warehouse_clause = "AND warehouse IN %(warehouse_list)s" if warehouse_list else ""
@@ -860,11 +1087,6 @@ def _get_exact_vendor_origin_stock(
 		},
 		as_dict=True,
 	)
-
-	item_names = {
-		row.name: row.item_name
-		for row in frappe.get_all("Item", filters={"name": ["in", item_codes]}, fields=["name", "item_name"])
-	}
 
 	layers_by_item: dict[str, list[dict]] = {item_code: [] for item_code in item_codes}
 	unattributed_qty = 0.0
@@ -913,6 +1135,79 @@ def _get_exact_vendor_origin_stock(
 			if flt(layer["qty"]) <= 0.0000001:
 				idx += 1
 
+	return layers_by_item, max(flt(unattributed_qty), 0), max(flt(unattributed_value), 0)
+
+
+def _get_fifo_origin_by_supplier_item(
+	company: str,
+	item_codes: list[str],
+	warehouse_list: list[str] | None = None,
+) -> tuple[bool, int, dict[tuple[str, str], dict]]:
+	"""FIFO remaining stock keyed by (supplier, item_code).
+
+	Returns (too_large, sle_row_count, origin_map). When too_large, origin_map is empty.
+	"""
+	if not item_codes:
+		return False, 0, {}
+
+	sle_row_count = _count_sle_rows(company, item_codes, warehouse_list)
+	if sle_row_count > _MAX_ORIGIN_STOCK_SLE_ROWS:
+		return True, sle_row_count, {}
+
+	layers_by_item, _unattr_qty, _unattr_value = _replay_fifo_remaining_layers(
+		company=company,
+		item_codes=item_codes,
+		warehouse_list=warehouse_list,
+	)
+
+	origin_map: dict[tuple[str, str], dict] = {}
+	for item_code, layers in layers_by_item.items():
+		by_supplier: dict[str, list[dict]] = defaultdict(list)
+		for layer in layers:
+			supplier_name = layer.get("supplier")
+			if supplier_name and flt(layer.get("qty")) > 0.0000001:
+				by_supplier[supplier_name].append(layer)
+		for supplier_name, supplier_layers in by_supplier.items():
+			qty = sum(flt(layer["qty"]) for layer in supplier_layers)
+			value = sum(flt(layer["value"]) for layer in supplier_layers)
+			latest_layer = supplier_layers[-1]
+			origin_map[(supplier_name, item_code)] = {
+				"origin_stock_qty": qty,
+				"origin_stock_value": value,
+				"last_origin_doc": latest_layer.get("voucher_no"),
+				"last_origin_doctype": latest_layer.get("voucher_type"),
+				"last_origin_date": latest_layer.get("posting_date"),
+			}
+	return False, sle_row_count, origin_map
+
+
+def _get_exact_vendor_origin_stock(
+	supplier: str,
+	company: str,
+	item_codes: list[str],
+	item_limit: int,
+	warehouse_list: list[str] | None = None,
+):
+	empty = {
+		"item_count": 0,
+		"stock_qty": 0,
+		"stock_value": 0,
+		"unattributed_qty": 0,
+		"unattributed_value": 0,
+	}
+	if not item_codes:
+		return empty, []
+
+	item_names = {
+		row.name: row.item_name
+		for row in frappe.get_all("Item", filters={"name": ["in", item_codes]}, fields=["name", "item_name"])
+	}
+	layers_by_item, unattributed_qty, unattributed_value = _replay_fifo_remaining_layers(
+		company=company,
+		item_codes=item_codes,
+		warehouse_list=warehouse_list,
+	)
+
 	per_item = []
 	total_qty = 0.0
 	total_value = 0.0
@@ -948,8 +1243,8 @@ def _get_exact_vendor_origin_stock(
 		"item_count": len(per_item),
 		"stock_qty": total_qty,
 		"stock_value": total_value,
-		"unattributed_qty": max(flt(unattributed_qty), 0),
-		"unattributed_value": max(flt(unattributed_value), 0),
+		"unattributed_qty": unattributed_qty,
+		"unattributed_value": unattributed_value,
 	}
 	return summary, per_item[:item_limit]
 
@@ -2058,7 +2353,11 @@ def _get_stock_positions(
 			"by_item": {},
 		}, []
 
-	row_limit = max(1, min(cint(row_limit or _MAX_STOCK_POSITION_ROWS), _MAX_STOCK_POSITION_ROWS))
+	# Absolute ceiling is the all-vendors cap; single-vendor callers still pass 5k.
+	row_limit = max(
+		1,
+		min(cint(row_limit or _MAX_STOCK_POSITION_ROWS), _MAX_ALL_STOCK_POSITION_ROWS),
+	)
 	warehouse_clause = "AND b.warehouse IN %(warehouse_list)s" if warehouse_list else ""
 
 	if group_by_warehouse:
@@ -2299,6 +2598,7 @@ def _build_vendor_stock_positions(
 	warehouse: str | None = None,
 	group_by_warehouse: int | bool = 0,
 	row_limit: int | None = None,
+	stock_basis: str | None = None,
 ):
 	supplier, company, supplier_meta, currency = _resolve_context(supplier, company)
 	lookback_days, date_from, date_to = _get_date_window(lookback_days, from_date, to_date)
@@ -2306,6 +2606,7 @@ def _build_vendor_stock_positions(
 	branch, warehouse_list = _resolve_branch_warehouse_scope(branch, warehouse)
 	_check_branch_permission(branch)
 	group_by_warehouse = bool(cint(group_by_warehouse))
+	stock_basis = _normalize_stock_basis(stock_basis)
 
 	item_codes = _get_supplier_item_codes(supplier=supplier, company=company, principal=principal)
 	stock_summary, stock_rows = _get_stock_positions(
@@ -2379,7 +2680,7 @@ def _build_vendor_stock_positions(
 	gross_margin_amount = sales_amount - cogs_amount
 	gross_margin_pct = (gross_margin_amount / sales_amount * 100) if sales_amount else 0
 
-	return {
+	payload = {
 		"supplier": supplier,
 		"supplier_name": supplier_meta.supplier_name or supplier,
 		"supplier_group": supplier_meta.supplier_group,
@@ -2389,6 +2690,7 @@ def _build_vendor_stock_positions(
 		"date_to": str(date_to),
 		"lookback_days": lookback_days,
 		"principal": principal,
+		"branch": branch,
 		"group_by_warehouse": group_by_warehouse,
 		"stock_definition_note": _(
 			"Stock position shows current stock of supplier-linked SKUs valued at cost (Bin stock value), "
@@ -2433,6 +2735,17 @@ def _build_vendor_stock_positions(
 		"stock_items": stock_rows,
 	}
 
+	from aimatic.vendor_performance.stock_positions_modes import apply_stock_basis_to_single_vendor
+
+	return apply_stock_basis_to_single_vendor(
+		payload,
+		supplier=supplier,
+		company=company,
+		item_codes=item_codes,
+		warehouse_list=warehouse_list,
+		stock_basis=stock_basis,
+	)
+
 
 @frappe.whitelist()
 def get_vendor_stock_positions(
@@ -2446,6 +2759,7 @@ def get_vendor_stock_positions(
 	warehouse: str | None = None,
 	group_by_warehouse: int | bool = 0,
 	row_limit: int | None = None,
+	stock_basis: str | None = None,
 ):
 	"""Full stock-position report for the Vendor Stock Positions console."""
 	return _build_vendor_stock_positions(
@@ -2459,6 +2773,7 @@ def get_vendor_stock_positions(
 		warehouse=warehouse,
 		group_by_warehouse=group_by_warehouse,
 		row_limit=row_limit,
+		stock_basis=stock_basis,
 	)
 
 
@@ -2473,9 +2788,12 @@ def export_vendor_stock_positions(
 	branch: str | None = None,
 	warehouse: str | None = None,
 	group_by_warehouse: int | bool = 0,
+	stock_basis: str | None = None,
 ):
 	"""Excel download of the same rows shown on Vendor Stock Positions."""
 	from frappe.utils.xlsxutils import build_xlsx_response
+
+	from aimatic.vendor_performance.stock_positions_modes import build_xlsx_data
 
 	payload = _build_vendor_stock_positions(
 		supplier=supplier,
@@ -2488,81 +2806,145 @@ def export_vendor_stock_positions(
 		warehouse=warehouse,
 		group_by_warehouse=group_by_warehouse,
 		row_limit=_MAX_STOCK_POSITION_ROWS,
+		stock_basis=stock_basis,
 	)
-	group_by_warehouse = bool(payload.get("group_by_warehouse"))
-	currency = payload.get("currency") or ""
+	data, filename = build_xlsx_data(payload)
+	build_xlsx_response(data, filename)
 
-	headers = [
-		"Item Code",
-		"Item Name",
-		"Barcode 1",
-		"Barcode 2",
-	]
-	if group_by_warehouse:
-		headers.extend(["Warehouse", "Branch"])
-	headers.extend(
-		[
-			"Stock Qty",
-			f"Stock Value (at Cost) ({currency})",
-			f"Stock Value (Incl Taxes) ({currency})",
-			f"Tax on Stock ({currency})",
-			"Total Purchase Qty",
-			f"Total Purchase Amount Excl Tax ({currency})",
-			f"Purchase Tax / GST ({currency})",
-			f"Total Purchase Amount Incl Tax ({currency})",
-			"Total Sale Qty",
-			f"Total Sale Amount ({currency})",
-			f"Cost of Goods Sold ({currency})",
-			f"Gross Margin ({currency})",
-			"Adjustment Qty",
-			f"Adjustment Value ({currency})",
-			"Last Purchase Date",
-			"Last Purchase Doc",
-			f"Last Purchase Rate Excl Tax ({currency})",
-			f"Last Purchase Rate Incl Tax ({currency})",
-			"Last Sale Date",
-			"Last Sale Doc",
-			f"Last Sale Rate ({currency})",
-		]
+
+@frappe.whitelist()
+def get_all_vendor_stock_positions(
+	company: str | None = None,
+	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
+	branch: str | None = None,
+	warehouse: str | None = None,
+	group_by_warehouse: int | bool = 0,
+	stock_basis: str | None = None,
+	row_limit: int | None = None,
+):
+	"""Combined vendor×item stock positions for all readable suppliers."""
+	from aimatic.vendor_performance.stock_positions_modes import build_multi_vendor_stock_positions
+
+	return build_multi_vendor_stock_positions(
+		company=company,
+		lookback_days=lookback_days,
+		from_date=from_date,
+		to_date=to_date,
+		principal=principal,
+		branch=branch,
+		warehouse=warehouse,
+		group_by_warehouse=group_by_warehouse,
+		stock_basis=stock_basis,
+		row_limit=row_limit,
+		mode="all_vendors",
 	)
 
-	data = [headers]
-	for row in payload.get("stock_items") or []:
-		line = [
-			row.get("item_code") or "",
-			row.get("item_name") or "",
-			row.get("barcode1") or "",
-			row.get("barcode2") or "",
-		]
-		if group_by_warehouse:
-			line.extend([row.get("warehouse") or "", row.get("branch") or ""])
-		line.extend(
-			[
-				flt(row.get("stock_qty")),
-				flt(row.get("stock_value")),
-				flt(row.get("stock_value_incl_tax")),
-				flt(row.get("stock_tax_amount")),
-				flt(row.get("purchase_qty_in_window")),
-				flt(row.get("purchase_amount_in_window")),
-				flt(row.get("purchase_tax_amount_in_window")),
-				flt(row.get("purchase_amount_incl_tax_in_window")),
-				flt(row.get("sales_qty_in_window")),
-				flt(row.get("sales_amount_in_window")),
-				flt(row.get("cogs_amount_in_window")),
-				flt(row.get("gross_margin_in_window")),
-				flt(row.get("adjustment_qty_in_window")),
-				flt(row.get("adjustment_value_in_window")),
-				row.get("last_purchase_date") or "",
-				row.get("last_purchase_doc") or "",
-				flt(row.get("last_purchase_rate")) if row.get("last_purchase_rate") else "",
-				flt(row.get("last_purchase_rate_incl_tax")) if row.get("last_purchase_rate_incl_tax") else "",
-				row.get("last_sale_date") or "",
-				row.get("last_sale_doc") or "",
-				flt(row.get("last_sale_rate")) if row.get("last_sale_rate") else "",
-			]
-		)
-		data.append(line)
 
-	safe_supplier = (payload.get("supplier") or "supplier").replace("/", "-").replace(" ", "_")
-	filename = f"vendor_stock_positions_{safe_supplier}"
+@frappe.whitelist()
+def export_all_vendor_stock_positions(
+	company: str | None = None,
+	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
+	branch: str | None = None,
+	warehouse: str | None = None,
+	group_by_warehouse: int | bool = 0,
+	stock_basis: str | None = None,
+):
+	"""Excel download for All Vendors stock positions."""
+	from frappe.utils.xlsxutils import build_xlsx_response
+
+	from aimatic.vendor_performance.stock_positions_modes import (
+		build_multi_vendor_stock_positions,
+		build_xlsx_data,
+	)
+
+	payload = build_multi_vendor_stock_positions(
+		company=company,
+		lookback_days=lookback_days,
+		from_date=from_date,
+		to_date=to_date,
+		principal=principal,
+		branch=branch,
+		warehouse=warehouse,
+		group_by_warehouse=group_by_warehouse,
+		stock_basis=stock_basis,
+		row_limit=_MAX_ALL_STOCK_POSITION_ROWS,
+		mode="all_vendors",
+	)
+	data, filename = build_xlsx_data(payload)
+	build_xlsx_response(data, filename)
+
+
+@frappe.whitelist()
+def get_stock_positions_by_barcodes(
+	barcodes_text: str | None = None,
+	company: str | None = None,
+	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
+	branch: str | None = None,
+	warehouse: str | None = None,
+	group_by_warehouse: int | bool = 0,
+	stock_basis: str | None = None,
+	row_limit: int | None = None,
+):
+	"""Stock positions for pasted barcodes / item codes, expanded to vendor×item."""
+	from aimatic.vendor_performance.stock_positions_modes import build_stock_positions_by_barcodes
+
+	return build_stock_positions_by_barcodes(
+		barcodes_text=barcodes_text,
+		company=company,
+		lookback_days=lookback_days,
+		from_date=from_date,
+		to_date=to_date,
+		principal=principal,
+		branch=branch,
+		warehouse=warehouse,
+		group_by_warehouse=group_by_warehouse,
+		stock_basis=stock_basis,
+		row_limit=row_limit,
+	)
+
+
+@frappe.whitelist()
+def export_stock_positions_by_barcodes(
+	barcodes_text: str | None = None,
+	company: str | None = None,
+	lookback_days: int = 30,
+	from_date=None,
+	to_date=None,
+	principal: str | None = None,
+	branch: str | None = None,
+	warehouse: str | None = None,
+	group_by_warehouse: int | bool = 0,
+	stock_basis: str | None = None,
+):
+	"""Excel download for barcode-paste stock positions."""
+	from frappe.utils.xlsxutils import build_xlsx_response
+
+	from aimatic.vendor_performance.stock_positions_modes import (
+		build_stock_positions_by_barcodes,
+		build_xlsx_data,
+	)
+
+	payload = build_stock_positions_by_barcodes(
+		barcodes_text=barcodes_text,
+		company=company,
+		lookback_days=lookback_days,
+		from_date=from_date,
+		to_date=to_date,
+		principal=principal,
+		branch=branch,
+		warehouse=warehouse,
+		group_by_warehouse=group_by_warehouse,
+		stock_basis=stock_basis,
+		row_limit=_MAX_ALL_STOCK_POSITION_ROWS,
+	)
+	data, filename = build_xlsx_data(payload)
 	build_xlsx_response(data, filename)
