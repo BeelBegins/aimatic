@@ -1113,6 +1113,35 @@ class TestPosRefund(_AimTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			get_pos_invoice_for_refund("")
 
+	def test_refund_reference_resolves_exact_invoice_fbr_or_terminal_id(self):
+		from aimatic.offline_pos.api import _resolve_pos_invoice_refund_reference
+
+		meta = SimpleNamespace(
+			has_field=lambda fieldname: fieldname
+				in {"custom_fbr_invoice_number", "custom_terminal_invoice_id"}
+		)
+		with patch("aimatic.offline_pos.api.frappe.get_meta", return_value=meta), patch(
+			"aimatic.offline_pos.api.frappe.db.sql",
+			return_value=[{"name": "ACC-PSINV-2026-00001"}],
+		) as sql:
+			self.assertEqual(
+				_resolve_pos_invoice_refund_reference(" FBR-2026-00001 "),
+				"ACC-PSINV-2026-00001",
+			)
+			params = sql.call_args.args[1]
+			self.assertEqual(params["reference"], "FBR-2026-00001")
+
+	def test_refund_reference_rejects_ambiguous_match(self):
+		from aimatic.offline_pos.api import _resolve_pos_invoice_refund_reference
+
+		meta = SimpleNamespace(has_field=lambda _fieldname: True)
+		with patch("aimatic.offline_pos.api.frappe.get_meta", return_value=meta), patch(
+			"aimatic.offline_pos.api.frappe.db.sql",
+			return_value=[{"name": "ACC-PSINV-2026-00001"}, {"name": "ACC-PSINV-2026-00002"}],
+		):
+			with self.assertRaises(frappe.ValidationError):
+				_resolve_pos_invoice_refund_reference("DUPLICATE-REFERENCE")
+
 	def test_fbr_acceptance_requires_code_and_number(self):
 		from aimatic.offline_pos.api import _normalize_refund_fbr_status
 

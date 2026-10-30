@@ -3489,8 +3489,61 @@ def _build_refund_response(doc, duplicate=False):
     }
 
 
+def _resolve_pos_invoice_refund_reference(reference):
+    """Resolve one exact receipt reference to a POS Invoice name.
+
+    A terminal's local Sales History only contains bills created on that
+    terminal. Cross-terminal refunds therefore need a server lookup, but the
+    lookup must never become a fuzzy invoice search or an unrestricted list.
+    Accept only an exact ERP invoice name, FBR invoice number, or terminal
+    invoice UUID; the caller still applies the normal POS Invoice read
+    permission check before returning any document data.
+    """
+    reference = str(reference or "").strip()
+    if not reference:
+        frappe.throw(_("invoice reference is required"))
+    if len(reference) > 140:
+        frappe.throw(_("invoice reference is too long"))
+
+    meta = frappe.get_meta("POS Invoice")
+    clauses = ["`tabPOS Invoice`.`name` = %(reference)s"]
+    if meta.has_field("custom_fbr_invoice_number"):
+        clauses.append(
+            "`tabPOS Invoice`.`custom_fbr_invoice_number` = %(reference)s"
+        )
+    if meta.has_field("custom_terminal_invoice_id"):
+        clauses.append(
+            "`tabPOS Invoice`.`custom_terminal_invoice_id` = %(reference)s"
+        )
+
+    rows = frappe.db.sql(
+        """
+        SELECT `tabPOS Invoice`.`name`
+        FROM `tabPOS Invoice`
+        WHERE ({clauses})
+        ORDER BY `tabPOS Invoice`.`creation` ASC
+        LIMIT 20
+        """.format(clauses=" OR ".join(clauses)),
+        {"reference": reference},
+        as_dict=True,
+    )
+    names = list(dict.fromkeys(row["name"] for row in rows if row.get("name")))
+    if not names:
+        frappe.throw(
+            _("No POS Invoice found for reference {0}.").format(reference)
+        )
+    if len(names) > 1:
+        # A collision must never select an arbitrary bill for a refund.
+        frappe.throw(
+            _("Reference {0} matches more than one POS Invoice; use the ERP invoice number.").format(
+                reference
+            )
+        )
+    return names[0]
+
+
 @frappe.whitelist()
-def get_pos_invoice_for_refund(invoice_name):
+def get_pos_invoice_for_refund(invoice_name=None, invoice_reference=None):
     """Return authoritative original-invoice data and refundable quantities.
 
     Never uses current Item Price or current Item tax config — every value comes
@@ -3503,8 +3556,9 @@ def get_pos_invoice_for_refund(invoice_name):
     shift-open — is enforced there, not here.
     """
     _require_login()
-    if not invoice_name:
-        frappe.throw(_("invoice_name is required"))
+    invoice_name = _resolve_pos_invoice_refund_reference(
+        invoice_reference or invoice_name
+    )
 
     original = frappe.get_doc("POS Invoice", invoice_name)
     original.check_permission("read")
