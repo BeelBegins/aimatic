@@ -1,0 +1,43 @@
+{
+ "actions": [],
+ "creation": "2026-11-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "issingle": 1,
+ "module": "Aimatic",
+ "name": "Weighing Scale Settings",
+ "field_order": [
+  "enabled",
+  "rules"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "0",
+   "description": "When enabled, every POS till uses these rules after its next catalogue sync, and the till's own rule editor becomes read-only."
+  },
+  {
+   "fieldname": "rules",
+   "fieldtype": "Table",
+   "label": "Label Rules",
+   "options": "Weighing Scale Rule"
+  }
+ ],
+ "modified": "2026-11-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "role": "System Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

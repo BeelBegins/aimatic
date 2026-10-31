@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "creation": "2026-11-01 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "istable": 1,
+ "module": "Aimatic",
+ "name": "Weighing Scale Rule",
+ "field_order": [
+  "rule_name",
+  "label_prefix",
+  "item_digits",
+  "value_digits",
+  "value_type",
+  "weight_unit",
+  "decimals",
+  "check_digit",
+  "erp_barcode_prefix"
+ ],
+ "fields": [
+  {
+   "fieldname": "rule_name",
+   "fieldtype": "Data",
+   "label": "Rule Name",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "label_prefix",
+   "fieldtype": "Data",
+   "label": "Label Prefix",
+   "default": "20",
+   "in_list_view": 1,
+   "description": "Digits printed first on every scale label, e.g. 20."
+  },
+  {
+   "fieldname": "item_digits",
+   "fieldtype": "Int",
+   "label": "Item Digits",
+   "default": "5",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "value_digits",
+   "fieldtype": "Int",
+   "label": "Value Digits",
+   "default": "5",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "value_type",
+   "fieldtype": "Select",
+   "label": "Value Is",
+   "options": "Weight\nPrice\nPiece Count",
+   "default": "Weight",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "weight_unit",
+   "fieldtype": "Select",
+   "label": "Weight Unit",
+   "options": "Gram\nKg",
+   "default": "Gram",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "decimals",
+   "fieldtype": "Int",
+   "label": "Decimals",
+   "default": "0"
+  },
+  {
+   "fieldname": "check_digit",
+   "fieldtype": "Check",
+   "label": "Check Digit",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "erp_barcode_prefix",
+   "fieldtype": "Data",
+   "label": "ERP Barcode Starts With",
+   "default": "SC",
+   "in_list_view": 1,
+   "description": "Item Barcode = this + item digits, e.g. SC29111."
+  }
+ ],
+ "modified": "2026-11-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

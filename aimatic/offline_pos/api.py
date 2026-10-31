@@ -1358,6 +1358,19 @@ def resolve_pos_catalog_item(barcode_or_item_code=None, pos_profile=None):
 
 
 @frappe.whitelist()
+def get_weighing_scale_rules():
+    """Central weighing-scale label rules (Weighing Scale Settings) for every till.
+
+    Response keys: managed, rules, modified. managed=False means no central rules are
+    enabled and each till keeps its own. Read-only; the POS user has no DocType access.
+    """
+    _require_login()
+    from aimatic.aimatic.doctype.weighing_scale_settings.weighing_scale_settings import pos_scale_rules
+
+    return pos_scale_rules()
+
+
+@frappe.whitelist()
 def get_uom_conversions(limit_start=0, limit_page_length=500, modified_after=None):
     """Return UOM conversion factors for active sales items.
 
