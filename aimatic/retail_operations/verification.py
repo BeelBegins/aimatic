@@ -90,3 +90,61 @@ def runtime_summary(enqueue=False):
 		)
 	value["verification_job_status"] = str(get_job_status("retail-operations-verification"))
 	return value
+
+
+def destination_summary(source_branch="S1 - Ghouri Town VIP"):
+	frappe.only_for("System Manager")
+	from aimatic.retail_operations.calculations import CHANNELS, fingerprint, webhook_valid
+
+	source = frappe.get_doc("Branch", source_branch)
+	result = {}
+	for channel in CHANNELS:
+		field = "custom_discord_" + channel.lower()
+		address = source.get_password(field, raise_exception=False)
+		matches = 0
+		for name in frappe.get_all("Branch", filters={"company": source.company}, pluck="name"):
+			other = frappe.get_doc("Branch", name).get_password(field, raise_exception=False)
+			matches += bool(address and other and fingerprint(address) == fingerprint(other))
+		result[channel] = dict(
+			configured=bool(address),
+			valid=bool(address and webhook_valid(address)),
+			matching_branches=matches,
+		)
+	return result
+
+
+def activate_discord():
+	"""Publish the initial, current reports after an administrator configures routes."""
+	frappe.only_for("System Manager")
+	from frappe.utils import today
+
+	from aimatic.retail_operations.calculations import CHANNELS
+	from aimatic.retail_operations.discord import queue_digests, route
+	from aimatic.retail_operations.service import latest
+	from aimatic.retail_operations.tasks import drain_deliveries
+
+	branches = frappe.get_all("Branch", filters={"custom_operations_enabled": 1}, pluck="name")
+	if not branches:
+		frappe.throw("No enabled branches")
+	for branch in branches:
+		snapshot = latest(branch)
+		if not snapshot or snapshot["errors"] or any(not route(branch, c) for c in CHANNELS):
+			frappe.throw("Every enabled branch needs current reports and four valid destinations")
+	config = frappe.get_single("Retail Operations Settings")
+	config.discord_enabled = 1
+	config.save()
+	for channel in CHANNELS:
+		queue_digests(branches, channel, "initial-" + today())
+	frappe.db.commit()
+	drain_deliveries()
+	return delivery_summary()
+
+
+def delivery_summary():
+	frappe.only_for("System Manager")
+	return frappe.db.sql(
+		"""SELECT channel, status, COUNT(*) AS messages,
+		SUM(CASE WHEN discord_message_id IS NOT NULL AND discord_message_id != '' THEN 1 ELSE 0 END) AS confirmed_ids
+		FROM `tabRetail Discord Delivery` GROUP BY channel, status ORDER BY channel, status""",
+		as_dict=True,
+	)
