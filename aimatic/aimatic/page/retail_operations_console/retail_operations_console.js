@@ -4,6 +4,7 @@ frappe.pages["retail-operations-console"].on_page_load = function (wrapper) {
     const esc = value => frappe.utils.escape_html(String(value ?? "—"));
     const body = $("<div class='retail-operations p-3'></div>").appendTo(page.body);
     let ctx, current, offset = 0;
+    let issueOffset = 0, issueSubject = "", issueStatus = "Active", issueSearch = "", issueScope = "", issueRequest = 0;
     const branch = page.add_field({fieldname: "branch", label: __("Branch"), fieldtype: "Link", options: "Branch", change: () => {offset=0; load();}});
     const channel = page.add_field({fieldname: "channel", label: __("Report"), fieldtype: "Select", options: "Inventory", default: "Inventory", change: () => {offset=0; load();}});
     page.set_primary_action(__("Refresh evidence"), async () => {
@@ -27,6 +28,11 @@ frappe.pages["retail-operations-console"].on_page_load = function (wrapper) {
     async function load() {
         if (!ctx || !branch.get_value() || !channel.get_value()) return;
         const selected = branch.get_value(), selectedChannel=channel.get_value();
+        issueRequest++;
+        if (issueScope !== selected + ":" + selectedChannel) {
+            issueScope = selected + ":" + selectedChannel;
+            issueOffset = 0; issueSubject = ""; issueStatus = "Active"; issueSearch = "";
+        }
         body.html("<p class='text-muted'>Loading recorded evidence…</p>");
         try {
             const result = await frappe.xcall(api+"report", {branch:selected,channel:selectedChannel,offset,limit:100});
@@ -37,6 +43,7 @@ frappe.pages["retail-operations-console"].on_page_load = function (wrapper) {
             let html="<div class='alert alert-info'><b>"+esc(selected)+"</b> · Evidence: "+esc(result.cutoff)+" · Business date: "+esc(result.business_date)+"<br>"+esc(ctx.discord_enabled?"Discord sending enabled for configured branches.":"Discord sending is off. Reports remain available here.")+"</div>";
             if (selectedChannel==="Inventory") {
                 html+="<p>"+Object.entries(r.summary).map(([k,v])=>esc(k)+": <b>"+esc(v)+"</b>").join(" · ")+"</p>";
+                html+="<p><button class='btn btn-default btn-sm' data-show-issues>Review tracked issues ↓</button></p>";
                 html+=table(r.rows,[["item_code","Item"],["item_name","Product"],["actual_qty","Recorded"],["available_qty","Qualified available"],["daily_demand","Demand/day"],["days_cover","Cover days"],["status","Status"],["flags","Review reasons"]]);
                 html+="<p>Rows "+(offset+1)+"–"+Math.min(offset+100,r.total_rows)+" of "+r.total_rows+" <button class='btn btn-sm btn-default' data-page='prev'>Previous</button> <button class='btn btn-sm btn-default' data-page='next'>Next</button></p>";
                 html+="<h4>Possible reference mismatches</h4>"+table(r.reference_candidates,[["items","References"],["reason","Evidence"]]);
@@ -62,20 +69,79 @@ frappe.pages["retail-operations-console"].on_page_load = function (wrapper) {
                 html+="<p>"+esc(r.note)+"</p>"+table(r.supplier_dues,[["supplier","Vendor"],["currency","Currency"],["bills","Bills"],["outstanding","Outstanding"],["overdue","Overdue"],["earliest_due","Earliest due"]]);
                 html+="<h4>Received but unbilled</h4>"+table(r.received_unbilled,[["supplier","Vendor"],["receipts","Receipts"],["estimated_unbilled_net","Estimated unbilled net"]])+"<p>"+esc(r.cash_reconciliation)+"</p>";
             }
-            html+="<h4>Tracked issues</h4><div data-issues></div>";
+            html+="<section data-issue-section aria-label='Tracked issues' style='scroll-margin-top:80px'><h4>Tracked issues</h4><p class='text-muted'>One finding per item or transaction. New means awaiting review. Quantities below are recorded evidence, not a physical stock count.</p><div data-issues></div></section>";
             body.html(html);
             body.find("[data-page]").on("click",e=>{offset=Math.max(0,offset+($(e.currentTarget).data("page")==="next"?100:-100));load();});
             body.find("[data-order]").on("click",e=>order(r.vendors[$(e.currentTarget).data("order")]));
             body.find("[data-export]").on("click",e=>download(r.vendors[$(e.currentTarget).data("export")]));
-            const found=await frappe.xcall(api+"issues",{branch:selected,channel:selectedChannel});
-            if (selected!==branch.get_value() || selectedChannel!==channel.get_value()) return;
-            const container=body.find("[data-issues]");
-            container.html(found.map(i=>"<div class='mb-2'><b>"+esc(i.subject)+"</b> · "+esc(i.status)+" · "+esc(i.last_changed)+" <button class='btn btn-xs btn-default' data-issue='"+esc(i.name)+"'>Update</button></div>").join("") || "No tracked issues.");
-            container.find("[data-issue]").on("click",e=>{
-                const name=$(e.currentTarget).data("issue");
-                frappe.prompt([{fieldname:"status",label:__("Status"),fieldtype:"Select",options:"Acknowledged\nAction underway\nResolved\nMuted",reqd:1},{fieldname:"reason",label:__("Reason"),fieldtype:"Small Text",reqd:1},{fieldname:"mute_until",label:__("Mute until"),fieldtype:"Datetime"}],async values=>{await frappe.xcall(api+"set_issue_status",{name,...values});load();});
-            });
+            body.find("[data-show-issues]").on("click",()=>body.find("[data-issue-section]")[0].scrollIntoView({behavior:"smooth",block:"start"}));
+            await loadIssues(selected, selectedChannel);
         } catch(error) {body.text("Report unavailable. "+(error.message || "Check server logs."));}
+    }
+    async function loadIssues(selected, selectedChannel) {
+        const request = ++issueRequest, container = body.find("[data-issues]");
+        const fmt = value => value == null ? "—" : new Intl.NumberFormat("en", {maximumFractionDigits:3}).format(value);
+        const date = value => value ? frappe.datetime.str_to_user(String(value).slice(0,19)) : "—";
+        try {
+            const result = await frappe.xcall(api+"issue_queue", {
+                branch:selected, channel:selectedChannel, offset:issueOffset, limit:25,
+                subject:issueSubject, status:issueStatus, search:issueSearch
+            });
+            if (request !== issueRequest || selected !== branch.get_value() || selectedChannel !== channel.get_value()) return;
+            if (issueOffset && issueOffset >= result.total) {
+                issueOffset = result.total ? Math.floor((result.total-1)/25)*25 : 0;
+                return loadIssues(selected, selectedChannel);
+            }
+            const all = result.groups.reduce((total, group)=>total+group.count,0);
+            const types = [{subject:"",count:all}, ...result.groups];
+            let html = `<div class="mb-3" role="group" aria-label="Issue types">${types.map((group,index)=>
+                `<button class="btn btn-sm ${group.subject===issueSubject?"btn-primary":"btn-default"} mr-2 mb-2" data-issue-type="${index}" aria-pressed="${group.subject===issueSubject}">${esc(group.subject||"All types")} <b>${fmt(group.count)}</b></button>`
+            ).join("")}</div>`;
+            html += `<form data-issue-search class="form-inline mb-3">
+                <label class="mr-2" for="retail-issue-status">Status</label>
+                <select id="retail-issue-status" class="form-control input-sm mr-3" data-issue-status>${["Active","All","New","Acknowledged","Action underway","Resolved","Muted"].map(status=>`<option ${status===issueStatus?"selected":""}>${esc(status)}</option>`).join("")}</select>
+                <label class="sr-only" for="retail-issue-query">Search item, code or transaction</label>
+                <input id="retail-issue-query" type="search" class="form-control input-sm mr-2" placeholder="Search item, code or transaction" value="${esc(issueSearch)}" maxlength="140">
+                <button class="btn btn-default btn-sm" type="submit">Search</button>
+            </form>`;
+            const stock = selectedChannel === "Inventory";
+            const rows = result.rows;
+            html += `<p class="text-muted" data-issue-count>${result.total?`${fmt(issueOffset+1)}–${fmt(issueOffset+rows.length)} of ${fmt(result.total)} matching issues`:"No issues match these filters."} · Active excludes resolved and muted findings.</p>`;
+            if (rows.length) {
+                html += `<div class="table-responsive"><table class="table table-bordered table-sm" data-issue-table>
+                    <thead><tr>${["Product / transaction","Issue",stock?"Recorded stock":"Recorded amount / margin","Status","Last change","Investigate"].map(title=>`<th scope="col">${title}</th>`).join("")}</tr></thead><tbody>`;
+                html += rows.map((issue,index)=>{
+                    const identity = issue.item_name || issue.document || issue.item_code || "Details unavailable";
+                    const details = [issue.item_code, issue.warehouse, issue.pos_profile].filter(Boolean).map(value=>`<div class="text-muted small">${esc(value)}</div>`).join("");
+                    const quantity = stock
+                        ? `<b>${fmt(issue.actual_qty)}</b> ${esc(issue.stock_uom||"")}<div class="small text-muted">Cover: ${fmt(issue.days_cover)} days · sales ${fmt(issue.daily_demand)}/day</div>`
+                        : issue.amount != null ? fmt(issue.amount) : `Profit ${fmt(issue.profit)} · margin ${fmt(issue.margin_percent)}%`;
+                    const flags = (Array.isArray(issue.flags)?issue.flags:[]).map(flag=>`<div class="small text-muted">${esc(flag)}</div>`).join("");
+                    return `<tr><td><strong>${esc(identity)}</strong>${details}</td><td>${esc(issue.subject)}${flags}</td><td>${quantity}</td>
+                        <td><span class="indicator-pill ${issue.status==="New"?"orange":"blue"}">${esc(issue.status)}</span></td>
+                        <td title="Last checked: ${esc(date(issue.last_seen))}">${esc(date(issue.last_changed))}</td>
+                        <td>${stock&&issue.item_code&&issue.warehouse?`<button class="btn btn-default btn-xs mb-1" data-issue-ledger="${index}">Stock ledger</button><br>`:""}<button class="btn btn-default btn-xs mb-1" data-issue-record="${index}">Details</button> <button class="btn btn-default btn-xs mb-1" data-issue-update="${index}">Update status</button></td></tr>`;
+                }).join("") + "</tbody></table></div>";
+            }
+            html += `<div class="mb-3"><button class="btn btn-default btn-sm mr-2" data-issue-page="prev" ${issueOffset===0?"disabled":""}>Previous issues</button><button class="btn btn-default btn-sm" data-issue-page="next" ${issueOffset+rows.length>=result.total?"disabled":""}>Next issues</button></div>`;
+            container.html(html);
+            const reload = ()=>loadIssues(selected, selectedChannel);
+            container.find("[data-issue-type]").on("click",event=>{issueSubject=types[Number(event.currentTarget.dataset.issueType)].subject;issueOffset=0;reload();});
+            container.find("[data-issue-status]").on("change",event=>{issueStatus=event.currentTarget.value;issueOffset=0;reload();});
+            container.find("[data-issue-search]").on("submit",event=>{event.preventDefault();issueSearch=container.find("#retail-issue-query").val().trim();issueOffset=0;reload();});
+            container.find("[data-issue-page]").on("click",event=>{issueOffset=Math.max(0,issueOffset+(event.currentTarget.dataset.issuePage==="next"?25:-25));reload();});
+            container.find("[data-issue-record]").on("click",event=>frappe.set_route("Form","Retail Operations Issue",rows[Number(event.currentTarget.dataset.issueRecord)].name));
+            container.find("[data-issue-ledger]").on("click",event=>{
+                const issue=rows[Number(event.currentTarget.dataset.issueLedger)];
+                frappe.set_route("query-report","Stock Ledger",{company:result.company,item_code:issue.item_code,warehouse:issue.warehouse});
+            });
+            container.find("[data-issue-update]").on("click",event=>{
+                const issue=rows[Number(event.currentTarget.dataset.issueUpdate)];
+                frappe.prompt([{fieldname:"status",label:__("Status"),fieldtype:"Select",options:"Acknowledged\nAction underway\nResolved\nMuted",reqd:1},{fieldname:"reason",label:__("Reason"),fieldtype:"Small Text",reqd:1},{fieldname:"mute_until",label:__("Mute until"),fieldtype:"Datetime"}],async values=>{await frappe.xcall(api+"set_issue_status",{name:issue.name,...values});await reload();},__("Update issue: "+(issue.item_name||issue.item_code||issue.subject)));
+            });
+        } catch(error) {
+            if (request===issueRequest) container.html("<p class='text-danger'>Unable to load issues. Use Reload to try again.</p>");
+        }
     }
     function download(vendor) {
         const columns=["branch","item_code","item_name","stock_uom","available_qty","daily_demand","days_cover","suggested_qty","estimated_value","confidence","flags"];

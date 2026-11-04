@@ -12,6 +12,67 @@ from aimatic.retail_operations import api, service
 
 
 class IntegrationTest(unittest.TestCase):
+	def test_issue_queue_identifies_products_and_scopes_filters_and_pages(self):
+		for index, state in enumerate(("New", "Acknowledged", "Resolved")):
+			service.write_internal(
+				frappe.get_doc(
+					dict(
+						doctype="Retail Operations Issue",
+						branch=self.branch.name,
+						company=self.branch.company,
+						issue_key="test-issue-queue-" + str(index),
+						channel="Inventory",
+						subject="Negative stock",
+						severity="Warning",
+						status=state,
+						last_changed=frappe.utils.now_datetime(),
+						evidence=json.dumps(
+							dict(
+								item_code=self.item,
+								item_name="TEST-ISSUE-QUEUE Product " + str(index),
+								actual_qty=-index - 1,
+								stock_uom="Pcs",
+								flags=["Verify stock references"],
+								internal_only="must-not-leak",
+							)
+						),
+					)
+				)
+			)
+		user = self.user("Stock Manager")
+		frappe.set_user(user)
+		queue = api.issue_queue(self.branch.name, search="TEST-ISSUE-QUEUE", limit=1)
+		self.assertEqual(queue["total"], 2)
+		self.assertEqual(len(queue["rows"]), 1)
+		self.assertEqual(queue["groups"], [dict(subject="Negative stock", count=2)])
+		row = queue["rows"][0]
+		self.assertEqual(row["item_code"], self.item)
+		self.assertEqual(row["warehouse"], self.branch.finished_goods_warehouse)
+		self.assertLess(row["actual_qty"], 0)
+		self.assertEqual(row["stock_uom"], "Pcs")
+		self.assertNotIn("must-not-leak", json.dumps(queue, default=str))
+		second = api.issue_queue(self.branch.name, search="TEST-ISSUE-QUEUE", limit=1, offset=1)
+		self.assertNotEqual(second["rows"][0]["name"], row["name"])
+		self.assertEqual(
+			api.issue_queue(self.branch.name, search="TEST-ISSUE-QUEUE", status="All")["total"], 3
+		)
+		self.assertEqual(
+			api.issue_queue(self.branch.name, search="TEST-ISSUE-QUEUE Product 2", status="Resolved")[
+				"total"
+			],
+			1,
+		)
+		self.assertEqual(
+			api.issue_queue(self.branch.name, search="TEST-ISSUE-QUEUE", subject="Overstock")["total"], 0
+		)
+		self.assertEqual(
+			api.issue_queue(self.branch.name, search="TEST-ISSUE-QUEUE%", status="All")["total"], 0
+		)
+		with self.assertRaises(frappe.PermissionError):
+			api.issue_queue(self.other)
+		with self.assertRaises(frappe.PermissionError):
+			api.issue_queue(self.branch.name, channel="Sales")
+
 	def test_layout_revision_keeps_existing_discord_messages(self):
 		from aimatic.retail_operations import discord
 		from aimatic.retail_operations.test_presentation import snapshot

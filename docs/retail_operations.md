@@ -108,6 +108,14 @@ provider secrets. No tools or writes are exposed to the model. Provider errors
 are sanitized and deterministic reporting continues. Conversational Discord
 commands require a separate Discord application and are outside webhook setup.
 
+The console's tracked issue queue defaults to active findings, with counts by
+issue type, status filters, product/document search and 25-row pages. Inventory
+rows identify the product, item code, warehouse, recorded quantity and stock unit,
+sales pace and cover. Stock Ledger opens with the selected item's warehouse and
+company; Details opens the existing issue and Update Status retains a required
+reason. Last change describes the finding, not the stock movement time. The queue
+uses branch/channel permission checks and returns selected evidence fields only.
+
 ## Known data/integration boundaries
 
 Historical cart voids cannot be reconstructed from supervisor authorization

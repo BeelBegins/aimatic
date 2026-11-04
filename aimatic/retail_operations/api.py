@@ -88,6 +88,74 @@ def issues(branch, channel="Inventory", offset=0):
 	)
 
 
+@frappe.whitelist()
+def issue_queue(branch, channel="Inventory", offset=0, limit=25, subject=None, status="Active", search=None):
+	"""A bounded, branch-authorised work queue with explicit item/document evidence."""
+	b = check(branch, channel)
+	if status not in ("Active", "All", "New", "Acknowledged", "Action underway", "Resolved", "Muted"):
+		frappe.throw("Choose a valid issue status")
+	start, size = max(0, int(offset)), min(100, max(1, int(limit)))
+	conditions = ["branch=%(branch)s", "channel=%(channel)s"]
+	params = dict(branch=branch, channel=channel, start=start, size=size)
+	if status == "Active":
+		conditions.append("status NOT IN ('Resolved','Muted')")
+	elif status != "All":
+		conditions.append("status=%(status)s")
+		params["status"] = status
+	if search and str(search).strip():
+		value = str(search).strip()[:140].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+		params["search"] = "%" + value + "%"
+		conditions.append("(subject LIKE %(search)s OR evidence LIKE %(search)s)")
+	where = " AND ".join(conditions)
+	groups = frappe.db.sql(
+		f"""SELECT subject,COUNT(*) AS count FROM `tabRetail Operations Issue`
+		WHERE {where} GROUP BY subject ORDER BY count DESC,subject""",
+		params,
+		as_dict=True,
+	)
+	if subject:
+		conditions.append("subject=%(subject)s")
+		params["subject"] = str(subject)[:140]
+	where = " AND ".join(conditions)
+	total = frappe.db.sql(f"SELECT COUNT(*) FROM `tabRetail Operations Issue` WHERE {where}", params)[0][0]
+	rows = frappe.db.sql(
+		f"""SELECT name,subject,severity,status,last_seen,last_changed,reason,evidence
+		FROM `tabRetail Operations Issue` WHERE {where}
+		ORDER BY FIELD(severity,'Urgent','Warning','Info'),last_changed DESC,name
+		LIMIT %(size)s OFFSET %(start)s""",
+		params,
+		as_dict=True,
+	)
+	for row in rows:
+		evidence = frappe.parse_json(row.pop("evidence") or "{}")
+		if not isinstance(evidence, dict):
+			evidence = {}
+		row.update(
+			{
+				key: evidence.get(key)
+				for key in (
+					"item_code",
+					"item_name",
+					"warehouse",
+					"actual_qty",
+					"available_qty",
+					"stock_uom",
+					"daily_demand",
+					"days_cover",
+					"flags",
+					"pos_profile",
+					"amount",
+					"profit",
+					"margin_percent",
+				)
+			}
+		)
+		if channel == "Inventory" and not row.warehouse:
+			row.warehouse = b.finished_goods_warehouse
+		row.document = evidence.get("name") if row.subject == "Large refund" else None
+	return dict(rows=rows, total=total, groups=groups, offset=start, limit=size, company=b.company)
+
+
 @frappe.whitelist(methods=["POST"])
 def set_issue_status(name, status, reason, mute_until=None):
 	doc = frappe.get_doc("Retail Operations Issue", name)
