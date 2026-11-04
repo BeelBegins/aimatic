@@ -119,9 +119,10 @@ uses branch/channel permission checks and returns selected evidence fields only.
 ## Known data/integration boundaries
 
 Historical cart voids cannot be reconstructed from supervisor authorization
-attempts. `record_void` is an authenticated idempotent endpoint for completed
-line/bill events. Existing cashier clients must emit those events before full
-counter void totals are available; reporting explicitly labels this coverage.
+attempts. Counter void totals read `POS Void Log`, which tills fill through
+`aimatic.offline_pos.api.log_pos_voids` (removed lines, cleared carts, deleted
+held sales; idempotent by till `eventId`). Tills older than the void-log
+release send nothing; reporting explicitly labels this coverage.
 Cash reconciliation is not claimed without independent source evidence.
 Reference suggestions use exact normalized full name/brand/unit and split
 balances as evidence, not automatic identity approval. Confirmed groups retain

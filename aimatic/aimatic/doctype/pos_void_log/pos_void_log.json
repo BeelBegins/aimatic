@@ -1,0 +1,267 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:event_id",
+ "creation": "2026-11-05 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "System",
+ "engine": "InnoDB",
+ "field_order": [
+  "event_id",
+  "kind",
+  "occurred_at",
+  "authorized_by",
+  "total_amount",
+  "column_break_1",
+  "cashier_user",
+  "cashier_name",
+  "reported_cashier_user",
+  "customer",
+  "section_terminal",
+  "pos_profile",
+  "branch",
+  "company",
+  "currency",
+  "column_break_2",
+  "terminal_id",
+  "hardware_id",
+  "pos_opening_entry",
+  "section_items",
+  "items",
+  "note",
+  "section_receipt",
+  "received_at",
+  "transport_user"
+ ],
+ "fields": [
+  {
+   "fieldname": "event_id",
+   "fieldtype": "Data",
+   "label": "Event ID",
+   "reqd": 1,
+   "unique": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "line_void\nclear_cart\nheld_sale_deleted",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "occurred_at",
+   "fieldtype": "Datetime",
+   "label": "Occurred At",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "authorized_by",
+   "fieldtype": "Select",
+   "label": "Authorized By",
+   "options": "supervisor_prompt\ncashier_privilege",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "cashier_privilege: the cashier's own role allowed the void and nobody else approved it.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Total Amount",
+   "options": "currency",
+   "in_list_view": 1,
+   "description": "Quantity x selling rate before tax, as estimated by the till.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "cashier_user",
+   "fieldtype": "Link",
+   "label": "Cashier",
+   "options": "User",
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "cashier_name",
+   "fieldtype": "Data",
+   "label": "Cashier Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reported_cashier_user",
+   "fieldtype": "Data",
+   "label": "Reported Cashier User",
+   "description": "Cashier user as sent by the till, kept when it does not match a User.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Data",
+   "label": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_terminal",
+   "fieldtype": "Section Break",
+   "label": "Terminal"
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break",
+   "label": ""
+  },
+  {
+   "fieldname": "terminal_id",
+   "fieldtype": "Data",
+   "label": "Terminal ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hardware_id",
+   "fieldtype": "Data",
+   "label": "Hardware ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pos_opening_entry",
+   "fieldtype": "Data",
+   "label": "POS Opening Entry",
+   "description": "As reported by the till; may be blank or an offline shift reference.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_items",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "POS Void Log Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Small Text",
+   "label": "Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_receipt",
+   "fieldtype": "Section Break",
+   "label": "Receipt",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "received_at",
+   "fieldtype": "Datetime",
+   "label": "Received At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transport_user",
+   "fieldtype": "Link",
+   "label": "Sent By",
+   "options": "User",
+   "description": "The authenticated terminal or device session that delivered this record.",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-05 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aimatic",
+ "name": "POS Void Log",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 0,
+   "share": 0,
+   "create": 0
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "POS Supervisor",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  }
+ ],
+ "sort_field": "occurred_at",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "cashier_name",
+ "track_changes": 1
+}

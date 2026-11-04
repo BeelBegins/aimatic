@@ -3888,3 +3888,167 @@ def submit_pos_refund(
             raise
 
     return _build_refund_response(return_doc, duplicate=False)
+
+
+# ---------------------------------------------------------------------------
+# Void log: cart lines removed, carts cleared and held sales deleted on a till.
+# The till records each void locally first and retries this call until the
+# eventId comes back in `accepted`, so the endpoint must be idempotent and must
+# never accept an event it did not store.
+# ---------------------------------------------------------------------------
+
+_VOID_KINDS = {"line_void", "clear_cart", "held_sale_deleted"}
+_VOID_AUTHORIZED_BY = {"supervisor_prompt", "cashier_privilege"}
+_VOID_MAX_EVENTS_PER_CALL = 100
+_VOID_MAX_LINES_PER_EVENT = 500
+
+
+def _void_text(value, length=140):
+    return str(value or "").strip()[:length]
+
+
+def _void_occurred_at(value):
+    """The till sends ISO-8601 UTC (`2026-11-05T09:30:00.000Z`); store site-local naive time."""
+    from datetime import datetime
+
+    from frappe.utils.data import convert_utc_to_system_timezone
+
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError("createdAt is required")
+    parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed  # already site-local
+    return convert_utc_to_system_timezone(parsed).replace(tzinfo=None)
+
+
+def _build_void_log_doc(ev, request_profile, is_bearer):
+    event_id = _void_text(ev.get("eventId"))
+    if not event_id:
+        raise ValueError("eventId is required")
+    kind = ev.get("kind")
+    if kind not in _VOID_KINDS:
+        raise ValueError(f"unknown kind {kind!r}")
+    authorized_by = ev.get("authorizedBy")
+    if authorized_by not in _VOID_AUTHORIZED_BY:
+        raise ValueError(f"unknown authorizedBy {authorized_by!r}")
+    lines = ev.get("lines") or []
+    if not isinstance(lines, list) or len(lines) > _VOID_MAX_LINES_PER_EVENT:
+        raise ValueError("lines must be a list of at most %d rows" % _VOID_MAX_LINES_PER_EVENT)
+
+    # A Bearer (Android) session is bound to one profile; Electron may flush
+    # events recorded under an earlier profile, so keep the event's own profile
+    # when it is a real one.
+    profile_name = request_profile.name
+    event_profile = _void_text(ev.get("posProfile"))
+    if not is_bearer and event_profile and event_profile != profile_name:
+        if frappe.db.exists("POS Profile", event_profile):
+            profile_name = event_profile
+    profile = frappe.get_cached_doc("POS Profile", profile_name)
+
+    # The terminal API user is the transport identity, never the cashier.
+    reported_cashier = _void_text(ev.get("cashierUser"))
+    if is_bearer:
+        cashier_user = frappe.session.user
+    else:
+        cashier_user = reported_cashier if reported_cashier and frappe.db.exists("User", reported_cashier) else None
+
+    items = []
+    for line in lines:
+        if not isinstance(line, dict):
+            raise ValueError("each line must be an object")
+        item_code = _void_text(line.get("itemCode"))
+        qty, rate = flt(line.get("qty")), flt(line.get("rate"), 2)
+        items.append(
+            {
+                "item_code": item_code if item_code and frappe.db.exists("Item", item_code) else None,
+                "item_name": _void_text(line.get("itemName") or item_code),
+                "uom": _void_text(line.get("uom")),
+                "qty": qty,
+                "rate": rate,
+                # Recomputed, not taken from the till's own amount/total.
+                "amount": flt(qty * rate, 2),
+            }
+        )
+
+    return frappe.get_doc(
+        {
+            "doctype": "POS Void Log",
+            "event_id": event_id,
+            "kind": kind,
+            "occurred_at": _void_occurred_at(ev.get("createdAt")),
+            "authorized_by": authorized_by,
+            "total_amount": flt(sum(row["amount"] for row in items), 2),
+            "cashier_user": cashier_user,
+            "cashier_name": _void_text(ev.get("cashierName") or reported_cashier),
+            "reported_cashier_user": reported_cashier,
+            "customer": _void_text(ev.get("customer")),
+            "pos_profile": profile.name,
+            "branch": profile.get("branch"),
+            "company": profile.company,
+            "currency": profile.get("currency")
+            or frappe.get_cached_value("Company", profile.company, "default_currency"),
+            "terminal_id": _void_text(ev.get("terminalId")),
+            "hardware_id": _void_text(ev.get("hardwareId")),
+            "pos_opening_entry": _void_text(ev.get("openingEntry")),
+            "note": _void_text(ev.get("note"), 1000),
+            "received_at": now_datetime(),
+            "transport_user": frappe.session.user,
+            "items": items,
+        }
+    )
+
+
+@frappe.whitelist(methods=["POST"])
+def log_pos_voids(pos_profile, events):
+    """Store void events reported by a till.
+
+    Identity: Electron calls with the terminal's API user, so the cashier is
+    taken from each event (kept only when it is a real User; the raw value is
+    always stored). Android Bearer calls are bound to the enrolled device's
+    profile and the cashier is the session user.
+
+    Returns {"accepted": [eventId, ...], "rejected": [{eventId, error}]}.
+    An eventId is accepted once it is stored, including when it was already
+    stored by an earlier call; anything else stays queued on the till.
+    """
+    _require_login()
+    is_bearer = _is_bearer_authenticated_request()
+    if not pos_profile:
+        frappe.throw(_("pos_profile is required"))
+    _enforce_bearer_profile(pos_profile)
+    request_profile = _get_pos_profile_or_throw(pos_profile)
+    if not frappe.has_permission("POS Invoice", "create"):
+        frappe.throw(_("Not permitted to report POS voids"), frappe.PermissionError)
+
+    events = _parse_json_param(events, "events")
+    if not isinstance(events, list):
+        frappe.throw(_("events must be a list"))
+    if len(events) > _VOID_MAX_EVENTS_PER_CALL:
+        frappe.throw(_("Send at most {0} void events per call").format(_VOID_MAX_EVENTS_PER_CALL))
+
+    accepted, rejected = [], []
+    for ev in events:
+        event_id = _void_text(ev.get("eventId")) if isinstance(ev, dict) else ""
+        if event_id and frappe.db.exists("POS Void Log", event_id):
+            accepted.append(event_id)
+            continue
+        frappe.db.savepoint("pos_void_log")
+        try:
+            if not isinstance(ev, dict):
+                raise ValueError("event must be an object")
+            _build_void_log_doc(ev, request_profile, is_bearer).insert(ignore_permissions=True)
+            accepted.append(event_id)
+        except frappe.DuplicateEntryError:
+            # A concurrent sync from the same till stored it first.
+            frappe.db.rollback(save_point="pos_void_log")
+            accepted.append(event_id)
+        except Exception as exc:
+            frappe.db.rollback(save_point="pos_void_log")
+            rejected.append({"eventId": event_id, "error": str(exc)[:200]})
+            frappe.log_error(
+                title="POS void log rejected",
+                message=f"pos_profile={pos_profile} event_id={event_id}\n{frappe.get_traceback()}",
+            )
+
+    return {"accepted": accepted, "rejected": rejected}

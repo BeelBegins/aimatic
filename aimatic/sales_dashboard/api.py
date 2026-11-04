@@ -123,6 +123,7 @@ def get_dashboard_summary(
 	open_shifts = _get_open_shifts(company, branch_filter)
 	kpis["active_shift_count"] = len(open_shifts)
 	payment_split = _get_payment_split(company, date_from, date_to, branch_filter=branch_filter)
+	kpis.update(_get_void_kpis(company, date_from, date_to, branch_filter))
 
 	return {
 		"company": company,
@@ -246,6 +247,133 @@ def get_returns_detail(
 			for row in rows
 		],
 	}
+
+
+_VOID_DETAIL_LIMIT = 500
+
+
+def _void_scope(company, date_from, date_to, branch_filter):
+	clause = "AND v.branch IN %(branch_names)s" if branch_filter is not None else ""
+	params = {
+		"company": company,
+		"date_from": date_from,
+		"date_to": date_to,
+		"branch_names": tuple(branch_filter) if branch_filter else (),
+	}
+	return clause, params
+
+
+def _get_void_kpis(company: str, date_from, date_to, branch_filter: list[str] | None):
+	"""Voids reported by tills (POS Void Log). Zero, not an error, for users who
+	cannot read the log or are restricted to no branch."""
+	empty = {"void_count": 0, "void_amount": 0, "void_unapproved_count": 0, "void_unapproved_amount": 0}
+	# Shared bench: a site whose code is newer than its schema must still load
+	# the dashboard, so a missing table means "no voids yet", not an error.
+	if not frappe.db.table_exists("POS Void Log"):
+		return empty
+	if not frappe.has_permission("POS Void Log", ptype="read") or (
+		branch_filter is not None and not branch_filter
+	):
+		return empty
+	clause, params = _void_scope(company, date_from, date_to, branch_filter)
+	row = frappe.db.sql(
+		f"""
+        SELECT COUNT(*) AS void_count,
+               COALESCE(SUM(v.total_amount), 0) AS void_amount,
+               COALESCE(SUM(v.authorized_by = 'cashier_privilege'), 0) AS void_unapproved_count,
+               COALESCE(SUM(CASE WHEN v.authorized_by = 'cashier_privilege' THEN v.total_amount ELSE 0 END), 0)
+                   AS void_unapproved_amount
+        FROM `tabPOS Void Log` v
+        WHERE v.company = %(company)s
+          AND DATE(v.occurred_at) BETWEEN %(date_from)s AND %(date_to)s
+          {clause}
+        """,
+		params,
+		as_dict=True,
+	)[0]
+	return {
+		"void_count": cint(row.void_count),
+		"void_amount": flt(row.void_amount),
+		"void_unapproved_count": cint(row.void_unapproved_count),
+		"void_unapproved_amount": flt(row.void_unapproved_amount),
+	}
+
+
+@frappe.whitelist()
+def get_void_detail(
+	company: str | None = None,
+	date_from: str | None = None,
+	date_to: str | None = None,
+	branch: str | None = None,
+):
+	"""Void Details: totals by branch, cashier and day, plus the latest events with
+	their items. `cashier_privilege` voids had no supervisor approval."""
+	company, currency = _resolve_context(company, branch)
+	if not frappe.has_permission("POS Void Log", ptype="read"):
+		frappe.throw(_("Not permitted to view POS voids."), frappe.PermissionError)
+	date_from, date_to = _get_date_range(date_from, date_to)
+	branch_filter = _resolve_branch_filter(company, branch)
+	result = {
+		"currency": currency,
+		"by_branch": [],
+		"by_cashier": [],
+		"by_day": [],
+		"events": [],
+		"truncated": False,
+	}
+	if branch_filter is not None and not branch_filter:
+		return result
+	clause, params = _void_scope(company, date_from, date_to, branch_filter)
+	base = f"""
+        FROM `tabPOS Void Log` v
+        WHERE v.company = %(company)s
+          AND DATE(v.occurred_at) BETWEEN %(date_from)s AND %(date_to)s
+          {clause}
+    """
+	totals = """COUNT(*) AS events, COALESCE(SUM(v.total_amount), 0) AS amount,
+        COALESCE(SUM(v.authorized_by = 'cashier_privilege'), 0) AS unapproved"""
+	result["by_branch"] = frappe.db.sql(
+		f"SELECT COALESCE(v.branch, '') AS branch, {totals} {base} GROUP BY v.branch ORDER BY amount DESC",
+		params,
+		as_dict=True,
+	)
+	result["by_cashier"] = frappe.db.sql(
+		f"""SELECT COALESCE(v.cashier_user, v.reported_cashier_user) AS cashier_user,
+               MAX(v.cashier_name) AS cashier_name, {totals}
+        {base} GROUP BY COALESCE(v.cashier_user, v.reported_cashier_user) ORDER BY amount DESC""",
+		params,
+		as_dict=True,
+	)
+	result["by_day"] = frappe.db.sql(
+		f"SELECT DATE(v.occurred_at) AS day, {totals} {base} GROUP BY DATE(v.occurred_at) ORDER BY day DESC",
+		params,
+		as_dict=True,
+	)
+	events = frappe.db.sql(
+		f"""SELECT v.name, v.kind, v.occurred_at, v.authorized_by, v.total_amount, v.cashier_name,
+               v.cashier_user, v.customer, v.branch, v.pos_profile, v.terminal_id
+        {base} ORDER BY v.occurred_at DESC, v.name DESC LIMIT {_VOID_DETAIL_LIMIT + 1}""",
+		params,
+		as_dict=True,
+	)
+	result["truncated"] = len(events) > _VOID_DETAIL_LIMIT
+	events = events[:_VOID_DETAIL_LIMIT]
+	items_by_parent = {}
+	if events:
+		for row in frappe.get_all(
+			"POS Void Log Item",
+			filters={"parent": ["in", [e.name for e in events]], "parenttype": "POS Void Log"},
+			fields=["parent", "item_code", "item_name", "uom", "qty", "rate", "amount"],
+			order_by="idx asc",
+		):
+			items_by_parent.setdefault(row.pop("parent"), []).append(row)
+	for event in events:
+		event["occurred_at"] = str(event.occurred_at)
+		event["items"] = items_by_parent.get(event.name, [])
+	for row in result["by_day"]:
+		row["day"] = str(row.day)
+	result["events"] = events
+	return result
 
 
 @frappe.whitelist()

@@ -462,10 +462,16 @@ def sales(branch, settings, business_date):
 			negative=[r for r in ranked if r["profit"] < 0][:100],
 			note="Recorded COGS, excluding tax; reference/valuation anomalies still require review. Rankings show volume and exclude return lines.",
 		)
-	voids = sql(
-		"""SELECT pos_profile,event_type,COUNT(*) events,SUM(amount) amount FROM `tabRetail POS Void Event`
-        WHERE branch=%(branch)s AND DATE(occurred_at)=%(date)s GROUP BY pos_profile,event_type""",
-		p,
+	voids = (
+		sql(
+			"""SELECT pos_profile,kind event_type,COUNT(*) events,SUM(total_amount) amount,
+        SUM(authorized_by='cashier_privilege') without_supervisor FROM `tabPOS Void Log`
+        WHERE branch=%(branch)s AND company=%(company)s AND DATE(occurred_at)=%(date)s
+        GROUP BY pos_profile,kind""",
+			p,
+		)
+		if frappe.db.table_exists("POS Void Log")
+		else []
 	)
 	cancelled = sql(
 		"""SELECT pos_profile,COUNT(*) invoices FROM `tabPOS Invoice`
@@ -490,7 +496,7 @@ def sales(branch, settings, business_date):
 		large_refund_threshold=threshold,
 		margins=margins,
 		voids=voids,
-		void_coverage="Recorded prospective events only; client capture must be connected. Historical line/bill void totals unavailable.",
+		void_coverage="Voids reported by POS tills (POS Void Log), valued at qty x rate before tax. Tills older than the void-log release report none, and an offline till sends its voids when it reconnects.",
 		submitted_cancellations=cancelled,
 		total_refunds=round(sum(flt(c.refunds) for c in counters), 2),
 		refund_count=sum(c.refund_count for c in counters),

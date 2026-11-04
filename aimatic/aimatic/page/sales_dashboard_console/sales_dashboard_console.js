@@ -286,6 +286,17 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
 					"returns"
 				)}
                 ${this.card(
+					"payable",
+					"x-circle",
+					__("Voids"),
+					this.money(kpis.void_amount),
+					`${this.number(kpis.void_count)} ${__("void(s)")} · ${this.number(
+						kpis.void_unapproved_count
+					)} ${__("without supervisor")}`,
+					undefined,
+					"voids"
+				)}
+                ${this.card(
 					"payment",
 					"clock",
 					__("Active Shifts"),
@@ -614,6 +625,20 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
 			}
 			return;
 		}
+		if (key === "voids") {
+			const dialog = this.open_dialog(__("Void Details"));
+			try {
+				const data = await frappe.xcall(
+					"aimatic.sales_dashboard.api.get_void_detail",
+					filters
+				);
+				this.currency = data.currency;
+				dialog.$body.html(`<div class="sales-dashboard-page">${this.render_void_detail(data)}</div>`);
+			} catch (error) {
+				this.render_dialog_error(dialog, error);
+			}
+			return;
+		}
 		if (key === "top_branch") {
 			const dialog = this.open_dialog(__("Branch Comparison"));
 			const rows = (this.last_summary && this.last_summary.branch_comparison) || [];
@@ -679,6 +704,95 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
                         </tr>
                     </thead>
                     <tbody>${body}</tbody>
+                </table>
+            </div>
+        `;
+	}
+
+	render_void_detail(data) {
+		const events = data.events || [];
+		if (!events.length) {
+			return `<div class="sd-empty sd-empty-inline">${__(
+				"No voids reported by tills in the selected range."
+			)}</div>`;
+		}
+		const esc = (v) => frappe.utils.escape_html(v == null ? "" : String(v));
+		const kindLabel = {
+			line_void: __("Line removed"),
+			clear_cart: __("Cart cleared"),
+			held_sale_deleted: __("Held sale deleted"),
+		};
+		const authBadge = (value) =>
+			value === "cashier_privilege"
+				? `<span class="sd-badge sd-badge-warn">${__("No supervisor")}</span>`
+				: `<span class="sd-badge sd-badge-closed">${__("Supervisor")}</span>`;
+		const summaryTable = (title, rows, labelFn) => `
+            <h5 class="sd-void-heading">${title}</h5>
+            <div class="sd-table-wrap">
+                <table class="sd-table">
+                    <thead><tr>
+                        <th></th>
+                        <th class="sd-num">${__("Voids")}</th>
+                        <th class="sd-num">${__("No supervisor")}</th>
+                        <th class="sd-num">${__("Value")}</th>
+                    </tr></thead>
+                    <tbody>${rows
+						.map(
+							(row) => `<tr>
+                        <td>${labelFn(row)}</td>
+                        <td class="sd-num">${this.number(row.events)}</td>
+                        <td class="sd-num">${this.number(row.unapproved)}</td>
+                        <td class="sd-num">${this.money(row.amount)}</td>
+                    </tr>`
+						)
+						.join("")}</tbody>
+                </table>
+            </div>`;
+		const eventRows = events
+			.map((event) => {
+				const items = (event.items || [])
+					.map(
+						(item) =>
+							`${esc(item.item_name || item.item_code)} × ${this.number(item.qty)} ${esc(
+								item.uom
+							)} (${this.money(item.amount)})`
+					)
+					.join("<br>");
+				return `<tr>
+                    <td>${this.docLink("POS Void Log", event.name, frappe.datetime.str_to_user(event.occurred_at))}</td>
+                    <td>${esc(kindLabel[event.kind] || event.kind)}</td>
+                    <td>${authBadge(event.authorized_by)}</td>
+                    <td>${esc(event.cashier_name || event.cashier_user)}</td>
+                    <td>${esc(event.branch)}<div class="sd-item-meta">${esc(event.pos_profile)}</div></td>
+                    <td>${esc(event.customer)}</td>
+                    <td>${items}</td>
+                    <td class="sd-num">${this.money(event.total_amount)}</td>
+                </tr>`;
+			})
+			.join("");
+		return `
+            <p class="sd-item-meta">${__(
+				"Value is quantity × selling rate before tax, as reported by the till. 'No supervisor' voids were allowed by the cashier's own role with no approval: review these first."
+			)}</p>
+            ${summaryTable(__("By Branch"), data.by_branch || [], (row) => esc(row.branch || __("Unassigned")))}
+            ${summaryTable(__("By Cashier"), data.by_cashier || [], (row) => esc(row.cashier_name || row.cashier_user))}
+            ${summaryTable(__("By Day"), data.by_day || [], (row) => esc(frappe.datetime.str_to_user(row.day)))}
+            <h5 class="sd-void-heading">${
+				data.truncated ? __("Latest {0} voids", [events.length]) : __("All voids")
+			}</h5>
+            <div class="sd-table-wrap">
+                <table class="sd-table">
+                    <thead><tr>
+                        <th>${__("When")}</th>
+                        <th>${__("Kind")}</th>
+                        <th>${__("Approval")}</th>
+                        <th>${__("Cashier")}</th>
+                        <th>${__("Branch / Counter")}</th>
+                        <th>${__("Customer")}</th>
+                        <th>${__("Items")}</th>
+                        <th class="sd-num">${__("Value")}</th>
+                    </tr></thead>
+                    <tbody>${eventRows}</tbody>
                 </table>
             </div>
         `;

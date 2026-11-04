@@ -292,55 +292,6 @@ def delivery_health():
 
 
 @frappe.whitelist(methods=["POST"])
-def record_void(branch, event_key, pos_profile, event_type, amount, reason, item_code=None, qty=None):
-	# This records a completed client event, never a supervisor authorization attempt.
-	b = frappe.get_doc("Branch", branch)
-	if frappe.session.user == "Guest" or not frappe.has_permission("POS Invoice", "create"):
-		frappe.throw("POS access required", frappe.PermissionError)
-	profile = frappe.get_doc("POS Profile", pos_profile)
-	if (
-		profile.company != b.company
-		or profile.branch != branch
-		or not frappe.has_permission("POS Profile", "read", doc=profile)
-	):
-		frappe.throw("Counter is not permitted", frappe.PermissionError)
-	if (
-		event_type not in ("Line void", "Bill void")
-		or not reason
-		or not event_key
-		or len(event_key) > 140
-		or flt(amount) < 0
-		or flt(qty or 0) < 0
-	):
-		frappe.throw("Invalid completed void event")
-	from aimatic.retail_operations.service import write_internal
-
-	key = fingerprint([branch, pos_profile, event_key])
-	existing = frappe.db.get_value("Retail POS Void Event", {"event_key": key}, "name")
-	if existing:
-		return existing
-	doc = frappe.get_doc(
-		dict(
-			doctype="Retail POS Void Event",
-			branch=branch,
-			company=b.company,
-			event_key=key,
-			pos_profile=pos_profile,
-			event_type=event_type,
-			amount=flt(amount),
-			reason=reason,
-			item_code=item_code,
-			qty=flt(qty),
-			occurred_at=now_datetime(),
-			cashier=frappe.session.user,
-		)
-	)
-	# Validation checks the permitted branch; do not broaden cashier permissions.
-	doc.flags.operations_internal = True
-	return doc.insert(ignore_permissions=True).name
-
-
-@frappe.whitelist(methods=["POST"])
 def reconcile_delivery(name, reason, confirmed_not_received=0, message_id=None):
 	frappe.only_for("System Manager")
 	if not reason:

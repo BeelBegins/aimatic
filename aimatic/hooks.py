@@ -765,7 +765,7 @@ doc_events.setdefault("Branch", {}).setdefault("validate", [])
 if isinstance(doc_events["Branch"]["validate"], str):
     doc_events["Branch"]["validate"] = [doc_events["Branch"]["validate"]]
 doc_events["Branch"]["validate"].append("aimatic.retail_operations.documents.validate_branch")
-for _ops_doctype in ("Retail Purchase Commitment", "Retail Product Reference", "Retail Replenishment Rule", "Retail POS Void Event"):
+for _ops_doctype in ("Retail Purchase Commitment", "Retail Product Reference", "Retail Replenishment Rule"):
     permission_query_conditions[_ops_doctype] = "aimatic.retail_operations.permissions.query_conditions"
     has_permission[_ops_doctype] = "aimatic.retail_operations.permissions.has_permission"
 permission_query_conditions["Retail Operations Issue"] = "aimatic.retail_operations.permissions.issue_query"

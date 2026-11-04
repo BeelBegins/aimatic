@@ -16,7 +16,6 @@ DOCTYPES = (
 	"Retail Purchase Commitment",
 	"Retail Product Reference",
 	"Retail Replenishment Rule",
-	"Retail POS Void Event",
 )
 
 

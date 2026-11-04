@@ -47,8 +47,7 @@ class OperationsDocument(Document):
 			return
 		branch = (
 			frappe.get_doc("Branch", self.branch)
-			if self.doctype in ("Retail POS Void Event", "Retail Operations Issue")
-			and self.flags.operations_internal
+			if self.doctype == "Retail Operations Issue" and self.flags.operations_internal
 			else check(self.branch)
 		)
 		self.company = branch.company
@@ -166,9 +165,6 @@ class OperationsDocument(Document):
 			)
 			if duplicate:
 				frappe.throw("A rule already exists for this item and branch")
-		elif self.doctype == "Retail POS Void Event":
-			if not self.flags.operations_internal:
-				frappe.throw("Void events must come from the authenticated event API")
 
 
 def validate_branch(doc, method=None):

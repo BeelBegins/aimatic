@@ -537,6 +537,15 @@
     color: var(--text-muted);
 }
 
+.sales-dashboard-page .sd-badge-warn {
+    background: var(--alert-bg-warning, var(--bg-yellow));
+    color: var(--alert-text-warning, var(--text-on-yellow));
+}
+
+.sales-dashboard-page .sd-void-heading {
+    margin: 16px 0 8px;
+}
+
 /* ---------- Tables (shared taxonomy with vendor_performance_console) ---------- */
 
 .sales-dashboard-page .sd-table-wrap {
