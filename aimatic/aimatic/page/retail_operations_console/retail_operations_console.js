@@ -96,7 +96,9 @@ frappe.pages["retail-operations-console"].on_page_load = function (wrapper) {
         }});dialog.show();
     }
     frappe.xcall(api+"context").then(value=>{
-        ctx=value;channel.df.options=ctx.channels.join("\n");channel.refresh();channel.set_value(ctx.channels[0]);
+        ctx=value;channel.df.options=ctx.channels.join("\n");channel.refresh();
+        const requestedChannel=new URLSearchParams(window.location.search).get("channel");
+        channel.set_value(ctx.channels.includes(requestedChannel)?requestedChannel:ctx.channels[0]);
         branch.get_query = ()=>({filters:{name:["in",ctx.branches.map(b=>b.name)]}});
         if (ctx.can_manage) {
             page.add_menu_item(__("Operations settings"),()=>frappe.set_route("Form","Retail Operations Settings"));

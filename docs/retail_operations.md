@@ -83,6 +83,15 @@ suppression. Stable findings are updated, not recreated. Daily digest revisions
 edit the existing Discord message where content changes. Mention parsing is
 disabled. A snapshot older than two hours is explicitly stale.
 
+Discord digests use native rich cards: a branch overview followed by complete
+branch cards, or priority vendor cards for Purchase. Ready lines and review holds
+are shown separately. Stockout risks precede lower-priority cover exceptions;
+vendors with ready lines precede review-only sources. Full-list omissions are
+labelled with links to the matching branch and report in the console. Card fields
+keep complete item blocks within Discord limits; descriptions and message counts
+are bounded. Shared Inventory and Accounts packs include a short interpretation
+card. Unchanged evidence timestamps alone do not trigger edits.
+
 Delivery queue states: Pending, Sending, Sent, Retry, Failed, Uncertain, Skipped.
 429 responses use bounded Retry-After. Network/5xx ambiguity is not blindly
 retried. An interrupted Sending row becomes Uncertain. System Manager can use

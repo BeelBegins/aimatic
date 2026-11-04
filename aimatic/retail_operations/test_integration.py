@@ -12,6 +12,49 @@ from aimatic.retail_operations import api, service
 
 
 class IntegrationTest(unittest.TestCase):
+	def test_layout_revision_keeps_existing_discord_messages(self):
+		from aimatic.retail_operations import discord
+		from aimatic.retail_operations.test_presentation import snapshot
+
+		frappe.db.set_value("Branch", self.branch.name, "custom_operations_enabled", 1)
+		snap = snapshot(self.branch.name)
+		snap["cutoff"] = str(frappe.utils.now_datetime())
+		with (
+			patch(
+				"aimatic.retail_operations.discord.settings",
+				return_value=frappe._dict(enabled=1, discord_enabled=1),
+			),
+			patch(
+				"aimatic.retail_operations.discord.route",
+				return_value="https://discord.com/api/webhooks/123/example-placeholder",
+			),
+			patch("aimatic.retail_operations.discord.latest", return_value=snap),
+		):
+			created = discord.queue_digests([self.branch.name], "Inventory", "test-layout")
+			self.assertEqual(len(created), 3)
+			for name in created:
+				frappe.db.set_value(
+					"Retail Discord Delivery",
+					name,
+					dict(status="Sent", discord_message_id="999", payload='{"content":"old messy text"}'),
+				)
+			self.assertEqual(discord.queue_digests([self.branch.name], "Inventory", "test-layout"), [])
+			for name in created:
+				doc = frappe.get_doc("Retail Discord Delivery", name)
+				self.assertEqual(doc.status, "Pending")
+				self.assertEqual(doc.discord_message_id, "999")
+				self.assertEqual(json.loads(doc.payload)["content"], "")
+				self.assertEqual(len(json.loads(doc.payload)["embeds"]), 1)
+				frappe.db.set_value("Retail Discord Delivery", name, "status", "Sent")
+			snap["cutoff"] = str(frappe.utils.add_to_date(frappe.utils.now_datetime(), minutes=1))
+			discord.queue_digests([self.branch.name], "Inventory", "test-layout")
+			self.assertTrue(
+				all(
+					frappe.db.get_value("Retail Discord Delivery", name, "status") == "Sent"
+					for name in created
+				)
+			)
+
 	def setUp(self):
 		if frappe.local.site != "siezal":
 			self.skipTest("Requires SZL retail test site")
@@ -267,11 +310,11 @@ class IntegrationTest(unittest.TestCase):
 def run():
 	if frappe.local.site != "siezal":
 		raise RuntimeError("Integration tests must not run on production")
-	from aimatic.retail_operations import test_calculations, test_delivery
+	from aimatic.retail_operations import test_calculations, test_delivery, test_presentation
 
 	suite = unittest.TestSuite()
 	loader = unittest.TestLoader()
-	for module in (test_calculations, test_delivery):
+	for module in (test_calculations, test_delivery, test_presentation):
 		suite.addTests(loader.loadTestsFromModule(module))
 	suite.addTests(loader.loadTestsFromTestCase(IntegrationTest))
 	result = unittest.TextTestRunner(verbosity=2).run(suite)

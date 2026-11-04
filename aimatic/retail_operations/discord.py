@@ -10,7 +10,7 @@ import frappe
 import requests
 from frappe.utils import get_url, now_datetime
 
-from aimatic.retail_operations.calculations import CHANNELS, chunks, fingerprint, webhook_valid
+from aimatic.retail_operations.calculations import fingerprint, webhook_valid
 from aimatic.retail_operations.service import latest, settings, write_internal
 
 
@@ -22,71 +22,6 @@ def route(branch, channel):
 	doc = frappe.get_doc("Branch", branch)
 	value = doc.get_password("custom_discord_" + channel.lower(), raise_exception=False)
 	return value if value and webhook_valid(value) else None
-
-
-def lines(snapshot, channel):
-	report = snapshot["reports"].get(channel)
-	out = [f"**{snapshot['branch']} — {channel}**", f"Evidence: {snapshot['cutoff']} PKT"]
-	out.append(operations_url() + "?branch=" + requests.utils.quote(snapshot["branch"]))
-	if report is None:
-		return out + ["Report unavailable. Check Operations Console; no zero result has been inferred."]
-	if channel == "Inventory":
-		out.append(" | ".join(f"{k}: {v}" for k, v in report["summary"].items()))
-		for r in report["rows"][:20]:
-			if r["status"] != "Healthy":
-				out.append(
-					f"{r['item_code']} {r['item_name']}: {r['status']}; recorded {r['actual_qty']}; cover {r['days_cover']} days; {r['confidence']}"
-				)
-		out.append("Complete inventory and reference exceptions are in the linked console.")
-	elif channel == "Purchase":
-		out.append(
-			"PROPOSED ORDERS — quantities are stock units; values are estimates. Check unrecorded placed orders."
-		)
-		for vendor in report["vendors"]:
-			out.append(
-				f"**{vendor['vendor']}** — estimate {vendor['estimated_value']:.2f}; ready {len(vendor['ready'])}, review {len(vendor['review'])}"
-			)
-			for r in vendor["ready"][:15]:
-				out.append(
-					f"{r['item_name']} [{r['item_code']}]: propose {r['suggested_qty']} {r['stock_uom']}; demand {r['daily_demand']}/day; cover {r['days_cover']}d; last PR {r.get('last_receipt', '—')}"
-				)
-			for r in vendor["review"][:5]:
-				out.append(f"REVIEW {r['item_code']}: {'; '.join(r['flags'])}")
-			if len(vendor["ready"]) > 15 or len(vendor["review"]) > 5:
-				out.append("Additional lines in Operations Console.")
-	elif channel == "Sales":
-		out.append(
-			f"Business date {report['date']}; sales {report['gross_sales']:.2f}; refunds {report['total_refunds']:.2f} ({report['refund_count']})"
-		)
-		for r in report["counters"]:
-			out.append(
-				f"{r['pos_profile']}: {r['receipts']} receipts; refunds {r['refunds']}; activity ratio {r['refund_activity_percent']}%; pending close {r['pending_closing']}"
-			)
-		out.append("Refund ratios measure activity, not proven cashier error. " + report["void_coverage"])
-		out.append("Margin status: " + report["margins"]["status"])
-		for kind in ("negative", "lowest", "highest"):
-			for r in report["margins"].get(kind, [])[:5]:
-				out.append(
-					f"{kind}: {r['item_name']} qty {r['qty']}; profit {r['profit']}; margin {r['margin_percent']}% (recorded cost)"
-				)
-		for r in report["large_refunds"][:10]:
-			out.append(f"Large refund {r['name']}: {r['amount']} at {r['pos_profile']}")
-		for r in report["voids"]:
-			out.append(
-				f"Recorded {r['event_type']} at {r['pos_profile']}: {r['events']}, value {r['amount']}"
-			)
-	else:
-		out.append(report["note"])
-		for r in report["supplier_dues"][:30]:
-			out.append(
-				f"{r['supplier']}: outstanding {r['outstanding']} {r['currency']}; overdue {r['overdue']}; {r['bills']} bills"
-			)
-		for r in report["received_unbilled"][:10]:
-			out.append(
-				f"Received/unbilled estimate: {r['supplier']}: {r['estimated_unbilled_net']} (receipt net basis)"
-			)
-		out.append(report["cash_reconciliation"])
-	return out
 
 
 def queue_digests(branches, channel, business_key):
@@ -103,8 +38,8 @@ def queue_digests(branches, channel, business_key):
 			destinations[fingerprint(address)].append(branch)
 	created = []
 	for dest, names in destinations.items():
-		# Initial daily packs are immutable; explicit revision keys can be queued later.
-		text = []
+		from aimatic.retail_operations.presentation import digest
+
 		snapshots = []
 		for branch in sorted(names):
 			snap = latest(branch)
@@ -112,57 +47,30 @@ def queue_digests(branches, channel, business_key):
 				not snap
 				or (now_datetime() - frappe.utils.get_datetime(snap["cutoff"])).total_seconds() > 7200
 			):
-				text.append(f"**{branch} — {channel}: stale or missing evidence; report unavailable**")
-			elif channel == "Purchase":
-				snapshots.append(snap)
-			else:
-				text += lines(snap, channel)
-		if channel == "Purchase":
-			vendors = defaultdict(list)
-			for snap in snapshots:
-				for vendor in snap["reports"].get("Purchase", {}).get("vendors", []):
-					vendors[vendor["vendor"]].append((snap, vendor))
-			text += [
-				"**Vendor order proposals — branch destinations retained**",
-				"Stock-unit quantities; historical price estimates. Record orders already placed before ordering again.",
-			]
-			for name, packs in sorted(vendors.items()):
-				text.append(f"**{name}** — estimated total {sum(v['estimated_value'] for _, v in packs):.2f}")
-				for snap, vendor in packs:
-					text.append(
-						f"**{snap['branch']}** — ready {len(vendor['ready'])}; review {len(vendor['review'])}"
-					)
-					for row in vendor["ready"][:15]:
-						text.append(
-							f"{row['item_name']} [{row['item_code']}]: {row['suggested_qty']} {row['stock_uom']}; {row['daily_demand']}/day; cover {row['days_cover']}d; estimate {row['estimated_value']}"
-						)
-					for row in vendor["review"][:5]:
-						text.append(f"REVIEW {row['item_code']}: {'; '.join(row['flags'])}")
-					text.append(operations_url() + "?branch=" + requests.utils.quote(snap["branch"]))
-			if not vendors:
-				text.append(
-					"No supported new vendor order lines. Check any unavailable branch reports and existing commitments."
-				)
-		pages = chunks(text)
-		max_pages = int(config.get("max_discord_pages") or 8)
-		if len(pages) > max_pages:
-			pages = pages[: max_pages - 1] + [
-				f"Additional {channel} detail is available in the authenticated Operations Console. Full vendor orders and CSV downloads are retained there. This Discord digest is limited to {max_pages} messages.\n"
-				+ operations_url()
-			]
-		for page, content in enumerate(pages):
+				snap = dict(branch=branch, reports={}, cutoff="")
+			snapshots.append(snap)
+		pages = digest(snapshots, channel, operations_url(), int(config.get("max_discord_pages") or 8))
+		for page, body in enumerate(pages):
 			key = fingerprint([channel, str(business_key), dest, page])
 			existing = frappe.db.get_value("Retail Discord Delivery", {"delivery_key": key}, "name")
 			if existing:
 				previous = frappe.get_doc("Retail Discord Delivery", existing)
 
-				def normalized(text):
-					return "\n".join(line for line in text.splitlines() if not line.startswith("Evidence:"))
+				# Evidence timestamps may advance, but a layout/data change edits the same message.
+				def normalized(value):
+					value = json.loads(json.dumps(value))
+					for embed in value.get("embeds", []):
+						embed["description"] = "\n".join(
+							line
+							for line in embed.get("description", "").splitlines()
+							if not line.startswith(("Evidence:", "Oldest evidence:"))
+						)
+					return json.dumps(value, sort_keys=True)
 
 				if previous.status in ("Sent", "Pending", "Retry") and normalized(
-					json.loads(previous.payload)["content"]
-				) != normalized(content):
-					previous.payload = frappe.as_json({"content": content, "allowed_mentions": {"parse": []}})
+					json.loads(previous.payload)
+				) != normalized(body):
+					previous.payload = frappe.as_json(body)
 					previous.status = "Pending"
 					write_internal(previous)
 				continue
@@ -174,7 +82,7 @@ def queue_digests(branches, channel, business_key):
 					route_branch=names[0],
 					branches=frappe.as_json(sorted(names)),
 					destination_hash=dest,
-					payload=frappe.as_json({"content": content, "allowed_mentions": {"parse": []}}),
+					payload=frappe.as_json(body),
 					status="Pending",
 				)
 			)
@@ -286,13 +194,9 @@ def queue_urgent(snapshot, baseline=False):
 		if not address:
 			continue
 		evidence = json.loads(issue.evidence)
-		text = [
-			f"**{snapshot['branch']} — {issue.subject}**",
-			str(evidence.get("item_name") or evidence.get("name") or ""),
-			f"Recorded stock: {evidence.get('actual_qty', '—')}; cover: {evidence.get('days_cover', '—')} days; refund amount: {evidence.get('amount', '—')}.",
-			"; ".join(evidence.get("flags") or []),
-			operations_url() + "?branch=" + requests.utils.quote(snapshot["branch"]),
-		]
+		from aimatic.retail_operations.presentation import urgent
+
+		body = urgent(snapshot, issue, evidence, operations_url())
 		key = fingerprint(["urgent", issue.name, issue.signal_hash])
 		if not frappe.db.exists("Retail Discord Delivery", {"delivery_key": key}):
 			doc = write_internal(
@@ -304,9 +208,7 @@ def queue_urgent(snapshot, baseline=False):
 						route_branch=snapshot["branch"],
 						branches=frappe.as_json([snapshot["branch"]]),
 						destination_hash=fingerprint(address),
-						payload=frappe.as_json(
-							{"content": "\n".join(text)[:1900], "allowed_mentions": {"parse": []}}
-						),
+						payload=frappe.as_json(body),
 						status="Pending",
 					)
 				)
