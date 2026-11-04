@@ -758,3 +758,23 @@ patch_stock_ledger_report()
 before_request = [
 	"aimatic.stock_reports.stock_ledger_barcodes.patch_stock_ledger_report",
 ]
+
+
+# Branch operations are inert until enabled in Retail Operations Settings.
+doc_events.setdefault("Branch", {}).setdefault("validate", [])
+if isinstance(doc_events["Branch"]["validate"], str):
+    doc_events["Branch"]["validate"] = [doc_events["Branch"]["validate"]]
+doc_events["Branch"]["validate"].append("aimatic.retail_operations.documents.validate_branch")
+for _ops_doctype in ("Retail Purchase Commitment", "Retail Product Reference", "Retail Replenishment Rule", "Retail POS Void Event"):
+    permission_query_conditions[_ops_doctype] = "aimatic.retail_operations.permissions.query_conditions"
+    has_permission[_ops_doctype] = "aimatic.retail_operations.permissions.has_permission"
+permission_query_conditions["Retail Operations Issue"] = "aimatic.retail_operations.permissions.issue_query"
+has_permission["Retail Operations Issue"] = "aimatic.retail_operations.permissions.has_permission"
+scheduler_events["cron"]["*/15 * * * *"].append("aimatic.retail_operations.tasks.tick")
+
+scheduler_events["cron"].setdefault("* * * * *", []).append("aimatic.retail_operations.tasks.drain_deliveries")
+
+_ops_branch_js = doctype_js.get("Branch", [])
+if isinstance(_ops_branch_js, str):
+    _ops_branch_js = [_ops_branch_js]
+doctype_js["Branch"] = _ops_branch_js + ["public/js/retail_operations_branch.js"]

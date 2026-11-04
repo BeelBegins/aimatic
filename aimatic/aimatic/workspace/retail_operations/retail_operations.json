@@ -1,0 +1,37 @@
+{
+ "doctype": "Workspace",
+ "name": "Retail Operations",
+ "label": "Retail Operations",
+ "title": "Retail Operations",
+ "module": "Aimatic",
+ "public": 1,
+ "is_hidden": 0,
+ "icon": "stock",
+ "parent_page": "",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Accounts Manager"
+  }
+ ],
+ "content": "[{\"id\": \"ops-header\", \"type\": \"header\", \"data\": {\"text\": \"<b>Retail Operations</b>\", \"col\": 12}}, {\"id\": \"ops-console\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Operations Console\", \"col\": 4}}]",
+ "shortcuts": [
+  {
+   "label": "Operations Console",
+   "type": "Page",
+   "link_to": "retail-operations-console"
+  }
+ ],
+ "modified": "2026-11-05 12:00:00.000000"
+}

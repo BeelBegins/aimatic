@@ -1,0 +1,147 @@
+{
+ "doctype": "DocType",
+ "name": "Retail Purchase Commitment",
+ "module": "Aimatic",
+ "custom": 0,
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "track_changes": 1,
+ "field_order": [
+  "branch",
+  "company",
+  "supplier",
+  "warehouse",
+  "placed_on",
+  "expected_on",
+  "status",
+  "external_reference",
+  "proposal_run",
+  "notes",
+  "items",
+  "commitment_key",
+  "receipts",
+  "fulfilment_status"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "label": "Branch",
+   "fieldtype": "Link",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1,
+   "options": "Branch"
+  },
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Company"
+  },
+  {
+   "fieldname": "supplier",
+   "label": "Supplier",
+   "fieldtype": "Link",
+   "reqd": 1,
+   "in_list_view": 1,
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "warehouse",
+   "label": "Warehouse",
+   "fieldtype": "Link",
+   "reqd": 1,
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "placed_on",
+   "label": "Placed On",
+   "fieldtype": "Date",
+   "reqd": 1,
+   "default": "Today"
+  },
+  {
+   "fieldname": "expected_on",
+   "label": "Expected On",
+   "fieldtype": "Date"
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Select",
+   "default": "Placed",
+   "in_list_view": 1,
+   "options": "Placed\nDelayed\nCompleted\nCancelled"
+  },
+  {
+   "fieldname": "external_reference",
+   "label": "External Reference",
+   "fieldtype": "Data"
+  },
+  {
+   "fieldname": "proposal_run",
+   "label": "Proposal Run",
+   "fieldtype": "Link",
+   "options": "Retail Operations Run"
+  },
+  {
+   "fieldname": "notes",
+   "label": "Notes",
+   "fieldtype": "Small Text"
+  },
+  {
+   "fieldname": "items",
+   "label": "Items",
+   "fieldtype": "Table",
+   "reqd": 1,
+   "options": "Retail Commitment Item"
+  },
+  {
+   "fieldname": "commitment_key",
+   "label": "Commitment Key",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "receipts",
+   "label": "Matched Partial Receipts",
+   "fieldtype": "Table",
+   "options": "Retail Commitment Receipt"
+  },
+  {
+   "fieldname": "fulfilment_status",
+   "label": "Fulfilment Status",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  }
+ ],
+ "istable": 0,
+ "issingle": 0,
+ "is_submittable": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "modified": "2026-11-05 12:00:00.000000"
+}

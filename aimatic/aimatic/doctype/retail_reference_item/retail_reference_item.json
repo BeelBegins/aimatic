@@ -1,0 +1,28 @@
+{
+ "doctype": "DocType",
+ "name": "Retail Reference Item",
+ "module": "Aimatic",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "field_order": [
+  "item_code"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "label": "Item Code",
+   "fieldtype": "Link",
+   "reqd": 1,
+   "in_list_view": 1,
+   "options": "Item"
+  }
+ ],
+ "permissions": [],
+ "istable": 1,
+ "issingle": 0,
+ "is_submittable": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "modified": "2026-11-05 12:00:00.000000"
+}

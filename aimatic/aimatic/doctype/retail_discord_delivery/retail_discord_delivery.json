@@ -1,0 +1,117 @@
+{
+ "doctype": "DocType",
+ "name": "Retail Discord Delivery",
+ "module": "Aimatic",
+ "custom": 0,
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "track_changes": 1,
+ "field_order": [
+  "delivery_key",
+  "channel",
+  "route_branch",
+  "branches",
+  "destination_hash",
+  "payload",
+  "status",
+  "attempts",
+  "next_attempt",
+  "discord_message_id",
+  "error_code",
+  "sent_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "delivery_key",
+   "label": "Delivery Key",
+   "fieldtype": "Data",
+   "unique": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "channel",
+   "label": "Channel",
+   "fieldtype": "Select",
+   "options": "Inventory\nAccounts\nSales\nPurchase"
+  },
+  {
+   "fieldname": "route_branch",
+   "label": "Route Branch",
+   "fieldtype": "Link",
+   "options": "Branch"
+  },
+  {
+   "fieldname": "branches",
+   "label": "Branches",
+   "fieldtype": "Code",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "destination_hash",
+   "label": "Destination Hash",
+   "fieldtype": "Data"
+  },
+  {
+   "fieldname": "payload",
+   "label": "Payload",
+   "fieldtype": "Code",
+   "read_only": 1,
+   "options": "JSON"
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Select",
+   "default": "Pending",
+   "in_list_view": 1,
+   "options": "Pending\nSending\nSent\nRetry\nFailed\nUncertain\nSkipped"
+  },
+  {
+   "fieldname": "attempts",
+   "label": "Attempts",
+   "fieldtype": "Int",
+   "read_only": 1
+  },
+  {
+   "fieldname": "next_attempt",
+   "label": "Next Attempt",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "discord_message_id",
+   "label": "Discord Message Id",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error_code",
+   "label": "Error Code",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sent_at",
+   "label": "Sent At",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  }
+ ],
+ "istable": 0,
+ "issingle": 0,
+ "is_submittable": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "modified": "2026-11-05 12:00:00.000000"
+}

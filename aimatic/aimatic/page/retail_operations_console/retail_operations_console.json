@@ -1,0 +1,26 @@
+{
+ "doctype": "Page",
+ "name": "retail-operations-console",
+ "page_name": "retail-operations-console",
+ "title": "Retail Operations",
+ "module": "Aimatic",
+ "standard": "Yes",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Accounts Manager"
+  }
+ ],
+ "modified": "2026-11-05 12:00:00.000000"
+}

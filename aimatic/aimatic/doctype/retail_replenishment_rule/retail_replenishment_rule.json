@@ -1,0 +1,124 @@
+{
+ "doctype": "DocType",
+ "name": "Retail Replenishment Rule",
+ "module": "Aimatic",
+ "custom": 0,
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "track_changes": 1,
+ "field_order": [
+  "branch",
+  "company",
+  "item_code",
+  "supplier",
+  "source_warehouse",
+  "enabled",
+  "automatic_request",
+  "reviewed",
+  "last_material_request",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "label": "Branch",
+   "fieldtype": "Link",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1,
+   "options": "Branch"
+  },
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Company"
+  },
+  {
+   "fieldname": "item_code",
+   "label": "Item Code",
+   "fieldtype": "Link",
+   "reqd": 1,
+   "in_list_view": 1,
+   "options": "Item"
+  },
+  {
+   "fieldname": "supplier",
+   "label": "Supplier",
+   "fieldtype": "Link",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "source_warehouse",
+   "label": "Source Warehouse",
+   "fieldtype": "Link",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "enabled",
+   "label": "Enabled",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "automatic_request",
+   "label": "Automatic Request",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "reviewed",
+   "label": "Reviewed",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "last_material_request",
+   "label": "Last Material Request",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Material Request"
+  },
+  {
+   "fieldname": "notes",
+   "label": "Notes",
+   "fieldtype": "Small Text"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  },
+  {
+   "role": "Stock Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  }
+ ],
+ "istable": 0,
+ "issingle": 0,
+ "is_submittable": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "modified": "2026-11-05 12:00:00.000000"
+}

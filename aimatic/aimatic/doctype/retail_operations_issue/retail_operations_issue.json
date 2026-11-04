@@ -1,0 +1,186 @@
+{
+ "doctype": "DocType",
+ "name": "Retail Operations Issue",
+ "module": "Aimatic",
+ "custom": 0,
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "track_changes": 1,
+ "field_order": [
+  "branch",
+  "company",
+  "issue_key",
+  "channel",
+  "subject",
+  "severity",
+  "status",
+  "mute_until",
+  "reason",
+  "evidence",
+  "signal_hash",
+  "last_seen",
+  "last_changed",
+  "run",
+  "notified_hash",
+  "last_notified"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "label": "Branch",
+   "fieldtype": "Link",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1,
+   "options": "Branch"
+  },
+  {
+   "fieldname": "company",
+   "label": "Company",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Company"
+  },
+  {
+   "fieldname": "issue_key",
+   "label": "Issue Key",
+   "fieldtype": "Data",
+   "unique": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "channel",
+   "label": "Channel",
+   "fieldtype": "Select",
+   "reqd": 1,
+   "options": "Inventory\nAccounts\nSales\nPurchase"
+  },
+  {
+   "fieldname": "subject",
+   "label": "Subject",
+   "fieldtype": "Data",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "severity",
+   "label": "Severity",
+   "fieldtype": "Select",
+   "options": "Info\nWarning\nUrgent"
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Select",
+   "default": "New",
+   "in_list_view": 1,
+   "options": "New\nAcknowledged\nAction underway\nResolved\nMuted"
+  },
+  {
+   "fieldname": "mute_until",
+   "label": "Mute Until",
+   "fieldtype": "Datetime"
+  },
+  {
+   "fieldname": "reason",
+   "label": "Reason",
+   "fieldtype": "Small Text"
+  },
+  {
+   "fieldname": "evidence",
+   "label": "Evidence",
+   "fieldtype": "Code",
+   "read_only": 1,
+   "options": "JSON"
+  },
+  {
+   "fieldname": "signal_hash",
+   "label": "Signal Hash",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_seen",
+   "label": "Last Seen",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_changed",
+   "label": "Last Changed",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "run",
+   "label": "Run",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Retail Operations Run"
+  },
+  {
+   "fieldname": "notified_hash",
+   "label": "Last Queued Signal",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_notified",
+   "label": "Last Queued At",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  },
+  {
+   "role": "Stock Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  }
+ ],
+ "istable": 0,
+ "issingle": 0,
+ "is_submittable": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "modified": "2026-11-05 12:00:00.000000"
+}

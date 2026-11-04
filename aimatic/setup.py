@@ -13,6 +13,9 @@ from aimatic.restaurant.setup import create_roles as create_restaurant_roles
 
 
 def after_install():
+	from aimatic.retail_operations.setup import install as install_retail_operations
+
+	install_retail_operations()
 	setup_journal_entry_remarks()
 	setup_label_printing()
 	create_restaurant_roles()

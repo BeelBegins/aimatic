@@ -1,0 +1,149 @@
+{
+ "doctype": "DocType",
+ "name": "Retail Operations Settings",
+ "module": "Aimatic",
+ "custom": 0,
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "field_order": [
+  "enabled",
+  "discord_enabled",
+  "automatic_requests",
+  "ai_enabled",
+  "history_days",
+  "fallback_cover_days",
+  "max_margin_rows",
+  "refund_alert_amount",
+  "counter_min_receipts",
+  "inventory_time",
+  "accounts_time",
+  "sales_time",
+  "purchase_time",
+  "last_evaluation",
+  "last_error",
+  "public_base_url",
+  "max_discord_pages"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "label": "Enabled",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "discord_enabled",
+   "label": "Discord Enabled",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "automatic_requests",
+   "label": "Automatic Requests",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "ai_enabled",
+   "label": "Ai Enabled",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "history_days",
+   "label": "History Days",
+   "fieldtype": "Int",
+   "default": "90"
+  },
+  {
+   "fieldname": "fallback_cover_days",
+   "label": "Fallback Cover Days",
+   "fieldtype": "Int",
+   "default": "7"
+  },
+  {
+   "fieldname": "max_margin_rows",
+   "label": "Max Margin Rows",
+   "fieldtype": "Int",
+   "default": "12000"
+  },
+  {
+   "fieldname": "refund_alert_amount",
+   "label": "Refund Alert Amount",
+   "fieldtype": "Currency",
+   "default": "10000"
+  },
+  {
+   "fieldname": "counter_min_receipts",
+   "label": "Counter Min Receipts",
+   "fieldtype": "Int",
+   "default": "20"
+  },
+  {
+   "fieldname": "inventory_time",
+   "label": "Inventory Time",
+   "fieldtype": "Time",
+   "default": "09:00:00"
+  },
+  {
+   "fieldname": "accounts_time",
+   "label": "Accounts Time",
+   "fieldtype": "Time",
+   "default": "09:30:00"
+  },
+  {
+   "fieldname": "sales_time",
+   "label": "Sales Time",
+   "fieldtype": "Time",
+   "default": "09:15:00"
+  },
+  {
+   "fieldname": "purchase_time",
+   "label": "Purchase Time",
+   "fieldtype": "Time",
+   "default": "08:30:00"
+  },
+  {
+   "fieldname": "last_evaluation",
+   "label": "Last Evaluation",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_error",
+   "label": "Last Error",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "public_base_url",
+   "label": "ERPNext Public URL",
+   "fieldtype": "Data",
+   "options": "URL",
+   "description": "HTTPS address used for links in Discord reports."
+  },
+  {
+   "fieldname": "max_discord_pages",
+   "label": "Maximum Digest Messages per Channel Destination",
+   "fieldtype": "Int",
+   "default": "8"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "submit": 0,
+   "cancel": 0
+  }
+ ],
+ "istable": 0,
+ "issingle": 1,
+ "is_submittable": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "modified": "2026-11-05 12:00:00.000000"
+}
