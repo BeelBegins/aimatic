@@ -87,6 +87,7 @@ class DeliveryTest(TestCase):
 		with (
 			patch("aimatic.retail_operations.discord.settings", return_value=frappe._dict(discord_enabled=0)),
 			patch.object(frappe.db, "sql") as update,
+			patch("aimatic.retail_operations.discord.now_datetime", return_value=datetime(2026, 11, 5)),
 		):
 			self.assertEqual(queue_urgent({"branch": "B"}, baseline=False), [])
 			self.assertIn("notified_hash=signal_hash", update.call_args.args[0])

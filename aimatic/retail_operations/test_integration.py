@@ -12,6 +12,64 @@ from aimatic.retail_operations import api, service
 
 
 class IntegrationTest(unittest.TestCase):
+	def test_native_payment_lifecycle_queues_separate_durable_events(self):
+		from erpnext.accounts.party import get_party_account
+
+		from aimatic.retail_operations import payments
+		from aimatic.retail_operations.calculations import fingerprint
+
+		cash = frappe.db.get_value(
+			"Account", dict(company=self.branch.company, account_type="Cash", is_group=0), "name"
+		)
+		self.assertTrue(cash, "Retail test company requires a cash account")
+		frappe.db.set_value("Branch", self.branch.name, "custom_operations_enabled", 1)
+		with (
+			patch(
+				"aimatic.retail_operations.payments.settings",
+				return_value=frappe._dict(enabled=1, discord_enabled=1),
+			),
+			patch(
+				"aimatic.retail_operations.payments.route",
+				return_value="https://discord.com/api/webhooks/123/example-placeholder",
+			),
+		):
+			doc = frappe.get_doc(
+				dict(
+					doctype="Payment Entry",
+					payment_type="Pay",
+					company=self.branch.company,
+					branch=self.branch.name,
+					cost_center=self.branch.cost_center,
+					party_type="Supplier",
+					party=self.supplier,
+					paid_from=cash,
+					paid_to=get_party_account("Supplier", self.supplier, self.branch.company),
+					paid_amount=10,
+					received_amount=10,
+					source_exchange_rate=1,
+					target_exchange_rate=1,
+					posting_date=frappe.utils.today(),
+					reference_no="test-only-payment",
+					reference_date=frappe.utils.today(),
+				)
+			).insert(ignore_permissions=True)
+			payments.payment_event(doc, "after_insert")
+			doc.save(ignore_permissions=True)
+			created_key = fingerprint(["payment-voucher", "Payment Entry", doc.name, "after_insert"])
+			self.assertEqual(frappe.db.count("Retail Discord Delivery", dict(delivery_key=created_key)), 1)
+			created = frappe.get_doc("Retail Discord Delivery", dict(delivery_key=created_key))
+			self.assertIn("Draft", created.payload)
+			self.assertEqual(created.status, "Pending")
+			doc.submit()
+			doc.cancel()
+			for method in ("on_submit", "on_cancel"):
+				key = fingerprint(["payment-voucher", "Payment Entry", doc.name, method])
+				self.assertEqual(frappe.db.count("Retail Discord Delivery", dict(delivery_key=key)), 1)
+				self.assertEqual(
+					frappe.db.get_value("Retail Discord Delivery", dict(delivery_key=key), "route_branch"),
+					self.branch.name,
+				)
+
 	def test_cost_review_preserves_existing_negative_margin_issue_identity(self):
 		run = service.write_internal(
 			frappe.get_doc(
@@ -406,11 +464,17 @@ class IntegrationTest(unittest.TestCase):
 def run():
 	if frappe.local.site != "siezal":
 		raise RuntimeError("Integration tests must not run on production")
-	from aimatic.retail_operations import test_calculations, test_delivery, test_margins, test_presentation
+	from aimatic.retail_operations import (
+		test_calculations,
+		test_delivery,
+		test_margins,
+		test_payments,
+		test_presentation,
+	)
 
 	suite = unittest.TestSuite()
 	loader = unittest.TestLoader()
-	for module in (test_calculations, test_delivery, test_presentation, test_margins):
+	for module in (test_calculations, test_delivery, test_presentation, test_margins, test_payments):
 		suite.addTests(loader.loadTestsFromModule(module))
 	suite.addTests(loader.loadTestsFromTestCase(IntegrationTest))
 	result = unittest.TextTestRunner(verbosity=2).run(suite)

@@ -1,5 +1,7 @@
 # Retail Operations
 
+Operator guide: [SZL Purchase & Inventory Operating Guide](szl-purchase-inventory-guide.md) · [PDF](szl-purchase-inventory-guide.pdf). Keep both updated with operational behavior changes; rebuild using the bench Python and `scripts/build_retail_operations_guide.py`.
+
 Entry: `/app/retail-operations-console` (also the Retail Operations workspace).
 Site: SZL retail; first verify site role before any installation/runtime action.
 
@@ -174,3 +176,17 @@ than destructively dropping evidence. SZL requires a verified pre-change backup.
 Full database restoration is a last resort and would also roll back later trade.
 
 Digests are bounded to eight messages per channel destination by default, with explicit links for remaining detail. Delivery retries drain every minute; report evaluation/digest routing is checked every 15 minutes. Existing issues are seeded as a historical baseline while sending is off, preventing a delayed flood when webhooks are enabled.
+
+## Payment voucher notifications
+
+Payment Entry after_insert/on_submit/on_cancel append durable Accounts events
+for creation, submission and cancellation. Draft saves do not repeat creation.
+The event key includes doctype, voucher and lifecycle step; its outbox write shares
+the financial transaction. The existing minute drain sends only after commit.
+There is no HTTP request or Redis dependency in these hooks. Disabled operations
+or Discord suppress alerts. Missing/ambiguous branch, conflicting company/cost
+center or missing destination is logged without blocking the financial save.
+Branch comes from the voucher or a unique exact company/cost-center mapping.
+No historical replay; generic Journal Entries are outside this event source.
+Cards disclose state and currencies, omit bank account numbers and free remarks,
+and do not claim bank settlement. See the maintained guide for operating steps.

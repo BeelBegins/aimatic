@@ -778,3 +778,10 @@ _ops_branch_js = doctype_js.get("Branch", [])
 if isinstance(_ops_branch_js, str):
     _ops_branch_js = [_ops_branch_js]
 doctype_js["Branch"] = _ops_branch_js + ["public/js/retail_operations_branch.js"]
+
+for _payment_event in ("after_insert", "on_submit", "on_cancel"):
+    _payment_hooks = doc_events.setdefault("Payment Entry", {})
+    _existing_payment_handlers = _payment_hooks.get(_payment_event, [])
+    if isinstance(_existing_payment_handlers, str):
+        _existing_payment_handlers = [_existing_payment_handlers]
+    _payment_hooks[_payment_event] = _existing_payment_handlers + ["aimatic.retail_operations.payments.payment_event"]
