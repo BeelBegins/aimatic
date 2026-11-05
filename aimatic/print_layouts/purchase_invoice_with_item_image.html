@@ -1,7 +1,7 @@
 {%- macro add_header(page_num, max_pages, doc, letter_head, no_letterhead, footer, print_settings=None, print_heading_template=None) -%}
 
 {% if letter_head and not no_letterhead %}
-<div class="letter-head">{{ letter_head }}</div>
+<div class="letter-head pi-letter-head">{{ letter_head }}</div>
 {% endif %}
 {% if print_heading_template %}
 {{ frappe.render_template(print_heading_template, {"doc":doc}) }}
@@ -9,7 +9,7 @@
 {%- endmacro -%}
 
 {% for page in layout %}
-<div class="page-break invoice-page">
+<div class="page-break invoice-page purchase-invoice-page">
 	<div {% if print_settings.repeat_header_footer %} id="header-html" class="hidden-pdf" {% endif %}>
 		{{ add_header(loop.index, layout|len, doc, letter_head, no_letterhead, footer, print_settings) }}
 	</div>
@@ -25,164 +25,85 @@
 	{%- endif -%}
 
 	<style>
-		.letter-head {
-			padding-top: 12px !important;
-			padding-bottom: 12px !important;
+		/* Scope the compact layout to PI, including the separately rendered PDF header. */
+		.print-format .pi-letter-head {
+			padding-top: 4px !important;
+			padding-bottom: 4px !important;
+			margin-bottom: 8px;
 		}
-		.invoice-page {
+		.pi-letter-head .logo-cell { width: 64px; }
+		.pi-letter-head .logo-container { width: 56px; }
+		.pi-letter-head .logo-container img { max-width: 56px; max-height: 56px; }
+		.print-format .purchase-invoice-page {
 			font-family: Inter, sans-serif;
+			font-size: 12px;
+			line-height: 1.3;
 			color: #171717;
 		}
-
-		.print-format-body {
-			padding: 30px 12px 12px 12px !important;
-		}
-
-		.title {
-			color: #7c7c7c !important;
-		}
-		.text-muted {
-			color: #7c7c7c !important;
-		}
-		.text-dark {
-			color: #171717 !important;
-		}
-		.small-text {
-			font-size: 11px;
-			color: #666;
-		}
-
-		.text-left {
-			text-align: left;
-		}
-		.text-center {
-			text-align: center;
-		}
-		.text-right {
-			text-align: right;
-		}
-		.text-bold {
-			font-weight: 700;
-		}
-
-		.mt-15 {
-			margin-top: 15px;
-		}
-		.mt-16 {
-			margin-top: 16px;
-		}
-		.mt-40 {
-			margin-top: 40px;
-		}
-		.mw-400 {
-			max-width: 400px;
-		}
-
-		.items-table,
-		.tax-table {
+		.purchase-invoice-page .print-format-body { padding: 8px 0 0 !important; }
+		.purchase-invoice-page .title,
+		.purchase-invoice-page .text-muted { color: #666 !important; }
+		.purchase-invoice-page .text-left { text-align: left; }
+		.purchase-invoice-page .text-center { text-align: center; }
+		.purchase-invoice-page .text-right { text-align: right; }
+		.purchase-invoice-page .mt-15 { margin-top: 8px; }
+		.purchase-invoice-page .mw-400 { max-width: 400px; }
+		.purchase-invoice-page .items-table {
 			width: 100%;
-			border-collapse: separate;
-			border-spacing: 0;
-			border-radius: 10px;
-			overflow: hidden;
+			border-collapse: collapse;
 		}
-
-		.items-table td,
-		.tax-table td {
+		.print-format .purchase-invoice-page .items-table td {
 			border-bottom: 1px solid #ededed;
-			padding: 8px;
+			padding: 3px 4px !important;
+			line-height: 1.3;
 		}
-
-		.items-table thead td,
-		.tax-table thead td {
-			color: #7c7c7c !important;
+		.purchase-invoice-page .items-table thead { display: table-header-group; }
+		.purchase-invoice-page .items-table tr {
+			break-inside: avoid;
+			page-break-inside: avoid;
 		}
-		.items-table thead tr:first-of-type td,
-		.tax-table thead tr:first-of-type td {
-			border-bottom: none;
-		}
-
-		.items-table thead tr:first-child td:first-child,
-		.tax-table thead tr:first-child td:first-child {
-			border-top-left-radius: 10px;
-			border-bottom-left-radius: 10px;
-		}
-		.items-table thead tr:first-child td:last-child,
-		.tax-table thead tr:first-child td:last-child {
-			border-top-right-radius: 10px;
-			border-bottom-right-radius: 10px;
-		}
-
-		.in-words {
-			color: #171717 !important;
-			max-width: 400px;
-			word-wrap: break-word;
-			line-height: 1.5;
-			font-size: 12px;
-		}
-
-		.row-divider {
-			border-bottom: 1px solid #e9e9e9;
-		}
-
-		.highlight-bg {
-			background: #f8f8f8;
-		}
-
-		.info-card {
-			margin-top: 40px;
-			color: #7c7c7c;
-		}
-
-		.info-text {
-			margin-bottom: 12px;
-		}
-
-		.print-format {
-			color: #171717;
-			font-size: 14px;
-			font-style: normal;
-			font-weight: 420;
-			line-height: 21px;
-			padding: 0px !important;
-			margin-left: 0mm !important;
-			margin-right: 0mm !important;
-		}
-
-		.letter-head-footer {
-			margin-top: 0px !important;
-		}
-
-		.print-format-body td {
-			padding: 8px 8px !important;
-		}
-
-		.tax-table td,
-		.items-table td {
-			height: auto !important;
-		}
-
-		.tax-table thead td,
-		.items-table thead td {
-			height: 32px;
-		}
-
-		.item-img td {
-			border: none !important;
-			padding: 0px !important;
-		}
-		.item-barcode {
-			font-size: 12px;
+		.print-format .purchase-invoice-page .items-table thead td {
+			color: #555 !important;
 			font-weight: 600;
-			color: #171717;
-			letter-spacing: 0.02em;
+			padding-top: 5px !important;
+			padding-bottom: 5px !important;
+		}
+		.purchase-invoice-page .highlight-bg { background-color: #f7f7f7; }
+		.purchase-invoice-page .info-text { padding: 1px 0; }
+		.purchase-invoice-page .info-card {
+			border: 1px solid #ededed;
+			border-radius: 4px;
+			padding: 6px;
+			margin-top: 8px;
+		}
+		.print-format .purchase-invoice-page .row-divider td { padding: 3px 6px !important; }
+		.print-format .purchase-invoice-page .pi-grand-total td { padding: 5px 6px !important; }
+		.purchase-invoice-page .pi-totals {
+			float: right;
+			margin: 6px 0 4px;
+			break-inside: avoid;
+			page-break-inside: avoid;
+		}
+		.purchase-invoice-page .pi-grand-total {
+			clear: both;
+			border-bottom: 1px solid #ededed;
+			break-inside: avoid;
+			page-break-inside: avoid;
+		}
+		.purchase-invoice-page .item-barcode {
+			font-size: 11px;
+			font-weight: 600;
 			font-variant-numeric: tabular-nums;
 			white-space: nowrap;
 		}
+		.purchase-invoice-page [document-status] { margin-bottom: 4px; }
+		.purchase-invoice-page [document-status] h4 { margin: 4px 0 !important; }
+		.print-format .purchase-invoice-page .item-img td { padding: 0 !important; border: 0; }
+		.purchase-invoice-page .item-img img { width: 20px !important; height: 20px !important; }
 	</style>
 
 	<div class="print-format-body">
-		<table class="info-table col-xs-12" style="width: 100%; margin-left: 12px">
+		<table class="info-table col-xs-12" style="width: 100%">
 			<tr>
 				<td class="col-xs-6" style="padding: 0 !important">
 					<div class="title col-xs-5 p-0">
@@ -290,7 +211,7 @@
 			</tbody>
 		</table>
 
-		<div class="test" style="float: right; margin-top: 15px; margin-bottom: 5px;">
+		<div class="pi-totals">
 			<table style="width: 100%; border-collapse: collapse">
 				<tr class="row-divider">
 					<td class="text-right text-muted" style="padding-right: 30px !important;">{{ _("Sub Total:") }}</td>
@@ -324,7 +245,7 @@
 			</table>
 		</div>
 
-		<div style="border-bottom: 1px solid #ededed;">
+		<div class="pi-grand-total">
 			<table class="highlight-bg" style="width: 100%; border-collapse: collapse; border-radius: 12px; margin-bottom: 10px;">
 				<tr>
 					<td class="text-left mw-400">

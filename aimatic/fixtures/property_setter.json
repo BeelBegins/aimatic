@@ -1885,7 +1885,7 @@
   "property": "default_print_format",
   "property_type": "Link",
   "row_name": null,
-  "value": "Purchase Invoice with Item Image"
+  "value": "Purchase Invoice Compact Layout"
  },
  {
   "default_value": null,

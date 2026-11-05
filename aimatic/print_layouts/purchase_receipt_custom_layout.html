@@ -35,6 +35,16 @@ html, body { width: 297mm; margin: 0; padding: 0; }
  html, body { width: 297mm !important; }
  .print-format { width: 287mm !important; max-width: 287mm !important; }
 }
+/* Override the site print style's 10px !important cell padding. */
+.print-format .aim-brand td { padding: 0 !important; }
+.print-format .aim-head td { padding: 1px 3px !important; line-height: 1.2; }
+.print-format .aim-grid th { padding: 3px 1px !important; }
+.print-format .aim-grid td { padding: 2px 1px !important; line-height: 1.2; }
+.print-format .aim-grid .line-total { padding-left: .5px !important; padding-right: .5px !important; }
+.aim-grid thead { display: table-header-group; }
+.aim-grid tbody tr { break-inside: avoid; page-break-inside: avoid; }
+.print-format .aim-bottom > tbody > tr > td { padding: 2px !important; }
+.print-format .aim-summary td { padding: 1px 2px !important; }
 </style>
 {% set gross = doc.custom_total_gross or doc.total or 0 %}
 {% set discount = doc.custom_total_discount or doc.discount_amount or 0 %}
