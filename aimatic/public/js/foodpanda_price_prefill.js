@@ -33,7 +33,8 @@ function aimatic_register_foodpanda_price_prefill(doctype, child_doctype) {
 					const rate = (r.message || {}).rate || 0;
 					if (rate > 0 && !row.custom_fp_price) {
 						frappe.model.set_value(cdt, cdn, "custom_fp_price", rate);
-						frm.fields_dict.items.grid.refresh();
+						// set_value already redraws this one cell; a full grid.refresh()
+						// re-rendered every row on each new row (slow on long receipts).
 					}
 				},
 			});

@@ -18,21 +18,26 @@ function harness(options = {}) {
     const row = {doctype: 'Purchase Receipt Item', name: 'ROW', item_code: 'ITEM',
         qty: 10, custom_vendor_rate: 100, custom_gst_per: 10,
         custom_gst_formula: 'GST', ...options.row};
-    const hooks = {}, writes = [], timers = new Map();
+    const hooks = {}, writes = [], timers = new Map(), logs = [];
     let now = 10000, timerId = 0;
     const editor = {tagName: 'INPUT', value: '74', dataset: {}, listeners: {},
         addEventListener(name, fn) { this.listeners[name] = fn; },
         removeEventListener(name) { delete this.listeners[name]; }};
     const context = {
-        console: {log() {}, warn() {}, error() {}},
+        console: {log() { logs.push([...arguments]); }, warn() {}, error() {}},
         locals: {'Purchase Receipt Item': {ROW: row}},
+        localStorage: {getItem: key => options.storage?.[key] ?? null},
         document: {activeElement: null}, aimatic: {},
         flt: v => Number(v) || 0, cint: v => parseInt(v) || 0, __: s => s,
         Date: class extends Date { static now() { return now; } },
         setTimeout(fn, delay) { timers.set(++timerId, {fn, at: now + Math.max(0, delay)}); return timerId; },
         clearTimeout(id) { timers.delete(id); },
     };
-    const frm = {doc: {docstatus: 0, is_return: 0, ignore_pricing_rule: 1, items: [row],
+    const extraRows = (options.extraRows || []).map(extra => ({
+        doctype: 'Purchase Receipt Item', item_code: 'ITEM2', qty: 1,
+        custom_vendor_rate: 50, ...extra}));
+    extraRows.forEach(extra => { context.locals['Purchase Receipt Item'][extra.name] = extra; });
+    const frm = {doc: {docstatus: 0, is_return: 0, ignore_pricing_rule: 1, items: [row, ...extraRows],
         ...options.doc},
         fields_dict: {items: {grid: {wrapper: {contains: input => input === editor}}}},
         async set_value(field, value) { this.doc[field] = value; },
@@ -47,9 +52,10 @@ function harness(options = {}) {
             async get_list() { return []; },
         },
         model: {async set_value(dt, name, field, value) {
-            writes.push({field, value});
-            row[field] = value;
-            if (options.onWrite) await options.onWrite(field, value, row);
+            const target = context.locals[dt][name];
+            writes.push({field, value, name});
+            target[field] = value;
+            if (options.onWrite) await options.onWrite(field, value, target);
             const fn = hooks[dt]?.[field];
             if (fn) await fn(frm, dt, name);
         }},
@@ -61,7 +67,12 @@ function harness(options = {}) {
     assert(last > 0);
     vm.runInContext(source.slice(0, last) +
         'globalThis.calcTest = {calculateRow, calculateDocument, scheduleCalculation};\n})();', context);
-    return {row, frm, hooks, writes, editor, context, timers,
+    const rowsByName = Object.fromEntries([row, ...extraRows].map(r => [r.name, r]));
+    return {row, rowsByName, frm, hooks, writes, editor, context, timers, logs,
+        edit(name, field, value) {
+            rowsByName[name][field] = value;
+            return hooks['Purchase Receipt Item'][field](frm, 'Purchase Receipt Item', name);
+        },
         calcRow: () => context.calcTest.calculateRow(frm, row.doctype, row.name),
         calc: () => context.calcTest.calculateDocument(frm),
         save: () => hooks['Purchase Receipt'].validate(frm),
@@ -229,4 +240,103 @@ test('changing vendor rate during a formula also discards stale derived values',
     h.row.custom_vendor_rate = 120;
     response.resolve({message: {formula_string: 'custom_gross_total * custom_gst_per / 100'}});
     await pending; assert.equal(h.writes.length, 0); assert.equal(h.row.custom_vendor_rate, 120);
+});
+
+// ---- Per-row background calculation (row add/scan must not redo every row) ----
+const DT = 'Purchase Receipt Item';
+const staleOther = {name: 'OTHER', custom_gross_total: 1, custom_line_total: 5};
+
+test('editing one row recalculates only that row and re-sums all totals', async () => {
+    const h = harness({extraRows: [staleOther]});
+    h.edit('ROW', 'qty', 20); await h.advance(100);
+    assert.equal(h.row.custom_gross_total, 2000);
+    assert.equal(h.rowsByName.OTHER.custom_gross_total, 1, 'unchanged row is not recalculated');
+    assert(!h.writes.some(w => w.name === 'OTHER'));
+    assert.equal(h.frm.doc.custom_grand_line_total, 2205);
+});
+
+test('a newly added row is calculated alone', async () => {
+    const h = harness({extraRows: [staleOther]});
+    h.hooks['Purchase Receipt'].items_add(h.frm, DT, 'OTHER'); await h.advance(500);
+    assert.equal(h.rowsByName.OTHER.custom_gross_total, 50);
+    assert(!h.writes.some(w => w.name === 'ROW'));
+});
+
+test('Save and Recalculate still recalculate every row', async () => {
+    const h = harness({extraRows: [staleOther]});
+    await h.save();
+    assert.equal(h.row.custom_gross_total, 1000);
+    assert.equal(h.rowsByName.OTHER.custom_gross_total, 50);
+    assert.equal(h.frm.doc.custom_grand_line_total, 1150);
+});
+
+test('onload and supplier changes still schedule a full pass', async () => {
+    const h = harness({extraRows: [staleOther]});
+    h.hooks['Purchase Receipt'].supplier(h.frm); await h.advance(1200);
+    assert.equal(h.row.custom_gross_total, 1000);
+    assert.equal(h.rowsByName.OTHER.custom_gross_total, 50);
+});
+
+test('removing a row only re-sums totals', async () => {
+    const h = harness({extraRows: [staleOther]});
+    h.frm.doc.items = [h.rowsByName.OTHER];
+    h.hooks['Purchase Receipt'].items_remove(h.frm); await h.advance(300);
+    assert.equal(h.writes.length, 0);
+    assert.equal(h.frm.doc.custom_grand_line_total, 5);
+});
+
+test("the script's own output writes do not schedule another pass", async () => {
+    const h = harness({row: {custom_trade_offer_total: 40, custom_scheme_qty: 2}});
+    h.edit('ROW', 'qty', 12); await h.advance(100);
+    assert(h.writes.some(w => w.field === 'custom_trade_offer'));
+    assert(h.writes.some(w => w.field === 'custom_scheme_qty') === false);
+    assert.equal(h.timers.size, 0, 'no echo pass queued');
+});
+
+test('a user edit to another row during our write is still recalculated', async () => {
+    let edited = false;
+    const h = harness({extraRows: [staleOther], row: {custom_trade_offer_total: 40},
+        onWrite: async (field, value, target) => {
+            if (!edited && target.name === 'ROW' && field === 'custom_trade_offer') {
+                edited = true; h.edit('OTHER', 'qty', 3);
+            }
+        }});
+    h.edit('ROW', 'qty', 12); await h.advance(100); await h.advance(1000);
+    assert(edited);
+    assert.equal(h.rowsByName.OTHER.custom_gross_total, 150);
+});
+
+test('a row deferred by grid focus is calculated after blur', async () => {
+    const h = harness({extraRows: [staleOther]});
+    h.focus(); h.edit('ROW', 'qty', 30); await h.advance(100);
+    assert.equal(h.writes.length, 0);
+    h.blur(); await h.advance(51);
+    assert.equal(h.row.custom_gross_total, 3000);
+    assert.equal(h.rowsByName.OTHER.custom_gross_total, 1);
+});
+
+test('a stale row keeps itself and unprocessed rows pending for the retry', async () => {
+    const started = deferred(), response = deferred();
+    let first = true;
+    const h = harness({extraRows: [{name: 'OTHER', custom_gst_formula: 'GST'}],
+        lookup: async () => {
+            if (first) { first = false; started.resolve(); return response.promise; }
+            return {message: {formula_string: 'custom_gross_total * custom_gst_per / 100'}};
+        }});
+    h.edit('ROW', 'qty', 20); h.edit('OTHER', 'qty', 4); await h.advance(100);
+    await started.promise;
+    h.row.qty = 25;
+    response.resolve({message: {formula_string: 'custom_gross_total * custom_gst_per / 100'}});
+    await h.advance(0);
+    assert.equal(h.row.custom_gross_total, undefined, 'stale outputs discarded');
+    await h.advance(1200);
+    assert.equal(h.row.custom_gross_total, 2500);
+    assert.equal(h.rowsByName.OTHER.custom_gross_total, 200);
+});
+
+test('per-row calculation log is silent unless the debug flag is set', async () => {
+    const quiet = harness(); await quiet.calc();
+    assert.equal(quiet.logs.length, 0);
+    const loud = harness({storage: {aimatic_pr_calc_debug: '1'}}); await loud.calc();
+    assert.equal(loud.logs.length, 1);
 });

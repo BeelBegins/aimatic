@@ -35,7 +35,8 @@ const helpers = {
 					const rate = (r.message || {}).rate || 0;
 					if (rate > 0 && !row.custom_shelf_price) {
 						frappe.model.set_value(cdt, cdn, "custom_shelf_price", rate);
-						frm.fields_dict.items.grid.refresh();
+						// set_value already redraws this one cell; a full grid.refresh()
+						// re-rendered every row on each new row (slow on long receipts).
 					}
 				},
 			});
@@ -52,7 +53,8 @@ const helpers = {
 					const mrp = (r.message || {}).mrp || 0;
 					if (mrp > 0 && !row.custom_mrp) {
 						frappe.model.set_value(cdt, cdn, "custom_mrp", mrp);
-						frm.fields_dict.items.grid.refresh();
+						// set_value already redraws this one cell; a full grid.refresh()
+						// re-rendered every row on each new row (slow on long receipts).
 					}
 				},
 			});

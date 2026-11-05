@@ -3,17 +3,6 @@
  * Frozen left columns + sticky item_code + frozen action column + fullscreen.
  */
 
-function excel_grid_debounce(fn, wait) {
-	let timer = null;
-	return function (...args) {
-		if (timer) clearTimeout(timer);
-		timer = setTimeout(() => {
-			timer = null;
-			fn.apply(this, args);
-		}, wait);
-	};
-}
-
 const AIMATIC_PURCHASE_EXCEL_GRID_DOCTYPES = [
 	"Purchase Order",
 	"Purchase Receipt",
@@ -90,16 +79,11 @@ function setup_items_excel_grid(frm) {
 		set_items_grid_fullscreen($wrapper, enable);
 	});
 
-	// FIXED: Allow edit buttons to work by using stopPropagation properly
+	// Every committed cell edit bubbles a change event. Coalesce them to one
+	// pass per animation frame, and only tag cells that lost their sticky
+	// class (re-rendered rows) instead of stripping and re-tagging every row.
 	$wrapper.off("change.excelItemsGrid").on("change.excelItemsGrid", function () {
-		requestAnimationFrame(() => {
-			mark_items_grid_sticky_columns($wrapper);
-			update_items_grid_count(frm, $wrapper);
-		});
-
-		excel_grid_debounce(() => {
-			queue_items_grid_header_sync($wrapper);
-		}, 180)();
+		schedule_items_grid_change_sync(frm, $wrapper);
 	});
 
 	// FIXED: Ensure edit buttons don't get blocked
@@ -136,6 +120,38 @@ function update_items_grid_count(frm, $wrapper) {
 	$wrapper
 		.find(".excel-grid-toolbar .excel-grid-row-count")
 		.text(`${row_count} ${row_count === 1 ? "row" : "rows"}`);
+}
+
+function schedule_items_grid_change_sync(frm, $wrapper) {
+	if ($wrapper.data("excel-grid-change-frame")) {
+		return;
+	}
+	const frame = requestAnimationFrame(() => {
+		$wrapper.removeData("excel-grid-change-frame");
+		mark_new_items_grid_sticky_columns($wrapper);
+		update_items_grid_count(frm, $wrapper);
+		queue_items_grid_header_sync($wrapper);
+	});
+	$wrapper.data("excel-grid-change-frame", frame);
+}
+
+// Incremental variant: rows whose cells were re-rendered come back without
+// the sticky classes; existing tagged cells are left alone (no style churn).
+function mark_new_items_grid_sticky_columns($wrapper) {
+	$wrapper
+		.find(".data-row > .row-check:not(.excel-sticky-check)")
+		.addClass("excel-sticky-check");
+	$wrapper
+		.find(".data-row > .row-index:not(.excel-sticky-index)")
+		.addClass("excel-sticky-index");
+	$wrapper
+		.find('.data-row > [data-fieldname="item_code"]:not(.excel-sticky-item)')
+		.addClass("excel-sticky-item");
+	$wrapper
+		.find(".btn-open-row")
+		.closest(".col")
+		.not(".excel-sticky-right")
+		.addClass("excel-sticky-right");
 }
 
 function mark_items_grid_sticky_columns($wrapper) {
