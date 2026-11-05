@@ -142,19 +142,53 @@ def sales(snap, base):
 	)
 	for key, title in (
 		("negative", "Negative-margin sales"),
-		("lowest", "Lowest-margin items"),
-		("highest", "Highest-margin items"),
+		("lowest", "Lowest non-negative margins · screened"),
+		("highest", "Highest margins · screened"),
 	):
 		field(
 			e,
 			title + " · top 2",
 			"\n\n".join(
 				item(row)
-				+ f"\nMargin {number(row['margin_percent'])}% · sold {number(row['qty'])} · profit {number(row['profit'])}"
+				+ f"\nSales {number(row['sales'])} · cost {number(row['cogs'])} · profit {number(row['profit'])}"
+				+ f"\nMargin {number(row['margin_percent'])}% · sold {number(row['qty'])} · returned {number(row.get('return_qty', 0))}"
 				for row in r["margins"].get(key, [])[:2]
 			)
 			or ("Unavailable" if r["margins"]["status"] == "Unavailable" else "None recorded"),
 		)
+	field(
+		e,
+		"Cost / valuation review · held out of rankings",
+		"\n\n".join(
+			item(row)
+			+ f"\nSales {number(row['sales'])} · recorded cost {number(row['cogs'])}"
+			+ (
+				f" · last receipt/unit {number(row['receipt_unit_cost'])}"
+				if row.get("receipt_unit_cost") is not None
+				else ""
+			)
+			+ "\n"
+			+ text("; ".join(row["flags"]), 240)
+			for row in r["margins"].get("exceptions", [])[:3]
+		)
+		or ("Unavailable" if r["margins"]["status"] == "Unavailable" else "No screened cost exceptions"),
+	)
+	field(
+		e,
+		"Returns · separate from sale-only rankings",
+		"\n\n".join(
+			item(row)
+			+ f"\nReturned {number(row['return_qty'])} · refund net {number(row['refund_sales'])}"
+			+ f"\nNet sales {number(row['net_sales'])} · net profit {number(row['net_profit'])} (recorded costs)"
+			+ (" · provisional: cost review" if row["flags"] else "")
+			for row in r["margins"].get("returns", [])[:2]
+		)
+		or (
+			"Unavailable: margin evidence was not loaded"
+			if r["margins"]["status"] == "Unavailable"
+			else "No item returns recorded in the available margin evidence"
+		),
+	)
 	field(
 		e,
 		"Voids · recorded events only",
@@ -167,7 +201,7 @@ def sales(snap, base):
 	field(
 		e,
 		"Coverage",
-		f"Margins: {r['margins']['status']} (recorded costs). Refund ratios show activity, not proven cashier error. Full lists and pending-cost details are in the report.",
+		f"Margins: {r['margins']['status']}. Cost exceptions: {r['margins'].get('exception_count', '—')}; pending cost lines: {r['margins'].get('pending_cost_lines', '—')}. Screening is not audited profit. Review limits: margin above 60% or receipt-cost difference over 50%. Full exceptions and returns are in the report.",
 	)
 	return e
 

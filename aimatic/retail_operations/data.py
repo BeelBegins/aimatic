@@ -430,38 +430,50 @@ def sales(branch, settings, business_date):
 				include_returns=1,
 			)
 		)
-		items = {}
-		pending = 0
-		for raw in evidence:
-			r = _set_margin_values(raw, 2)
-			if not r.get("has_ledger_cogs"):
-				pending += 1
-				continue
-			# Rankings describe sold lines; returns stay in the financial totals separately.
-			if r.is_return:
-				continue
-			item = items.setdefault(
-				r.item_code, dict(item_code=r.item_code, item_name=r.item_name, sales=0, cogs=0, qty=0)
+		from aimatic.retail_operations.margins import summarize
+
+		lines = [_set_margin_values(raw, 2) for raw in evidence]
+		details = tuple({r.consolidated_item for r in lines if r.consolidated_item})
+		stock = {}
+		if details:
+			stock = {
+				r.voucher_detail_no: r
+				for r in sql(
+					"""SELECT voucher_detail_no,MIN(qty_after_transaction) minimum_balance
+				FROM `tabStock Ledger Entry` WHERE company=%(company)s
+				AND warehouse=%(warehouse)s AND voucher_type='Sales Invoice'
+				AND voucher_detail_no IN %(details)s AND is_cancelled=0 GROUP BY voucher_detail_no""",
+					dict(company=branch.company, warehouse=branch.finished_goods_warehouse, details=details),
+				)
+			}
+		items = tuple({r.item_code for r in lines})
+		receipts = []
+		if items:
+			receipts = sql(
+				"""SELECT pri.item_code,pr.posting_date date,
+				pri.base_net_rate/NULLIF(pri.conversion_factor,0) unit_cost
+				FROM `tabPurchase Receipt Item` pri JOIN `tabPurchase Receipt` pr ON pr.name=pri.parent
+				WHERE pr.company=%(company)s AND pri.warehouse=%(warehouse)s
+				AND pri.item_code IN %(items)s AND pr.docstatus=1 AND pr.is_return=0
+				AND pri.stock_qty>0 AND pr.posting_date BETWEEN %(start)s AND %(end)s
+				ORDER BY pr.posting_date DESC,pr.posting_time DESC,pr.creation DESC,pri.idx DESC LIMIT 20001""",
+				dict(
+					company=branch.company,
+					warehouse=branch.finished_goods_warehouse,
+					items=items,
+					start=add_days(business_date, -90),
+					end=business_date,
+				),
 			)
-			item["sales"] += flt(r.sales)
-			item["cogs"] += flt(r.cogs)
-			item["qty"] += flt(r.stock_qty)
-		for item in items.values():
-			item["profit"] = round(item["sales"] - item["cogs"], 2)
-			item["margin_percent"] = (
-				round(item["profit"] / abs(item["sales"]) * 100, 2) if item["sales"] else None
-			)
-		ranked = sorted(
-			(r for r in items.values() if r["margin_percent"] is not None), key=lambda r: r["margin_percent"]
-		)
-		margins = dict(
-			status="Provisional" if pending else "Ledger cost",
-			pending_cost_lines=pending,
-			lowest=ranked[:10],
-			highest=list(reversed(ranked[-10:])),
-			negative=[r for r in ranked if r["profit"] < 0][:100],
-			note="Recorded COGS, excluding tax; reference/valuation anomalies still require review. Rankings show volume and exclude return lines.",
-		)
+		limited = len(receipts) > 20000
+		reference = {}
+		if not limited:
+			for receipt in receipts:
+				if receipt.item_code not in reference and receipt.unit_cost is not None:
+					reference[receipt.item_code] = dict(
+						unit_cost=flt(receipt.unit_cost), date=str(receipt.date)
+					)
+		margins = summarize(lines, stock, reference, receipt_limited=limited)
 	voids = (
 		sql(
 			"""SELECT pos_profile,kind event_type,COUNT(*) events,SUM(total_amount) amount,

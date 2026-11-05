@@ -42,6 +42,20 @@ def vendor(name, ready=1):
 
 
 class PresentationTest(TestCase):
+	def test_screened_margins_show_costs_review_and_returns(self):
+		from aimatic.retail_operations.margins import summarize
+		from aimatic.retail_operations.test_margins import line
+
+		snap = snapshot()
+		returned = line("A", sales=-100, cost=0)
+		returned.update(is_return=1, stock_qty=-1)
+		snap["reports"]["Sales"]["margins"] = summarize([line("A", cost=0), line("B"), returned], {}, {})
+		pages = digest([snap], "Sales", BASE)
+		self.assertIn("Sales 100 · cost 80", str(pages))
+		self.assertIn("Zero recorded cost", str(pages))
+		self.assertIn("Returns · separate", str(pages))
+		self.assert_limits(pages)
+
 	def assert_limits(self, pages):
 		for page in pages:
 			self.assertEqual(page["allowed_mentions"], {"parse": []})

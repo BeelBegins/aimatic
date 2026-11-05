@@ -116,6 +116,20 @@ company; Details opens the existing issue and Update Status retains a required
 reason. Last change describes the finding, not the stock movement time. The queue
 uses branch/channel permission checks and returns selected evidence fields only.
 
+Margin reporting screens the existing POS gross-margin report's recorded costs;
+it never substitutes a receipt price for accounting COGS. Zero/wrong-sign costs,
+sales crossing negative stock, item margins above 60%, missing costs and unit
+cost differences above 50% versus the latest branch receipt in the preceding
+90 days are held in Cost / valuation review. Thresholds are review rules, not
+proof of bad data. Stock evidence is restricted to the branch warehouse;
+receipt evidence to the company, branch warehouse, item and report date, with
+a 20,000-row limit and an explicit unavailable-comparison note if exceeded.
+Negative and lowest non-negative lists are separate. Ranked sale values/costs
+exclude returns; item return units, refund values, cost reversals and their net
+recorded result are separately disclosed. Flagged net results remain provisional.
+Cost review retains an existing daily item-margin issue's identity. Financial
+records and the underlying authoritative gross-margin report remain unchanged.
+
 ## Known data/integration boundaries
 
 Historical cart voids cannot be reconstructed from supervisor authorization

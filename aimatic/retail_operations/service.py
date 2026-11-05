@@ -152,6 +152,16 @@ def sync_issues(snapshot, run_name):
 					"Warning",
 				)
 			)
+		for item in sales["margins"].get("exceptions", []):
+			signals.append(
+				(
+					"Sales",
+					"margin:" + sales["date"] + ":" + item["item_code"],
+					"Cost / valuation review",
+					item,
+					"Warning",
+				)
+			)
 	existing = {
 		r.issue_key: r
 		for r in frappe.get_all(

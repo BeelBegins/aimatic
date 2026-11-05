@@ -12,6 +12,41 @@ from aimatic.retail_operations import api, service
 
 
 class IntegrationTest(unittest.TestCase):
+	def test_cost_review_preserves_existing_negative_margin_issue_identity(self):
+		run = service.write_internal(
+			frappe.get_doc(
+				dict(
+					doctype="Retail Operations Run",
+					branch=self.branch.name,
+					company=self.branch.company,
+					cutoff=frappe.utils.now_datetime(),
+					snapshot=service.pack_snapshot({}),
+					status="Complete",
+				)
+			)
+		)
+		item = dict(item_code=self.item, profit=-10, flags=[])
+		snap = dict(
+			branch=self.branch.name,
+			company=self.branch.company,
+			reports={"Sales": dict(date="2026-11-04", large_refunds=[], margins=dict(negative=[item]))},
+		)
+		service.sync_issues(snap, run.name)
+		name = frappe.db.get_value(
+			"Retail Operations Issue",
+			dict(branch=self.branch.name, subject="Negative recorded margin"),
+			"name",
+		)
+		self.assertTrue(name)
+		snap["reports"]["Sales"]["margins"] = dict(
+			negative=[], exceptions=[dict(item, flags=["Verify cost"])]
+		)
+		service.sync_issues(snap, run.name)
+		doc = frappe.get_doc("Retail Operations Issue", name)
+		self.assertEqual(doc.subject, "Cost / valuation review")
+		self.assertEqual(doc.status, "New")
+		self.assertEqual(json.loads(doc.evidence)["flags"], ["Verify cost"])
+
 	def test_issue_queue_identifies_products_and_scopes_filters_and_pages(self):
 		for index, state in enumerate(("New", "Acknowledged", "Resolved")):
 			service.write_internal(
@@ -371,11 +406,11 @@ class IntegrationTest(unittest.TestCase):
 def run():
 	if frappe.local.site != "siezal":
 		raise RuntimeError("Integration tests must not run on production")
-	from aimatic.retail_operations import test_calculations, test_delivery, test_presentation
+	from aimatic.retail_operations import test_calculations, test_delivery, test_margins, test_presentation
 
 	suite = unittest.TestSuite()
 	loader = unittest.TestLoader()
-	for module in (test_calculations, test_delivery, test_presentation):
+	for module in (test_calculations, test_delivery, test_presentation, test_margins):
 		suite.addTests(loader.loadTestsFromModule(module))
 	suite.addTests(loader.loadTestsFromTestCase(IntegrationTest))
 	result = unittest.TextTestRunner(verbosity=2).run(suite)
