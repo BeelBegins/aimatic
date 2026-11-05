@@ -3261,7 +3261,7 @@
   "property": "fetch_if_empty",
   "property_type": "Check",
   "row_name": null,
-  "value": "1"
+  "value": "0"
  },
  {
   "default_value": null,
