@@ -349,9 +349,11 @@ def get_void_detail(
 		params,
 		as_dict=True,
 	)
+	# Shared bench: code can be newer than a site's schema; never break Void Details for it.
+	reason_column = "v.reason" if frappe.db.has_column("POS Void Log", "reason") else "'' AS reason"
 	events = frappe.db.sql(
 		f"""SELECT v.name, v.kind, v.occurred_at, v.authorized_by, v.total_amount, v.cashier_name,
-               v.cashier_user, v.customer, v.branch, v.pos_profile, v.terminal_id
+               v.cashier_user, v.customer, v.branch, v.pos_profile, v.terminal_id, {reason_column}
         {base} ORDER BY v.occurred_at DESC, v.name DESC LIMIT {_VOID_DETAIL_LIMIT + 1}""",
 		params,
 		as_dict=True,

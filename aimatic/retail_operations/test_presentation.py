@@ -56,6 +56,29 @@ class PresentationTest(TestCase):
 		self.assertIn("Returns · separate", str(pages))
 		self.assert_limits(pages)
 
+	def test_voids_show_labels_and_unapproved_count(self):
+		snap = snapshot()
+		snap["reports"]["Sales"]["voids"] = [
+			dict(
+				pos_profile="S1 Counter 1",
+				event_type="Line removed",
+				events=4,
+				amount=850,
+				without_supervisor=3,
+			),
+			dict(
+				pos_profile="S1 Counter 2", event_type="Cart cleared", events=1, amount=120
+			),  # older snapshot
+		]
+		page = str(digest([snap], "Sales", BASE))
+		self.assertIn("S1 Counter 1 · Line removed: 4 · value 850 · 3 without supervisor", page)
+		self.assertIn("S1 Counter 2 · Cart cleared: 1 · value 120", page)
+		self.assertNotIn("Client capture is not connected", page)
+
+	def test_no_voids_is_not_called_disconnected(self):
+		page = str(digest([snapshot()], "Sales", BASE))
+		self.assertIn("No voids reported for this day", page)
+
 	def assert_limits(self, pages):
 		for page in pages:
 			self.assertEqual(page["allowed_mentions"], {"parse": []})

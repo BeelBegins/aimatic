@@ -191,12 +191,17 @@ def sales(snap, base):
 	)
 	field(
 		e,
-		"Voids · recorded events only",
+		"Voids · reported by tills",
 		"\n".join(
 			f"{text(v['pos_profile'], 60)} · {text(v['event_type'], 30)}: {number(v['events'], 0)} · value {number(v['amount'])}"
+			+ (
+				f" · {number(v['without_supervisor'], 0)} without supervisor"
+				if v.get("without_supervisor")
+				else ""
+			)
 			for v in sorted(r["voids"], key=lambda v: -v["events"])[:3]
 		)
-		or "Client capture is not connected. Complete void totals and counter rankings are unavailable.",
+		or "No voids reported for this day. Tills on POS versions before the void log report none.",
 	)
 	field(
 		e,

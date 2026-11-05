@@ -28,6 +28,7 @@
   "pos_opening_entry",
   "section_items",
   "items",
+  "reason",
   "note",
   "section_receipt",
   "received_at",
@@ -189,6 +190,13 @@
    "read_only": 1
   },
   {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "read_only": 1,
+   "description": "Entered by the cashier when the POS Profile has Require Void Reason checked."
+  },
+  {
    "fieldname": "note",
    "fieldtype": "Small Text",
    "label": "Note",
@@ -218,7 +226,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-05 00:00:00.000000",
+ "modified": "2026-11-05 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Aimatic",
  "name": "POS Void Log",

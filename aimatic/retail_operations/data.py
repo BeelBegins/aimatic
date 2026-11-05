@@ -16,6 +16,12 @@ from aimatic.retail_operations.calculations import (
 	vendor_packs,
 )
 
+VOID_KIND_LABELS = {
+	"line_void": "Line removed",
+	"clear_cart": "Cart cleared",
+	"held_sale_deleted": "Held sale deleted",
+}
+
 
 def sql(query, args):
 	return frappe.db.sql(query, args, as_dict=True)
@@ -485,6 +491,9 @@ def sales(branch, settings, business_date):
 		if frappe.db.table_exists("POS Void Log")
 		else []
 	)
+	for v in voids:
+		v["event_type"] = VOID_KIND_LABELS.get(v["event_type"], v["event_type"])
+		v["without_supervisor"] = int(v.get("without_supervisor") or 0)
 	cancelled = sql(
 		"""SELECT pos_profile,COUNT(*) invoices FROM `tabPOS Invoice`
         WHERE branch=%(branch)s AND company=%(company)s AND docstatus=2 AND posting_date=%(date)s GROUP BY pos_profile""",

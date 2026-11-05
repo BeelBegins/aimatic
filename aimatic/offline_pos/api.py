@@ -3991,6 +3991,7 @@ def _build_void_log_doc(ev, request_profile, is_bearer):
             "terminal_id": _void_text(ev.get("terminalId")),
             "hardware_id": _void_text(ev.get("hardwareId")),
             "pos_opening_entry": _void_text(ev.get("openingEntry")),
+            "reason": _void_text(ev.get("reason"), 500),
             "note": _void_text(ev.get("note"), 1000),
             "received_at": now_datetime(),
             "transport_user": frappe.session.user,

@@ -765,7 +765,11 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
                     <td>${esc(event.cashier_name || event.cashier_user)}</td>
                     <td>${esc(event.branch)}<div class="sd-item-meta">${esc(event.pos_profile)}</div></td>
                     <td>${esc(event.customer)}</td>
-                    <td>${items}</td>
+                    <td>${items}${
+						event.reason
+							? `<div class="sd-item-meta">${__("Reason")}: ${esc(event.reason)}</div>`
+							: ""
+					}</td>
                     <td class="sd-num">${this.money(event.total_amount)}</td>
                 </tr>`;
 			})

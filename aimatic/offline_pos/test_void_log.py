@@ -65,6 +65,12 @@ class TestVoidLogDoc(unittest.TestCase):
 	def test_bearer_cashier_comes_from_session(self):
 		self.assertEqual(self.build(event(), is_bearer=True)["cashier_user"], "android-cashier@szl")
 
+	def test_reason_is_stored_when_sent_and_blank_otherwise(self):
+		self.assertEqual(
+			self.build(event(reason="  Customer changed mind  "))["reason"], "Customer changed mind"
+		)
+		self.assertEqual(self.build(event())["reason"], "")
+
 	def test_invalid_events_are_rejected(self):
 		for bad in (event(eventId=""), event(kind="refund"), event(authorizedBy="me"), event(lines="x")):
 			with self.assertRaises(ValueError):

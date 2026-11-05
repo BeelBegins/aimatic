@@ -342,7 +342,7 @@ Keep History Days at least 28 (the installed default is 90): lowering the fetche
 
 The current demand calculation can understate demand after prolonged stockouts because unsatisfied customers leave no sales quantity. It cannot see unrecorded theft, damage, stock on the wrong shelf or undocumented supplier orders. No algorithm removes the need for physical control.
 
-The reporting installation includes a separate POS Void Log integration in current source; its completeness depends on clients emitting the events. Do not infer complete void capture merely from an empty daily table. Independent cash reconciliation remains a separate evidence requirement.
+Voids come from POS Void Log, which tills fill when a cashier removes a cart line, clears the cart or deletes a held sale. The Sales card lists the busiest counters by void type (Line removed, Cart cleared, Held sale deleted) with value (quantity × selling rate before tax) and how many had no supervisor approval because the cashier's own role allowed them; review those first. Tills on POS versions before the void log report nothing, and an offline till sends its voids when it reconnects, so do not read an empty day as proof of no voids. A reason is recorded only on POS Profiles with Require Void Reason checked (off by default for retail). Independent cash reconciliation remains a separate evidence requirement.
 
 ## 14. Controls, rollback and document maintenance
 

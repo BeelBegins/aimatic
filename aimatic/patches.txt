@@ -64,3 +64,4 @@ aimatic.patches.grant_pos_margin_cache_read
 aimatic.patches.fix_pos_margin_cache_refresh
 
 aimatic.patches.setup_retail_operations
+aimatic.patches.create_pos_profile_require_void_reason_field
