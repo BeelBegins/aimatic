@@ -18,6 +18,17 @@ DOCTYPES = (
 	"Retail Replenishment Rule",
 )
 
+DEMAND_WINDOW_FIELD = dict(
+	fieldname="custom_demand_window_days",
+	label="Demand Window (Days)",
+	fieldtype="Int",
+	default="28",
+	insert_after="custom_operations_auto_requests",
+	permlevel=1,
+	description="Completed selling days used for replenishment demand (7-90). "
+	"Limited by Retail Operations History Days.",
+)
+
 
 def install():
 	for name in DOCTYPES:
@@ -59,18 +70,7 @@ def install():
 			)
 		)
 		previous = field
-	fields.append(
-		dict(
-			fieldname="custom_demand_window_days",
-			label="Demand Window (Days)",
-			fieldtype="Int",
-			default="28",
-			insert_after=previous,
-			permlevel=1,
-			description="Completed selling days used for replenishment demand (7-90). "
-			"Limited by Retail Operations History Days.",
-		)
-	)
+	fields.append(dict(DEMAND_WINDOW_FIELD, insert_after=previous))
 	create_custom_fields(
 		{
 			"Branch": fields,
