@@ -168,6 +168,12 @@ class OperationsDocument(Document):
 
 
 def validate_branch(doc, method=None):
+	if doc.meta.has_field("custom_demand_window_days"):
+		window = doc.get("custom_demand_window_days")
+		if window in (None, "", 0):
+			doc.custom_demand_window_days = 28
+		elif not 7 <= int(window) <= 90:
+			frappe.throw("Demand Window must be between 7 and 90 days")
 	for channel in CHANNELS:
 		field = "custom_discord_" + channel.lower()
 		value = doc.get_password(field, raise_exception=False) if doc.meta.has_field(field) else None

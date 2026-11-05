@@ -6,7 +6,7 @@ from collections import defaultdict
 from statistics import median, pstdev
 
 import frappe
-from frappe.utils import add_days, flt, getdate, now_datetime, today
+from frappe.utils import add_days, cint, flt, getdate, now_datetime, today
 
 from aimatic.retail_operations.calculations import (
 	VERSION,
@@ -23,14 +23,27 @@ VOID_KIND_LABELS = {
 }
 
 
+DEFAULT_DEMAND_WINDOW = 28
+MIN_DEMAND_WINDOW = 7
+MAX_DEMAND_WINDOW = 90
+
+
 def sql(query, args):
 	return frappe.db.sql(query, args, as_dict=True)
+
+
+def demand_window(branch, settings):
+	"""Branch selling-history window in days, never longer than the fetched history."""
+	configured = cint(branch.get("custom_demand_window_days")) or DEFAULT_DEMAND_WINDOW
+	fetched = cint(settings.get("history_days")) or MAX_DEMAND_WINDOW
+	return max(1, min(max(configured, MIN_DEMAND_WINDOW), MAX_DEMAND_WINDOW, fetched))
 
 
 def inventory(branch, settings, cutoff=None):
 	cutoff = getdate(cutoff or today())
 	end = add_days(cutoff, -1)
 	start = add_days(cutoff, -int(settings.history_days or 90))
+	window = demand_window(branch, settings)
 	p = {
 		"branch": branch.name,
 		"company": branch.company,
@@ -38,7 +51,7 @@ def inventory(branch, settings, cutoff=None):
 		"start": start,
 		"end": end,
 		"recent": add_days(cutoff, -7),
-		"month": add_days(cutoff, -28),
+		"month": add_days(cutoff, -window),
 		"today": cutoff,
 	}
 	stock = sql(
@@ -64,7 +77,7 @@ def inventory(branch, settings, cutoff=None):
         WHERE docstatus=1 AND company=%(company)s AND branch=%(branch)s""",
 		p,
 	)[0].first_date
-	denominator = max(1, min(28, (end - getdate(first)).days + 1)) if first else 28
+	denominator = max(1, min(window, (end - getdate(first)).days + 1)) if first else window
 	by_item = defaultdict(list)
 	for d in daily:
 		by_item[d.item_code].append(d)
@@ -375,6 +388,7 @@ def inventory(branch, settings, cutoff=None):
 		history_from=str(start),
 		history_to=str(end),
 		history_days=denominator,
+		demand_window_days=window,
 		units_note="Quantities are stock units; no inferred carton conversions.",
 		warnings=[
 			"Coverage uses receipt patterns, not supplier lead times.",

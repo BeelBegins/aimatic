@@ -55,7 +55,7 @@ Review the Accounts channel and supporting voucher links. Distinguish invoice ou
 
 The branch's recorded position starts with its finished-goods warehouse's Bin balance. Demand uses submitted POS stock-unit quantities, grouped by item and warehouse. Non-return sales build selling pace; returns remain separate evidence rather than being treated as negative demand.
 
-The current day is excluded from the selling history. The normal demand window is the last 28 completed days. Its denominator is shortened only when fewer than 28 days have elapsed since the branch's first submitted POS document. It is a branch-age denominator, not a separate launch date for every product. The recent window is up to seven completed days. Calendar days without recorded sales count as zero; this is not an estimate of sales lost while the shelf was empty.
+The current day is excluded from the selling history. The demand window is set per branch in Branch → Demand Window (Days): 28 completed days by default, allowed from 7 to 90, and never longer than Retail Operations Settings → History Days. Its denominator is shortened only when fewer days than the window have elapsed since the branch's first submitted POS document. It is a branch-age denominator, not a separate launch date for every product. The recent window is up to seven completed days. Calendar days without recorded sales count as zero; this is not an estimate of sales lost while the shelf was empty.
 
 Submitted POS invoices that have not yet been consolidated/closed can represent sales not yet reflected in the stock ledger. The engine subtracts their pending stock effect once. Old unconsolidated sales are flagged for review. Investigate the real POS closing/stock impact rather than blindly closing documents to change the report.
 
@@ -80,10 +80,10 @@ This section documents the current implementation. Displayed values are rounded;
 
 ### 4.1 Demand rate
 
-Let `N = max(1, min(28, days from the branch's first submitted POS date through yesterday))`, or 28 when no such document exists; `S28` is sold stock units in that completed period; `S7` is sold stock units in the recent period of up to seven days.
+Let `W` be the branch demand window (default 28, bounded to 7–90 days and to History Days). Let `N = max(1, min(W, days from the branch's first submitted POS date through yesterday))`, or `W` when no such document exists; `SW` is sold stock units in that completed period; `S7` is sold stock units in the recent period of up to seven days.
 
 ```text
-long_rate   = max(S28 / max(N, 1), 0)
+long_rate   = max(SW / max(N, 1), 0)
 recent_rate = max(S7 / max(min(N, 7), 1), 0)
 
 If long_rate > 0:
@@ -170,7 +170,7 @@ A flagged item can still display a calculated quantity to help investigation. Th
 
 ### 4.7 Worked example
 
-Assume a general-goods item with 28-day sales of 112 units, seven-day sales of 35 units, selected horizon seven days and daily sales standard deviation two units.
+Assume a branch on the default 28-day window and a general-goods item with 28-day sales of 112 units, seven-day sales of 35 units, selected horizon seven days and daily sales standard deviation two units.
 
 | Step | Result |
 |---|---|
@@ -338,7 +338,9 @@ If a mapping error prevented a payment alert from being queued, the financial vo
 | Later | Better seasonal/promotion and lost-sales treatment | Recorded campaign/availability evidence and validation across branches. |
 | Later | Exact old-PO/batch depletion alerts | Verified batch or allocation evidence; current aggregate stock is insufficient. |
 
-Keep History Days at least 28 (the installed default is 90): lowering the fetched history below 28 does not automatically lower the established branch's demand denominator. Newly introduced products in an older branch also share its denominator and can initially be understated.
+The effective demand window is the smaller of the branch's Demand Window and History Days (the installed default is 90), so lowering History Days also shortens every longer branch window. Newly introduced products in an older branch share its denominator and can initially be understated; a longer window extends that effect.
+
+Choosing the window: a 28-day window reacts quickly but gives zero demand to items with no sale in 28 days and noisy rates for items selling a few days a month. A 90-day window steadies those items but reacts more slowly to falling demand and keeps a branch's opening-period sales in view for 90 days. The window does not lengthen by itself; it is a reviewed branch setting. A read-only S1 replay on 5 November 2026 (14 September to 29 October) gave a 90-day fill rate of 87.4% against 81.1% for 28 days, with about 18% more stock held. Most of the gain was in slow and dormant items. This was a simplified replay on one branch, not a forecast.
 
 The current demand calculation can understate demand after prolonged stockouts because unsatisfied customers leave no sales quantity. It cannot see unrecorded theft, damage, stock on the wrong shelf or undocumented supplier orders. No algorithm removes the need for physical control.
 
@@ -346,7 +348,7 @@ Voids come from POS Void Log, which tills fill when a cashier removes a cart lin
 
 ## 14. Controls, rollback and document maintenance
 
-Use Retail Operations Settings for global evaluation, Discord and automatic-request controls. Use Branch for its warehouse mapping, operations flags and four private webhooks. Use reviewed rules for item sourcing and request activation. Use purchasing commitments for real placed orders. Use Tracked issues for investigation ownership and audit reasons.
+Use Retail Operations Settings for global evaluation, Discord and automatic-request controls. Use Branch for its warehouse mapping, operations flags, demand window and four private webhooks. Use reviewed rules for item sourcing and request activation. Use purchasing commitments for real placed orders. Use Tracked issues for investigation ownership and audit reasons.
 
 To stop notifications, turn off Discord Enabled; to stop evaluation, turn off Enabled or the relevant jobs. Retain snapshots, commitments and delivery history. Do not delete audit evidence. Review downstream links before cancelling any generated native request. Database restoration is an outage/recovery decision that would discard newer production changes; disabling the feature is the first containment step.
 
@@ -368,3 +370,5 @@ To stop notifications, turn off Discord Enabled; to stop evaluation, turn off En
 | Desk reports and permission-aware APIs | Native Retail Operations Console Page; `api.py`, `permissions.py` |
 
 **Change record:** 5 November 2026 — initial detailed operating guide covering the installed replenishment workflow, investigation/correction paths, margin screening and prospective payment-voucher notifications. Keep future changes here brief; Git retains the full history.
+
+5 November 2026 — demand window is a per-branch setting (default 28, 7–90 days, limited by History Days) instead of a fixed 28 days.

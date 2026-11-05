@@ -59,6 +59,18 @@ def install():
 			)
 		)
 		previous = field
+	fields.append(
+		dict(
+			fieldname="custom_demand_window_days",
+			label="Demand Window (Days)",
+			fieldtype="Int",
+			default="28",
+			insert_after=previous,
+			permlevel=1,
+			description="Completed selling days used for replenishment demand (7-90). "
+			"Limited by Retail Operations History Days.",
+		)
+	)
 	create_custom_fields(
 		{
 			"Branch": fields,
