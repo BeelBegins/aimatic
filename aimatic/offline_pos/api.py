@@ -1504,8 +1504,10 @@ def create_walkin_customer(customer_name, customer_group=None, territory=None,
         "email_id": email_id,
         "tax_id": tax_id,
     })
-    if default_price_list:
-        doc.default_price_list = default_price_list
+    # default_price_list is still accepted so existing APKs/Electron builds that
+    # send the counter's list keep working, but it is deliberately ignored: a
+    # Customer must not own a branch price list (customer_validation.
+    # validate_no_branch_price_list) - POS sales price from the POS Profile.
     doc.insert(ignore_permissions=True)
     return doc.as_dict()
 

@@ -12,8 +12,10 @@ import_szl_customers.py (see customerimport.md) with the S2 decisions of
   CustomerCode.
 - A mobile that already belongs to an existing szl Customer reuses that Customer
   and ADDS the S2 points as a new Loyalty Point Entry (not replace).
-- New Customers get default_price_list = S2 - Bhatta Chowk Selling Price List
-  explicitly. Selling Settings is never touched (it is site-wide, live S1).
+- New Customers get NO default_price_list (2026-11-05): a branch list on a
+  Customer overrides the selling counter's POS Profile list at every other
+  branch, and offline_pos.customer_validation now rejects it. Selling
+  Settings is never touched (it is site-wide, live S1).
 - S2 CustomerCodes are stored as "S2:<code>" in custom_legacy_customer_code so
   they can never be confused with S1 codes, and S2 loyalty entries carry a
   distinct reason tag so a customer's existing S1 opening entry does not make
@@ -191,7 +193,6 @@ def create_customers(groups):
 				c.mobile_no = key
 			c.custom_legacy_customer_code = _legacy(members)
 			c.loyalty_program = LOYALTY_PROGRAM_NAME
-			c.default_price_list = S2_PRICE_LIST
 			c.insert(ignore_permissions=True)
 			key_to_customer[key] = c.name
 			stats["customers_created"] += 1
@@ -261,7 +262,7 @@ def main(apply: bool = False):
 			"rows": len(rows),
 			"groups": len(groups),
 			"file_total_points": total_points,
-			"price_list_for_new_customers": S2_PRICE_LIST,
+			"price_list_for_new_customers": None,
 			"plan": dict(pstats),
 			"existing_mobile_sample": existing_mobile[:10],
 			"already_imported_sample": reused[:5],

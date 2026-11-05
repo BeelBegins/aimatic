@@ -402,39 +402,113 @@ class TestCustomerValidation(_AimTestCase):
 		validate_customer(c)  # must not raise
 		self.assertEqual(c.mobile_no, "0045700000001")
 
-	def test_default_price_list_set_when_empty(self):
-		from aimatic.offline_pos.customer_validation import validate_customer
-
-		selling = frappe.get_single("Selling Settings")
-		if not selling.selling_price_list:
-			pl = frappe.db.get_value("Price List", {"selling": 1}, "name")
-			selling.selling_price_list = pl
-			selling.save(ignore_permissions=True)
-
+	def _new_customer(self, name, price_list=None):
 		cg = frappe.db.get_value("Customer Group", {"is_group": 0}, "name")
 		ter = frappe.db.get_value("Territory", {"is_group": 0}, "name") or "All Territories"
 		c = frappe.new_doc("Customer")
-		c.customer_name = "_CV PL Default"
+		c.customer_name = name
 		c.customer_type = "Individual"
 		c.customer_group = cg
 		c.territory = ter
+		c.default_price_list = price_list
+		return c
+
+	def _branch_price_list_or_skip(self):
+		from aimatic.offline_pos.customer_validation import get_branch_price_lists
+
+		existing = [pl for pl in get_branch_price_lists() if frappe.db.exists("Price List", pl)]
+		if not existing:
+			raise unittest.SkipTest("No branch price list on this site")
+		return sorted(existing)[0]
+
+	def _non_branch_price_list(self):
+		name = "_Test CV Non Branch Selling"
+		if not frappe.db.exists("Price List", name):
+			frappe.get_doc(
+				{
+					"doctype": "Price List",
+					"price_list_name": name,
+					"selling": 1,
+					"currency": frappe.db.get_default("currency") or "PKR",
+					"enabled": 1,
+				}
+			).insert(ignore_permissions=True)
+		return name
+
+	def test_blank_price_list_stays_blank(self):
+		"""Regression: the old hook stamped Selling Settings (live S1 list)."""
+		from aimatic.offline_pos.customer_validation import validate_customer
+
+		c = self._new_customer("_CV PL Blank")
 		validate_customer(c)
-		self.assertIsNotNone(getattr(c, "default_price_list", None))
+		self.assertFalse(c.default_price_list)
 
-	def test_existing_price_list_not_overridden(self):
+	def test_branch_price_list_rejected_on_new_customer(self):
 		from aimatic.offline_pos.customer_validation import validate_customer
 
-		pl = frappe.db.get_value("Price List", {"selling": 1}, "name") or "Standard Selling"
-		cg = frappe.db.get_value("Customer Group", {"is_group": 0}, "name")
-		ter = frappe.db.get_value("Territory", {"is_group": 0}, "name") or "All Territories"
-		c = frappe.new_doc("Customer")
-		c.customer_name = "_CV PL Keep"
-		c.customer_type = "Individual"
-		c.customer_group = cg
-		c.territory = ter
-		c.default_price_list = pl
+		c = self._new_customer("_CV PL Branch", self._branch_price_list_or_skip())
+		with self.assertRaises(frappe.ValidationError):
+			validate_customer(c)
+
+	def test_branch_price_list_rejected_when_changed_on_existing(self):
+		branch_pl = self._branch_price_list_or_skip()
+		c = self._new_customer("_CV PL Branch Edit")
+		c.insert(ignore_permissions=True)
+		c.default_price_list = branch_pl
+		with self.assertRaises(frappe.ValidationError):
+			c.save(ignore_permissions=True)
+
+	def test_unchanged_legacy_branch_price_list_does_not_block_save(self):
+		"""Records awaiting the data cleanup can still be edited."""
+		branch_pl = self._branch_price_list_or_skip()
+		c = self._new_customer("_CV PL Legacy")
+		c.insert(ignore_permissions=True)
+		frappe.db.set_value("Customer", c.name, "default_price_list", branch_pl)
+		c = frappe.get_doc("Customer", c.name)
+		c.customer_name = "_CV PL Legacy Renamed"
+		c.save(ignore_permissions=True)
+		self.assertEqual(c.default_price_list, branch_pl)
+
+	def test_non_branch_price_list_allowed(self):
+		from aimatic.offline_pos.customer_validation import validate_customer
+
+		pl = self._non_branch_price_list()
+		c = self._new_customer("_CV PL Keep", pl)
 		validate_customer(c)
 		self.assertEqual(c.default_price_list, pl)
+
+	def test_create_walkin_customer_ignores_sent_price_list(self):
+		"""Old APKs still send the counter's list; it must not land on the Customer."""
+		from aimatic.offline_pos.api import create_walkin_customer
+
+		branch_pl = self._branch_price_list_or_skip()
+		cg = frappe.db.get_value("Customer Group", {"is_group": 0}, "name")
+		ter = frappe.db.get_value("Territory", {"is_group": 0}, "name") or "All Territories"
+		result = create_walkin_customer(
+			customer_name="_CV Walkin PL",
+			customer_group=cg,
+			territory=ter,
+			default_price_list=branch_pl,
+		)
+		self.assertFalse(frappe.db.get_value("Customer", result["name"], "default_price_list"))
+
+	@_require_fixtures
+	def test_pos_invoice_uses_profile_price_list_for_blank_customer(self):
+		"""A customer with no list is priced from the selling counter's profile."""
+		from aimatic.offline_pos.api import _build_pos_invoice_doc
+
+		pos = frappe.get_doc("POS Profile", _POS_PROFILE_NAME)
+		if not pos.selling_price_list:
+			raise unittest.SkipTest("POS Profile has no selling price list")
+		c = self._new_customer("_CV PL POS Blank")
+		c.insert(ignore_permissions=True)
+		item_code = frappe.db.get_value(
+			"Item Price", {"price_list": pos.selling_price_list, "selling": 1}, "item_code"
+		)
+		if not item_code:
+			raise unittest.SkipTest("Profile price list has no Item Price")
+		doc = _build_pos_invoice_doc(pos, c, [{"item_code": item_code, "qty": 1}])
+		self.assertEqual(doc.selling_price_list, pos.selling_price_list)
 
 
 # ---------------------------------------------------------------------------

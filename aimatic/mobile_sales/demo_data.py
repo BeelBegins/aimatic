@@ -8,6 +8,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, flt, now_datetime, nowdate
 
+from aimatic.offline_pos.customer_validation import get_branch_price_lists
+
 DEMO_PREFIX = "AIMATIC DEMO"
 
 
@@ -162,7 +164,10 @@ def _ensure_customer(spec, price_list, company):
 				"customer_type": "Company",
 				"customer_group": "Commercial",
 				"territory": "Pakistan",
-				"default_price_list": price_list,
+				# Branch counter lists may not sit on a Customer (see
+				# offline_pos.customer_validation); Mobile Sales then falls
+				# back to the branch list on its own.
+				"default_price_list": None if price_list in get_branch_price_lists() else price_list,
 			}
 		).insert(ignore_permissions=True)
 	if not any(row.company == company for row in doc.credit_limits):
