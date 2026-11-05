@@ -1,6 +1,6 @@
 {%- macro add_header(page_num, max_pages, doc, letter_head, no_letterhead, footer, print_settings=None, print_heading_template=None) -%}
 {% if letter_head and not no_letterhead %}
-<div class="letter-head">{{ letter_head }}</div>
+<div class="letter-head po-letter-head">{{ letter_head }}</div>
 {% endif %}
 {% if print_heading_template %}
 {{ frappe.render_template(print_heading_template, {"doc":doc}) }}
@@ -8,7 +8,7 @@
 {%- endmacro -%}
 
 {% for page in layout %}
-<div class="page-break invoice-page">
+<div class="page-break invoice-page purchase-order-page">
 	<div {% if print_settings.repeat_header_footer %} id="header-html" class="hidden-pdf" {% endif %}>
 		{{ add_header(loop.index, layout|len, doc, letter_head, no_letterhead, footer, print_settings) }}
 	</div>
@@ -24,55 +24,83 @@
 	{%- endif -%}
 
 	<style>
-		.letter-head { padding-top: 12px !important; padding-bottom: 12px !important; }
-		.invoice-page { font-family: Inter, sans-serif; color: #171717; }
-		.print-format-body { padding: 30px 12px 12px 12px !important; }
-		.title { color: #7c7c7c !important; }
-		.text-muted { color: #7c7c7c !important; }
-		.text-dark { color: #171717 !important; }
-		.text-left { text-align: left; }
-		.text-center { text-align: center; }
-		.text-right { text-align: right; }
-		.text-bold { font-weight: 700; }
-		.mt-15 { margin-top: 15px; }
-		.mw-400 { max-width: 400px; }
-		.items-table, .tax-table {
-			width: 100%;
-			border-collapse: separate;
-			border-spacing: 0;
-			border-radius: 10px;
-			overflow: hidden;
+		/* Scope the compact layout to PO, including the separately rendered PDF header. */
+		.print-format .po-letter-head {
+			padding-top: 4px !important;
+			padding-bottom: 4px !important;
+			margin-bottom: 8px;
 		}
-		.items-table td, .tax-table td {
-			border-bottom: 1px solid #ededed;
-			padding: 8px;
-		}
-		.items-table thead td, .tax-table thead td { color: #7c7c7c !important; }
-		.items-table thead tr:first-of-type td,
-		.tax-table thead tr:first-of-type td { padding-top: 12px !important; }
-		.items-table tbody tr:last-of-type td,
-		.tax-table tbody tr:last-of-type td { border-bottom: none; }
-		.highlight-bg { background-color: #f7f7f7; }
-		.info-text { padding: 2px 0; }
-		.info-card {
-			border: 1px solid #ededed;
-			border-radius: 12px;
-			padding: 12px;
-			margin-top: 16px;
-		}
-		.row-divider td { padding-top: 6px; padding-bottom: 6px; }
-		.item-barcode {
+		.po-letter-head .logo-cell { width: 64px; }
+		.po-letter-head .logo-container { width: 56px; }
+		.po-letter-head .logo-container img { max-width: 56px; max-height: 56px; }
+		.print-format .purchase-order-page {
+			font-family: Inter, sans-serif;
 			font-size: 12px;
-			font-weight: 600;
+			line-height: 1.3;
 			color: #171717;
-			letter-spacing: 0.02em;
+		}
+		.purchase-order-page .print-format-body { padding: 8px 0 0 !important; }
+		.purchase-order-page .title,
+		.purchase-order-page .text-muted { color: #666 !important; }
+		.purchase-order-page .text-left { text-align: left; }
+		.purchase-order-page .text-center { text-align: center; }
+		.purchase-order-page .text-right { text-align: right; }
+		.purchase-order-page .mt-15 { margin-top: 8px; }
+		.purchase-order-page .mw-400 { max-width: 400px; }
+		.purchase-order-page .items-table {
+			width: 100%;
+			border-collapse: collapse;
+		}
+		.print-format .purchase-order-page .items-table td {
+			border-bottom: 1px solid #ededed;
+			padding: 3px 4px !important;
+			line-height: 1.3;
+		}
+		.purchase-order-page .items-table thead { display: table-header-group; }
+		.purchase-order-page .items-table tr {
+			break-inside: avoid;
+			page-break-inside: avoid;
+		}
+		.print-format .purchase-order-page .items-table thead td {
+			color: #555 !important;
+			font-weight: 600;
+			padding-top: 5px !important;
+			padding-bottom: 5px !important;
+		}
+		.purchase-order-page .highlight-bg { background-color: #f7f7f7; }
+		.purchase-order-page .info-text { padding: 1px 0; }
+		.purchase-order-page .info-card {
+			border: 1px solid #ededed;
+			border-radius: 4px;
+			padding: 6px;
+			margin-top: 8px;
+		}
+		.print-format .purchase-order-page .row-divider td { padding: 3px 6px !important; }
+		.print-format .purchase-order-page .po-grand-total td { padding: 5px 6px !important; }
+		.purchase-order-page .po-totals {
+			float: right;
+			margin: 6px 0 4px;
+			break-inside: avoid;
+			page-break-inside: avoid;
+		}
+		.purchase-order-page .po-grand-total {
+			clear: both;
+			border-bottom: 1px solid #ededed;
+			break-inside: avoid;
+			page-break-inside: avoid;
+		}
+		.purchase-order-page .item-barcode {
+			font-size: 11px;
+			font-weight: 600;
 			font-variant-numeric: tabular-nums;
 			white-space: nowrap;
 		}
+		.purchase-order-page [document-status] { margin-bottom: 4px; }
+		.purchase-order-page [document-status] h4 { margin: 4px 0 !important; }
 	</style>
 
 	<div class="print-format-body">
-		<table class="info-table col-xs-12" style="width: 100%; margin-left: 12px">
+		<table class="info-table col-xs-12" style="width: 100%">
 			<tr>
 				<td class="col-xs-6" style="padding: 0 !important">
 					<div class="title col-xs-5 p-0">
@@ -144,7 +172,7 @@
 			</tbody>
 		</table>
 
-		<div style="float: right; margin-top: 15px; margin-bottom: 5px;">
+		<div class="po-totals">
 			<table style="width: 100%; border-collapse: collapse">
 				<tr class="row-divider">
 					<td class="text-right text-muted" style="padding-right: 30px !important;">{{ _("Sub Total:") }}</td>
@@ -177,7 +205,7 @@
 			</table>
 		</div>
 
-		<div style="border-bottom: 1px solid #ededed;">
+		<div class="po-grand-total">
 			<table class="highlight-bg" style="width: 100%; border-collapse: collapse; border-radius: 12px; margin-bottom: 10px;">
 				<tr>
 					<td class="text-left mw-400">
