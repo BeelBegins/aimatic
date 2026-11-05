@@ -211,6 +211,11 @@ def get_autofillable_fields(target_doctype: str) -> dict[str, str]:
 			continue
 		if df.fieldname in _ALWAYS_EXCLUDE:
 			continue
+		# PO MRP is entered explicitly; never inherit it from purchase history.
+		# Shared discovery protects server autofill and both preview APIs,
+		# including requests from older browser tabs.
+		if target_doctype == "Purchase Order Item" and df.fieldname == "custom_mrp":
+			continue
 		fields[df.fieldname] = df.fieldtype
 	return fields
 

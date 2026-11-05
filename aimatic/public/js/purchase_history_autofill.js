@@ -134,6 +134,9 @@
 									}
 									let row_changed = false;
 									Object.keys(history).forEach((fieldname) => {
+										if (doctype === "Purchase Order" && fieldname === "custom_mrp") {
+											return;
+										}
 										const fieldtype = fieldtypes[fieldname];
 										const current = row[fieldname];
 										if (!is_empty_value(current, fieldtype)) {

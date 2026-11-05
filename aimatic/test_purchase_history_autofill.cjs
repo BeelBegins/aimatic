@@ -38,9 +38,9 @@ for (const doctype of ['Purchase Order', 'Purchase Receipt', 'Purchase Invoice']
    assert.equal(h.row.custom_mrp, 0); assert.equal(h.dirty, 0);
   }
  });
- test(`${doctype}: draft still fills missing MRP and preserves entered terms`, () => {
+ test(`${doctype}: draft preserves PO MRP and still fills receipt/invoice MRP`, () => {
   const h = harness(doctype); h.open(); h.runTimers(); h.respond();
-  assert.equal(h.row.custom_mrp, 120); assert.equal(h.row.custom_trade_offer, 5); assert.equal(h.dirty, 1);
+  assert.equal(h.row.custom_mrp, doctype === 'Purchase Order' ? 0 : 120); assert.equal(h.row.custom_trade_offer, 5); assert.equal(h.dirty, doctype === 'Purchase Order' ? 0 : 1);
  });
  test(`${doctype}: submission before debounce prevents history lookup`, () => {
   const h = harness(doctype); h.open(); h.frm.doc.docstatus = 1; h.runTimers();
