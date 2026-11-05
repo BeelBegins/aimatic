@@ -69,6 +69,13 @@
 			},
 
 			refresh_rows(frm, row_refs) {
+				// Submitted purchase terms are historical values, including saved zeros.
+				if (frm.doc.docstatus !== 0) {
+					clearTimeout(state.timer);
+					++state.request_id;
+					return;
+				}
+				const doc = frm.doc;
 				const supplier = frm.doc.supplier;
 				const branch = resolve_branch(frm);
 				if (!supplier || !branch || !row_refs.length) {
@@ -90,6 +97,9 @@
 
 				clearTimeout(state.timer);
 				state.timer = setTimeout(() => {
+					if (frm.doc !== doc || doc.docstatus !== 0) {
+						return;
+					}
 					const request_id = ++state.request_id;
 					frappe.call({
 						method: "aimatic.purchase_history_autofill.api.preview_items_history",
@@ -100,7 +110,13 @@
 							target_doctype: child_doctype,
 						},
 						callback(r) {
-							if (request_id !== state.request_id) {
+							if (
+								request_id !== state.request_id ||
+								frm.doc !== doc ||
+								doc.docstatus !== 0 ||
+								doc.supplier !== supplier ||
+								resolve_branch(frm) !== branch
+							) {
 								return;
 							}
 							const payload = r.message || {};
@@ -112,7 +128,10 @@
 								const refs = refs_by_item[item_code] || [];
 								const history = history_map[item_code] || {};
 								refs.forEach((ref) => {
-									const row = locals[ref.doctype][ref.name];
+									const row = locals[ref.doctype] && locals[ref.doctype][ref.name];
+									if (!row || row.item_code !== item_code) {
+										return;
+									}
 									let row_changed = false;
 									Object.keys(history).forEach((fieldname) => {
 										const fieldtype = fieldtypes[fieldname];
