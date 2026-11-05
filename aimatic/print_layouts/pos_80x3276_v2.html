@@ -570,7 +570,8 @@ html, body {
 
   {%- set ns = namespace(fbr_sales_tax=ctx.fbr_sales_tax, fbr_tax_total=ctx.fbr_tax_total, fbr_pos_fee=ctx.fbr_pos_fee) -%}
 
-  {% for item in doc.items %}
+  {#- Receipt lines print A-Z by item name (case-insensitive); idx keeps duplicate names in scan order. -#}
+  {% for item in doc.items | sort(attribute="item_name,idx") %}
     <div class="rc-item">
       <div class="rc-item-name">{{ item.item_name }}</div>
       <div class="rc-item-nums">
