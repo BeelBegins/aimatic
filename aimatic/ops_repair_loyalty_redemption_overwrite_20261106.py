@@ -16,7 +16,7 @@ repaired an invoice has no redemption rows and is not selected again.
 Dry run (default, read-only):
     bench --site szl execute aimatic.ops_repair_loyalty_redemption_overwrite_20261106.run
 Apply (after backup and approval):
-    bench --site szl execute aimatic.ops_repair_loyalty_redemption_overwrite_20261106.run --kwargs '{"dry_run": false}'
+    bench --site szl execute aimatic.ops_repair_loyalty_redemption_overwrite_20261106.run --kwargs "{'dry_run': False}"
 """
 
 from collections import defaultdict
