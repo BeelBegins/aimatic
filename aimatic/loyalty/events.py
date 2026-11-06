@@ -31,6 +31,46 @@ def _compute_item_group_points(invoice, returned_qty=None):
 	return cint(total_points), flt(eligible_amount, 2)
 
 
+def _earning_entry_name(invoice_name):
+	"""The invoice's own earning Loyalty Point Entry -- never a redemption row.
+
+	Core's apply_loyalty_points also writes rows with invoice=<this invoice>
+	(one per earlier POS Invoice earning entry it consumes, each carrying
+	redeem_against). Matching on invoice alone picked the newest such
+	redemption row, overwrote it with the earned points, and left core's
+	flat 1-point-per-rupee earning row untouched (szl, 2026-10-30..11-06).
+	"""
+	return frappe.db.get_value(
+		"Loyalty Point Entry",
+		{
+			"invoice_type": "POS Invoice",
+			"invoice": invoice_name,
+			"redeem_against": ["is", "not set"],
+		},
+		"name",
+	)
+
+
+def _remove_core_redemption_entries(invoice_name):
+	"""Delete core's own redemption rows for this POS Invoice.
+
+	_debit_redeemed_loyalty_points is the single source of a redemption
+	debit (it alone applies the honored-redemption check and debits the full
+	redeemed points, including points from Journal Entry opening balances that
+	core's apply_loyalty_points skips). Keeping core's rows as well would
+	debit twice, and their redeem_against links make core refuse to return or
+	cancel the earlier invoice whose points were consumed.
+	"""
+	frappe.db.delete(
+		"Loyalty Point Entry",
+		{
+			"invoice_type": "POS Invoice",
+			"invoice": invoice_name,
+			"redeem_against": ["is", "set"],
+		},
+	)
+
+
 def _correct_loyalty_point_entry(invoice, returned_qty=None):
 	"""Overwrite the Loyalty Point Entry core's own on_submit already created/
 	recalculated, replacing its flat collection_factor points with the
@@ -40,11 +80,7 @@ def _correct_loyalty_point_entry(invoice, returned_qty=None):
 	if not getattr(invoice, "loyalty_program", None):
 		return
 
-	entry_name = frappe.db.get_value(
-		"Loyalty Point Entry",
-		{"invoice_type": "POS Invoice", "invoice": invoice.name},
-		"name",
-	)
+	entry_name = _earning_entry_name(invoice.name)
 	if not entry_name:
 		return
 
@@ -138,12 +174,12 @@ def _debit_redeemed_loyalty_points(doc):
 	POS Invoice -- see _redemption_was_actually_honored for why "claimed"
 	and "genuinely redeemed" are not the same thing here.
 
-	Core never creates a redemption-side Loyalty Point Entry even for an
-	honored redemption -- it only validates the redemption
-	(loyalty_program.validate_loyalty_points) and folds loyalty_amount into
-	paid_amount/change_amount arithmetic. get_loyalty_details sums every row
-	for the customer with no docstatus filter and nothing else ever offsets a
-	redemption, so without this an honored redemption's points would stay
+	Core's POS Invoice.apply_loyalty_points only debits points earned on
+	earlier POS Invoices (it skips Journal Entry opening balances) and does so
+	whether or not the redemption was honored. Its rows are removed by
+	_remove_core_redemption_entries; this debit is the only one kept.
+	get_loyalty_details sums every row for the customer with no docstatus
+	filter, so without it an honored redemption's points would stay
 	redeemable indefinitely.
 
 	`invoice_type` is mandatory on this doctype. Leaves it as `"Journal
@@ -188,6 +224,8 @@ def on_submit_debit_redeemed_loyalty_points(doc, method=None):
 	"""Registered as a POS Invoice on_submit doc_event."""
 	if cint(getattr(doc, "is_return", 0)):
 		return
+	if cint(doc.redeem_loyalty_points):
+		_remove_core_redemption_entries(doc.name)
 	_debit_redeemed_loyalty_points(doc)
 
 
@@ -223,9 +261,7 @@ def _post_honored_redemption_gle(doc):
 	if amount <= 0:
 		return
 
-	expense_account = frappe.get_cached_value(
-		"Loyalty Program", doc.loyalty_program, "expense_account"
-	)
+	expense_account = frappe.get_cached_value("Loyalty Program", doc.loyalty_program, "expense_account")
 	if not expense_account:
 		frappe.log_error(
 			title="Loyalty redemption GL could not be posted",
