@@ -29,6 +29,26 @@ class TestEarningEntryLookup(unittest.TestCase):
 		)
 
 
+class TestReceiptLoyaltyEarned(unittest.TestCase):
+	def test_receipt_reads_only_the_earning_row(self):
+		from aimatic import pos_printing
+
+		with (
+			mock.patch.object(events, "_earning_entry_name", return_value="EARN") as lookup,
+			mock.patch.object(pos_printing, "frappe") as fr,
+		):
+			fr.db.get_value.return_value = {"loyalty_points": 23}
+			self.assertEqual(pos_printing._loyalty_earned("PINV-1"), {"loyalty_points": 23})
+		lookup.assert_called_once_with("PINV-1")
+		self.assertEqual(fr.db.get_value.call_args.args[:2], ("Loyalty Point Entry", "EARN"))
+
+	def test_receipt_without_earning_row_prints_nothing(self):
+		from aimatic import pos_printing
+
+		with mock.patch.object(events, "_earning_entry_name", return_value=None):
+			self.assertIsNone(pos_printing._loyalty_earned("PINV-1"))
+
+
 class TestRedemptionSubmitHook(unittest.TestCase):
 	def _doc(self, redeem=1, is_return=0):
 		return frappe._dict(name="PINV-1", redeem_loyalty_points=redeem, is_return=is_return)

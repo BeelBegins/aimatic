@@ -118,6 +118,19 @@ def _get_receipt_branch_context(doc):
 	}
 
 
+def _loyalty_earned(invoice_name):
+	"""This sale's earning row only. A redemption sale can also own redemption
+	rows with the same invoice (see aimatic.loyalty.events._earning_entry_name)."""
+	from aimatic.loyalty.events import _earning_entry_name
+
+	entry = _earning_entry_name(invoice_name)
+	if not entry:
+		return None
+	return frappe.db.get_value(
+		"Loyalty Point Entry", entry, ["loyalty_points", "purchase_amount"], as_dict=True
+	)
+
+
 def _loyalty_points_balance(doc):
 	"""Post-sale remaining loyalty points for an enrolled customer.
 
@@ -137,9 +150,7 @@ def _loyalty_points_balance(doc):
 		get_loyalty_program_details_with_points,
 	)
 
-	details = get_loyalty_program_details_with_points(
-		customer, loyalty_program, company=doc.company
-	)
+	details = get_loyalty_program_details_with_points(customer, loyalty_program, company=doc.company)
 	return int(details.get("loyalty_points") or 0)
 
 
@@ -215,12 +226,7 @@ def get_pos_receipt_context(doc):
 		"fbr_excl_total": fbr_excl_total,
 		"fbr_tax_total": fbr_tax_total,
 		"item_disc_total": item_disc_total,
-		"loyalty_earned": frappe.db.get_value(
-			"Loyalty Point Entry",
-			{"invoice": doc.name},
-			["loyalty_points", "purchase_amount"],
-			as_dict=True,
-		),
+		"loyalty_earned": _loyalty_earned(doc.name),
 		"loyalty_balance": _loyalty_points_balance(doc),
 		"gift_voucher_redeemed": None
 		if is_duplicate_print
