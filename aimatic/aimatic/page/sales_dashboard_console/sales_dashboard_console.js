@@ -276,6 +276,13 @@ aimatic.SalesDashboardPage = class SalesDashboardPage {
 						kpis.loyalty_redemption_count
 					)} ${__("redemption(s)")}`
 				)}
+				${this.card(
+					"loyalty",
+					"star",
+					__("Loyalty Points Earned"),
+					this.number(kpis.loyalty_points_earned),
+					`${this.number(kpis.loyalty_earning_count)} ${__("sale(s) earned points")}`
+				)}
                 ${this.card(
 					"payable",
 					"rotate-ccw",

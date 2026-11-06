@@ -413,6 +413,8 @@ def _get_range_kpis(company: str, date_from, date_to, branch_filter: list[str] |
 			"loyalty_amount_redeemed": 0,
 			"loyalty_points_redeemed": 0,
 			"loyalty_redemption_count": 0,
+			"loyalty_points_earned": 0,
+			"loyalty_earning_count": 0,
 		}
 
 	rows = frappe.db.sql(
@@ -445,6 +447,7 @@ def _get_range_kpis(company: str, date_from, date_to, branch_filter: list[str] |
 		as_dict=True,
 	)
 	row = rows[0] if rows else {}
+	earned = _get_loyalty_earned(company, date_from, date_to, branch_filter)
 	sales_txn_count = cint(row.get("sales_txn_count"))
 	gross_sales = flt(row.get("gross_sales"))
 	return {
@@ -459,7 +462,41 @@ def _get_range_kpis(company: str, date_from, date_to, branch_filter: list[str] |
 		"loyalty_amount_redeemed": flt(row.get("loyalty_amount_redeemed")),
 		"loyalty_points_redeemed": cint(row.get("loyalty_points_redeemed")),
 		"loyalty_redemption_count": cint(row.get("loyalty_redemption_count")),
+		"loyalty_points_earned": cint(earned.get("points")),
+		"loyalty_earning_count": cint(earned.get("sales")),
 	}
+
+
+def _get_loyalty_earned(company: str, date_from, date_to, branch_filter: list[str] | None):
+	"""Points earned on sales in range: each sale's own earning Loyalty Point
+	Entry only (redeem_against unset -- a redemption sale can also own
+	redemption rows). Returns are already netted into the original sale's
+	earning row by aimatic.loyalty.events, so return invoices are excluded."""
+	rows = frappe.db.sql(
+		f"""
+        SELECT COALESCE(SUM(lpe.loyalty_points), 0) AS points,
+               COUNT(DISTINCT CASE WHEN lpe.loyalty_points > 0 THEN pi.name END) AS sales
+        FROM `tabPOS Invoice` pi
+        JOIN `tabLoyalty Point Entry` lpe
+          ON lpe.invoice_type = 'POS Invoice'
+         AND lpe.invoice = pi.name
+         AND COALESCE(lpe.redeem_against, '') = ''
+        LEFT JOIN `tabPOS Profile` pp ON pp.name = pi.pos_profile
+        WHERE pi.docstatus = 1
+          AND pi.is_return = 0
+          AND pi.company = %(company)s
+          AND pi.posting_date BETWEEN %(date_from)s AND %(date_to)s
+          {_branch_scope_clause(branch_filter)}
+        """,
+		{
+			"company": company,
+			"date_from": date_from,
+			"date_to": date_to,
+			"branch_names": tuple(branch_filter) if branch_filter else (),
+		},
+		as_dict=True,
+	)
+	return rows[0] if rows else {}
 
 
 def _get_trend_series(company: str, date_from, date_to, branch_filter: list[str] | None):
